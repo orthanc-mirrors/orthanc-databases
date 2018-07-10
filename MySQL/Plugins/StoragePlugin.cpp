@@ -19,10 +19,9 @@
  **/
 
 
+#include "MySQLStorageArea.h"
 #include "../../Framework/MySQL/MySQLDatabase.h"
-#include "../../Framework/Plugins/StorageBackend.h"
 
-#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
 #include <Core/Logging.h>
 
 
@@ -80,8 +79,9 @@ extern "C"
 
     try
     {
-      // TODO
-      //OrthancDatabases::StorageBackend::Register();
+      OrthancDatabases::MySQLParameters parameters(mysql);
+      OrthancDatabases::StorageBackend::Register
+        (context, new OrthancDatabases::MySQLStorageArea(parameters));
     }
     catch (Orthanc::OrthancException& e)
     {

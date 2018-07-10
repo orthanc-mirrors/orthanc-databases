@@ -22,27 +22,28 @@
 #pragma once
 
 #include "../../Framework/Plugins/StorageBackend.h"
-#include "../../Framework/PostgreSQL/PostgreSQLParameters.h"
+#include "../../Framework/MySQL/MySQLParameters.h"
+
 
 namespace OrthancDatabases
 {
-  class PostgreSQLStorageArea : public StorageBackend
+  class MySQLStorageArea : public StorageBackend
   {
   private:
     class Factory : public IDatabaseFactory
     {
     private:
-      PostgreSQLStorageArea&  that_;
+      MySQLStorageArea&  that_;
 
     public:
-      Factory(PostgreSQLStorageArea& that) :
-      that_(that)
+      Factory(MySQLStorageArea& that) :
+        that_(that)
       {
       }
 
       virtual Dialect GetDialect() const
       {
-        return Dialect_PostgreSQL;
+        return Dialect_MySQL;
       }
 
       virtual IDatabase* Open()
@@ -52,13 +53,13 @@ namespace OrthancDatabases
     };
 
     OrthancPluginContext*  context_;
-    PostgreSQLParameters   parameters_;
+    MySQLParameters        parameters_;
     bool                   clearAll_;
 
     IDatabase* OpenInternal();
 
   public:
-    PostgreSQLStorageArea(const PostgreSQLParameters& parameters);
+    MySQLStorageArea(const MySQLParameters& parameters);
 
     void SetClearAll(bool clear)
     {
