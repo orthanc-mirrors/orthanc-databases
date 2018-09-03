@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* Fix Debian issue #906771 (Uncaught exception prevents db intialization
+  (likely related to pg_trgm))
 * Fix: Catching exceptions in destructors
 
 

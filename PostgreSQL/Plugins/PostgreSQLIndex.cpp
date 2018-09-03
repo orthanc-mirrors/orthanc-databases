@@ -113,6 +113,18 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
+      if (revision != 1)
+      {
+        LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+      }
+
+      t.Commit();
+    }
+
+    {
+      PostgreSQLTransaction t(*db);
+
       int hasTrigram = 0;
       if (!LookupGlobalIntegerProperty(hasTrigram, *db, t, Orthanc::GlobalProperty_HasTrigramIndex) ||
           hasTrigram != 1)
@@ -139,6 +151,8 @@ namespace OrthancDatabases
 
           SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasTrigramIndex, 1);
           LOG(WARNING) << "Trigram index has been created";
+
+          t.Commit();
         }
         catch (Orthanc::OrthancException&)
         {
@@ -148,14 +162,6 @@ namespace OrthancDatabases
                        << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
         }
       }
-
-      if (revision != 1)
-      {
-        LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-      }
-
-      t.Commit();
     }
 
     return db.release();
