@@ -29,6 +29,13 @@
 #include "../Common/Utf8StringValue.h"
 #include "PostgreSQLResult.h"
 
+#include <pg_config.h>
+
+#if PG_VERSION_NUM >= 110000
+#  include <postgres.h>
+#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Core/Logging.h>
+#endif
+
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>
 #include <Core/Toolbox.h>
