@@ -328,7 +328,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    if (!IsAlphanumericString(name))
+    if (!IsValidDatabaseIdentifier(name))
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
@@ -360,7 +360,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    if (!IsAlphanumericString(name))
+    if (!IsValidDatabaseIdentifier(name))
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
@@ -480,11 +480,14 @@ namespace OrthancDatabases
   } 
 
 
-  bool MySQLDatabase::IsAlphanumericString(const std::string& s)
+  bool MySQLDatabase::IsValidDatabaseIdentifier(const std::string& s)
   {
     for (size_t i = 0; i < s.length(); i++)
     {
-      if (!isalnum(s[i]))
+      // https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
+      if (!isalnum(s[i]) &&
+          s[i] != '$' &&
+          s[i] != '_')
       {
         return false;
       }

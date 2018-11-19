@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* Characters "$" and "_" are allowed in MySQL database identifiers
+
 
 Release 1.1 (2018-07-18)
 ========================

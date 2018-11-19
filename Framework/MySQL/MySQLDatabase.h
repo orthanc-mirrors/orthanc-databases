@@ -92,6 +92,6 @@ namespace OrthancDatabases
 
     static void GlobalFinalization();
 
-    static bool IsAlphanumericString(const std::string& s);
+    static bool IsValidDatabaseIdentifier(const std::string& s);
   };
 }
