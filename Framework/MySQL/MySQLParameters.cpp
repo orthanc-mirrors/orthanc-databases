@@ -21,6 +21,8 @@
 
 #include "MySQLParameters.h"
 
+#include "MySQLDatabase.h"
+
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>
 
@@ -116,14 +118,11 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
     
-    for (size_t i = 0; i < database.length(); i++)
+    if (!MySQLDatabase::IsValidDatabaseIdentifier(database))
     {
-      if (!isalnum(database [i]))
-      {
-        LOG(ERROR) << "MySQL: Only alphanumeric characters are allowed in a "
-                   << "database name: \"" << database << "\"";
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);          
-      }
+      LOG(ERROR) << "MySQL: Only alphanumeric characters are allowed in a "
+                 << "database name: \"" << database << "\"";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);          
     }
     
     database_ = database;
