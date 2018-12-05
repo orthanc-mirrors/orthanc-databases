@@ -24,6 +24,8 @@
 #include "../Common/ImplicitTransaction.h"
 
 #include <Core/Logging.h>
+#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
+
 
 namespace OrthancDatabases
 {
@@ -43,6 +45,7 @@ namespace OrthancDatabases
                         bool isIndex)
   {
     Orthanc::Logging::Initialize(context);
+    OrthancPlugins::SetGlobalContext(context);
     ImplicitTransaction::SetErrorOnDoubleExecution(false);
 
     assert(DisplayPerformanceWarning(dbms, isIndex));

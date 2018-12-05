@@ -37,7 +37,7 @@ extern "C"
     }
 
 #if 0
-    OrthancPlugins::OrthancConfiguration configuration(context);
+    OrthancPlugins::OrthancConfiguration configuration;
 
     if (!configuration.IsSection("SQLite"))
     {

@@ -36,7 +36,7 @@ extern "C"
       return -1;
     }
 
-    OrthancPlugins::OrthancConfiguration configuration(context);
+    OrthancPlugins::OrthancConfiguration configuration;
 
     if (!configuration.IsSection("PostgreSQL"))
     {

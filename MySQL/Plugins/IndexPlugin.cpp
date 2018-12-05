@@ -42,7 +42,7 @@ extern "C"
     Orthanc::Toolbox::InitializeOpenSsl();
     Orthanc::HttpClient::GlobalInitialize();
 
-    OrthancPlugins::OrthancConfiguration configuration(context);
+    OrthancPlugins::OrthancConfiguration configuration;
 
     if (!configuration.IsSection("MySQL"))
     {
