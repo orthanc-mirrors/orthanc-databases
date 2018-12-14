@@ -24,6 +24,7 @@
 #include "../Common/ImplicitTransaction.h"
 
 #include <Core/Logging.h>
+#include <Core/Toolbox.h>
 #include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
 
 
@@ -84,6 +85,35 @@ namespace OrthancDatabases
                  << ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER
                  << " to run this plugin";
       return false;
+    }
+
+    if (useFallback)
+    {
+      std::string v(context->orthancVersion);
+
+      if (v == "mainline")
+      {
+        isOptimal = true;
+      }
+      else
+      {
+        std::vector<std::string> tokens;
+        Orthanc::Toolbox::TokenizeString(tokens, v, '.');
+        
+        if (tokens.size() != 3)
+        {
+          LOG(ERROR) << "Bad version of Orthanc: " << v;
+          return false;
+        }
+
+        int major = boost::lexical_cast<int>(tokens[0]);
+        int minor = boost::lexical_cast<int>(tokens[1]);
+        int revision = boost::lexical_cast<int>(tokens[2]);
+
+        isOptimal = (major > 1 ||
+                     (major == 1 && minor > 4) ||
+                     (major == 1 && minor == 4 && revision >= 0));
+      }
     }
 
     if (!isOptimal &&
