@@ -6,6 +6,7 @@ set(ORTHANC_PLUGIN_VERSION "mainline")
 if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
+  set(ORTHANC_FRAMEWORK_BRANCH "db-changes")  # TODO - Remove this once out of "db-changes" branch
 else()
   set(ORTHANC_FRAMEWORK_VERSION "1.4.0")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
