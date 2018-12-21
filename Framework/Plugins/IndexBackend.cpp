@@ -49,6 +49,8 @@ namespace OrthancDatabases
       }
     }
 
+    // TODO Escape underscores and percents
+
     return s;
   }
 
