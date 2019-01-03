@@ -125,8 +125,8 @@ namespace OrthancDatabases
 
     if (found == parameters_.end())
     {
-      LOG(ERROR) << "Inexistent parameter in a SQL query: " << parameter;
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InexistentItem);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InexistentItem,
+                                      "Inexistent parameter in a SQL query: " + parameter);
     }
     else
     {
@@ -142,8 +142,8 @@ namespace OrthancDatabases
 
     if (found == parameters_.end())
     {
-      LOG(ERROR) << "Ignoring inexistent parameter in a SQL query: " << parameter;
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InexistentItem,
+                                      "Inexistent parameter in a SQL query: " + parameter);
     }
     else
     {

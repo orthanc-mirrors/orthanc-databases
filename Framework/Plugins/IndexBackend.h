@@ -40,13 +40,13 @@ namespace OrthancDatabases
       return manager_;
     }
     
-    static int64_t ReadInteger64(const DatabaseManager::CachedStatement& statement,
+    static int64_t ReadInteger64(const DatabaseManager::StatementBase& statement,
                                  size_t field);
 
-    static int32_t ReadInteger32(const DatabaseManager::CachedStatement& statement,
+    static int32_t ReadInteger32(const DatabaseManager::StatementBase& statement,
                                  size_t field);
     
-    static std::string ReadString(const DatabaseManager::CachedStatement& statement,
+    static std::string ReadString(const DatabaseManager::StatementBase& statement,
                                   size_t field);
     
     template <typename T>

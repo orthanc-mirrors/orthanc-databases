@@ -111,36 +111,51 @@ namespace OrthancDatabases
     };
 
 
-    class CachedStatement : public boost::noncopyable
+    class StatementBase : public boost::noncopyable
     {
     private:
       DatabaseManager&                     manager_;
       boost::recursive_mutex::scoped_lock  lock_;
-      IDatabase&                           database_;
-      StatementLocation                    location_;
       ITransaction&                        transaction_;
-      IPrecompiledStatement*               statement_;
       std::auto_ptr<Query>                 query_;
       std::auto_ptr<IResult>               result_;
 
-      void Setup(const char* sql);
-
       IResult& GetResult() const;
 
+    protected:
+      DatabaseManager& GetManager() const
+      {
+        return manager_;
+      }
+
+      ITransaction& GetTransaction() const
+      {
+        return transaction_;
+      }
+      
+      void SetQuery(Query* query);
+
+      void SetResult(IResult* result);
+
+      void ClearResult()
+      {
+        result_.reset();
+      }
+
+      Query* ReleaseQuery()
+      {
+        return query_.release();
+      }
+
     public:
-      CachedStatement(const StatementLocation& location,
-                      DatabaseManager& manager,
-                      const char* sql);
+      StatementBase(DatabaseManager& manager);
 
-      CachedStatement(const StatementLocation& location,
-                      Transaction& transaction,
-                      const char* sql);
+      virtual ~StatementBase();
 
-      ~CachedStatement();
-
+      // Used only by SQLite
       IDatabase& GetDatabase()
       {
-        return database_;
+        return manager_.GetDatabase();
       }
 
       void SetReadOnly(bool readOnly);
@@ -148,10 +163,6 @@ namespace OrthancDatabases
       void SetParameterType(const std::string& parameter,
                             ValueType type);
       
-      void Execute();
-
-      void Execute(const Dictionary& parameters);
-
       bool IsDone() const;
       
       void Next();
@@ -162,6 +173,42 @@ namespace OrthancDatabases
                               ValueType type);
       
       const IValue& GetResultField(size_t index) const;
+    };
+
+
+    class CachedStatement : public StatementBase
+    {
+    private:
+      StatementLocation       location_;
+      IPrecompiledStatement*  statement_;
+
+    public:
+      CachedStatement(const StatementLocation& location,
+                      DatabaseManager& manager,
+                      const std::string& sql);
+
+      void Execute()
+      {
+        Dictionary parameters;
+        Execute(parameters);
+      }
+
+      void Execute(const Dictionary& parameters);
+    };
+
+
+    class StandaloneStatement : public StatementBase
+    {
+    private:
+      std::auto_ptr<IPrecompiledStatement>  statement_;
+      
+    public:
+      StandaloneStatement(DatabaseManager& manager,
+                          const std::string& sql);
+
+      virtual ~StandaloneStatement();
+
+      void Execute(const Dictionary& parameters);
     };
   };
 }

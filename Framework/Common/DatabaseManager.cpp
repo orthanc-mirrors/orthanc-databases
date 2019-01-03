@@ -279,34 +279,6 @@ namespace OrthancDatabases
   }
 
 
-  IResult& DatabaseManager::CachedStatement::GetResult() const
-  {
-    if (result_.get() == NULL)
-    {
-      LOG(ERROR) << "Accessing the results of a statement without having executed it";
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
-
-    return *result_;
-  }
-
-
-  void DatabaseManager::CachedStatement::Setup(const char* sql)
-  {
-    statement_ = manager_.LookupCachedStatement(location_);
-
-    if (statement_ == NULL)
-    {
-      query_.reset(new Query(sql));
-    }
-    else
-    {
-      LOG(TRACE) << "Reusing cached statement from "
-                 << location_.GetFile() << ":" << location_.GetLine();
-    }
-  }
-
-
   DatabaseManager::Transaction::Transaction(DatabaseManager& manager) :
     lock_(manager.mutex_),
     manager_(manager),
@@ -347,40 +319,72 @@ namespace OrthancDatabases
     }
   }
 
+
+  IResult& DatabaseManager::StatementBase::GetResult() const
+  {
+    if (result_.get() == NULL)
+    {
+      LOG(ERROR) << "Accessing the results of a statement without having executed it";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    return *result_;
+  }
+
+
+  void DatabaseManager::StatementBase::SetQuery(Query* query)
+  {
+    std::auto_ptr<Query> protection(query);
+    
+    if (query_.get() != NULL)
+    {
+      LOG(ERROR) << "Cannot set twice a query";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    if (query == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+
+    query_.reset(protection.release());
+  }
+
   
-  DatabaseManager::CachedStatement::CachedStatement(const StatementLocation& location,
-                                                    DatabaseManager& manager,
-                                                    const char* sql) :
+  void DatabaseManager::StatementBase::SetResult(IResult* result)
+  {
+    std::auto_ptr<IResult> protection(result);
+    
+    if (result_.get() != NULL)
+    {
+      LOG(ERROR) << "Cannot execute twice a statement";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    if (result == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+
+    result_.reset(protection.release());
+  }
+
+  
+  DatabaseManager::StatementBase::StatementBase(DatabaseManager& manager) :
     manager_(manager),
     lock_(manager_.mutex_),
-    database_(manager_.GetDatabase()),
-    location_(location),
     transaction_(manager_.GetTransaction())
   {
-    Setup(sql);
-  }
-
-      
-  DatabaseManager::CachedStatement::CachedStatement(const StatementLocation& location,
-                                                    Transaction& transaction,
-                                                    const char* sql) :
-    manager_(transaction.GetManager()),
-    lock_(manager_.mutex_),
-    database_(manager_.GetDatabase()),
-    location_(location),
-    transaction_(manager_.GetTransaction())
-  {
-    Setup(sql);
   }
 
 
-  DatabaseManager::CachedStatement::~CachedStatement()
+  DatabaseManager::StatementBase::~StatementBase()
   {
     manager_.ReleaseImplicitTransaction();
   }
+
   
-      
-  void DatabaseManager::CachedStatement::SetReadOnly(bool readOnly)
+  void DatabaseManager::StatementBase::SetReadOnly(bool readOnly)
   {
     if (query_.get() != NULL)
     {
@@ -389,8 +393,8 @@ namespace OrthancDatabases
   }
 
 
-  void DatabaseManager::CachedStatement::SetParameterType(const std::string& parameter,
-                                                          ValueType type)
+  void DatabaseManager::StatementBase::SetParameterType(const std::string& parameter,
+                                                        ValueType type)
   {
     if (query_.get() != NULL)
     {
@@ -398,44 +402,7 @@ namespace OrthancDatabases
     }
   }
       
-      
-  void DatabaseManager::CachedStatement::Execute()
-  {
-    Dictionary parameters;
-    Execute(parameters);
-  }
-
-
-  void DatabaseManager::CachedStatement::Execute(const Dictionary& parameters)
-  {
-    if (result_.get() != NULL)
-    {
-      LOG(ERROR) << "Cannot execute twice a statement";
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
-
-    try
-    {
-      if (query_.get() != NULL)
-      {
-        // Register the newly-created statement
-        assert(statement_ == NULL);
-        statement_ = &manager_.CacheStatement(location_, *query_);
-        query_.reset(NULL);
-      }
-        
-      assert(statement_ != NULL);
-      result_.reset(transaction_.Execute(*statement_, parameters));
-    }
-    catch (Orthanc::OrthancException& e)
-    {
-      manager_.CloseIfUnavailable(e.GetErrorCode());
-      throw;
-    }
-  }
-
-
-  bool DatabaseManager::CachedStatement::IsDone() const
+  bool DatabaseManager::StatementBase::IsDone() const
   {
     try
     {
@@ -449,7 +416,7 @@ namespace OrthancDatabases
   }
 
 
-  void DatabaseManager::CachedStatement::Next()
+  void DatabaseManager::StatementBase::Next()
   {
     try
     {
@@ -463,7 +430,7 @@ namespace OrthancDatabases
   }
 
 
-  size_t DatabaseManager::CachedStatement::GetResultFieldsCount() const
+  size_t DatabaseManager::StatementBase::GetResultFieldsCount() const
   {
     try
     {
@@ -477,8 +444,8 @@ namespace OrthancDatabases
   }
 
 
-  void DatabaseManager::CachedStatement::SetResultFieldType(size_t field,
-                                                            ValueType type)
+  void DatabaseManager::StatementBase::SetResultFieldType(size_t field,
+                                                          ValueType type)
   {
     try
     {
@@ -495,7 +462,7 @@ namespace OrthancDatabases
   }
 
 
-  const IValue& DatabaseManager::CachedStatement::GetResultField(size_t index) const
+  const IValue& DatabaseManager::StatementBase::GetResultField(size_t index) const
   {
     try
     {
@@ -504,6 +471,89 @@ namespace OrthancDatabases
     catch (Orthanc::OrthancException& e)
     {
       manager_.CloseIfUnavailable(e.GetErrorCode());
+      throw;
+    }
+  }  
+  
+  
+  DatabaseManager::CachedStatement::CachedStatement(const StatementLocation& location,
+                                                    DatabaseManager& manager,
+                                                    const std::string& sql) :
+    StatementBase(manager),
+    location_(location)
+  {
+    statement_ = GetManager().LookupCachedStatement(location_);
+
+    if (statement_ == NULL)
+    {
+      SetQuery(new Query(sql));
+    }
+    else
+    {
+      LOG(TRACE) << "Reusing cached statement from "
+                 << location_.GetFile() << ":" << location_.GetLine();
+    }
+  }
+
+      
+  void DatabaseManager::CachedStatement::Execute(const Dictionary& parameters)
+  {
+    try
+    {
+      std::auto_ptr<Query> query(ReleaseQuery());
+      
+      if (query.get() != NULL)
+      {
+        // Register the newly-created statement
+        assert(statement_ == NULL);
+        statement_ = &GetManager().CacheStatement(location_, *query);
+      }
+        
+      assert(statement_ != NULL);
+      SetResult(GetTransaction().Execute(*statement_, parameters));
+    }
+    catch (Orthanc::OrthancException& e)
+    {
+      GetManager().CloseIfUnavailable(e.GetErrorCode());
+      throw;
+    }
+  }
+  
+  
+  DatabaseManager::StandaloneStatement::StandaloneStatement(DatabaseManager& manager,
+                                                            const std::string& sql) :
+    StatementBase(manager)
+  {
+    SetQuery(new Query(sql));
+  }
+
+      
+  DatabaseManager::StandaloneStatement::~StandaloneStatement()
+  {
+    // The result must be removed before the statement, cf. (*)
+    ClearResult();
+    statement_.reset();
+  }
+
+
+  void DatabaseManager::StandaloneStatement::Execute(const Dictionary& parameters)
+  {
+    try
+    {
+      std::auto_ptr<Query> query(ReleaseQuery());
+      assert(query.get() != NULL);
+
+      // The "statement_" object must be kept as long as the "IResult"
+      // is not destroyed, as the "IResult" can make calls to the
+      // statement (this is the case for SQLite and MySQL) - (*)
+      statement_.reset(GetManager().GetDatabase().Compile(*query));
+      assert(statement_.get() != NULL);
+
+      SetResult(GetTransaction().Execute(*statement_, parameters));
+    }
+    catch (Orthanc::OrthancException& e)
+    {
+      GetManager().CloseIfUnavailable(e.GetErrorCode());
       throw;
     }
   }

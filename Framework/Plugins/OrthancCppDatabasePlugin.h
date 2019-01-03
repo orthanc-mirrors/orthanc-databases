@@ -251,8 +251,7 @@ namespace OrthancPlugins
     }
 
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     void AnswerMatchingResource(const std::string& resourceId)
     {
       if (allowedAnswers_ != AllowedAnswers_All &&
@@ -267,8 +266,10 @@ namespace OrthancPlugins
 
       OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
     }
+#endif
 
 
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     void AnswerMatchingResource(const std::string& resourceId,
                                 const std::string& someInstanceId)
     {
@@ -284,7 +285,6 @@ namespace OrthancPlugins
 
       OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
     }
-#  endif
 #endif
   };
 
