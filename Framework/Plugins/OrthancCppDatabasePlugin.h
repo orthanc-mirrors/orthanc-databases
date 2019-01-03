@@ -32,9 +32,14 @@
 #  error HAS_ORTHANC_EXCEPTION must be set to 1
 #endif
 
+#if ORTHANC_ENABLE_PLUGINS != 1
+#  error ORTHANC_ENABLE_PLUGINS must be set to 1
+#endif
 
-#include <orthanc/OrthancCDatabasePlugin.h>
+
 #include <Core/OrthancException.h>
+#include <OrthancServer/Search/DatabaseConstraint.h>
+
 
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH                            \
@@ -75,7 +80,8 @@ namespace OrthancPlugins
       AllowedAnswers_Attachment,
       AllowedAnswers_Change,
       AllowedAnswers_DicomTag,
-      AllowedAnswers_ExportedResource
+      AllowedAnswers_ExportedResource,
+      AllowedAnswers_MatchingResource
     };
 
     OrthancPluginContext*         context_;
@@ -243,6 +249,43 @@ namespace OrthancPlugins
 
       OrthancPluginDatabaseAnswerExportedResource(context_, database_, &exported);
     }
+
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
+    void AnswerMatchingResource(const std::string& resourceId)
+    {
+      if (allowedAnswers_ != AllowedAnswers_All &&
+          allowedAnswers_ != AllowedAnswers_MatchingResource)
+      {
+        throw std::runtime_error("Cannot answer with an exported resource in the current state");
+      }
+
+      OrthancPluginMatchingResource match;
+      match.resourceId = resourceId.c_str();
+      match.someInstanceId = NULL;
+
+      OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
+    }
+
+
+    void AnswerMatchingResource(const std::string& resourceId,
+                                const std::string& someInstanceId)
+    {
+      if (allowedAnswers_ != AllowedAnswers_All &&
+          allowedAnswers_ != AllowedAnswers_MatchingResource)
+      {
+        throw std::runtime_error("Cannot answer with an exported resource in the current state");
+      }
+
+      OrthancPluginMatchingResource match;
+      match.resourceId = resourceId.c_str();
+      match.someInstanceId = someInstanceId.c_str();
+
+      OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
+    }
+#  endif
+#endif
   };
 
 
@@ -447,6 +490,13 @@ namespace OrthancPlugins
                                  OrthancPluginStorageArea* storageArea) = 0;
 
     virtual void ClearMainDicomTags(int64_t internalId) = 0;
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 OrthancPluginResourceType queryLevel,
+                                 uint32_t limit,
+                                 bool requestSomeInstance) = 0;
+#endif
   };
 
 
@@ -1421,6 +1471,38 @@ namespace OrthancPlugins
       ORTHANC_PLUGINS_DATABASE_CATCH
     }
 
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    /* Use GetOutput().AnswerResource() */
+    static OrthancPluginErrorCode LookupResources(
+      OrthancPluginDatabaseContext* context,
+      void* payload,
+      uint32_t constraintsCount,
+      const OrthancPluginDatabaseConstraint* constraints,
+      OrthancPluginResourceType queryLevel,
+      uint32_t limit,
+      uint8_t requestSomeInstance)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_MatchingResource);
+
+      try
+      {
+        std::vector<Orthanc::DatabaseConstraint> lookup;
+        lookup.reserve(constraintsCount);
+
+        for (uint32_t i = 0; i < constraintsCount; i++)
+        {
+          lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
+        }
+        
+        backend->LookupResources(lookup, queryLevel, limit, (requestSomeInstance != 0));
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH
+    }
+#endif
+
     
   public:
     /**
@@ -1468,7 +1550,7 @@ namespace OrthancPlugins
       params.logExportedResource = LogExportedResource;
       params.lookupAttachment = LookupAttachment;
       params.lookupGlobalProperty = LookupGlobalProperty;
-      params.lookupIdentifier = NULL;   // Unused starting with Orthanc 0.9.5 (db v6)
+      params.lookupIdentifier = NULL;    // Unused starting with Orthanc 0.9.5 (db v6)
       params.lookupIdentifier2 = NULL;   // Unused starting with Orthanc 0.9.5 (db v6)
       params.lookupMetadata = LookupMetadata;
       params.lookupParent = LookupParent;
@@ -1490,17 +1572,21 @@ namespace OrthancPlugins
       extensions.getDatabaseVersion = GetDatabaseVersion;
       extensions.upgradeDatabase = UpgradeDatabase;
       extensions.clearMainDicomTags = ClearMainDicomTags;
-      extensions.getAllInternalIds = GetAllInternalIds;    // New in Orthanc 0.9.5 (db v6)
-      extensions.lookupIdentifier3 = LookupIdentifier3;    // New in Orthanc 0.9.5 (db v6)
+      extensions.getAllInternalIds = GetAllInternalIds;     // New in Orthanc 0.9.5 (db v6)
+      extensions.lookupIdentifier3 = LookupIdentifier3;     // New in Orthanc 0.9.5 (db v6)
 
       bool performanceWarning = true;
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 4, 0)
       extensions.lookupIdentifierRange = LookupIdentifierRange;    // New in Orthanc 1.4.0
-      performanceWarning = false;
 #  endif
 #endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+      extensions.lookupResources = LookupResources;   // New in Orthanc 1.5.2 (fast lookup)
+      performanceWarning = false;
+#endif      
 
       if (performanceWarning)
       {
@@ -1508,7 +1594,7 @@ namespace OrthancPlugins
         sprintf(info, 
                 "Performance warning: The database index plugin was compiled "
                 "against an old version of the Orthanc SDK (%d.%d.%d): "
-                "Consider upgrading to version 1.4.0 of the Orthanc SDK",
+                "Consider upgrading to version 1.5.2 of the Orthanc SDK",
                 ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER);

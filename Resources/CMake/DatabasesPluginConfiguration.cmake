@@ -40,6 +40,12 @@ else ()
 endif()
 
 
+add_definitions(
+  -DHAS_ORTHANC_EXCEPTION=1
+  -DORTHANC_ENABLE_PLUGINS=1
+  )
+
+
 list(APPEND DATABASES_SOURCES
   ${ORTHANC_CORE_SOURCES}
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/GlobalProperties.cpp
@@ -47,8 +53,7 @@ list(APPEND DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_ROOT}/Plugins/Samples/Common/OrthancPluginCppWrapper.cpp
 
-  # New for "db-changes"
-  #${ORTHANC_ROOT}/OrthancServer/Search/ISqlLookupFormatter.cpp
-  #${ORTHANC_ROOT}/OrthancServer/Search/DatabaseConstraint.cpp
-  #${ORTHANC_ROOT}/OrthancServer/Search/DicomTagConstraint.cpp
+  # New from "db-changes"
+  ${ORTHANC_ROOT}/OrthancServer/Search/DatabaseConstraint.cpp
+  ${ORTHANC_ROOT}/OrthancServer/Search/ISqlLookupFormatter.cpp
   )

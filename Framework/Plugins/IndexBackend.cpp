@@ -29,6 +29,7 @@
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>
 #include <OrthancServer/ServerEnumerations.h>
+#include <OrthancServer/Search/ISqlLookupFormatter.h>
 
 
 namespace OrthancDatabases
@@ -1579,4 +1580,55 @@ namespace OrthancDatabases
 
     ReadListOfStrings(childrenPublicIds, statement, args);
   }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
+  {
+  private:
+    Dialect  dialect_;
+
+  public:
+    LookupFormatter(Dialect  dialect) :
+      dialect_(dialect)
+    {
+    }
+
+    virtual std::string GenerateParameter(const std::string& value)
+    {
+      switch (dialect_)
+      {
+        case Dialect_MySQL:
+          break;
+        
+        case Dialect_PostgreSQL:
+          break;
+
+        case Dialect_SQLite:
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
+  };
+#endif
+
+  
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                     OrthancPluginResourceType queryLevel,
+                                     uint32_t limit,
+                                     bool requestSomeInstance)
+  {
+    std::string sql;
+
+    {
+      LookupFormatter formatter(manager_.GetDialect());
+      Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
+                                          Orthanc::Plugins::Convert(queryLevel), limit);
+    }
+  }
+#endif
 }

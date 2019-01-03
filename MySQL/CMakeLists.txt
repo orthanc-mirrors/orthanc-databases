@@ -79,7 +79,6 @@ message("Setting the version of the libraries to ${ORTHANC_PLUGIN_VERSION}")
 
 add_definitions(
   -DORTHANC_PLUGIN_VERSION="${ORTHANC_PLUGIN_VERSION}"
-  -DHAS_ORTHANC_EXCEPTION=1
   )
 
 set_target_properties(OrthancMySQLStorage PROPERTIES 

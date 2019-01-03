@@ -30,6 +30,8 @@ namespace OrthancDatabases
   class IndexBackend : public OrthancPlugins::IDatabaseBackend
   {
   private:
+    class LookupFormatter;
+    
     DatabaseManager   manager_;
 
   protected:
@@ -242,7 +244,6 @@ namespace OrthancDatabases
     
     virtual void ClearMainDicomTags(int64_t internalId);
 
-
     // For unit testing only!
     virtual uint64_t GetResourcesCount();
 
@@ -256,5 +257,13 @@ namespace OrthancDatabases
     // For unit tests only!
     virtual void GetChildren(std::list<std::string>& childrenPublicIds,
                              int64_t id);
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    // New primitive since Orthanc 1.5.2
+    virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 OrthancPluginResourceType queryLevel,
+                                 uint32_t limit,
+                                 bool requestSomeInstance);
+#endif
   };
 }
