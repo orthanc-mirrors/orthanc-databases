@@ -187,6 +187,27 @@ namespace OrthancDatabases
       }
     }
 
+    {
+      PostgreSQLTransaction t(*db);
+
+      int hasFastTotalSize = 0;
+      if (!LookupGlobalIntegerProperty(hasFastTotalSize, *db, t,
+                                       Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
+          hasFastTotalSize != 1)
+      {
+        LOG(INFO) << "Installing the FastTotalSize extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
+
+        t.Commit();
+      }
+    }
+
     return db.release();
   }
 
@@ -217,6 +238,34 @@ namespace OrthancDatabases
     statement.Execute(args);
 
     return ReadInteger64(statement, 0);
+  }
+
+
+  uint64_t PostgreSQLIndex::GetTotalCompressedSize()
+  {
+    // Fast version if extension "./FastTotalSize.sql" is installed
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT value FROM GlobalIntegers WHERE key = 0");
+
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    return static_cast<uint64_t>(ReadInteger64(statement, 0));
+  }
+
+  
+  uint64_t PostgreSQLIndex::GetTotalUncompressedSize()
+  {
+    // Fast version if extension "./FastTotalSize.sql" is installed
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT value FROM GlobalIntegers WHERE key = 1");
+
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    return static_cast<uint64_t>(ReadInteger64(statement, 0));
   }
 
 

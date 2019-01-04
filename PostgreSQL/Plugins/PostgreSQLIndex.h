@@ -71,9 +71,14 @@ namespace OrthancDatabases
     }
 
     virtual int64_t CreateResource(const char* publicId,
-                                   OrthancPluginResourceType type);
+                                   OrthancPluginResourceType type)
+      ORTHANC_OVERRIDE;
 
-    virtual bool HasCreateInstance() const
+    virtual uint64_t GetTotalCompressedSize() ORTHANC_OVERRIDE;
+
+    virtual uint64_t GetTotalUncompressedSize() ORTHANC_OVERRIDE;
+    
+    virtual bool HasCreateInstance() const  ORTHANC_OVERRIDE
     {
       return true;
     }
@@ -83,7 +88,8 @@ namespace OrthancDatabases
                                 const char* hashPatient,
                                 const char* hashStudy,
                                 const char* hashSeries,
-                                const char* hashInstance);
+                                const char* hashInstance)
+      ORTHANC_OVERRIDE;
 #endif
   };
 }

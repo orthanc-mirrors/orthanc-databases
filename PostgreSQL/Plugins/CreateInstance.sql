@@ -10,7 +10,8 @@ CREATE FUNCTION CreateInstance(
   OUT patientKey BIGINT,
   OUT studyKey BIGINT,
   OUT seriesKey BIGINT,
-  OUT instanceKey BIGINT) AS $$
+  OUT instanceKey BIGINT) AS $body$
+
 BEGIN
   SELECT internalId FROM Resources INTO instanceKey WHERE publicId = instance AND resourceType = 3;
 
@@ -63,4 +64,5 @@ BEGIN
     isNewInstance := 1;
   END IF;  
 END;
-$$ LANGUAGE plpgsql;
+
+$body$ LANGUAGE plpgsql;

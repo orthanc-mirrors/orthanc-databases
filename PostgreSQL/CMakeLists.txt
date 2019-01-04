@@ -54,6 +54,7 @@ endif()
 EmbedResources(
   POSTGRESQL_PREPARE_INDEX    ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
   POSTGRESQL_CREATE_INSTANCE  ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
+  POSTGRESQL_FAST_TOTAL_SIZE  ${CMAKE_SOURCE_DIR}/Plugins/FastTotalSize.sql
   )
 
 add_library(OrthancPostgreSQLIndex SHARED
