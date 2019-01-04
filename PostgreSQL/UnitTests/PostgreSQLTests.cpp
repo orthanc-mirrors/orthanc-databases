@@ -439,6 +439,7 @@ TEST(PostgreSQL, ImplicitTransaction)
 }
 
 
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
 TEST(PostgreSQLIndex, CreateInstance)
 {
   OrthancDatabases::PostgreSQLIndex db(globalParameters_);
@@ -511,3 +512,4 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_NE(r1.seriesId, r2.seriesId);
   ASSERT_NE(r1.instanceId, r2.instanceId);
 }
+#endif

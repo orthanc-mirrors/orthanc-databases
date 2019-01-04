@@ -269,6 +269,7 @@ namespace OrthancDatabases
   }
 
 
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
                                        const char* hashPatient,
                                        const char* hashStudy,
@@ -316,4 +317,5 @@ namespace OrthancDatabases
       result.seriesId = ReadInteger64(statement, 6);
     }
   }
+#endif
 }
