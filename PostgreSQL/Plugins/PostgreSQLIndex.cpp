@@ -269,7 +269,7 @@ namespace OrthancDatabases
   }
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
   void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
                                        const char* hashPatient,
                                        const char* hashStudy,

@@ -83,7 +83,7 @@ namespace OrthancDatabases
       return true;
     }
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
     virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
                                 const char* hashPatient,
                                 const char* hashStudy,

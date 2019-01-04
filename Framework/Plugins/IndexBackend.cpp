@@ -1582,7 +1582,7 @@ namespace OrthancDatabases
   }
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
   class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
   {
   private:
@@ -1651,7 +1651,7 @@ namespace OrthancDatabases
 #endif
 
   
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
