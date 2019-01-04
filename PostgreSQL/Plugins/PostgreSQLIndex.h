@@ -72,5 +72,18 @@ namespace OrthancDatabases
 
     virtual int64_t CreateResource(const char* publicId,
                                    OrthancPluginResourceType type);
+
+    virtual bool HasCreateInstance() const
+    {
+      return true;
+    }
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                const char* hashPatient,
+                                const char* hashStudy,
+                                const char* hashSeries,
+                                const char* hashInstance);
+#endif
   };
 }

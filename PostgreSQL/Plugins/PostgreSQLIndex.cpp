@@ -35,6 +35,7 @@ namespace Orthanc
 {
   // Some aliases for internal properties
   static const GlobalProperty GlobalProperty_HasTrigramIndex = GlobalProperty_DatabaseInternal0;
+  static const GlobalProperty GlobalProperty_HasCreateInstance = GlobalProperty_DatabaseInternal1;
 }
 
 
@@ -126,7 +127,8 @@ namespace OrthancDatabases
       PostgreSQLTransaction t(*db);
 
       int hasTrigram = 0;
-      if (!LookupGlobalIntegerProperty(hasTrigram, *db, t, Orthanc::GlobalProperty_HasTrigramIndex) ||
+      if (!LookupGlobalIntegerProperty(hasTrigram, *db, t,
+                                       Orthanc::GlobalProperty_HasTrigramIndex) ||
           hasTrigram != 1)
       {
         /**
@@ -164,6 +166,27 @@ namespace OrthancDatabases
       }
     }
 
+    {
+      PostgreSQLTransaction t(*db);
+
+      int hasCreateInstance = 0;
+      if (!LookupGlobalIntegerProperty(hasCreateInstance, *db, t,
+                                       Orthanc::GlobalProperty_HasCreateInstance) ||
+          hasCreateInstance != 1)
+      {
+        LOG(INFO) << "Installing the CreateInstance extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 1);
+
+        t.Commit();
+      }
+    }
+
     return db.release();
   }
 
@@ -194,5 +217,54 @@ namespace OrthancDatabases
     statement.Execute(args);
 
     return ReadInteger64(statement, 0);
+  }
+
+
+  void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                       const char* hashPatient,
+                                       const char* hashStudy,
+                                       const char* hashSeries,
+                                       const char* hashInstance)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT * FROM CreateInstance(${patient}, ${study}, ${series}, ${instance})");
+
+    statement.SetParameterType("patient", ValueType_Utf8String);
+    statement.SetParameterType("study", ValueType_Utf8String);
+    statement.SetParameterType("series", ValueType_Utf8String);
+    statement.SetParameterType("instance", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetUtf8Value("patient", hashPatient);
+    args.SetUtf8Value("study", hashStudy);
+    args.SetUtf8Value("series", hashSeries);
+    args.SetUtf8Value("instance", hashInstance);
+    
+    statement.Execute(args);
+
+    if (statement.IsDone() ||
+        statement.GetResultFieldsCount() != 8)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+
+    for (size_t i = 0; i < 8; i++)
+    {
+      statement.SetResultFieldType(i, ValueType_Integer64);
+    }
+
+    result.isNewInstance = (ReadInteger64(statement, 3) == 1);
+    result.instanceId = ReadInteger64(statement, 7);
+
+    if (result.isNewInstance)
+    {
+      result.isNewPatient = (ReadInteger64(statement, 0) == 1);
+      result.isNewStudy = (ReadInteger64(statement, 1) == 1);
+      result.isNewSeries = (ReadInteger64(statement, 2) == 1);
+      result.patientId = ReadInteger64(statement, 4);
+      result.studyId = ReadInteger64(statement, 5);
+      result.seriesId = ReadInteger64(statement, 6);
+    }
   }
 }

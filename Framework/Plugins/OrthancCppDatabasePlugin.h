@@ -491,11 +491,24 @@ namespace OrthancPlugins
 
     virtual void ClearMainDicomTags(int64_t internalId) = 0;
 
+    virtual bool HasCreateInstance() const = 0;
+
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                const char* hashPatient,
+                                const char* hashStudy,
+                                const char* hashSeries,
+                                const char* hashInstance)
+    {
+      throw std::runtime_error("Not implemented");
+    }
 #endif
   };
 
@@ -1503,6 +1516,26 @@ namespace OrthancPlugins
     }
 #endif
 
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    static OrthancPluginErrorCode CreateInstance(OrthancPluginCreateInstanceResult* output,
+                                                 void* payload,
+                                                 const char* hashPatient,
+                                                 const char* hashStudy,
+                                                 const char* hashSeries,
+                                                 const char* hashInstance)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+
+      try
+      {
+        backend->CreateInstance(*output, hashPatient, hashStudy, hashSeries, hashInstance);
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#endif
+
     
   public:
     /**
@@ -1585,6 +1618,12 @@ namespace OrthancPlugins
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
       extensions.lookupResources = LookupResources;   // New in Orthanc 1.5.2 (fast lookup)
+
+      if (backend.HasCreateInstance())
+      {
+        extensions.createInstance = CreateInstance;   // New in Orthanc 1.5.2 (fast create)
+      }
+      
       performanceWarning = false;
 #endif      
 

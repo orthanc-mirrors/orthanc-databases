@@ -34,6 +34,7 @@
 #  undef S_IXOTH
 #endif
 
+#include "../Plugins/PostgreSQLIndex.h"
 #include "../Plugins/PostgreSQLStorageArea.h"
 #include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
 #include "../../Framework/PostgreSQL/PostgreSQLResult.h"
@@ -437,3 +438,76 @@ TEST(PostgreSQL, ImplicitTransaction)
   ASSERT_TRUE(db->DoesTableExist("test2"));
 }
 
+
+TEST(PostgreSQLIndex, CreateInstance)
+{
+  OrthancDatabases::PostgreSQLIndex db(globalParameters_);
+  db.SetClearAll(true);
+  db.Open();
+
+  std::string s;
+  ASSERT_TRUE(db.LookupGlobalProperty(s, Orthanc::GlobalProperty_DatabaseInternal1));
+  ASSERT_EQ("1", s);
+
+  OrthancPluginCreateInstanceResult r1, r2;
+  
+  memset(&r1, 0, sizeof(r1));
+  db.CreateInstance(r1, "a", "b", "c", "d");
+  ASSERT_TRUE(r1.isNewInstance);
+  ASSERT_TRUE(r1.isNewSeries);
+  ASSERT_TRUE(r1.isNewStudy);
+  ASSERT_TRUE(r1.isNewPatient);
+
+  memset(&r2, 0, sizeof(r2));
+  db.CreateInstance(r2, "a", "b", "c", "d");
+  ASSERT_FALSE(r2.isNewInstance);
+  ASSERT_EQ(r1.instanceId, r2.instanceId);
+
+  // Breaking the hierarchy
+  memset(&r2, 0, sizeof(r2));
+  ASSERT_THROW(db.CreateInstance(r2, "a", "e", "c", "f"), Orthanc::OrthancException);
+
+  memset(&r2, 0, sizeof(r2));
+  db.CreateInstance(r2, "a", "b", "c", "e");
+  ASSERT_TRUE(r2.isNewInstance);
+  ASSERT_FALSE(r2.isNewSeries);
+  ASSERT_FALSE(r2.isNewStudy);
+  ASSERT_FALSE(r2.isNewPatient);
+  ASSERT_EQ(r1.patientId, r2.patientId);
+  ASSERT_EQ(r1.studyId, r2.studyId);
+  ASSERT_EQ(r1.seriesId, r2.seriesId);
+  ASSERT_NE(r1.instanceId, r2.instanceId);
+
+  memset(&r2, 0, sizeof(r2));
+  db.CreateInstance(r2, "a", "b", "f", "g");
+  ASSERT_TRUE(r2.isNewInstance);
+  ASSERT_TRUE(r2.isNewSeries);
+  ASSERT_FALSE(r2.isNewStudy);
+  ASSERT_FALSE(r2.isNewPatient);
+  ASSERT_EQ(r1.patientId, r2.patientId);
+  ASSERT_EQ(r1.studyId, r2.studyId);
+  ASSERT_NE(r1.seriesId, r2.seriesId);
+  ASSERT_NE(r1.instanceId, r2.instanceId);
+
+  memset(&r2, 0, sizeof(r2));
+  db.CreateInstance(r2, "a", "h", "i", "j");
+  ASSERT_TRUE(r2.isNewInstance);
+  ASSERT_TRUE(r2.isNewSeries);
+  ASSERT_TRUE(r2.isNewStudy);
+  ASSERT_FALSE(r2.isNewPatient);
+  ASSERT_EQ(r1.patientId, r2.patientId);
+  ASSERT_NE(r1.studyId, r2.studyId);
+  ASSERT_NE(r1.seriesId, r2.seriesId);
+  ASSERT_NE(r1.instanceId, r2.instanceId);
+
+  memset(&r2, 0, sizeof(r2));
+  db.CreateInstance(r2, "k", "l", "m", "n");
+  ASSERT_TRUE(r2.isNewInstance);
+  ASSERT_TRUE(r2.isNewSeries);
+  ASSERT_TRUE(r2.isNewStudy);
+  ASSERT_TRUE(r2.isNewPatient);
+  ASSERT_NE(r1.patientId, r2.patientId);
+  ASSERT_NE(r1.studyId, r2.studyId);
+  ASSERT_NE(r1.seriesId, r2.seriesId);
+  ASSERT_NE(r1.instanceId, r2.instanceId);
+}
