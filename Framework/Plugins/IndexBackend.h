@@ -265,5 +265,16 @@ namespace OrthancDatabases
                                  uint32_t limit,
                                  bool requestSomeInstance);
 #endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+    // New primitive since Orthanc 1.5.2
+    virtual void SetResourcesContent(
+      uint32_t countIdentifierTags,
+      const OrthancPluginResourcesContentTags* identifierTags,
+      uint32_t countMainDicomTags,
+      const OrthancPluginResourcesContentTags* mainDicomTags,
+      uint32_t countMetadata,
+      const OrthancPluginResourcesContentMetadata* metadata);
+#endif
   };
 }

@@ -208,6 +208,12 @@ namespace OrthancDatabases
 
       virtual ~StandaloneStatement();
 
+      void Execute()
+      {
+        Dictionary parameters;
+        Execute(parameters);
+      }
+
       void Execute(const Dictionary& parameters);
     };
   };

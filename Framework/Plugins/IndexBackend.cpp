@@ -705,14 +705,14 @@ namespace OrthancDatabases
 
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                        STATEMENT_FROM_HERE, GetManager(),
-                        "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources WHERE resourceType=${type}"));
+                          STATEMENT_FROM_HERE, GetManager(),
+                          "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources WHERE resourceType=${type}"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                        STATEMENT_FROM_HERE, GetManager(),
-                        "SELECT COUNT(*) FROM Resources WHERE resourceType=${type}"));
+                          STATEMENT_FROM_HERE, GetManager(),
+                          "SELECT COUNT(*) FROM Resources WHERE resourceType=${type}"));
         break;
 
       default:
@@ -1717,6 +1717,147 @@ namespace OrthancDatabases
 
       statement.Next();
     }    
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+  static void ExecuteSetResourcesContentTags(
+    DatabaseManager& manager,
+    const std::string& table,
+    const std::string& variablePrefix,
+    uint32_t count,
+    const OrthancPluginResourcesContentTags* tags)
+  {
+    std::string sql;
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string name = variablePrefix + boost::lexical_cast<std::string>(i);
+
+      args.SetUtf8Value(name, tags[i].value);
+      
+      std::string insert = ("(" + boost::lexical_cast<std::string>(tags[i].resource) + ", " +
+                           boost::lexical_cast<std::string>(tags[i].group) + ", " +
+                           boost::lexical_cast<std::string>(tags[i].element) + ", " +
+                           "${" + name + "})");
+
+      if (sql.empty())
+      {
+        sql = "INSERT INTO " + table + " VALUES " + insert;
+      }
+      else
+      {
+        sql += ", " + insert;
+      }
+    }
+
+    if (!sql.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sql);
+
+      for (uint32_t i = 0; i < count; i++)
+      {
+        statement.SetParameterType(variablePrefix + boost::lexical_cast<std::string>(i),
+                                   ValueType_Utf8String);
+      }
+
+      statement.Execute(args);
+    }
+  }
+#endif
+  
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+  static void ExecuteSetResourcesContentMetadata(
+    DatabaseManager& manager,
+    uint32_t count,
+    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    std::string sqlRemove;  // To overwrite    
+    std::string sqlInsert;
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string name = "m" + boost::lexical_cast<std::string>(i);
+
+      args.SetUtf8Value(name, metadata[i].value);
+      
+      std::string insert = ("(" + boost::lexical_cast<std::string>(metadata[i].resource) + ", " +
+                            boost::lexical_cast<std::string>(metadata[i].metadata) + ", " +
+                           "${" + name + "})");
+
+      std::string remove = ("(id=" + boost::lexical_cast<std::string>(metadata[i].resource) +
+                            " AND type=" + boost::lexical_cast<std::string>(metadata[i].metadata)
+                            + ")");
+
+      if (sqlInsert.empty())
+      {
+        sqlInsert = "INSERT INTO Metadata VALUES " + insert;
+      }
+      else
+      {
+        sqlInsert += ", " + insert;
+      }
+
+      if (sqlRemove.empty())
+      {
+        sqlRemove = "DELETE FROM Metadata WHERE " + remove;
+      }
+      else
+      {
+        sqlRemove += " OR " + remove;
+      }
+    }
+
+    if (!sqlRemove.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sqlRemove);
+      statement.Execute();
+    }
+    
+    if (!sqlInsert.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sqlInsert);
+
+      for (uint32_t i = 0; i < count; i++)
+      {
+        statement.SetParameterType("m" + boost::lexical_cast<std::string>(i),
+                                   ValueType_Utf8String);
+      }
+
+      statement.Execute(args);
+    }
+  }
+#endif
+  
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::SetResourcesContent(
+    uint32_t countIdentifierTags,
+    const OrthancPluginResourcesContentTags* identifierTags,
+    uint32_t countMainDicomTags,
+    const OrthancPluginResourcesContentTags* mainDicomTags,
+    uint32_t countMetadata,
+    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    /**
+     * TODO - PostgreSQL doesn't allow multiple commands in a prepared
+     * statement, so we execute 3 separate commands (for identifiers,
+     * main tags and metadata). Maybe MySQL does not suffer from the
+     * same limitation, to check.
+     **/
+    
+    ExecuteSetResourcesContentTags(GetManager(), "DicomIdentifiers", "i",
+                                   countIdentifierTags, identifierTags);
+
+    ExecuteSetResourcesContentTags(GetManager(), "MainDicomTags", "t",
+                                   countMainDicomTags, mainDicomTags);
+
+    ExecuteSetResourcesContentMetadata(GetManager(), countMetadata, metadata);
   }
 #endif
 }

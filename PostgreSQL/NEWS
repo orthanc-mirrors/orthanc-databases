@@ -1,6 +1,7 @@
 Pending changes in the mainline
 ===============================
 
+* Database optimizations thanks to the new primitives in Orthanc SDK 
 * Fix Debian issue #906771 (Uncaught exception prevents db intialization
   (likely related to pg_trgm))
 * Fix: Catching exceptions in destructors

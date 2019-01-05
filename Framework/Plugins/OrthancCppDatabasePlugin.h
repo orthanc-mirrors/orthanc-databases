@@ -510,6 +510,17 @@ namespace OrthancPlugins
       throw std::runtime_error("Not implemented");
     }
 #endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+    virtual void SetResourcesContent(
+      uint32_t countIdentifierTags,
+      const OrthancPluginResourcesContentTags* identifierTags,
+      uint32_t countMainDicomTags,
+      const OrthancPluginResourcesContentTags* mainDicomTags,
+      uint32_t countMetadata,
+      const OrthancPluginResourcesContentMetadata* metadata) = 0;
+#endif
   };
 
 
@@ -1536,6 +1547,30 @@ namespace OrthancPlugins
     }
 #endif
 
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+    static OrthancPluginErrorCode SetResourcesContent(
+      void* payload,
+      uint32_t countIdentifierTags,
+      const OrthancPluginResourcesContentTags* identifierTags,
+      uint32_t countMainDicomTags,
+      const OrthancPluginResourcesContentTags* mainDicomTags,
+      uint32_t countMetadata,
+      const OrthancPluginResourcesContentMetadata* metadata)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+
+      try
+      {
+        backend->SetResourcesContent(countIdentifierTags, identifierTags,
+                                     countMainDicomTags, mainDicomTags,
+                                     countMetadata, metadata);
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#endif    
+
     
   public:
     /**
@@ -1617,11 +1652,13 @@ namespace OrthancPlugins
 #endif
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
-      extensions.lookupResources = LookupResources;   // New in Orthanc 1.5.2 (fast lookup)
+      // Optimizations brought by Orthanc 1.5.2
+      extensions.lookupResources = LookupResources;          // Fast lookup
+      extensions.setResourcesContent = SetResourcesContent;  // Fast setting tags/metadata
 
       if (backend.HasCreateInstance())
       {
-        extensions.createInstance = CreateInstance;   // New in Orthanc 1.5.2 (fast create)
+        extensions.createInstance = CreateInstance;          // Fast creation of resources
       }
       
       performanceWarning = false;
