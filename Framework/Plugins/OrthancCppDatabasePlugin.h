@@ -81,7 +81,8 @@ namespace OrthancPlugins
       AllowedAnswers_Change,
       AllowedAnswers_DicomTag,
       AllowedAnswers_ExportedResource,
-      AllowedAnswers_MatchingResource
+      AllowedAnswers_MatchingResource,
+      AllowedAnswers_String
     };
 
     OrthancPluginContext*         context_;
@@ -520,6 +521,13 @@ namespace OrthancPlugins
       const OrthancPluginResourcesContentTags* mainDicomTags,
       uint32_t countMetadata,
       const OrthancPluginResourcesContentMetadata* metadata) = 0;
+#endif
+
+    
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+    virtual void GetChildrenMetadata(std::list<std::string>& target,
+                                     int64_t resourceId,
+                                     int32_t metadata) = 0;
 #endif
   };
 
@@ -1457,6 +1465,7 @@ namespace OrthancPlugins
                                                      void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
       
       try
       {
@@ -1472,6 +1481,7 @@ namespace OrthancPlugins
                                                   OrthancPluginStorageArea* storageArea)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
       
       try
       {
@@ -1486,6 +1496,7 @@ namespace OrthancPlugins
                                                      int64_t internalId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
       
       try
       {
@@ -1537,6 +1548,7 @@ namespace OrthancPlugins
                                                  const char* hashInstance)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
 
       try
       {
@@ -1559,6 +1571,7 @@ namespace OrthancPlugins
       const OrthancPluginResourcesContentMetadata* metadata)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
 
       try
       {
@@ -1572,6 +1585,37 @@ namespace OrthancPlugins
 #endif    
 
     
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+    // New primitive since Orthanc 1.5.2
+    static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseContext* context,
+                                                      void* payload,
+                                                      int64_t resourceId,
+                                                      int32_t metadata)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        std::list<std::string> values;
+        backend->GetChildrenMetadata(values, resourceId, metadata);
+
+        for (std::list<std::string>::const_iterator
+               it = values.begin(); it != values.end(); ++it)
+        {
+          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
+                                            backend->GetOutput().database_,
+                                            it->c_str());
+        }
+
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#endif
+
+
   public:
     /**
      * Register a custom database back-end written in C++.
@@ -1655,6 +1699,7 @@ namespace OrthancPlugins
       // Optimizations brought by Orthanc 1.5.2
       extensions.lookupResources = LookupResources;          // Fast lookup
       extensions.setResourcesContent = SetResourcesContent;  // Fast setting tags/metadata
+      extensions.getChildrenMetadata = GetChildrenMetadata;
 
       if (backend.HasCreateInstance())
       {

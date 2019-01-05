@@ -1860,4 +1860,28 @@ namespace OrthancDatabases
     ExecuteSetResourcesContentMetadata(GetManager(), countMetadata, metadata);
   }
 #endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::GetChildrenMetadata(std::list<std::string>& target,
+                                         int64_t resourceId,
+                                         int32_t metadata)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager_,
+      "SELECT value FROM Metadata WHERE type=${metadata} AND "
+      "id IN (SELECT internalId FROM Resources WHERE parentId=${id})");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("metadata", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", static_cast<int>(resourceId));
+    args.SetIntegerValue("metadata", static_cast<int>(metadata));
+
+    ReadListOfStrings(target, statement, args);
+  }
+#endif  
 }
