@@ -164,6 +164,10 @@ namespace OrthancDatabases
                        << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
         }
       }
+      else
+      {
+        t.Commit();
+      }
     }
 
     {
@@ -182,9 +186,9 @@ namespace OrthancDatabases
         db->Execute(query);
 
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 1);
-
-        t.Commit();
       }
+
+      t.Commit();
     }
 
     {
@@ -203,9 +207,9 @@ namespace OrthancDatabases
         db->Execute(query);
 
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
-
-        t.Commit();
       }
+
+      t.Commit();
     }
 
     return db.release();
