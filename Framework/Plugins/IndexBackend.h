@@ -258,7 +258,7 @@ namespace OrthancDatabases
     virtual void GetChildren(std::list<std::string>& childrenPublicIds,
                              int64_t id);
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
@@ -266,7 +266,7 @@ namespace OrthancDatabases
                                  bool requestSomeInstance);
 #endif
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     virtual void SetResourcesContent(
       uint32_t countIdentifierTags,
@@ -277,7 +277,7 @@ namespace OrthancDatabases
       const OrthancPluginResourcesContentMetadata* metadata);
 #endif
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     virtual void GetChildrenMetadata(std::list<std::string>& target,
                                      int64_t resourceId,

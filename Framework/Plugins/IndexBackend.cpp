@@ -1582,7 +1582,7 @@ namespace OrthancDatabases
   }
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
   {
   private:
@@ -1651,7 +1651,7 @@ namespace OrthancDatabases
 #endif
 
   
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
@@ -1721,7 +1721,7 @@ namespace OrthancDatabases
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   static void ExecuteSetResourcesContentTags(
     DatabaseManager& manager,
     const std::string& table,
@@ -1769,7 +1769,7 @@ namespace OrthancDatabases
 #endif
   
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   static void ExecuteSetResourcesContentMetadata(
     DatabaseManager& manager,
     uint32_t count,
@@ -1834,7 +1834,7 @@ namespace OrthancDatabases
 #endif
   
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::SetResourcesContent(
     uint32_t countIdentifierTags,
@@ -1862,7 +1862,7 @@ namespace OrthancDatabases
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::GetChildrenMetadata(std::list<std::string>& target,
                                          int64_t resourceId,

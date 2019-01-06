@@ -252,7 +252,7 @@ namespace OrthancPlugins
     }
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     void AnswerMatchingResource(const std::string& resourceId)
     {
       if (allowedAnswers_ != AllowedAnswers_All &&
@@ -270,7 +270,7 @@ namespace OrthancPlugins
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     void AnswerMatchingResource(const std::string& resourceId,
                                 const std::string& someInstanceId)
     {
@@ -494,14 +494,14 @@ namespace OrthancPlugins
 
     virtual bool HasCreateInstance() const = 0;
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
 #endif
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
                                 const char* hashPatient,
                                 const char* hashStudy,
@@ -513,7 +513,7 @@ namespace OrthancPlugins
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void SetResourcesContent(
       uint32_t countIdentifierTags,
       const OrthancPluginResourcesContentTags* identifierTags,
@@ -524,7 +524,7 @@ namespace OrthancPlugins
 #endif
 
     
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void GetChildrenMetadata(std::list<std::string>& target,
                                      int64_t resourceId,
                                      int32_t metadata) = 0;
@@ -1507,7 +1507,7 @@ namespace OrthancPlugins
     }
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     /* Use GetOutput().AnswerResource() */
     static OrthancPluginErrorCode LookupResources(
       OrthancPluginDatabaseContext* context,
@@ -1539,7 +1539,7 @@ namespace OrthancPlugins
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     static OrthancPluginErrorCode CreateInstance(OrthancPluginCreateInstanceResult* output,
                                                  void* payload,
                                                  const char* hashPatient,
@@ -1560,7 +1560,7 @@ namespace OrthancPlugins
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     static OrthancPluginErrorCode SetResourcesContent(
       void* payload,
       uint32_t countIdentifierTags,
@@ -1586,7 +1586,7 @@ namespace OrthancPlugins
 
     
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseContext* context,
                                                       void* payload,
@@ -1695,7 +1695,7 @@ namespace OrthancPlugins
 #  endif
 #endif
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_OPTIMIZATIONS_1 == 1
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
       // Optimizations brought by Orthanc 1.5.2
       extensions.lookupResources = LookupResources;          // Fast lookup
       extensions.setResourcesContent = SetResourcesContent;  // Fast setting tags/metadata
