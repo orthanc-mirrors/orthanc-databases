@@ -91,5 +91,8 @@ namespace OrthancDatabases
                                 const char* hashInstance)
       ORTHANC_OVERRIDE;
 #endif
+
+    virtual uint64_t GetResourceCount(OrthancPluginResourceType resourceType)
+      ORTHANC_OVERRIDE;
   };
 }

@@ -36,6 +36,7 @@ namespace Orthanc
   // Some aliases for internal properties
   static const GlobalProperty GlobalProperty_HasTrigramIndex = GlobalProperty_DatabaseInternal0;
   static const GlobalProperty GlobalProperty_HasCreateInstance = GlobalProperty_DatabaseInternal1;
+  static const GlobalProperty GlobalProperty_HasFastCountResources = GlobalProperty_DatabaseInternal2;
 }
 
 
@@ -212,6 +213,29 @@ namespace OrthancDatabases
       t.Commit();
     }
 
+    {
+      PostgreSQLTransaction t(*db);
+
+      // Installing this extension requires the "GlobalIntegers" table
+      // created by the "FastTotalSize" extension
+      int property = 0;
+      if (!LookupGlobalIntegerProperty(property, *db, t,
+                                       Orthanc::GlobalProperty_HasFastCountResources) ||
+          property != 1)
+      {
+        LOG(INFO) << "Installing the FastCountResources extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasFastCountResources, 1);
+      }
+
+      t.Commit();
+    }
+
     return db.release();
   }
 
@@ -248,28 +272,42 @@ namespace OrthancDatabases
   uint64_t PostgreSQLIndex::GetTotalCompressedSize()
   {
     // Fast version if extension "./FastTotalSize.sql" is installed
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
-      "SELECT value FROM GlobalIntegers WHERE key = 0");
+    uint64_t result;
 
-    statement.SetReadOnly(true);
-    statement.Execute();
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT value FROM GlobalIntegers WHERE key = 0");
 
-    return static_cast<uint64_t>(ReadInteger64(statement, 0));
+      statement.SetReadOnly(true);
+      statement.Execute();
+
+      result = static_cast<uint64_t>(ReadInteger64(statement, 0));
+    }
+    
+    assert(result == IndexBackend::GetTotalCompressedSize());
+    return result;
   }
 
   
   uint64_t PostgreSQLIndex::GetTotalUncompressedSize()
   {
     // Fast version if extension "./FastTotalSize.sql" is installed
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
-      "SELECT value FROM GlobalIntegers WHERE key = 1");
+    uint64_t result;
 
-    statement.SetReadOnly(true);
-    statement.Execute();
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT value FROM GlobalIntegers WHERE key = 1");
 
-    return static_cast<uint64_t>(ReadInteger64(statement, 0));
+      statement.SetReadOnly(true);
+      statement.Execute();
+
+      result = static_cast<uint64_t>(ReadInteger64(statement, 0));
+    }
+    
+    assert(result == IndexBackend::GetTotalUncompressedSize());
+    return result;
   }
 
 
@@ -322,4 +360,38 @@ namespace OrthancDatabases
     }
   }
 #endif
+
+
+  uint64_t PostgreSQLIndex::GetResourceCount(OrthancPluginResourceType resourceType)
+  {
+    // Optimized version thanks to the "FastCountResources.sql" extension
+
+    assert(OrthancPluginResourceType_Patient == 0 &&
+           OrthancPluginResourceType_Study == 1 &&
+           OrthancPluginResourceType_Series == 2 &&
+           OrthancPluginResourceType_Instance == 3);
+
+    uint64_t result;
+    
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT value FROM GlobalIntegers WHERE key = ${key}");
+
+      statement.SetParameterType("key", ValueType_Integer64);
+
+      Dictionary args;
+
+      // For an explanation of the "+ 2" below, check out "FastCountResources.sql"
+      args.SetIntegerValue("key", static_cast<int>(resourceType + 2));
+
+      statement.SetReadOnly(true);
+      statement.Execute(args);
+
+      result = static_cast<uint64_t>(ReadInteger64(statement, 0));
+    }
+      
+    assert(result == IndexBackend::GetResourceCount(resourceType));
+    return result;
+  }
 }
