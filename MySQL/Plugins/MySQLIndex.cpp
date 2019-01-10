@@ -116,7 +116,19 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
-      if (revision != 1)
+      if (revision == 1)
+      {
+        // The serialization of jobs as a global property can lead to
+        // very long values => switch to the LONGTEXT type that can
+        // store up to 4GB:
+        // https://stackoverflow.com/a/13932834/881731
+        db->Execute("ALTER TABLE GlobalProperties MODIFY value LONGTEXT", false);
+
+        revision = 2;
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+      }
+
+      if (revision != 2)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        

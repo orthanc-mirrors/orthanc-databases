@@ -123,6 +123,13 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
         )
     endif()
     
+    if (ENABLE_SSL)
+      add_definitions(
+        -DHAVE_LIBSSL=1
+        -DUSE_OPENSSL=1
+        )
+    endif()
+
   elseif(CROSS_COMPILING)
     message(FATAL_ERROR "Cannot auto-generate the configuration file cross-compiling")
     
@@ -228,7 +235,6 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
       unset(HAVE_NETINET_TCP_H CACHE)
       check_include_files("sys/socket.h;netinet/tcp.h" HAVE_NETINET_TCP_H)
     endif()
-
 
     if (ENABLE_SSL)
       set(HAVE_LIBSSL 1)
