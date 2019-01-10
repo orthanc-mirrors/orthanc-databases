@@ -21,6 +21,7 @@
 
 #include "SQLiteIndex.h"
 
+#include "../../Framework/Common/Integer64Value.h"
 #include "../../Framework/Plugins/GlobalProperties.h"
 #include "../../Framework/SQLite/SQLiteDatabase.h"
 #include "../../Framework/SQLite/SQLiteTransaction.h"
@@ -172,5 +173,36 @@ namespace OrthancDatabases
     statement.Execute(args);
 
     return dynamic_cast<SQLiteDatabase&>(statement.GetDatabase()).GetLastInsertRowId();
+  }
+
+
+  int64_t SQLiteIndex::GetLastChangeIndex()
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT seq FROM sqlite_sequence WHERE name='Changes'");
+
+    statement.SetReadOnly(true);
+    statement.Execute();
+    
+    if (statement.IsDone())
+    {
+      // No change has been recorded so far in the database
+      return 0;
+    }
+    else
+    {
+      const IValue& value = statement.GetResultField(0);
+      
+      switch (value.GetType())
+      {
+        case ValueType_Integer64:
+          return dynamic_cast<const Integer64Value&>(value).GetValue();
+          
+        default:
+          //LOG(ERROR) << value.Format();
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+    }
   }
 }

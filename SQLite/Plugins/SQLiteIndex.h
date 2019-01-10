@@ -73,5 +73,8 @@ namespace OrthancDatabases
 
     virtual int64_t CreateResource(const char* publicId,
                                    OrthancPluginResourceType type);
+
+    // New primitive since Orthanc 1.5.2
+    virtual int64_t GetLastChangeIndex();
   };
 }

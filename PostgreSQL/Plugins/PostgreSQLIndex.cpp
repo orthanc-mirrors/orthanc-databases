@@ -37,6 +37,7 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasTrigramIndex = GlobalProperty_DatabaseInternal0;
   static const GlobalProperty GlobalProperty_HasCreateInstance = GlobalProperty_DatabaseInternal1;
   static const GlobalProperty GlobalProperty_HasFastCountResources = GlobalProperty_DatabaseInternal2;
+  static const GlobalProperty GlobalProperty_GetLastChangeIndex = GlobalProperty_DatabaseInternal3;
 }
 
 
@@ -236,6 +237,29 @@ namespace OrthancDatabases
       t.Commit();
     }
 
+    {
+      PostgreSQLTransaction t(*db);
+
+      // Installing this extension requires the "GlobalIntegers" table
+      // created by the "GetLastChangeIndex" extension
+      int property = 0;
+      if (!LookupGlobalIntegerProperty(property, *db, t,
+                                       Orthanc::GlobalProperty_GetLastChangeIndex) ||
+          property != 1)
+      {
+        LOG(INFO) << "Installing the GetLastChangeIndex extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+      }
+
+      t.Commit();
+    }
+
     return db.release();
   }
 
@@ -393,5 +417,18 @@ namespace OrthancDatabases
       
     assert(result == IndexBackend::GetResourceCount(resourceType));
     return result;
+  }
+
+
+  int64_t PostgreSQLIndex::GetLastChangeIndex()
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT value FROM GlobalIntegers WHERE key = 6");
+
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    return ReadInteger64(statement, 0);
   }
 }

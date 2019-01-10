@@ -52,10 +52,11 @@ endif()
 
 
 EmbedResources(
-  POSTGRESQL_PREPARE_INDEX         ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
-  POSTGRESQL_CREATE_INSTANCE       ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
-  POSTGRESQL_FAST_TOTAL_SIZE       ${CMAKE_SOURCE_DIR}/Plugins/FastTotalSize.sql
-  POSTGRESQL_FAST_COUNT_RESOURCES  ${CMAKE_SOURCE_DIR}/Plugins/FastCountResources.sql
+  POSTGRESQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
+  POSTGRESQL_CREATE_INSTANCE        ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
+  POSTGRESQL_FAST_TOTAL_SIZE        ${CMAKE_SOURCE_DIR}/Plugins/FastTotalSize.sql
+  POSTGRESQL_FAST_COUNT_RESOURCES   ${CMAKE_SOURCE_DIR}/Plugins/FastCountResources.sql
+  POSTGRESQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
   )
 
 add_library(OrthancPostgreSQLIndex SHARED

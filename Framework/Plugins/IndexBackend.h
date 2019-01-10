@@ -277,11 +277,9 @@ namespace OrthancDatabases
       const OrthancPluginResourcesContentMetadata* metadata);
 #endif
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     virtual void GetChildrenMetadata(std::list<std::string>& target,
                                      int64_t resourceId,
                                      int32_t metadata);
-#endif
   };
 }

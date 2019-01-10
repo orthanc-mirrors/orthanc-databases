@@ -1862,7 +1862,6 @@ namespace OrthancDatabases
 #endif
 
 
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::GetChildrenMetadata(std::list<std::string>& target,
                                          int64_t resourceId,
@@ -1883,5 +1882,4 @@ namespace OrthancDatabases
 
     ReadListOfStrings(target, statement, args);
   }
-#endif  
 }

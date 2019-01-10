@@ -492,7 +492,10 @@ namespace OrthancPlugins
 
     virtual void ClearMainDicomTags(int64_t internalId) = 0;
 
-    virtual bool HasCreateInstance() const = 0;
+    virtual bool HasCreateInstance() const
+    {
+      return false;
+    }
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
@@ -524,11 +527,11 @@ namespace OrthancPlugins
 #endif
 
     
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void GetChildrenMetadata(std::list<std::string>& target,
                                      int64_t resourceId,
                                      int32_t metadata) = 0;
-#endif
+
+    virtual int64_t GetLastChangeIndex() = 0;
   };
 
 
@@ -1585,8 +1588,6 @@ namespace OrthancPlugins
 #endif    
 
     
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseContext* context,
                                                       void* payload,
@@ -1613,8 +1614,23 @@ namespace OrthancPlugins
       }
       ORTHANC_PLUGINS_DATABASE_CATCH      
     }
-#endif
 
+
+    // New primitive since Orthanc 1.5.2
+    static OrthancPluginErrorCode GetLastChangeIndex(int64_t* result,
+                                                     void* payload)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        *result = backend->GetLastChangeIndex();
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+   
 
   public:
     /**
@@ -1700,6 +1716,7 @@ namespace OrthancPlugins
       extensions.lookupResources = LookupResources;          // Fast lookup
       extensions.setResourcesContent = SetResourcesContent;  // Fast setting tags/metadata
       extensions.getChildrenMetadata = GetChildrenMetadata;
+      extensions.getLastChangeIndex = GetLastChangeIndex;
 
       if (backend.HasCreateInstance())
       {
