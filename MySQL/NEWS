@@ -1,6 +1,7 @@
 Pending changes in the mainline
 ===============================
 
+* Database optimizations by implementing new primitives of Orthanc SDK 1.5.2
 * Characters "$" and "_" are allowed in MySQL database identifiers
 * Fix serialization of jobs if many of them
 

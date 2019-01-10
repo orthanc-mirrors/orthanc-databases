@@ -52,7 +52,8 @@ endif()
 
 
 EmbedResources(
-  MYSQL_PREPARE_INDEX ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
+  MYSQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
+  MYSQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
   )
 
 add_library(OrthancMySQLIndex SHARED
