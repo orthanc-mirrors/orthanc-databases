@@ -230,6 +230,12 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
     endif()
 
 
+    if (ENABLE_SSL)
+      set(HAVE_LIBSSL 1)
+      set(HAVE_SSL_GET_CURRENT_COMPRESSION 1)
+      set(USE_OPENSSL 1)
+    endif()
+
     execute_process(
       COMMAND 
       ${PYTHON_EXECUTABLE}
@@ -298,6 +304,12 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
     ${LIBPQ_SOURCES_DIR}/src/backend/utils/mb/encnames.c
     ${LIBPQ_SOURCES_DIR}/src/backend/utils/mb/wchar.c
     )
+
+  if (ENABLE_SSL)
+    list(APPEND LIBPQ_SOURCES
+      ${LIBPQ_SOURCES_DIR}/src/interfaces/libpq/fe-secure-openssl.c
+      )
+  endif()
 
 
   if (CMAKE_SYSTEM_NAME STREQUAL "Linux")

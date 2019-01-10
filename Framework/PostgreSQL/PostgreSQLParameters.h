@@ -38,6 +38,7 @@ namespace OrthancDatabases
     std::string  password_;
     std::string  database_;
     std::string  uri_;
+    bool         ssl_;
     bool         lock_;
 
     void Reset();
@@ -89,6 +90,16 @@ namespace OrthancDatabases
     const std::string& GetDatabase() const
     {
       return database_;
+    }
+
+    void SetSsl(bool ssl)
+    {
+      ssl_ = ssl;
+    }
+
+    bool IsSsl() const
+    {
+      return ssl_;
     }
 
     void SetLock(bool lock)

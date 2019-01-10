@@ -37,6 +37,7 @@ namespace OrthancDatabases
     password_ = "";
     database_.clear();
     uri_.clear();
+    ssl_ = false;
     lock_ = true;
   }
 
@@ -84,6 +85,8 @@ namespace OrthancDatabases
       {
         SetPassword(s);
       }
+
+      ssl_ = configuration.GetBooleanValue("EnableSsl", false);
     }
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
@@ -174,7 +177,11 @@ namespace OrthancDatabases
   {
     if (uri_.empty())
     {
-      target = std::string("sslmode=disable") +  // TODO WHY SSL DOES NOT WORK? ("SSL error: wrong version number")
+      // Note about SSL: "require" means that "I want my data to be
+      // encrypted, and I accept the overhead. I trust that the
+      // network will make sure I always connect to the server I want."
+      // https://www.postgresql.org/docs/current/libpq-ssl.html
+      target = std::string(ssl_ ? "sslmode=require" : "sslmode=disable") +
         " user=" + username_ + 
         " host=" + host_ + 
         " port=" + boost::lexical_cast<std::string>(port_);
