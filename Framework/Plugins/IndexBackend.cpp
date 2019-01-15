@@ -1882,4 +1882,73 @@ namespace OrthancDatabases
 
     ReadListOfStrings(target, statement, args);
   }
+
+
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::TagMostRecentPatient(int64_t patient)
+  {
+    int64_t seq;
+    
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "SELECT * FROM PatientRecyclingOrder WHERE seq >= "
+        "(SELECT seq FROM PatientRecyclingOrder WHERE patientid=${id}) ORDER BY seq LIMIT 2");
+
+      statement.SetReadOnly(true);
+      statement.SetParameterType("id", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetIntegerValue("id", patient);
+
+      statement.Execute(args);
+      
+      if (statement.IsDone())
+      {
+        // The patient is protected, don't add it to the recycling order
+        return;
+      }
+
+      seq = ReadInteger64(statement, 0);
+
+      statement.Next();
+
+      if (statement.IsDone())
+      {
+        // The patient is already at the end of the recycling order
+        // (because of the "LIMIT 2" above), no need to modify the table
+        return;
+      }
+    }
+
+    // Delete the old position of the patient in the recycling order
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "DELETE FROM PatientRecyclingOrder WHERE seq=${seq}");
+        
+      statement.SetParameterType("seq", ValueType_Integer64);
+        
+      Dictionary args;
+      args.SetIntegerValue("seq", seq);
+        
+      statement.Execute(args);
+    }
+
+    // Add the patient to the end of the recycling order
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "INSERT INTO PatientRecyclingOrder VALUES(${}, ${id})");
+        
+      statement.SetParameterType("id", ValueType_Integer64);
+        
+      Dictionary args;
+      args.SetIntegerValue("id", patient);
+        
+      statement.Execute(args);
+    }
+  }
 }

@@ -281,5 +281,7 @@ namespace OrthancDatabases
     virtual void GetChildrenMetadata(std::list<std::string>& target,
                                      int64_t resourceId,
                                      int32_t metadata);
+
+    virtual void TagMostRecentPatient(int64_t patient);
   };
 }

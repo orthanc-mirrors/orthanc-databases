@@ -381,6 +381,9 @@ namespace OrthancDatabases
       result.patientId = ReadInteger64(statement, 4);
       result.studyId = ReadInteger64(statement, 5);
       result.seriesId = ReadInteger64(statement, 6);
+
+      // TODO - Move this to the stored procedure
+      TagMostRecentPatient(result.patientId);
     }
   }
 #endif

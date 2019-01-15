@@ -532,6 +532,8 @@ namespace OrthancPlugins
                                      int32_t metadata) = 0;
 
     virtual int64_t GetLastChangeIndex() = 0;
+
+    virtual void TagMostRecentPatient(int64_t patientId) = 0;
   };
 
 
@@ -1630,6 +1632,22 @@ namespace OrthancPlugins
       }
       ORTHANC_PLUGINS_DATABASE_CATCH      
     }
+
+
+    // New primitive since Orthanc 1.5.2
+    static OrthancPluginErrorCode TagMostRecentPatient(void* payload,
+                                                       int64_t patientId)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        backend->TagMostRecentPatient(patientId);
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
    
 
   public:
@@ -1717,6 +1735,7 @@ namespace OrthancPlugins
       extensions.setResourcesContent = SetResourcesContent;  // Fast setting tags/metadata
       extensions.getChildrenMetadata = GetChildrenMetadata;
       extensions.getLastChangeIndex = GetLastChangeIndex;
+      extensions.tagMostRecentPatient = TagMostRecentPatient;
 
       if (backend.HasCreateInstance())
       {
