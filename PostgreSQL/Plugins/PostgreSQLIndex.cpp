@@ -175,31 +175,32 @@ namespace OrthancDatabases
     {
       PostgreSQLTransaction t(*db);
 
-      int hasCreateInstance = 0;
-      if (!LookupGlobalIntegerProperty(hasCreateInstance, *db, t,
+      int property = 0;
+      if (!LookupGlobalIntegerProperty(property, *db, t,
                                        Orthanc::GlobalProperty_HasCreateInstance) ||
-          hasCreateInstance != 1)
+          property != 2)
       {
         LOG(INFO) << "Installing the CreateInstance extension";
 
+        if (property == 1)
+        {
+          // Drop older, experimental versions of this extension
+          db->Execute("DROP FUNCTION CreateInstance("
+                      "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+        }
+        
         std::string query;
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
         db->Execute(query);
 
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 1);
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 2);
       }
 
-      t.Commit();
-    }
-
-    {
-      PostgreSQLTransaction t(*db);
-
-      int hasFastTotalSize = 0;
-      if (!LookupGlobalIntegerProperty(hasFastTotalSize, *db, t,
+      
+      if (!LookupGlobalIntegerProperty(property, *db, t,
                                        Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-          hasFastTotalSize != 1)
+          property != 1)
       {
         LOG(INFO) << "Installing the FastTotalSize extension";
 
@@ -211,15 +212,10 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
       }
 
-      t.Commit();
-    }
-
-    {
-      PostgreSQLTransaction t(*db);
 
       // Installing this extension requires the "GlobalIntegers" table
       // created by the "FastTotalSize" extension
-      int property = 0;
+      property = 0;
       if (!LookupGlobalIntegerProperty(property, *db, t,
                                        Orthanc::GlobalProperty_HasFastCountResources) ||
           property != 1)
@@ -234,15 +230,10 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasFastCountResources, 1);
       }
 
-      t.Commit();
-    }
-
-    {
-      PostgreSQLTransaction t(*db);
 
       // Installing this extension requires the "GlobalIntegers" table
       // created by the "GetLastChangeIndex" extension
-      int property = 0;
+      property = 0;
       if (!LookupGlobalIntegerProperty(property, *db, t,
                                        Orthanc::GlobalProperty_GetLastChangeIndex) ||
           property != 1)
@@ -381,9 +372,6 @@ namespace OrthancDatabases
       result.patientId = ReadInteger64(statement, 4);
       result.studyId = ReadInteger64(statement, 5);
       result.seriesId = ReadInteger64(statement, 6);
-
-      // TODO - Move this to the stored procedure
-      TagMostRecentPatient(result.patientId);
     }
   }
 #endif
@@ -433,5 +421,13 @@ namespace OrthancDatabases
     statement.Execute();
 
     return ReadInteger64(statement, 0);
+  }
+
+
+  void PostgreSQLIndex::TagMostRecentPatient(int64_t patient)
+  {
+    // This behavior is implemented in "CreateInstance()", and no
+    // backward compatibility is necessary
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
 }

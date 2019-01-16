@@ -12,6 +12,10 @@ CREATE FUNCTION CreateInstance(
   OUT seriesKey BIGINT,
   OUT instanceKey BIGINT) AS $body$
 
+DECLARE
+  patientSeq BIGINT;
+  countRecycling BIGINT;
+
 BEGIN
   SELECT internalId FROM Resources INTO instanceKey WHERE publicId = instance AND resourceType = 3;
 
@@ -62,6 +66,19 @@ BEGIN
 
     INSERT INTO Resources VALUES (DEFAULT, 3, instance, seriesKey) RETURNING internalId INTO instanceKey;
     isNewInstance := 1;
+
+    -- Move the patient to the end of the recycling order
+    SELECT seq FROM PatientRecyclingOrder WHERE patientId = patientKey INTO patientSeq;
+
+    IF NOT (patientSeq IS NULL) THEN
+       -- The patient is not protected
+       SELECT COUNT(*) FROM (SELECT * FROM PatientRecyclingOrder WHERE seq >= patientSeq LIMIT 2) AS tmp INTO countRecycling;
+       IF countRecycling = 2 THEN
+          -- The patient was not at the end of the recycling order
+          DELETE FROM PatientRecyclingOrder WHERE seq = patientSeq;
+          INSERT INTO PatientRecyclingOrder VALUES(DEFAULT, patientKey);
+       END IF;
+    END IF;
   END IF;  
 END;
 
