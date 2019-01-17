@@ -24,7 +24,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
   set(MARIADB_PACKAGE_VERSION "3.0.5")
   set(MARIADB_CLIENT_SOURCES_DIR ${CMAKE_BINARY_DIR}/mariadb-connector-c-${MARIADB_PACKAGE_VERSION}-src)
   set(MARIADB_CLIENT_MD5 "b846584b8b7a39c51a6e83986b57c71c")
-  set(MARIADB_CLIENT_URL "http://www.orthanc-server.com/downloads/third-party/mariadb-connector-c-${MARIADB_PACKAGE_VERSION}-src.tar.gz")
+  set(MARIADB_CLIENT_URL "http://orthanc.osimis.io/ThirdPartyDownloads/mariadb-connector-c-${MARIADB_PACKAGE_VERSION}-src.tar.gz")
 
   if (IS_DIRECTORY "${MARIADB_CLIENT_SOURCES_DIR}")
     set(FirstRun OFF)
