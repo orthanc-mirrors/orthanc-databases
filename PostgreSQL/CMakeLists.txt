@@ -1,13 +1,13 @@
 cmake_minimum_required(VERSION 2.8)
 project(OrthancPostgreSQL)
 
-set(ORTHANC_PLUGIN_VERSION "mainline")
+set(ORTHANC_PLUGIN_VERSION "3.0")
 
 if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.4.0")
+  set(ORTHANC_FRAMEWORK_VERSION "1.5.2")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 

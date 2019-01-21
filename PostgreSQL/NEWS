@@ -1,6 +1,10 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 3.0 (2019-01-21)
+========================
+
 * New configuration option: "EnableSsl"
 * Database optimizations by implementing new primitives of Orthanc SDK 1.5.2
 * Fix issue 105 (Unable to connect to PostgreSQL database using SSL)
