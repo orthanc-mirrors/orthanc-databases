@@ -448,7 +448,7 @@ TEST(PostgreSQLIndex, CreateInstance)
 
   std::string s;
   ASSERT_TRUE(db.LookupGlobalProperty(s, Orthanc::GlobalProperty_DatabaseInternal1));
-  ASSERT_EQ("1", s);
+  ASSERT_EQ("2", s);
 
   OrthancPluginCreateInstanceResult r1, r2;
   
