@@ -148,7 +148,7 @@ namespace OrthancDatabases
       }
 
     public:
-      StatementBase(DatabaseManager& manager);
+      explicit StatementBase(DatabaseManager& manager);
 
       virtual ~StatementBase();
 
