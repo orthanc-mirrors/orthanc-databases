@@ -29,6 +29,7 @@
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>
 #include <OrthancServer/ServerEnumerations.h>
+#include <OrthancServer/Search/ISqlLookupFormatter.h>
 
 
 namespace OrthancDatabases
@@ -55,7 +56,7 @@ namespace OrthancDatabases
   }
 
   
-  int64_t IndexBackend::ReadInteger64(const DatabaseManager::CachedStatement& statement,
+  int64_t IndexBackend::ReadInteger64(const DatabaseManager::StatementBase& statement,
                                       size_t field)
   {
     if (statement.IsDone())
@@ -77,7 +78,7 @@ namespace OrthancDatabases
   }
 
 
-  int32_t IndexBackend::ReadInteger32(const DatabaseManager::CachedStatement& statement,
+  int32_t IndexBackend::ReadInteger32(const DatabaseManager::StatementBase& statement,
                                       size_t field)
   {
     if (statement.IsDone())
@@ -99,11 +100,11 @@ namespace OrthancDatabases
   }
 
     
-  std::string IndexBackend::ReadString(const DatabaseManager::CachedStatement& statement,
+  std::string IndexBackend::ReadString(const DatabaseManager::StatementBase& statement,
                                        size_t field)
   {
     const IValue& value = statement.GetResultField(field);
-      
+
     switch (value.GetType())
     {
       case ValueType_BinaryString:
@@ -704,14 +705,14 @@ namespace OrthancDatabases
 
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                        STATEMENT_FROM_HERE, GetManager(),
-                        "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources WHERE resourceType=${type}"));
+                          STATEMENT_FROM_HERE, GetManager(),
+                          "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources WHERE resourceType=${type}"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                        STATEMENT_FROM_HERE, GetManager(),
-                        "SELECT COUNT(*) FROM Resources WHERE resourceType=${type}"));
+                          STATEMENT_FROM_HERE, GetManager(),
+                          "SELECT COUNT(*) FROM Resources WHERE resourceType=${type}"));
         break;
 
       default:
@@ -1578,5 +1579,376 @@ namespace OrthancDatabases
     args.SetIntegerValue("id", id);
 
     ReadListOfStrings(childrenPublicIds, statement, args);
+  }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
+  {
+  private:
+    Dialect     dialect_;
+    size_t      count_;
+    Dictionary  dictionary_;
+
+    static std::string FormatParameter(size_t index)
+    {
+      return "p" + boost::lexical_cast<std::string>(index);
+    }
+    
+  public:
+    LookupFormatter(Dialect dialect) :
+      dialect_(dialect),
+      count_(0)
+    {
+    }
+
+    virtual std::string GenerateParameter(const std::string& value)
+    {
+      const std::string key = FormatParameter(count_);
+
+      count_ ++;
+      dictionary_.SetUtf8Value(key, value);
+
+      return "${" + key + "}";
+    }
+
+    virtual std::string FormatResourceType(Orthanc::ResourceType level)
+    {
+      return boost::lexical_cast<std::string>(Orthanc::Plugins::Convert(level));
+    }
+
+    virtual std::string FormatWildcardEscape()
+    {
+      switch (dialect_)
+      {
+        case Dialect_SQLite:
+        case Dialect_PostgreSQL:
+          return "ESCAPE '\\'";
+
+        case Dialect_MySQL:
+          return "ESCAPE '\\\\'";
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
+
+    void PrepareStatement(DatabaseManager::StandaloneStatement& statement) const
+    {
+      statement.SetReadOnly(true);
+      
+      for (size_t i = 0; i < count_; i++)
+      {
+        statement.SetParameterType(FormatParameter(i), ValueType_Utf8String);
+      }
+    }
+
+    const Dictionary& GetDictionary() const
+    {
+      return dictionary_;
+    }
+  };
+#endif
+
+  
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                     OrthancPluginResourceType queryLevel,
+                                     uint32_t limit,
+                                     bool requestSomeInstance)
+  {
+    LookupFormatter formatter(manager_.GetDialect());
+
+    std::string sql;
+    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
+                                        Orthanc::Plugins::Convert(queryLevel), limit);
+
+    if (requestSomeInstance)
+    {
+      // Composite query to find some instance if requested
+      switch (queryLevel)
+      {
+        case OrthancPluginResourceType_Patient:
+          sql = ("SELECT patients.publicId, MIN(instances.publicId) FROM (" + sql + ") patients "
+                 "INNER JOIN Resources studies   ON studies.parentId   = patients.internalId "
+                 "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
+                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                 "GROUP BY patients.publicId");
+          break;
+
+        case OrthancPluginResourceType_Study:
+          sql = ("SELECT studies.publicId, MIN(instances.publicId) FROM (" + sql + ") studies "
+                 "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
+                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                 "GROUP BY studies.publicId");                 
+          break;
+
+        case OrthancPluginResourceType_Series:
+          sql = ("SELECT series.publicId, MIN(instances.publicId) FROM (" + sql + ") series "
+                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                 "GROUP BY series.publicId");
+          break;
+
+        case OrthancPluginResourceType_Instance:
+          sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+    }
+
+    DatabaseManager::StandaloneStatement statement(GetManager(), sql);
+    formatter.PrepareStatement(statement);
+
+    statement.Execute(formatter.GetDictionary());
+
+    while (!statement.IsDone())
+    {
+      if (requestSomeInstance)
+      {
+        GetOutput().AnswerMatchingResource(ReadString(statement, 0), ReadString(statement, 1));
+      }
+      else
+      {
+        GetOutput().AnswerMatchingResource(ReadString(statement, 0));
+      }
+
+      statement.Next();
+    }    
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  static void ExecuteSetResourcesContentTags(
+    DatabaseManager& manager,
+    const std::string& table,
+    const std::string& variablePrefix,
+    uint32_t count,
+    const OrthancPluginResourcesContentTags* tags)
+  {
+    std::string sql;
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string name = variablePrefix + boost::lexical_cast<std::string>(i);
+
+      args.SetUtf8Value(name, tags[i].value);
+      
+      std::string insert = ("(" + boost::lexical_cast<std::string>(tags[i].resource) + ", " +
+                           boost::lexical_cast<std::string>(tags[i].group) + ", " +
+                           boost::lexical_cast<std::string>(tags[i].element) + ", " +
+                           "${" + name + "})");
+
+      if (sql.empty())
+      {
+        sql = "INSERT INTO " + table + " VALUES " + insert;
+      }
+      else
+      {
+        sql += ", " + insert;
+      }
+    }
+
+    if (!sql.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sql);
+
+      for (uint32_t i = 0; i < count; i++)
+      {
+        statement.SetParameterType(variablePrefix + boost::lexical_cast<std::string>(i),
+                                   ValueType_Utf8String);
+      }
+
+      statement.Execute(args);
+    }
+  }
+#endif
+  
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  static void ExecuteSetResourcesContentMetadata(
+    DatabaseManager& manager,
+    uint32_t count,
+    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    std::string sqlRemove;  // To overwrite    
+    std::string sqlInsert;
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string name = "m" + boost::lexical_cast<std::string>(i);
+
+      args.SetUtf8Value(name, metadata[i].value);
+      
+      std::string insert = ("(" + boost::lexical_cast<std::string>(metadata[i].resource) + ", " +
+                            boost::lexical_cast<std::string>(metadata[i].metadata) + ", " +
+                           "${" + name + "})");
+
+      std::string remove = ("(id=" + boost::lexical_cast<std::string>(metadata[i].resource) +
+                            " AND type=" + boost::lexical_cast<std::string>(metadata[i].metadata)
+                            + ")");
+
+      if (sqlInsert.empty())
+      {
+        sqlInsert = "INSERT INTO Metadata VALUES " + insert;
+      }
+      else
+      {
+        sqlInsert += ", " + insert;
+      }
+
+      if (sqlRemove.empty())
+      {
+        sqlRemove = "DELETE FROM Metadata WHERE " + remove;
+      }
+      else
+      {
+        sqlRemove += " OR " + remove;
+      }
+    }
+
+    if (!sqlRemove.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sqlRemove);
+      statement.Execute();
+    }
+    
+    if (!sqlInsert.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sqlInsert);
+
+      for (uint32_t i = 0; i < count; i++)
+      {
+        statement.SetParameterType("m" + boost::lexical_cast<std::string>(i),
+                                   ValueType_Utf8String);
+      }
+
+      statement.Execute(args);
+    }
+  }
+#endif
+  
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::SetResourcesContent(
+    uint32_t countIdentifierTags,
+    const OrthancPluginResourcesContentTags* identifierTags,
+    uint32_t countMainDicomTags,
+    const OrthancPluginResourcesContentTags* mainDicomTags,
+    uint32_t countMetadata,
+    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    /**
+     * TODO - PostgreSQL doesn't allow multiple commands in a prepared
+     * statement, so we execute 3 separate commands (for identifiers,
+     * main tags and metadata). Maybe MySQL does not suffer from the
+     * same limitation, to check.
+     **/
+    
+    ExecuteSetResourcesContentTags(GetManager(), "DicomIdentifiers", "i",
+                                   countIdentifierTags, identifierTags);
+
+    ExecuteSetResourcesContentTags(GetManager(), "MainDicomTags", "t",
+                                   countMainDicomTags, mainDicomTags);
+
+    ExecuteSetResourcesContentMetadata(GetManager(), countMetadata, metadata);
+  }
+#endif
+
+
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::GetChildrenMetadata(std::list<std::string>& target,
+                                         int64_t resourceId,
+                                         int32_t metadata)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager_,
+      "SELECT value FROM Metadata WHERE type=${metadata} AND "
+      "id IN (SELECT internalId FROM Resources WHERE parentId=${id})");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("metadata", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", static_cast<int>(resourceId));
+    args.SetIntegerValue("metadata", static_cast<int>(metadata));
+
+    ReadListOfStrings(target, statement, args);
+  }
+
+
+  // New primitive since Orthanc 1.5.2
+  void IndexBackend::TagMostRecentPatient(int64_t patient)
+  {
+    int64_t seq;
+    
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "SELECT * FROM PatientRecyclingOrder WHERE seq >= "
+        "(SELECT seq FROM PatientRecyclingOrder WHERE patientid=${id}) ORDER BY seq LIMIT 2");
+
+      statement.SetReadOnly(true);
+      statement.SetParameterType("id", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetIntegerValue("id", patient);
+
+      statement.Execute(args);
+      
+      if (statement.IsDone())
+      {
+        // The patient is protected, don't add it to the recycling order
+        return;
+      }
+
+      seq = ReadInteger64(statement, 0);
+
+      statement.Next();
+
+      if (statement.IsDone())
+      {
+        // The patient is already at the end of the recycling order
+        // (because of the "LIMIT 2" above), no need to modify the table
+        return;
+      }
+    }
+
+    // Delete the old position of the patient in the recycling order
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "DELETE FROM PatientRecyclingOrder WHERE seq=${seq}");
+        
+      statement.SetParameterType("seq", ValueType_Integer64);
+        
+      Dictionary args;
+      args.SetIntegerValue("seq", seq);
+        
+      statement.Execute(args);
+    }
+
+    // Add the patient to the end of the recycling order
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "INSERT INTO PatientRecyclingOrder VALUES(${}, ${id})");
+        
+      statement.SetParameterType("id", ValueType_Integer64);
+        
+      Dictionary args;
+      args.SetIntegerValue("id", patient);
+        
+      statement.Execute(args);
+    }
   }
 }

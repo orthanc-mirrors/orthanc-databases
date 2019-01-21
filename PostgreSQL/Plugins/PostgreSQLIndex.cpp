@@ -35,6 +35,9 @@ namespace Orthanc
 {
   // Some aliases for internal properties
   static const GlobalProperty GlobalProperty_HasTrigramIndex = GlobalProperty_DatabaseInternal0;
+  static const GlobalProperty GlobalProperty_HasCreateInstance = GlobalProperty_DatabaseInternal1;
+  static const GlobalProperty GlobalProperty_HasFastCountResources = GlobalProperty_DatabaseInternal2;
+  static const GlobalProperty GlobalProperty_GetLastChangeIndex = GlobalProperty_DatabaseInternal3;
 }
 
 
@@ -126,7 +129,8 @@ namespace OrthancDatabases
       PostgreSQLTransaction t(*db);
 
       int hasTrigram = 0;
-      if (!LookupGlobalIntegerProperty(hasTrigram, *db, t, Orthanc::GlobalProperty_HasTrigramIndex) ||
+      if (!LookupGlobalIntegerProperty(hasTrigram, *db, t,
+                                       Orthanc::GlobalProperty_HasTrigramIndex) ||
           hasTrigram != 1)
       {
         /**
@@ -162,6 +166,89 @@ namespace OrthancDatabases
                        << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
         }
       }
+      else
+      {
+        t.Commit();
+      }
+    }
+
+    {
+      PostgreSQLTransaction t(*db);
+
+      int property = 0;
+      if (!LookupGlobalIntegerProperty(property, *db, t,
+                                       Orthanc::GlobalProperty_HasCreateInstance) ||
+          property != 2)
+      {
+        LOG(INFO) << "Installing the CreateInstance extension";
+
+        if (property == 1)
+        {
+          // Drop older, experimental versions of this extension
+          db->Execute("DROP FUNCTION CreateInstance("
+                      "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+        }
+        
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 2);
+      }
+
+      
+      if (!LookupGlobalIntegerProperty(property, *db, t,
+                                       Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
+          property != 1)
+      {
+        LOG(INFO) << "Installing the FastTotalSize extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
+      }
+
+
+      // Installing this extension requires the "GlobalIntegers" table
+      // created by the "FastTotalSize" extension
+      property = 0;
+      if (!LookupGlobalIntegerProperty(property, *db, t,
+                                       Orthanc::GlobalProperty_HasFastCountResources) ||
+          property != 1)
+      {
+        LOG(INFO) << "Installing the FastCountResources extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasFastCountResources, 1);
+      }
+
+
+      // Installing this extension requires the "GlobalIntegers" table
+      // created by the "GetLastChangeIndex" extension
+      property = 0;
+      if (!LookupGlobalIntegerProperty(property, *db, t,
+                                       Orthanc::GlobalProperty_GetLastChangeIndex) ||
+          property != 1)
+      {
+        LOG(INFO) << "Installing the GetLastChangeIndex extension";
+
+        std::string query;
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
+        db->Execute(query);
+
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+      }
+
+      t.Commit();
     }
 
     return db.release();
@@ -194,5 +281,153 @@ namespace OrthancDatabases
     statement.Execute(args);
 
     return ReadInteger64(statement, 0);
+  }
+
+
+  uint64_t PostgreSQLIndex::GetTotalCompressedSize()
+  {
+    // Fast version if extension "./FastTotalSize.sql" is installed
+    uint64_t result;
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT value FROM GlobalIntegers WHERE key = 0");
+
+      statement.SetReadOnly(true);
+      statement.Execute();
+
+      result = static_cast<uint64_t>(ReadInteger64(statement, 0));
+    }
+    
+    assert(result == IndexBackend::GetTotalCompressedSize());
+    return result;
+  }
+
+  
+  uint64_t PostgreSQLIndex::GetTotalUncompressedSize()
+  {
+    // Fast version if extension "./FastTotalSize.sql" is installed
+    uint64_t result;
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT value FROM GlobalIntegers WHERE key = 1");
+
+      statement.SetReadOnly(true);
+      statement.Execute();
+
+      result = static_cast<uint64_t>(ReadInteger64(statement, 0));
+    }
+    
+    assert(result == IndexBackend::GetTotalUncompressedSize());
+    return result;
+  }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                       const char* hashPatient,
+                                       const char* hashStudy,
+                                       const char* hashSeries,
+                                       const char* hashInstance)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT * FROM CreateInstance(${patient}, ${study}, ${series}, ${instance})");
+
+    statement.SetParameterType("patient", ValueType_Utf8String);
+    statement.SetParameterType("study", ValueType_Utf8String);
+    statement.SetParameterType("series", ValueType_Utf8String);
+    statement.SetParameterType("instance", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetUtf8Value("patient", hashPatient);
+    args.SetUtf8Value("study", hashStudy);
+    args.SetUtf8Value("series", hashSeries);
+    args.SetUtf8Value("instance", hashInstance);
+    
+    statement.Execute(args);
+
+    if (statement.IsDone() ||
+        statement.GetResultFieldsCount() != 8)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+
+    for (size_t i = 0; i < 8; i++)
+    {
+      statement.SetResultFieldType(i, ValueType_Integer64);
+    }
+
+    result.isNewInstance = (ReadInteger64(statement, 3) == 1);
+    result.instanceId = ReadInteger64(statement, 7);
+
+    if (result.isNewInstance)
+    {
+      result.isNewPatient = (ReadInteger64(statement, 0) == 1);
+      result.isNewStudy = (ReadInteger64(statement, 1) == 1);
+      result.isNewSeries = (ReadInteger64(statement, 2) == 1);
+      result.patientId = ReadInteger64(statement, 4);
+      result.studyId = ReadInteger64(statement, 5);
+      result.seriesId = ReadInteger64(statement, 6);
+    }
+  }
+#endif
+
+
+  uint64_t PostgreSQLIndex::GetResourceCount(OrthancPluginResourceType resourceType)
+  {
+    // Optimized version thanks to the "FastCountResources.sql" extension
+
+    assert(OrthancPluginResourceType_Patient == 0 &&
+           OrthancPluginResourceType_Study == 1 &&
+           OrthancPluginResourceType_Series == 2 &&
+           OrthancPluginResourceType_Instance == 3);
+
+    uint64_t result;
+    
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT value FROM GlobalIntegers WHERE key = ${key}");
+
+      statement.SetParameterType("key", ValueType_Integer64);
+
+      Dictionary args;
+
+      // For an explanation of the "+ 2" below, check out "FastCountResources.sql"
+      args.SetIntegerValue("key", static_cast<int>(resourceType + 2));
+
+      statement.SetReadOnly(true);
+      statement.Execute(args);
+
+      result = static_cast<uint64_t>(ReadInteger64(statement, 0));
+    }
+      
+    assert(result == IndexBackend::GetResourceCount(resourceType));
+    return result;
+  }
+
+
+  int64_t PostgreSQLIndex::GetLastChangeIndex()
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT value FROM GlobalIntegers WHERE key = 6");
+
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    return ReadInteger64(statement, 0);
+  }
+
+
+  void PostgreSQLIndex::TagMostRecentPatient(int64_t patient)
+  {
+    // This behavior is implemented in "CreateInstance()", and no
+    // backward compatibility is necessary
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
 }

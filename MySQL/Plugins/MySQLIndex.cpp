@@ -128,7 +128,19 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
-      if (revision != 2)
+      if (revision == 2)
+      {
+        std::string query;
+
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::MYSQL_GET_LAST_CHANGE_INDEX);
+        db->Execute(query, true);
+        
+        revision = 3;
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+      }
+
+      if (revision != 3)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -260,5 +272,18 @@ namespace OrthancDatabases
     }
 
     SignalDeletedFiles();
+  }
+
+  
+  int64_t MySQLIndex::GetLastChangeIndex()
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, GetManager(),
+      "SELECT value FROM GlobalIntegers WHERE property = 0");
+    
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    return ReadInteger64(statement, 0);
   }
 }

@@ -32,9 +32,14 @@
 #  error HAS_ORTHANC_EXCEPTION must be set to 1
 #endif
 
+#if ORTHANC_ENABLE_PLUGINS != 1
+#  error ORTHANC_ENABLE_PLUGINS must be set to 1
+#endif
 
-#include <orthanc/OrthancCDatabasePlugin.h>
+
 #include <Core/OrthancException.h>
+#include <OrthancServer/Search/DatabaseConstraint.h>
+
 
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH                            \
@@ -75,7 +80,9 @@ namespace OrthancPlugins
       AllowedAnswers_Attachment,
       AllowedAnswers_Change,
       AllowedAnswers_DicomTag,
-      AllowedAnswers_ExportedResource
+      AllowedAnswers_ExportedResource,
+      AllowedAnswers_MatchingResource,
+      AllowedAnswers_String
     };
 
     OrthancPluginContext*         context_;
@@ -243,6 +250,43 @@ namespace OrthancPlugins
 
       OrthancPluginDatabaseAnswerExportedResource(context_, database_, &exported);
     }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    void AnswerMatchingResource(const std::string& resourceId)
+    {
+      if (allowedAnswers_ != AllowedAnswers_All &&
+          allowedAnswers_ != AllowedAnswers_MatchingResource)
+      {
+        throw std::runtime_error("Cannot answer with an exported resource in the current state");
+      }
+
+      OrthancPluginMatchingResource match;
+      match.resourceId = resourceId.c_str();
+      match.someInstanceId = NULL;
+
+      OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
+    }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    void AnswerMatchingResource(const std::string& resourceId,
+                                const std::string& someInstanceId)
+    {
+      if (allowedAnswers_ != AllowedAnswers_All &&
+          allowedAnswers_ != AllowedAnswers_MatchingResource)
+      {
+        throw std::runtime_error("Cannot answer with an exported resource in the current state");
+      }
+
+      OrthancPluginMatchingResource match;
+      match.resourceId = resourceId.c_str();
+      match.someInstanceId = someInstanceId.c_str();
+
+      OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
+    }
+#endif
   };
 
 
@@ -447,6 +491,49 @@ namespace OrthancPlugins
                                  OrthancPluginStorageArea* storageArea) = 0;
 
     virtual void ClearMainDicomTags(int64_t internalId) = 0;
+
+    virtual bool HasCreateInstance() const
+    {
+      return false;
+    }
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 OrthancPluginResourceType queryLevel,
+                                 uint32_t limit,
+                                 bool requestSomeInstance) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                const char* hashPatient,
+                                const char* hashStudy,
+                                const char* hashSeries,
+                                const char* hashInstance)
+    {
+      throw std::runtime_error("Not implemented");
+    }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void SetResourcesContent(
+      uint32_t countIdentifierTags,
+      const OrthancPluginResourcesContentTags* identifierTags,
+      uint32_t countMainDicomTags,
+      const OrthancPluginResourcesContentTags* mainDicomTags,
+      uint32_t countMetadata,
+      const OrthancPluginResourcesContentMetadata* metadata) = 0;
+#endif
+
+    
+    virtual void GetChildrenMetadata(std::list<std::string>& target,
+                                     int64_t resourceId,
+                                     int32_t metadata) = 0;
+
+    virtual int64_t GetLastChangeIndex() = 0;
+
+    virtual void TagMostRecentPatient(int64_t patientId) = 0;
   };
 
 
@@ -1383,6 +1470,7 @@ namespace OrthancPlugins
                                                      void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
       
       try
       {
@@ -1398,6 +1486,7 @@ namespace OrthancPlugins
                                                   OrthancPluginStorageArea* storageArea)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
       
       try
       {
@@ -1412,6 +1501,7 @@ namespace OrthancPlugins
                                                      int64_t internalId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
       
       try
       {
@@ -1421,7 +1511,145 @@ namespace OrthancPlugins
       ORTHANC_PLUGINS_DATABASE_CATCH
     }
 
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    /* Use GetOutput().AnswerResource() */
+    static OrthancPluginErrorCode LookupResources(
+      OrthancPluginDatabaseContext* context,
+      void* payload,
+      uint32_t constraintsCount,
+      const OrthancPluginDatabaseConstraint* constraints,
+      OrthancPluginResourceType queryLevel,
+      uint32_t limit,
+      uint8_t requestSomeInstance)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_MatchingResource);
+
+      try
+      {
+        std::vector<Orthanc::DatabaseConstraint> lookup;
+        lookup.reserve(constraintsCount);
+
+        for (uint32_t i = 0; i < constraintsCount; i++)
+        {
+          lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
+        }
+        
+        backend->LookupResources(lookup, queryLevel, limit, (requestSomeInstance != 0));
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH
+    }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    static OrthancPluginErrorCode CreateInstance(OrthancPluginCreateInstanceResult* output,
+                                                 void* payload,
+                                                 const char* hashPatient,
+                                                 const char* hashStudy,
+                                                 const char* hashSeries,
+                                                 const char* hashInstance)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        backend->CreateInstance(*output, hashPatient, hashStudy, hashSeries, hashInstance);
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    static OrthancPluginErrorCode SetResourcesContent(
+      void* payload,
+      uint32_t countIdentifierTags,
+      const OrthancPluginResourcesContentTags* identifierTags,
+      uint32_t countMainDicomTags,
+      const OrthancPluginResourcesContentTags* mainDicomTags,
+      uint32_t countMetadata,
+      const OrthancPluginResourcesContentMetadata* metadata)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        backend->SetResourcesContent(countIdentifierTags, identifierTags,
+                                     countMainDicomTags, mainDicomTags,
+                                     countMetadata, metadata);
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#endif    
+
     
+    // New primitive since Orthanc 1.5.2
+    static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseContext* context,
+                                                      void* payload,
+                                                      int64_t resourceId,
+                                                      int32_t metadata)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        std::list<std::string> values;
+        backend->GetChildrenMetadata(values, resourceId, metadata);
+
+        for (std::list<std::string>::const_iterator
+               it = values.begin(); it != values.end(); ++it)
+        {
+          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
+                                            backend->GetOutput().database_,
+                                            it->c_str());
+        }
+
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+
+
+    // New primitive since Orthanc 1.5.2
+    static OrthancPluginErrorCode GetLastChangeIndex(int64_t* result,
+                                                     void* payload)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        *result = backend->GetLastChangeIndex();
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+
+
+    // New primitive since Orthanc 1.5.2
+    static OrthancPluginErrorCode TagMostRecentPatient(void* payload,
+                                                       int64_t patientId)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_None);
+
+      try
+      {
+        backend->TagMostRecentPatient(patientId);
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+   
+
   public:
     /**
      * Register a custom database back-end written in C++.
@@ -1468,7 +1696,7 @@ namespace OrthancPlugins
       params.logExportedResource = LogExportedResource;
       params.lookupAttachment = LookupAttachment;
       params.lookupGlobalProperty = LookupGlobalProperty;
-      params.lookupIdentifier = NULL;   // Unused starting with Orthanc 0.9.5 (db v6)
+      params.lookupIdentifier = NULL;    // Unused starting with Orthanc 0.9.5 (db v6)
       params.lookupIdentifier2 = NULL;   // Unused starting with Orthanc 0.9.5 (db v6)
       params.lookupMetadata = LookupMetadata;
       params.lookupParent = LookupParent;
@@ -1490,17 +1718,32 @@ namespace OrthancPlugins
       extensions.getDatabaseVersion = GetDatabaseVersion;
       extensions.upgradeDatabase = UpgradeDatabase;
       extensions.clearMainDicomTags = ClearMainDicomTags;
-      extensions.getAllInternalIds = GetAllInternalIds;    // New in Orthanc 0.9.5 (db v6)
-      extensions.lookupIdentifier3 = LookupIdentifier3;    // New in Orthanc 0.9.5 (db v6)
+      extensions.getAllInternalIds = GetAllInternalIds;     // New in Orthanc 0.9.5 (db v6)
+      extensions.lookupIdentifier3 = LookupIdentifier3;     // New in Orthanc 0.9.5 (db v6)
 
       bool performanceWarning = true;
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 4, 0)
       extensions.lookupIdentifierRange = LookupIdentifierRange;    // New in Orthanc 1.4.0
-      performanceWarning = false;
 #  endif
 #endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+      // Optimizations brought by Orthanc 1.5.2
+      extensions.lookupResources = LookupResources;          // Fast lookup
+      extensions.setResourcesContent = SetResourcesContent;  // Fast setting tags/metadata
+      extensions.getChildrenMetadata = GetChildrenMetadata;
+      extensions.getLastChangeIndex = GetLastChangeIndex;
+      extensions.tagMostRecentPatient = TagMostRecentPatient;
+
+      if (backend.HasCreateInstance())
+      {
+        extensions.createInstance = CreateInstance;          // Fast creation of resources
+      }
+      
+      performanceWarning = false;
+#endif      
 
       if (performanceWarning)
       {
@@ -1508,7 +1751,7 @@ namespace OrthancPlugins
         sprintf(info, 
                 "Performance warning: The database index plugin was compiled "
                 "against an old version of the Orthanc SDK (%d.%d.%d): "
-                "Consider upgrading to version 1.4.0 of the Orthanc SDK",
+                "Consider upgrading to version 1.5.2 of the Orthanc SDK",
                 ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER);

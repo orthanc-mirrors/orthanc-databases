@@ -71,6 +71,32 @@ namespace OrthancDatabases
     }
 
     virtual int64_t CreateResource(const char* publicId,
-                                   OrthancPluginResourceType type);
+                                   OrthancPluginResourceType type)
+      ORTHANC_OVERRIDE;
+
+    virtual uint64_t GetTotalCompressedSize() ORTHANC_OVERRIDE;
+
+    virtual uint64_t GetTotalUncompressedSize() ORTHANC_OVERRIDE;
+    
+    virtual bool HasCreateInstance() const  ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                const char* hashPatient,
+                                const char* hashStudy,
+                                const char* hashSeries,
+                                const char* hashInstance)
+      ORTHANC_OVERRIDE;
+#endif
+
+    virtual uint64_t GetResourceCount(OrthancPluginResourceType resourceType)
+      ORTHANC_OVERRIDE;
+
+    virtual int64_t GetLastChangeIndex() ORTHANC_OVERRIDE;
+
+    virtual void TagMostRecentPatient(int64_t patient) ORTHANC_OVERRIDE;
   };
 }

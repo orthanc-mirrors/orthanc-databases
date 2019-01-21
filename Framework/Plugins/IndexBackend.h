@@ -30,6 +30,8 @@ namespace OrthancDatabases
   class IndexBackend : public OrthancPlugins::IDatabaseBackend
   {
   private:
+    class LookupFormatter;
+    
     DatabaseManager   manager_;
 
   protected:
@@ -38,13 +40,13 @@ namespace OrthancDatabases
       return manager_;
     }
     
-    static int64_t ReadInteger64(const DatabaseManager::CachedStatement& statement,
+    static int64_t ReadInteger64(const DatabaseManager::StatementBase& statement,
                                  size_t field);
 
-    static int32_t ReadInteger32(const DatabaseManager::CachedStatement& statement,
+    static int32_t ReadInteger32(const DatabaseManager::StatementBase& statement,
                                  size_t field);
     
-    static std::string ReadString(const DatabaseManager::CachedStatement& statement,
+    static std::string ReadString(const DatabaseManager::StatementBase& statement,
                                   size_t field);
     
     template <typename T>
@@ -242,7 +244,6 @@ namespace OrthancDatabases
     
     virtual void ClearMainDicomTags(int64_t internalId);
 
-
     // For unit testing only!
     virtual uint64_t GetResourcesCount();
 
@@ -256,5 +257,31 @@ namespace OrthancDatabases
     // For unit tests only!
     virtual void GetChildren(std::list<std::string>& childrenPublicIds,
                              int64_t id);
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    // New primitive since Orthanc 1.5.2
+    virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 OrthancPluginResourceType queryLevel,
+                                 uint32_t limit,
+                                 bool requestSomeInstance);
+#endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    // New primitive since Orthanc 1.5.2
+    virtual void SetResourcesContent(
+      uint32_t countIdentifierTags,
+      const OrthancPluginResourcesContentTags* identifierTags,
+      uint32_t countMainDicomTags,
+      const OrthancPluginResourcesContentTags* mainDicomTags,
+      uint32_t countMetadata,
+      const OrthancPluginResourcesContentMetadata* metadata);
+#endif
+
+    // New primitive since Orthanc 1.5.2
+    virtual void GetChildrenMetadata(std::list<std::string>& target,
+                                     int64_t resourceId,
+                                     int32_t metadata);
+
+    virtual void TagMostRecentPatient(int64_t patient);
   };
 }

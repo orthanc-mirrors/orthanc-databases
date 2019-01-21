@@ -27,6 +27,8 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_ORTHANC_SDK)
     include_directories(${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-0.9.5)
   elseif (ORTHANC_SDK_VERSION STREQUAL "1.4.0")
     include_directories(${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.4.0)
+  elseif (ORTHANC_SDK_VERSION STREQUAL "1.5.2")
+    include_directories(${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.5.2)
   elseif (ORTHANC_SDK_VERSION STREQUAL "framework")
     include_directories(${ORTHANC_ROOT}/Plugins/Include)
   else()
@@ -40,10 +42,20 @@ else ()
 endif()
 
 
+add_definitions(
+  -DHAS_ORTHANC_EXCEPTION=1
+  -DORTHANC_ENABLE_PLUGINS=1
+  )
+
+
 list(APPEND DATABASES_SOURCES
   ${ORTHANC_CORE_SOURCES}
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/GlobalProperties.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/IndexBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_ROOT}/Plugins/Samples/Common/OrthancPluginCppWrapper.cpp
+
+  # New from "db-changes"
+  ${ORTHANC_ROOT}/OrthancServer/Search/DatabaseConstraint.cpp
+  ${ORTHANC_ROOT}/OrthancServer/Search/ISqlLookupFormatter.cpp
   )

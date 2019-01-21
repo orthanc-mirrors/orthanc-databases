@@ -74,5 +74,7 @@ namespace OrthancDatabases
                                    OrthancPluginResourceType type);
 
     virtual void DeleteResource(int64_t id);
+
+    virtual int64_t GetLastChangeIndex();
   };
 }
