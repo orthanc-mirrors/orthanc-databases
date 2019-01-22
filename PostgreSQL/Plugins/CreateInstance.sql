@@ -29,40 +29,51 @@ BEGIN
 
     IF patientKey IS NULL THEN
       -- Must create a new patient
-      ASSERT studyKey IS NULL;
-      ASSERT seriesKey IS NULL;
-      ASSERT instanceKey IS NULL;
+      IF NOT (studyKey IS NULL AND seriesKey IS NULL AND instanceKey IS NULL) THEN
+         RAISE EXCEPTION 'Broken invariant';
+      END IF;
+
       INSERT INTO Resources VALUES (DEFAULT, 0, patient, NULL) RETURNING internalId INTO patientKey;
       isNewPatient := 1;
     ELSE
       isNewPatient := 0;
     END IF;
   
-    ASSERT NOT patientKey IS NULL;
+    IF (patientKey IS NULL) THEN
+       RAISE EXCEPTION 'Broken invariant';
+    END IF;
 
     IF studyKey IS NULL THEN
       -- Must create a new study
-      ASSERT seriesKey IS NULL;
-      ASSERT instanceKey IS NULL;
+      IF NOT (seriesKey IS NULL AND instanceKey IS NULL) THEN
+         RAISE EXCEPTION 'Broken invariant';
+      END IF;
+
       INSERT INTO Resources VALUES (DEFAULT, 1, study, patientKey) RETURNING internalId INTO studyKey;
       isNewStudy := 1;
     ELSE
       isNewStudy := 0;
     END IF;
 
-    ASSERT NOT studyKey IS NULL;
-    
+    IF (studyKey IS NULL) THEN
+       RAISE EXCEPTION 'Broken invariant';
+    END IF;
+
     IF seriesKey IS NULL THEN
       -- Must create a new series
-      ASSERT instanceKey IS NULL;
+      IF NOT (instanceKey IS NULL) THEN
+         RAISE EXCEPTION 'Broken invariant';
+      END IF;
+
       INSERT INTO Resources VALUES (DEFAULT, 2, series, studyKey) RETURNING internalId INTO seriesKey;
       isNewSeries := 1;
     ELSE
       isNewSeries := 0;
     END IF;
   
-    ASSERT NOT seriesKey IS NULL;
-    ASSERT instanceKey IS NULL;
+    IF (seriesKey IS NULL OR NOT instanceKey IS NULL) THEN
+       RAISE EXCEPTION 'Broken invariant';
+    END IF;
 
     INSERT INTO Resources VALUES (DEFAULT, 3, instance, seriesKey) RETURNING internalId INTO instanceKey;
     isNewInstance := 1;
