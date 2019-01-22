@@ -376,6 +376,18 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   source_group(ThirdParty\\PostgreSQL REGULAR_EXPRESSION ${LIBPQ_SOURCES_DIR}/.*)
 
 else()
+  set(PostgreSQL_ADDITIONAL_VERSIONS
+    "11" "10" "9.6" "9.5" "9.4" "9.3" "9.2" "9.1" "9.0" "8.4" "8.3" "8.2" "8.1" "8.0")
+  if (NOT WIN32)
+    foreach (suffix ${PostgreSQL_ADDITIONAL_VERSIONS})
+      list(APPEND PostgreSQL_ADDITIONAL_SEARCH_PATHS
+        "/usr/include/postgresql/${suffix}"
+        "/usr/include/postgresql/${suffix}/server"
+        "/usr/local/include/postgresql/${suffix}"
+        )
+    endforeach()
+  endif()
+
   include(FindPostgreSQL)
   include_directories(
     ${PostgreSQL_INCLUDE_DIR}
