@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* Fix build on Debian Buster
+
 
 Release 3.0 (2019-01-21)
 ========================

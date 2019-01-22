@@ -19,6 +19,7 @@
  **/
 
 
+#include "PostgreSQLIncludes.h"
 #include "PostgreSQLResult.h"
 
 #include "../Common/BinaryStringValue.h"
@@ -27,25 +28,12 @@
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
 
-#include <pg_config.h>
-
-#if PG_VERSION_NUM >= 110000
-#  include <postgres.h>
-#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Core/Logging.h>
-#endif
-
 #include <Core/OrthancException.h>
 #include <Core/Logging.h>
+#include <Core/Endianness.h>
 
 #include <cassert>
 #include <boost/lexical_cast.hpp>
-
-// PostgreSQL includes
-#include <libpq-fe.h>
-#include <c.h>
-#include <catalog/pg_type.h>
-
-#include <Core/Endianness.h>
 
 
 namespace OrthancDatabases

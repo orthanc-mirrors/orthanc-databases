@@ -376,7 +376,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   source_group(ThirdParty\\PostgreSQL REGULAR_EXPRESSION ${LIBPQ_SOURCES_DIR}/.*)
 
 else()
-  include(${CMAKE_CURRENT_LIST_DIR}/FindPostgreSQL.cmake)
+  include(FindPostgreSQL)
   include_directories(
     ${PostgreSQL_INCLUDE_DIR}
     ${PostgreSQL_TYPE_INCLUDE_DIR}

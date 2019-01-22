@@ -19,6 +19,7 @@
  **/
 
 
+#include "PostgreSQLIncludes.h"
 #include "PostgreSQLDatabase.h"
 
 #include "PostgreSQLResult.h"
@@ -26,22 +27,10 @@
 #include "PostgreSQLTransaction.h"
 #include "../Common/ImplicitTransaction.h"
 
-#include <pg_config.h>
-
-#if PG_VERSION_NUM >= 110000
-#  include <postgres.h>
-#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Core/Logging.h>
-#endif
-
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
-
-// PostgreSQL includes
-#include <libpq-fe.h>
-#include <c.h>
-#include <catalog/pg_type.h>
 
 
 namespace OrthancDatabases
