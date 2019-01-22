@@ -21,6 +21,13 @@
 
 #pragma once
 
+// These includes are necessary for compilation on OS X
+#include <unistd.h>
+#include <vector>
+#include <map>
+#include <cmath>
+#include <Core/Enumerations.h>
+
 // PostgreSQL includes
 #include <pg_config.h>
 
