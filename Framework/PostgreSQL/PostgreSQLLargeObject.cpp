@@ -21,8 +21,8 @@
 
 // http://www.postgresql.org/docs/9.1/static/lo-interfaces.html#AEN33102
 
-#include "PostgreSQLIncludes.h"
 #include "PostgreSQLLargeObject.h"
+#include "PostgreSQLIncludes.h"
 
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>

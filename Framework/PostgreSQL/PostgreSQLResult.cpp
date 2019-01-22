@@ -19,8 +19,8 @@
  **/
 
 
-#include "PostgreSQLIncludes.h"
 #include "PostgreSQLResult.h"
+#include "PostgreSQLIncludes.h"
 
 #include "../Common/BinaryStringValue.h"
 #include "../Common/FileValue.h"

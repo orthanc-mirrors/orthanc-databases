@@ -19,8 +19,8 @@
  **/
 
 
-#include "PostgreSQLIncludes.h"
 #include "PostgreSQLDatabase.h"
+#include "PostgreSQLIncludes.h"
 
 #include "PostgreSQLResult.h"
 #include "PostgreSQLStatement.h"
