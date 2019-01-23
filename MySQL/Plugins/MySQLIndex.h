@@ -76,5 +76,19 @@ namespace OrthancDatabases
     virtual void DeleteResource(int64_t id);
 
     virtual int64_t GetLastChangeIndex();
+
+    virtual bool HasCreateInstance() const  ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                const char* hashPatient,
+                                const char* hashStudy,
+                                const char* hashSeries,
+                                const char* hashInstance)
+      ORTHANC_OVERRIDE;
+#endif
   };
 }

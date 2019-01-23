@@ -130,6 +130,7 @@ namespace OrthancDatabases
 
       if (revision == 2)
       {
+        // Install the "GetLastChangeIndex" extension
         std::string query;
 
         Orthanc::EmbeddedResources::GetFileResource
@@ -153,7 +154,20 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
-      if (revision != 4)
+      if (revision == 4)
+      {
+        // Install the "CreateInstance" extension
+        std::string query;
+
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::MYSQL_CREATE_INSTANCE);
+        db->Execute(query, true);
+
+        revision = 5;
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+      }
+
+      if (revision != 5)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -299,4 +313,67 @@ namespace OrthancDatabases
 
     return ReadInteger64(statement, 0);
   }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  void MySQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                  const char* hashPatient,
+                                  const char* hashStudy,
+                                  const char* hashSeries,
+                                  const char* hashInstance)
+  {
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "CALL CreateInstance(${patient}, ${study}, ${series}, ${instance}, "
+        "@isNewPatient, @isNewStudy, @isNewSeries, @isNewInstance, "
+        "@patientKey, @studyKey, @seriesKey, @instanceKey)");
+
+      statement.SetParameterType("patient", ValueType_Utf8String);
+      statement.SetParameterType("study", ValueType_Utf8String);
+      statement.SetParameterType("series", ValueType_Utf8String);
+      statement.SetParameterType("instance", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("patient", hashPatient);
+      args.SetUtf8Value("study", hashStudy);
+      args.SetUtf8Value("series", hashSeries);
+      args.SetUtf8Value("instance", hashInstance);
+    
+      statement.Execute(args);
+
+      if (!statement.IsDone())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+      }
+    }
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, GetManager(),
+        "SELECT @isNewPatient, @isNewStudy, @isNewSeries, @isNewInstance, "
+        "@patientKey, @studyKey, @seriesKey, @instanceKey");
+
+      statement.Execute();
+
+      for (size_t i = 0; i < 8; i++)
+      {
+        statement.SetResultFieldType(i, ValueType_Integer64);
+      }
+
+      result.isNewInstance = (ReadInteger64(statement, 3) == 1);
+      result.instanceId = ReadInteger64(statement, 7);
+
+      if (result.isNewInstance)
+      {
+        result.isNewPatient = (ReadInteger64(statement, 0) == 1);
+        result.isNewStudy = (ReadInteger64(statement, 1) == 1);
+        result.isNewSeries = (ReadInteger64(statement, 2) == 1);
+        result.patientId = ReadInteger64(statement, 4);
+        result.studyId = ReadInteger64(statement, 5);
+        result.seriesId = ReadInteger64(statement, 6);
+      }
+    }   
+  }
+#endif
 }
