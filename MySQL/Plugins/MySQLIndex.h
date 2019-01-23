@@ -71,11 +71,12 @@ namespace OrthancDatabases
     }
 
     virtual int64_t CreateResource(const char* publicId,
-                                   OrthancPluginResourceType type);
+                                   OrthancPluginResourceType type)
+      ORTHANC_OVERRIDE;
 
-    virtual void DeleteResource(int64_t id);
+    virtual void DeleteResource(int64_t id) ORTHANC_OVERRIDE;
 
-    virtual int64_t GetLastChangeIndex();
+    virtual int64_t GetLastChangeIndex() ORTHANC_OVERRIDE;
 
     virtual bool HasCreateInstance() const  ORTHANC_OVERRIDE
     {
