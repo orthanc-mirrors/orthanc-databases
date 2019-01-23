@@ -121,7 +121,7 @@ namespace OrthancDatabases
     {
       LOG(WARNING) << "Performance warning in " << dbms
                    << " index: Your version of Orthanc (" 
-                   << context->orthancVersion << ") should be upgraded to 1.4.0 "
+                   << context->orthancVersion << ") should be upgraded to 1.5.2 "
                    << "to benefit from best performance";
     }
 
