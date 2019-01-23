@@ -140,7 +140,20 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
-      if (revision != 3)
+      if (revision == 3)
+      {
+        // Reconfiguration of "Metadata" from TEXT type (up to 64KB)
+        // to the LONGTEXT type (up to 4GB). This might be important
+        // for applications such as the Osimis Web viewer that stores
+        // large amount of metadata.
+        // http://book.orthanc-server.com/faq/features.html#central-registry-of-metadata-and-attachments
+        db->Execute("ALTER TABLE Metadata MODIFY value LONGTEXT", false);
+
+        revision = 4;
+        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+      }
+
+      if (revision != 4)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
