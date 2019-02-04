@@ -283,5 +283,23 @@ namespace OrthancDatabases
                                      int32_t metadata);
 
     virtual void TagMostRecentPatient(int64_t patient);
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+    // New primitive since Orthanc 1.5.4
+    virtual bool LookupResourceAndParent(int64_t& id,
+                                         OrthancPluginResourceType& type,
+                                         std::string& parentPublicId,
+                                         const char* publicId);
+#  endif
+#endif
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+    // New primitive since Orthanc 1.5.4
+    virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
+                                int64_t id);
+#  endif
+#endif
   };
 }

@@ -1739,9 +1739,9 @@ namespace OrthancDatabases
       args.SetUtf8Value(name, tags[i].value);
       
       std::string insert = ("(" + boost::lexical_cast<std::string>(tags[i].resource) + ", " +
-                           boost::lexical_cast<std::string>(tags[i].group) + ", " +
-                           boost::lexical_cast<std::string>(tags[i].element) + ", " +
-                           "${" + name + "})");
+                            boost::lexical_cast<std::string>(tags[i].group) + ", " +
+                            boost::lexical_cast<std::string>(tags[i].element) + ", " +
+                            "${" + name + "})");
 
       if (sql.empty())
       {
@@ -1787,7 +1787,7 @@ namespace OrthancDatabases
       
       std::string insert = ("(" + boost::lexical_cast<std::string>(metadata[i].resource) + ", " +
                             boost::lexical_cast<std::string>(metadata[i].metadata) + ", " +
-                           "${" + name + "})");
+                            "${" + name + "})");
 
       std::string remove = ("(id=" + boost::lexical_cast<std::string>(metadata[i].resource) +
                             " AND type=" + boost::lexical_cast<std::string>(metadata[i].metadata)
@@ -1951,4 +1951,108 @@ namespace OrthancDatabases
       statement.Execute(args);
     }
   }
+
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+  // New primitive since Orthanc 1.5.4
+  bool IndexBackend::LookupResourceAndParent(int64_t& id,
+                                             OrthancPluginResourceType& type,
+                                             std::string& parentPublicId,
+                                             const char* publicId)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager_,
+      "SELECT resource.internalId, resource.resourceType, parent.publicId "
+      "FROM Resources AS resource LEFT JOIN Resources parent ON parent.internalId=resource.parentId "
+      "WHERE resource.publicId=${id}");
+
+    statement.SetParameterType("id", ValueType_Utf8String);
+        
+    Dictionary args;
+    args.SetUtf8Value("id", publicId);
+
+    statement.Execute(args);
+
+    if (statement.IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      if (statement.GetResultFieldsCount() != 3)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+
+      statement.SetResultFieldType(0, ValueType_Integer64);
+      statement.SetResultFieldType(1, ValueType_Integer64);      
+      statement.SetResultFieldType(2, ValueType_Utf8String);
+
+      id = ReadInteger64(statement, 0);
+      type = static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
+
+      const IValue& value = statement.GetResultField(2);
+      
+      switch (value.GetType())
+      {
+        case ValueType_Null:
+          parentPublicId.clear();
+          break;
+
+        case ValueType_Utf8String:
+          parentPublicId = dynamic_cast<const Utf8StringValue&>(value).GetContent();
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+      
+      assert((statement.Next(), statement.IsDone()));
+      return true;
+    }
+  }
+#  endif
+#endif
+  
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+  // New primitive since Orthanc 1.5.4
+  void IndexBackend::GetAllMetadata(std::map<int32_t, std::string>& result,
+                                    int64_t id)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager_,
+      "SELECT type, value FROM Metadata WHERE id=${id}");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", id);
+
+    statement.Execute(args);
+      
+    result.clear();
+
+    if (!statement.IsDone())
+    {
+      if (statement.GetResultFieldsCount() != 2)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+      
+      statement.SetResultFieldType(0, ValueType_Integer64);
+      statement.SetResultFieldType(1, ValueType_Utf8String);
+
+      while (!statement.IsDone())
+      {
+        result[ReadInteger32(statement, 0)] = ReadString(statement, 1);
+        statement.Next();
+      }
+    }
+  }
+#  endif
+#endif
 }
