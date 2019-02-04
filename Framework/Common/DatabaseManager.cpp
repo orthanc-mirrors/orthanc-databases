@@ -21,8 +21,6 @@
 
 #include "DatabaseManager.h"
 
-#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
-
 #include <Core/Logging.h>
 #include <Core/OrthancException.h>
 
@@ -512,18 +510,6 @@ namespace OrthancDatabases
       }
         
       assert(statement_ != NULL);
-
-      /*
-        TODO - Sample code to monitor the execution time of each
-        cached statement, and publish it as an Orthanc metrics
-
-        #if HAS_ORTHANC_PLUGIN_METRICS == 1
-        std::string name = (std::string(location_.GetFile()) + "_" +
-        boost::lexical_cast<std::string>(location_.GetLine()));
-        OrthancPlugins::MetricsTimer timer(name.c_str());
-        #endif
-      */
-
       SetResult(GetTransaction().Execute(*statement_, parameters));
     }
     catch (Orthanc::OrthancException& e)
