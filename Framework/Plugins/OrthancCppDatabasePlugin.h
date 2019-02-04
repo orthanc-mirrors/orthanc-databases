@@ -82,7 +82,8 @@ namespace OrthancPlugins
       AllowedAnswers_DicomTag,
       AllowedAnswers_ExportedResource,
       AllowedAnswers_MatchingResource,
-      AllowedAnswers_String
+      AllowedAnswers_String,
+      AllowedAnswers_Metadata
     };
 
     OrthancPluginContext*         context_;
@@ -534,6 +535,23 @@ namespace OrthancPlugins
     virtual int64_t GetLastChangeIndex() = 0;
 
     virtual void TagMostRecentPatient(int64_t patientId) = 0;
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+    // NB: "parentPublicId" must be cleared if the resource has no parent
+    virtual bool LookupResourceAndParent(int64_t& id,
+      OrthancPluginResourceType& type,
+      std::string& parentPublicId,
+      const char* publicId) = 0;
+#  endif
+#endif
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+  virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
+                              int64_t id) = 0;
+#  endif
+#endif
   };
 
 
@@ -1650,6 +1668,77 @@ namespace OrthancPlugins
     }
    
 
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+    // New primitive since Orthanc 1.5.4
+    static OrthancPluginErrorCode GetAllMetadata(OrthancPluginDatabaseContext* context,
+                                                 void* payload,
+                                                 int64_t resourceId)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_Metadata);
+
+      try
+      {
+        std::map<int32_t, std::string> result;
+        backend->GetAllMetadata(result, resourceId);
+
+        for (std::map<int32_t, std::string>::const_iterator
+               it = result.begin(); it != result.end(); ++it)
+        {
+          OrthancPluginDatabaseAnswerMetadata(backend->GetOutput().context_,
+                                            backend->GetOutput().database_,
+                                            resourceId, it->first, it->second.c_str());
+        }
+        
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#  endif
+#endif
+   
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+    // New primitive since Orthanc 1.5.4
+    static OrthancPluginErrorCode LookupResourceAndParent(OrthancPluginDatabaseContext* context,
+                                                          uint8_t* isExisting,
+                                                          int64_t* id,
+                                                          OrthancPluginResourceType* type,
+                                                          void* payload,
+                                                          const char* publicId)
+    {
+      IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+      backend->GetOutput().SetAllowedAnswers(DatabaseBackendOutput::AllowedAnswers_String);
+
+      try
+      {
+        std::string parent;
+        if (backend->LookupResourceAndParent(*id, *type, parent, publicId))
+        {
+          *isExisting = 1;
+
+          if (!parent.empty())
+          {
+            OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
+                                              backend->GetOutput().database_,
+                                              parent.c_str());
+          }
+        }
+        else
+        {
+          *isExisting = 0;
+        }
+        
+        return OrthancPluginErrorCode_Success;
+      }
+      ORTHANC_PLUGINS_DATABASE_CATCH      
+    }
+#  endif
+#endif
+   
+
   public:
     /**
      * Register a custom database back-end written in C++.
@@ -1741,11 +1830,18 @@ namespace OrthancPlugins
       {
         extensions.createInstance = CreateInstance;          // Fast creation of resources
       }
-      
-      performanceWarning = false;
 #endif      
 
-      if (performanceWarning)
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
+      // Optimizations brought by Orthanc 1.5.4
+      extensions.lookupResourceAndParent = LookupResourceAndParent;
+      extensions.getAllMetadata = GetAllMetadata;
+      performanceWarning = false;
+#  endif
+#endif
+
+  if (performanceWarning)
       {
         char info[1024];
         sprintf(info, 

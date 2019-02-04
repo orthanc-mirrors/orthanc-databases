@@ -108,7 +108,7 @@ namespace OrthancDatabases
       readOnly_ = false;
     }
 
-  return result.release();
+    return result.release();
   }
 
 
