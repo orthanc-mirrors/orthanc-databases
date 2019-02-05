@@ -4,6 +4,7 @@ Pending changes in the mainline
 * Fix build on Debian Buster
 * Remove "ASSERT" in SQL for compatibility with older releases of PostgreSQL
 * Implementation of new extensions: LookupResourceAndParent and GetAllMetadata
+* Performance: Defining option "TCP_NODELAY" if libpq is linked statically
 
 
 Release 3.0 (2019-01-21)

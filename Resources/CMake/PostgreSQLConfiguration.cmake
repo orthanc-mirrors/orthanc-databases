@@ -276,6 +276,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
     -DFRONTEND
     -DUNSAFE_STAT_OK
     -DSYSCONFDIR=""
+    -DTCP_NODELAY
     )
 
   include_directories(
