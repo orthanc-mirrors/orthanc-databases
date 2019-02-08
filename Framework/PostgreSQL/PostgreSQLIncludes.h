@@ -28,6 +28,15 @@
 #include <cmath>
 #include <Core/Enumerations.h>
 
+/**
+ * This include must be before including "c.h" from PostgreSQL,
+ * otherwise the function "static bool
+ * boost::date_time::special_values_parser<date_type,
+ * charT>::__builtin_expect()" from Boost clashes with macro
+ * "__builtin_expect()" used by PostgreSQL 11.
+ **/
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 // PostgreSQL includes
 #include <pg_config.h>
 
