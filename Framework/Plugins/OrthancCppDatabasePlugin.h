@@ -1841,13 +1841,13 @@ namespace OrthancPlugins
 #  endif
 #endif
 
-  if (performanceWarning)
+      if (performanceWarning)
       {
         char info[1024];
         sprintf(info, 
                 "Performance warning: The database index plugin was compiled "
                 "against an old version of the Orthanc SDK (%d.%d.%d): "
-                "Consider upgrading to version 1.5.2 of the Orthanc SDK",
+                "Consider upgrading to version 1.5.4 of the Orthanc SDK",
                 ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER);
