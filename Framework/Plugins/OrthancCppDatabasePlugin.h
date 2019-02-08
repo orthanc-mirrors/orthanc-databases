@@ -1847,10 +1847,13 @@ namespace OrthancPlugins
         sprintf(info, 
                 "Performance warning: The database index plugin was compiled "
                 "against an old version of the Orthanc SDK (%d.%d.%d): "
-                "Consider upgrading to version 1.5.4 of the Orthanc SDK",
+                "Consider upgrading to version %d.%d.%d of the Orthanc SDK",
                 ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER,
                 ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER,
-                ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER);
+                ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER,
+                ORTHANC_OPTIMAL_VERSION_MAJOR,
+                ORTHANC_OPTIMAL_VERSION_MINOR,
+                ORTHANC_OPTIMAL_VERSION_REVISION);
 
         OrthancPluginLogWarning(context, info);
       }
