@@ -1,6 +1,10 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 3.1 (2019-02-08)
+========================
+
 * Fix build on Debian Buster
 * Remove "ASSERT" in SQL for compatibility with older releases of PostgreSQL
 * Implementation of new extensions: LookupResourceAndParent and GetAllMetadata
