@@ -65,7 +65,7 @@ namespace OrthancDatabases
       return false;
     }
 
-    if (OrthancPluginCheckVersionAdvanced(context, 1, 4, 0) == 1)
+    if (OrthancPluginCheckVersionAdvanced(context, 1, 5, 4) == 1)
     {
       ImplicitTransaction::SetErrorOnDoubleExecution(true);
       isOptimal = true;
@@ -111,8 +111,8 @@ namespace OrthancDatabases
         int revision = boost::lexical_cast<int>(tokens[2]);
 
         isOptimal = (major > 1 ||
-                     (major == 1 && minor > 4) ||
-                     (major == 1 && minor == 4 && revision >= 0));
+                     (major == 1 && minor > 5) ||
+                     (major == 1 && minor == 5 && revision >= 4));
       }
     }
 
@@ -121,7 +121,7 @@ namespace OrthancDatabases
     {
       LOG(WARNING) << "Performance warning in " << dbms
                    << " index: Your version of Orthanc (" 
-                   << context->orthancVersion << ") should be upgraded to 1.5.2 "
+                   << context->orthancVersion << ") should be upgraded to 1.5.4 "
                    << "to benefit from best performance";
     }
 
