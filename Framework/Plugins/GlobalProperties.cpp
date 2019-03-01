@@ -115,6 +115,12 @@ namespace OrthancDatabases
                          Orthanc::GlobalProperty property,
                          const std::string& utf8)
   {
+    // This version of "SetGlobalProperty()" (with an explicit
+    // transaction) is called internally by the plugin to set a global
+    // property during the initialization of the database. (TODO:
+    // Could be replaced by the version with an implicit transaction
+    // to avoid code redundancy).
+    
     if (db.GetDialect() == Dialect_SQLite)
     {
       Query query("INSERT OR REPLACE INTO GlobalProperties VALUES (${property}, ${value})", false);
@@ -164,6 +170,11 @@ namespace OrthancDatabases
                          Orthanc::GlobalProperty property,
                          const std::string& utf8)
   {
+    // This version of "SetGlobalProperty()" (without an explicit
+    // transaction) is called by Orthanc during its execution. Orthanc
+    // manages the transaction at a higher level, but this transaction
+    // is always present.
+
     if (manager.GetDialect() == Dialect_SQLite)
     {
       DatabaseManager::CachedStatement statement(
