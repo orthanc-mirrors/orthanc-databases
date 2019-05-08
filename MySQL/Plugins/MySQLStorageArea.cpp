@@ -42,6 +42,14 @@ namespace OrthancDatabases
       db->AdvisoryLock(43 /* some arbitrary constant */);
     }
 
+    /**
+     * Try and acquire a transient advisory lock to protect the setup
+     * of the database, because concurrent statements like "CREATE
+     * TABLE" are not protected by transactions.
+     * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
+     **/
+    MySQLDatabase::TransientAdvisoryLock lock(*db, 44 /* some arbitrary constant */);
+    
     {
       MySQLTransaction t(*db);
 

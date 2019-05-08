@@ -35,6 +35,7 @@
 #include <mysqld_error.h>
 
 #include <memory>
+#include <boost/thread.hpp>
 
 namespace OrthancDatabases
 {
@@ -289,32 +290,45 @@ namespace OrthancDatabases
   }
 
 
+  bool MySQLDatabase::RunAdvisoryLockStatement(const std::string& s)
+  {
+    Query query(s, false);
+    MySQLStatement statement(*this, query);
+
+    MySQLTransaction t(*this);
+    Dictionary args;
+
+    std::auto_ptr<IResult> result(t.Execute(statement, args));
+
+    bool success = (!result->IsDone() &&
+                    result->GetField(0).GetType() == ValueType_Integer64 &&
+                    dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() == 1);
+
+    t.Commit();
+
+    return success;
+  }
+  
+
+  bool MySQLDatabase::AcquireAdvisoryLock(int32_t lock)
+  {
+    return RunAdvisoryLockStatement("SELECT GET_LOCK('Lock" +
+                                    boost::lexical_cast<std::string>(lock) + "', 0);");
+  }
+  
+
+  bool MySQLDatabase::ReleaseAdvisoryLock(int32_t lock)
+  {
+    return RunAdvisoryLockStatement("SELECT RELEASE_LOCK('Lock" +
+                                    boost::lexical_cast<std::string>(lock) + "');");
+  }
+
+
   void MySQLDatabase::AdvisoryLock(int32_t lock)
   {
-    try
-    {
-      Query query("SELECT GET_LOCK('Lock" +
-                  boost::lexical_cast<std::string>(lock) + "', 0);", false);
-      MySQLStatement statement(*this, query);
-
-      MySQLTransaction t(*this);
-      Dictionary args;
-
-      std::auto_ptr<IResult> result(t.Execute(statement, args));
-
-      if (result->IsDone() ||
-          result->GetField(0).GetType() != ValueType_Integer64 ||
-          dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() != 1)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-      }
-
-      t.Commit();
-    }
-    catch (Orthanc::OrthancException&)
+    if (!AcquireAdvisoryLock(lock))
     {
       LOG(ERROR) << "The MySQL database is locked by another instance of Orthanc";
-      Close();
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
     }
   }
@@ -494,5 +508,40 @@ namespace OrthancDatabases
     }
 
     return true;
+  }
+
+
+  MySQLDatabase::TransientAdvisoryLock::
+  TransientAdvisoryLock(MySQLDatabase&  database,
+                        int32_t lock) :
+    database_(database),
+    lock_(lock)
+  {
+    bool locked = true;
+    
+    for (unsigned int i = 0; i < 10; i++)
+    {
+      if (database_.AcquireAdvisoryLock(lock_))
+      {
+        locked = false;
+        break;
+      }
+      else
+      {
+        boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+      }
+    }
+
+    if (locked)
+    {
+      LOG(ERROR) << "Cannot acquire a transient advisory lock";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
+    }    
+  }
+    
+
+  MySQLDatabase::TransientAdvisoryLock::~TransientAdvisoryLock()
+  {
+    database_.ReleaseAdvisoryLock(lock_);
   }
 }

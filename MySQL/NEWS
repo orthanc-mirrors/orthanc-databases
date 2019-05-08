@@ -2,6 +2,7 @@ Pending changes in the mainline
 ===============================
 
 * Implementation of new extensions: LookupResourceAndParent and GetAllMetadata
+* Added an advisory lock to avoid race conditions during database setup
 
 
 Release 2.0 (2019-01-23)
