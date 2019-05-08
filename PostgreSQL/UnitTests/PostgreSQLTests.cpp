@@ -513,3 +513,41 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_NE(r1.instanceId, r2.instanceId);
 }
 #endif
+
+
+TEST(PostgreSQL, Lock2)
+{
+  std::auto_ptr<PostgreSQLDatabase> db1(CreateTestDatabase());
+  db1->Open();
+
+  ASSERT_FALSE(db1->ReleaseAdvisoryLock(43)); // lock counter = 0
+  ASSERT_TRUE(db1->AcquireAdvisoryLock(43));  // lock counter = 1
+
+  // OK, as this is the same connection
+  ASSERT_TRUE(db1->AcquireAdvisoryLock(43));  // lock counter = 2
+  ASSERT_TRUE(db1->ReleaseAdvisoryLock(43));  // lock counter = 1
+
+  // Try and release twice the lock
+  ASSERT_TRUE(db1->ReleaseAdvisoryLock(43));  // lock counter = 0
+  ASSERT_FALSE(db1->ReleaseAdvisoryLock(43)); // cannot unlock
+  ASSERT_TRUE(db1->AcquireAdvisoryLock(43));  // lock counter = 1
+
+  {
+    std::auto_ptr<PostgreSQLDatabase> db2(CreateTestDatabase());
+    db2->Open();
+
+    // The "db1" is still actively locking
+    ASSERT_FALSE(db2->AcquireAdvisoryLock(43));
+
+    // Release the "db1" lock
+    ASSERT_TRUE(db1->ReleaseAdvisoryLock(43));
+    ASSERT_FALSE(db1->ReleaseAdvisoryLock(43));
+
+    // "db2" can now acquire the lock, but not "db1"
+    ASSERT_TRUE(db2->AcquireAdvisoryLock(43));
+    ASSERT_FALSE(db1->AcquireAdvisoryLock(43));
+  }
+
+  // "db2" is closed, "db1" can now acquire the lock
+  ASSERT_TRUE(db1->AcquireAdvisoryLock(43));
+}

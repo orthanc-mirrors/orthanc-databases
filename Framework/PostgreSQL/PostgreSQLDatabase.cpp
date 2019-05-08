@@ -31,6 +31,7 @@
 #include <Core/OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
+#include <boost/thread.hpp>
 
 
 namespace OrthancDatabases
@@ -109,23 +110,47 @@ namespace OrthancDatabases
   }
 
 
-  void PostgreSQLDatabase::AdvisoryLock(int32_t lock)
+  bool PostgreSQLDatabase::RunAdvisoryLockStatement(const std::string& statement)
   {
     PostgreSQLTransaction transaction(*this);
 
-    Query query("select pg_try_advisory_lock(" + 
-                boost::lexical_cast<std::string>(lock) + ");", false);
+    Query query(statement, false);
     PostgreSQLStatement s(*this, query);
 
     PostgreSQLResult result(s);
-    if (result.IsDone() ||
-        !result.GetBoolean(0))
+
+    bool success = (!result.IsDone() &&
+                    result.GetBoolean(0));
+
+    transaction.Commit();
+
+    return success;
+  }
+  
+
+  bool PostgreSQLDatabase::AcquireAdvisoryLock(int32_t lock)
+  {
+    return RunAdvisoryLockStatement(
+      "select pg_try_advisory_lock(" + 
+      boost::lexical_cast<std::string>(lock) + ")");
+  }
+
+
+  bool PostgreSQLDatabase::ReleaseAdvisoryLock(int32_t lock)
+  {
+    return RunAdvisoryLockStatement(
+      "select pg_advisory_unlock(" + 
+      boost::lexical_cast<std::string>(lock) + ")");
+  }
+
+
+  void PostgreSQLDatabase::AdvisoryLock(int32_t lock)
+  {
+    if (!AcquireAdvisoryLock(lock))
     {
       LOG(ERROR) << "The PostgreSQL database is locked by another instance of Orthanc";
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
     }
-
-    transaction.Commit();
   }
 
 
@@ -242,5 +267,40 @@ namespace OrthancDatabases
     {
       return new PostgreSQLTransaction(*this);
     }
+  }
+
+
+  PostgreSQLDatabase::TransientAdvisoryLock::TransientAdvisoryLock(
+    PostgreSQLDatabase&  database,
+    int32_t lock) :
+    database_(database),
+    lock_(lock)
+  {
+    bool locked = true;
+    
+    for (unsigned int i = 0; i < 10; i++)
+    {
+      if (database_.AcquireAdvisoryLock(lock_))
+      {
+        locked = false;
+        break;
+      }
+      else
+      {
+        boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+      }
+    }
+
+    if (locked)
+    {
+      LOG(ERROR) << "Cannot acquire a transient advisory lock";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
+    }    
+  }
+    
+
+  PostgreSQLDatabase::TransientAdvisoryLock::~TransientAdvisoryLock()
+  {
+    database_.ReleaseAdvisoryLock(lock_);
   }
 }

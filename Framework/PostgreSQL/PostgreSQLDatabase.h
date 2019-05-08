@@ -43,6 +43,8 @@ namespace OrthancDatabases
 
     void Close();
 
+    bool RunAdvisoryLockStatement(const std::string& statement);
+
   public:
     PostgreSQLDatabase(const PostgreSQLParameters& parameters) :
     parameters_(parameters),
@@ -53,6 +55,10 @@ namespace OrthancDatabases
     ~PostgreSQLDatabase();
 
     void Open();
+
+    bool AcquireAdvisoryLock(int32_t lock);
+
+    bool ReleaseAdvisoryLock(int32_t lock);
 
     void AdvisoryLock(int32_t lock);
 
@@ -70,5 +76,18 @@ namespace OrthancDatabases
     virtual IPrecompiledStatement* Compile(const Query& query);
 
     virtual ITransaction* CreateTransaction(bool isImplicit);
+
+    class TransientAdvisoryLock
+    {
+    private:
+      PostgreSQLDatabase&  database_;
+      int32_t              lock_;
+
+    public:
+      TransientAdvisoryLock(PostgreSQLDatabase&  database,
+                            int32_t lock);
+
+      ~TransientAdvisoryLock();
+    };
   };
 }

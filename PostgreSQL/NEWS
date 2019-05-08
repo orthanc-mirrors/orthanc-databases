@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* Added an advisory lock to avoid race conditions during database setup
+
 
 Release 3.2 (2019-03-01)
 ========================
