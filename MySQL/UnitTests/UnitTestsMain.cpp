@@ -74,31 +74,36 @@ TEST(MySQL, Lock2)
   ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));  // lock counter = 1
 
   // OK, as this is the same connection
-  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));  // lock counter = 1
-  ASSERT_TRUE(db1.ReleaseAdvisoryLock("mylock"));  // lock counter = 0
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));
+  // lock counter = 2 if MySQL >= 5.7, or 1 if MySQL < 5.7 (because
+  // acquiring a lock releases all the previously-acquired locks)
+  
+  ASSERT_TRUE(db1.ReleaseAdvisoryLock("mylock"));
+  // lock counter = 1 if MySQL >= 5.7, or 0 if MySQL < 5.7
 
   // Try and release twice the lock
-  ASSERT_FALSE(db1.ReleaseAdvisoryLock("mylock"));  // lock counter = 0
-  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));  // lock counter = 1
+  db1.ReleaseAdvisoryLock("mylock"); // Succeeds iff MySQL >= 5.7
+
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock2"));  // lock counter = 1
 
   {
     OrthancDatabases::MySQLDatabase db2(globalParameters_);
     db2.Open();
 
     // The "db1" is still actively locking
-    ASSERT_FALSE(db2.AcquireAdvisoryLock("mylock"));
+    ASSERT_FALSE(db2.AcquireAdvisoryLock("mylock2"));
 
     // Release the "db1" lock
-    ASSERT_TRUE(db1.ReleaseAdvisoryLock("mylock"));
-    ASSERT_FALSE(db1.ReleaseAdvisoryLock("mylock"));
+    ASSERT_TRUE(db1.ReleaseAdvisoryLock("mylock2"));
+    ASSERT_FALSE(db1.ReleaseAdvisoryLock("mylock2"));
 
     // "db2" can now acquire the lock, but not "db1"
-    ASSERT_TRUE(db2.AcquireAdvisoryLock("mylock"));
-    ASSERT_FALSE(db1.AcquireAdvisoryLock("mylock"));
+    ASSERT_TRUE(db2.AcquireAdvisoryLock("mylock2"));
+    ASSERT_FALSE(db1.AcquireAdvisoryLock("mylock2"));
   }
 
   // "db2" is closed, "db1" can now acquire the lock
-  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock2"));
 }
 
 
