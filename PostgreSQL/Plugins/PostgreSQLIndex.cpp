@@ -24,6 +24,7 @@
 #include "../../Framework/Plugins/GlobalProperties.h"
 #include "../../Framework/PostgreSQL/PostgreSQLDatabase.h"
 #include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
+#include "PostgreSQLDefinitions.h"
 
 #include <EmbeddedResources.h>  // Auto-generated file
 
@@ -71,192 +72,188 @@ namespace OrthancDatabases
 
     if (parameters_.HasLock())
     {
-      db->AdvisoryLock(42 /* some arbitrary constant */);
-    }
-
-    /**
-     * Try and acquire a transient advisory lock to protect the setup
-     * of the database, because concurrent statements like "CREATE
-     * TABLE" are not protected by transactions.
-     * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
-     **/
-    PostgreSQLDatabase::TransientAdvisoryLock lock(*db, 44 /* some arbitrary constant */);
-
-    if (clearAll_)
-    {
-      db->ClearAll();
+      db->AdvisoryLock(POSTGRESQL_LOCK_INDEX);
     }
 
     {
-      PostgreSQLTransaction t(*db);
+      PostgreSQLDatabase::TransientAdvisoryLock lock(*db, POSTGRESQL_LOCK_DATABASE_SETUP);
 
-      if (!db->DoesTableExist("Resources"))
+      if (clearAll_)
       {
-        std::string query;
-
-        Orthanc::EmbeddedResources::GetFileResource
-          (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
-        db->Execute(query);
-
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasTrigramIndex, 0);
+        db->ClearAll();
       }
+
+      {
+        PostgreSQLTransaction t(*db);
+
+        if (!db->DoesTableExist("Resources"))
+        {
+          std::string query;
+
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
+          db->Execute(query);
+
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasTrigramIndex, 0);
+        }
           
-      if (!db->DoesTableExist("Resources"))
-      {
-        LOG(ERROR) << "Corrupted PostgreSQL database";
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
-      }
-
-      int version = 0;
-      if (!LookupGlobalIntegerProperty(version, *db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
-          version != 6)
-      {
-        LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema version: " << version;
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-      }
-
-      int revision;
-      if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
-      {
-        revision = 1;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-      }
-
-      if (revision != 1)
-      {
-        LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-      }
-
-      t.Commit();
-    }
-
-    {
-      PostgreSQLTransaction t(*db);
-
-      int hasTrigram = 0;
-      if (!LookupGlobalIntegerProperty(hasTrigram, *db, t,
-                                       Orthanc::GlobalProperty_HasTrigramIndex) ||
-          hasTrigram != 1)
-      {
-        /**
-         * Apply fix for performance issue (speed up wildcard search
-         * by using GIN trigrams). This implements the patch suggested
-         * in issue #47, BUT we also keep the original
-         * "DicomIdentifiersIndexValues", as it leads to better
-         * performance for "strict" searches (i.e. searches involving
-         * no wildcard).
-         * https://www.postgresql.org/docs/current/static/pgtrgm.html
-         * https://bitbucket.org/sjodogne/orthanc/issues/47/index-improvements-for-pg-plugin
-         **/
-        try
+        if (!db->DoesTableExist("Resources"))
         {
-          // We've observed 9 minutes on DB with 100000 studies
-          LOG(WARNING) << "Trying to enable trigram matching on the PostgreSQL database "
-                       << "to speed up wildcard searches. This may take several minutes";
-
-          db->Execute(
-            "CREATE EXTENSION IF NOT EXISTS pg_trgm; "
-            "CREATE INDEX DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);");
-
-          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasTrigramIndex, 1);
-          LOG(WARNING) << "Trigram index has been created";
-
-          t.Commit();
+          LOG(ERROR) << "Corrupted PostgreSQL database";
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
         }
-        catch (Orthanc::OrthancException&)
+
+        int version = 0;
+        if (!LookupGlobalIntegerProperty(version, *db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+            version != 6)
         {
-          LOG(WARNING) << "Performance warning: Your PostgreSQL server does "
-                       << "not support trigram matching";
-          LOG(WARNING) << "-> Consider installing the \"pg_trgm\" extension on the "
-                       << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
+          LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema version: " << version;
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
         }
-      }
-      else
-      {
+
+        int revision;
+        if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
+        {
+          revision = 1;
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        }
+
+        if (revision != 1)
+        {
+          LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+        }
+
         t.Commit();
       }
-    }
 
-    {
-      PostgreSQLTransaction t(*db);
-
-      int property = 0;
-      if (!LookupGlobalIntegerProperty(property, *db, t,
-                                       Orthanc::GlobalProperty_HasCreateInstance) ||
-          property != 2)
       {
-        LOG(INFO) << "Installing the CreateInstance extension";
+        PostgreSQLTransaction t(*db);
 
-        if (property == 1)
+        int hasTrigram = 0;
+        if (!LookupGlobalIntegerProperty(hasTrigram, *db, t,
+                                         Orthanc::GlobalProperty_HasTrigramIndex) ||
+            hasTrigram != 1)
         {
-          // Drop older, experimental versions of this extension
-          db->Execute("DROP FUNCTION CreateInstance("
-                      "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
-        }
-        
-        std::string query;
-        Orthanc::EmbeddedResources::GetFileResource
-          (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
-        db->Execute(query);
+          /**
+           * Apply fix for performance issue (speed up wildcard search
+           * by using GIN trigrams). This implements the patch suggested
+           * in issue #47, BUT we also keep the original
+           * "DicomIdentifiersIndexValues", as it leads to better
+           * performance for "strict" searches (i.e. searches involving
+           * no wildcard).
+           * https://www.postgresql.org/docs/current/static/pgtrgm.html
+           * https://bitbucket.org/sjodogne/orthanc/issues/47/index-improvements-for-pg-plugin
+           **/
+          try
+          {
+            // We've observed 9 minutes on DB with 100000 studies
+            LOG(WARNING) << "Trying to enable trigram matching on the PostgreSQL database "
+                         << "to speed up wildcard searches. This may take several minutes";
 
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 2);
+            db->Execute(
+              "CREATE EXTENSION IF NOT EXISTS pg_trgm; "
+              "CREATE INDEX DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);");
+
+            SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasTrigramIndex, 1);
+            LOG(WARNING) << "Trigram index has been created";
+
+            t.Commit();
+          }
+          catch (Orthanc::OrthancException&)
+          {
+            LOG(WARNING) << "Performance warning: Your PostgreSQL server does "
+                         << "not support trigram matching";
+            LOG(WARNING) << "-> Consider installing the \"pg_trgm\" extension on the "
+                         << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
+          }
+        }
+        else
+        {
+          t.Commit();
+        }
       }
+
+      {
+        PostgreSQLTransaction t(*db);
+
+        int property = 0;
+        if (!LookupGlobalIntegerProperty(property, *db, t,
+                                         Orthanc::GlobalProperty_HasCreateInstance) ||
+            property != 2)
+        {
+          LOG(INFO) << "Installing the CreateInstance extension";
+
+          if (property == 1)
+          {
+            // Drop older, experimental versions of this extension
+            db->Execute("DROP FUNCTION CreateInstance("
+                        "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+          }
+        
+          std::string query;
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
+          db->Execute(query);
+
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasCreateInstance, 2);
+        }
 
       
-      if (!LookupGlobalIntegerProperty(property, *db, t,
-                                       Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-          property != 1)
-      {
-        LOG(INFO) << "Installing the FastTotalSize extension";
+        if (!LookupGlobalIntegerProperty(property, *db, t,
+                                         Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
+            property != 1)
+        {
+          LOG(INFO) << "Installing the FastTotalSize extension";
 
-        std::string query;
-        Orthanc::EmbeddedResources::GetFileResource
-          (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
-        db->Execute(query);
+          std::string query;
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
+          db->Execute(query);
 
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
+        }
+
+
+        // Installing this extension requires the "GlobalIntegers" table
+        // created by the "FastTotalSize" extension
+        property = 0;
+        if (!LookupGlobalIntegerProperty(property, *db, t,
+                                         Orthanc::GlobalProperty_HasFastCountResources) ||
+            property != 1)
+        {
+          LOG(INFO) << "Installing the FastCountResources extension";
+
+          std::string query;
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
+          db->Execute(query);
+
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasFastCountResources, 1);
+        }
+
+
+        // Installing this extension requires the "GlobalIntegers" table
+        // created by the "GetLastChangeIndex" extension
+        property = 0;
+        if (!LookupGlobalIntegerProperty(property, *db, t,
+                                         Orthanc::GlobalProperty_GetLastChangeIndex) ||
+            property != 1)
+        {
+          LOG(INFO) << "Installing the GetLastChangeIndex extension";
+
+          std::string query;
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
+          db->Execute(query);
+
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+        }
+
+        t.Commit();
       }
-
-
-      // Installing this extension requires the "GlobalIntegers" table
-      // created by the "FastTotalSize" extension
-      property = 0;
-      if (!LookupGlobalIntegerProperty(property, *db, t,
-                                       Orthanc::GlobalProperty_HasFastCountResources) ||
-          property != 1)
-      {
-        LOG(INFO) << "Installing the FastCountResources extension";
-
-        std::string query;
-        Orthanc::EmbeddedResources::GetFileResource
-          (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
-        db->Execute(query);
-
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_HasFastCountResources, 1);
-      }
-
-
-      // Installing this extension requires the "GlobalIntegers" table
-      // created by the "GetLastChangeIndex" extension
-      property = 0;
-      if (!LookupGlobalIntegerProperty(property, *db, t,
-                                       Orthanc::GlobalProperty_GetLastChangeIndex) ||
-          property != 1)
-      {
-        LOG(INFO) << "Installing the GetLastChangeIndex extension";
-
-        std::string query;
-        Orthanc::EmbeddedResources::GetFileResource
-          (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
-        db->Execute(query);
-
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
-      }
-
-      t.Commit();
     }
 
     return db.release();

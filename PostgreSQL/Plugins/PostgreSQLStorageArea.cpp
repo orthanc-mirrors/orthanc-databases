@@ -20,6 +20,7 @@
 
 
 #include "PostgreSQLStorageArea.h"
+#include "PostgreSQLDefinitions.h"
 
 #include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
 
@@ -37,38 +38,34 @@ namespace OrthancDatabases
 
     if (parameters_.HasLock())
     {
-      db->AdvisoryLock(43 /* some arbitrary constant */);
-    }
-
-    /**
-     * Try and acquire a transient advisory lock to protect the setup
-     * of the database, because concurrent statements like "CREATE
-     * TABLE" are not protected by transactions.
-     * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
-     **/
-    PostgreSQLDatabase::TransientAdvisoryLock lock(*db, 44 /* some arbitrary constant */);
-
-    if (clearAll_)
-    {
-      db->ClearAll();
+      db->AdvisoryLock(POSTGRESQL_LOCK_STORAGE);
     }
 
     {
-      PostgreSQLTransaction t(*db);
+      PostgreSQLDatabase::TransientAdvisoryLock lock(*db, POSTGRESQL_LOCK_DATABASE_SETUP);
 
-      if (!db->DoesTableExist("StorageArea"))
+      if (clearAll_)
       {
-        db->Execute("CREATE TABLE IF NOT EXISTS StorageArea("
-                    "uuid VARCHAR NOT NULL PRIMARY KEY,"
-                    "content OID NOT NULL,"
-                    "type INTEGER NOT NULL)");
-
-        // Automatically remove the large objects associated with the table
-        db->Execute("CREATE OR REPLACE RULE StorageAreaDelete AS ON DELETE "
-                    "TO StorageArea DO SELECT lo_unlink(old.content);");
+        db->ClearAll();
       }
 
-      t.Commit();
+      {
+        PostgreSQLTransaction t(*db);
+
+        if (!db->DoesTableExist("StorageArea"))
+        {
+          db->Execute("CREATE TABLE IF NOT EXISTS StorageArea("
+                      "uuid VARCHAR NOT NULL PRIMARY KEY,"
+                      "content OID NOT NULL,"
+                      "type INTEGER NOT NULL)");
+
+          // Automatically remove the large objects associated with the table
+          db->Execute("CREATE OR REPLACE RULE StorageAreaDelete AS ON DELETE "
+                      "TO StorageArea DO SELECT lo_unlink(old.content);");
+        }
+
+        t.Commit();
+      }
     }
 
     return db.release();
