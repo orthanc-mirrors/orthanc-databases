@@ -290,41 +290,65 @@ namespace OrthancDatabases
   }
 
 
-  bool MySQLDatabase::RunAdvisoryLockStatement(const std::string& s)
+  bool MySQLDatabase::RunAdvisoryLockStatement(Query& query,
+                                               const std::string& lock)
   {
-    Query query(s, false);
+    const std::string& dbName = parameters_.GetDatabase();
+
+    // Prepend the name of the lock by the database name. This allows
+    // to create a namespace for advisory locks:
+    // https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/MQIcvnMlAQAJ
+    std::string prefix;
+    prefix.reserve(dbName.size());
+    for (size_t i = 0; i < dbName.size(); i++)
+    {
+      if (isalnum(dbName[i]) ||
+          dbName[i] == '$' ||
+          dbName[i] == '_')
+      {
+        prefix.push_back(dbName[i]);
+      }
+    }
+
+    query.SetType("lock", ValueType_Utf8String);
+    
     MySQLStatement statement(*this, query);
 
-    MySQLTransaction t(*this);
     Dictionary args;
+    args.SetUtf8Value("lock", prefix + "." + lock);
 
-    std::auto_ptr<IResult> result(t.Execute(statement, args));
+    bool success;
 
-    bool success = (!result->IsDone() &&
-                    result->GetField(0).GetType() == ValueType_Integer64 &&
-                    dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() == 1);
+    {
+      MySQLTransaction t(*this);
+      std::auto_ptr<IResult> result(t.Execute(statement, args));
 
-    t.Commit();
+      success = (!result->IsDone() &&
+                 result->GetField(0).GetType() == ValueType_Integer64 &&
+                 dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() == 1);
+      
+      t.Commit();
+    }
 
     return success;
   }
   
 
-  bool MySQLDatabase::AcquireAdvisoryLock(int32_t lock)
+  bool MySQLDatabase::AcquireAdvisoryLock(const std::string& lock)
   {
-    return RunAdvisoryLockStatement("SELECT GET_LOCK('Lock" +
-                                    boost::lexical_cast<std::string>(lock) + "', 0);");
+    Query query("SELECT GET_LOCK(${lock}, 0)", false);
+    return RunAdvisoryLockStatement(query, lock);
   }
   
 
-  bool MySQLDatabase::ReleaseAdvisoryLock(int32_t lock)
+  bool MySQLDatabase::ReleaseAdvisoryLock(const std::string& lock)
   {
-    return RunAdvisoryLockStatement("SELECT RELEASE_LOCK('Lock" +
-                                    boost::lexical_cast<std::string>(lock) + "');");
+    Query query("SELECT RELEASE_LOCK(${lock})", false);
+    return RunAdvisoryLockStatement(query, lock);
   }
 
 
-  void MySQLDatabase::AdvisoryLock(int32_t lock)
+  void MySQLDatabase::AdvisoryLock(const std::string& lock)
   {
     if (!AcquireAdvisoryLock(lock))
     {
@@ -513,7 +537,7 @@ namespace OrthancDatabases
 
   MySQLDatabase::TransientAdvisoryLock::
   TransientAdvisoryLock(MySQLDatabase&  database,
-                        int32_t lock) :
+                        const std::string& lock) :
     database_(database),
     lock_(lock)
   {

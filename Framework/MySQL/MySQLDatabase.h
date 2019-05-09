@@ -44,7 +44,8 @@ namespace OrthancDatabases
     
     void Close();
 
-    bool RunAdvisoryLockStatement(const std::string& statement);
+    bool RunAdvisoryLockStatement(Query& query,
+                                  const std::string& lock);
 
   public:
     MySQLDatabase(const MySQLParameters& parameters);
@@ -72,11 +73,11 @@ namespace OrthancDatabases
     bool LookupGlobalIntegerVariable(int64_t& value,
                                      const std::string& variable);
 
-    bool AcquireAdvisoryLock(int32_t lock);
+    bool AcquireAdvisoryLock(const std::string& lock);
 
-    bool ReleaseAdvisoryLock(int32_t lock);
+    bool ReleaseAdvisoryLock(const std::string& lock);
 
-    void AdvisoryLock(int32_t lock);
+    void AdvisoryLock(const std::string& lock);
 
     void Execute(const std::string& sql,
                  bool arobaseSeparator);
@@ -104,11 +105,11 @@ namespace OrthancDatabases
     {
     private:
       MySQLDatabase&  database_;
-      int32_t         lock_;
+      std::string     lock_;
 
     public:
       TransientAdvisoryLock(MySQLDatabase&  database,
-                            int32_t lock);
+                            const std::string& lock);
 
       ~TransientAdvisoryLock();
     };

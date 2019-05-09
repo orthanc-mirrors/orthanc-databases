@@ -24,6 +24,7 @@
 #include "../../Framework/Plugins/GlobalProperties.h"
 #include "../../Framework/MySQL/MySQLDatabase.h"
 #include "../../Framework/MySQL/MySQLTransaction.h"
+#include "MySQLDefinitions.h"
 
 #include <EmbeddedResources.h>  // Auto-generated file
 
@@ -69,23 +70,10 @@ namespace OrthancDatabases
     std::auto_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
 
     db->Open();
-    
     db->Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
 
-    if (parameters_.HasLock())
     {
-      db->AdvisoryLock(42 /* some arbitrary constant */);
-    }
-
-    /**
-     * Try and acquire a transient advisory lock to protect the setup
-     * of the database, because concurrent statements like "CREATE
-     * TABLE" are not protected by transactions.
-     * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
-     **/
-    MySQLDatabase::TransientAdvisoryLock lock(*db, 44 /* some arbitrary constant */);
-    
-    {
+      MySQLDatabase::TransientAdvisoryLock lock(*db, MYSQL_LOCK_DATABASE_SETUP);
       MySQLTransaction t(*db);
 
       db->Execute("ALTER DATABASE " + parameters_.GetDatabase() + 
@@ -182,6 +170,19 @@ namespace OrthancDatabases
       }
 
       t.Commit();
+    }
+
+    /**
+     * WARNING: This lock must be acquired after
+     * "MYSQL_LOCK_DATABASE_SETUP" is released. Indeed, in MySQL <
+     * 5.7, it is impossible to acquire more than one lock at a time,
+     * as calling "SELECT GET_LOCK()" releases all the
+     * previously-acquired locks.
+     * https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html
+     **/
+    if (parameters_.HasLock())
+    {
+      db->AdvisoryLock(MYSQL_LOCK_INDEX);
     }
           
     return db.release();

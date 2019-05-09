@@ -23,6 +23,7 @@
 
 #include "../../Framework/MySQL/MySQLDatabase.h"
 #include "../../Framework/MySQL/MySQLTransaction.h"
+#include "MySQLDefinitions.h"
 
 #include <Core/Logging.h>
 
@@ -37,20 +38,8 @@ namespace OrthancDatabases
 
     db->Open();
 
-    if (parameters_.HasLock())
     {
-      db->AdvisoryLock(43 /* some arbitrary constant */);
-    }
-
-    /**
-     * Try and acquire a transient advisory lock to protect the setup
-     * of the database, because concurrent statements like "CREATE
-     * TABLE" are not protected by transactions.
-     * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
-     **/
-    MySQLDatabase::TransientAdvisoryLock lock(*db, 44 /* some arbitrary constant */);
-    
-    {
+      MySQLDatabase::TransientAdvisoryLock lock(*db, MYSQL_LOCK_DATABASE_SETUP);    
       MySQLTransaction t(*db);
 
       int64_t size;
@@ -80,6 +69,19 @@ namespace OrthancDatabases
                   "type INTEGER NOT NULL)", false);
 
       t.Commit();
+    }
+
+    /**
+     * WARNING: This lock must be acquired after
+     * "MYSQL_LOCK_DATABASE_SETUP" is released. Indeed, in MySQL <
+     * 5.7, it is impossible to acquire more than one lock at a time,
+     * as calling "SELECT GET_LOCK()" releases all the
+     * previously-acquired locks.
+     * https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html
+     **/
+    if (parameters_.HasLock())
+    {
+      db->AdvisoryLock(MYSQL_LOCK_STORAGE);
     }
 
     return db.release();

@@ -70,36 +70,60 @@ TEST(MySQL, Lock2)
   OrthancDatabases::MySQLDatabase db1(globalParameters_);
   db1.Open();
 
-  ASSERT_FALSE(db1.ReleaseAdvisoryLock(43)); // lock counter = 0
-  ASSERT_TRUE(db1.AcquireAdvisoryLock(43));  // lock counter = 1
+  ASSERT_FALSE(db1.ReleaseAdvisoryLock("mylock")); // lock counter = 0
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));  // lock counter = 1
 
   // OK, as this is the same connection
-  ASSERT_TRUE(db1.AcquireAdvisoryLock(43));  // lock counter = 2
-  ASSERT_TRUE(db1.ReleaseAdvisoryLock(43));  // lock counter = 1
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));  // lock counter = 1
+  ASSERT_TRUE(db1.ReleaseAdvisoryLock("mylock"));  // lock counter = 0
 
   // Try and release twice the lock
-  ASSERT_TRUE(db1.ReleaseAdvisoryLock(43));  // lock counter = 0
-  ASSERT_FALSE(db1.ReleaseAdvisoryLock(43)); // cannot unlock
-  ASSERT_TRUE(db1.AcquireAdvisoryLock(43));  // lock counter = 1
+  ASSERT_FALSE(db1.ReleaseAdvisoryLock("mylock"));  // lock counter = 0
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));  // lock counter = 1
 
   {
     OrthancDatabases::MySQLDatabase db2(globalParameters_);
     db2.Open();
 
     // The "db1" is still actively locking
-    ASSERT_FALSE(db2.AcquireAdvisoryLock(43));
+    ASSERT_FALSE(db2.AcquireAdvisoryLock("mylock"));
 
     // Release the "db1" lock
-    ASSERT_TRUE(db1.ReleaseAdvisoryLock(43));
-    ASSERT_FALSE(db1.ReleaseAdvisoryLock(43));
+    ASSERT_TRUE(db1.ReleaseAdvisoryLock("mylock"));
+    ASSERT_FALSE(db1.ReleaseAdvisoryLock("mylock"));
 
     // "db2" can now acquire the lock, but not "db1"
-    ASSERT_TRUE(db2.AcquireAdvisoryLock(43));
-    ASSERT_FALSE(db1.AcquireAdvisoryLock(43));
+    ASSERT_TRUE(db2.AcquireAdvisoryLock("mylock"));
+    ASSERT_FALSE(db1.AcquireAdvisoryLock("mylock"));
   }
 
   // "db2" is closed, "db1" can now acquire the lock
-  ASSERT_TRUE(db1.AcquireAdvisoryLock(43));
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock"));
+}
+
+
+
+/**
+ * WARNING: The following test only succeeds if MySQL >= 5.7. This is
+ * because in MySQL < 5.7, acquiring a lock by calling "SELECT
+ * GET_LOCK()" releases all the previously acquired locks!
+ **/
+TEST(MySQL, DISABLED_Lock3)
+{
+  OrthancDatabases::MySQLDatabase::ClearDatabase(globalParameters_);  
+
+  OrthancDatabases::MySQLDatabase db1(globalParameters_);
+  db1.Open();
+
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock1"));  // lock counter = 1
+  ASSERT_TRUE(db1.AcquireAdvisoryLock("mylock2"));  // lock counter = 1
+
+  {
+    OrthancDatabases::MySQLDatabase db2(globalParameters_);
+    db2.Open();
+
+    ASSERT_FALSE(db2.AcquireAdvisoryLock("mylock1"));
+  }
 }
 
 
