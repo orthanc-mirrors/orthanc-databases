@@ -50,6 +50,12 @@ namespace OrthancDatabases
       {
         return that_.OpenInternal();
       }
+
+      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries, unsigned int& connectionRetryInterval)
+      {
+        maxConnectionRetries = that_.parameters_.GetMaxConnectionRetries();
+        connectionRetryInterval = that_.parameters_.GetConnectionRetryInterval();
+      }
     };
 
     OrthancPluginContext*  context_;

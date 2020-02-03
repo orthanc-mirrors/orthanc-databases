@@ -39,6 +39,8 @@ namespace OrthancDatabases
     uri_.clear();
     ssl_ = false;
     lock_ = true;
+    maxConnectionRetries_ = 10;
+    connectionRetryInterval_ = 5;
   }
 
 
@@ -90,6 +92,9 @@ namespace OrthancDatabases
     }
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
+
+    maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
+    connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
   }
 
 

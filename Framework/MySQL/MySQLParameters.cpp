@@ -89,6 +89,9 @@ namespace OrthancDatabases
     }
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
+
+    maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
+    connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
   }
 
 

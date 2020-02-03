@@ -32,9 +32,11 @@ namespace OrthancDatabases
 {
   IDatabase& DatabaseManager::GetDatabase()
   {
-    static const unsigned int MAX_CONNECTION_ATTEMPTS = 10;   // TODO: Parameter
-
+    unsigned int maxConnectionRetries = 10;
+    unsigned int connectionRetryInterval = 5;
     unsigned int count = 0;
+
+    factory_->GetConnectionRetriesParameters(maxConnectionRetries, connectionRetryInterval);
       
     while (database_.get() == NULL)
     {
@@ -50,10 +52,10 @@ namespace OrthancDatabases
         {
           count ++;
 
-          if (count <= MAX_CONNECTION_ATTEMPTS)
+          if (count <= maxConnectionRetries)
           {
             LOG(WARNING) << "Database is currently unavailable, retrying...";
-            boost::this_thread::sleep(boost::posix_time::seconds(1));
+            boost::this_thread::sleep(boost::posix_time::seconds(connectionRetryInterval));
             continue;
           }
           else

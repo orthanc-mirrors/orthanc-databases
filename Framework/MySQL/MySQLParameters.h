@@ -39,6 +39,8 @@ namespace OrthancDatabases
     uint16_t     port_;
     std::string  unixSocket_;
     bool         lock_;
+    unsigned int maxConnectionRetries_;
+    unsigned int connectionRetryInterval_;
 
     void Reset();
 
@@ -97,6 +99,16 @@ namespace OrthancDatabases
     bool HasLock() const
     {
       return lock_;
+    }
+
+    unsigned int GetMaxConnectionRetries() const
+    {
+      return maxConnectionRetries_;
+    }
+
+    unsigned int GetConnectionRetryInterval() const
+    {
+      return connectionRetryInterval_;
     }
 
     void Format(Json::Value& target) const;

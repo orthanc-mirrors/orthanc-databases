@@ -40,6 +40,8 @@ namespace OrthancDatabases
     std::string  uri_;
     bool         ssl_;
     bool         lock_;
+    unsigned int maxConnectionRetries_;
+    unsigned int connectionRetryInterval_;
 
     void Reset();
 
@@ -110,6 +112,16 @@ namespace OrthancDatabases
     bool HasLock() const
     {
       return lock_;
+    }
+
+    unsigned int GetMaxConnectionRetries() const
+    {
+      return maxConnectionRetries_;
+    }
+
+    unsigned int GetConnectionRetryInterval() const
+    {
+      return connectionRetryInterval_;
     }
 
     void Format(std::string& target) const;
