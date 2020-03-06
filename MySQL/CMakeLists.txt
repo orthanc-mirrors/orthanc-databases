@@ -18,6 +18,7 @@ endif()
 include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginParameters.cmake)
 
 set(ENABLE_MYSQL_BACKEND ON)
+set(OPENSSL_STATIC_VERSION "1.0.2" CACHE STRING "TODO - Upgrade to OpenSSL 1.1.1" FORCE)
   
 include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginConfiguration.cmake)
 
