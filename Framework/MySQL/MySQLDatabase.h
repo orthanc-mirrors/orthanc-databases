@@ -88,6 +88,9 @@ namespace OrthancDatabases
     bool DoesDatabaseExist(MySQLTransaction& transaction,
                            const std::string& name);
 
+    bool DoesTriggerExist(MySQLTransaction& transaction,
+                          const std::string& name);
+
     virtual Dialect GetDialect() const
     {
       return Dialect_MySQL;

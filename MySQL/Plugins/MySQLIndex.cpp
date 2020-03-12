@@ -35,6 +35,16 @@
 
 namespace OrthancDatabases
 {
+  static void ThrowCannotCreateTrigger()
+  {
+    LOG(ERROR) << "The MySQL user is not allowed to create triggers => 2 possible solutions:";
+    LOG(ERROR) << "  1- Give the SUPER privilege to the MySQL database user, or";
+    LOG(ERROR) << "  2- Run \"set global log_bin_trust_function_creators=1;\" as MySQL root user.";
+    LOG(ERROR) << "Once you are done, drop and recreate the MySQL database";
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_Database,
+                                    "Need to fix the MySQL permissions for \"CREATE TRIGGER\"");
+  }
+  
   IDatabase* MySQLIndex::OpenInternal()
   {
     uint32_t expectedVersion = 6;
@@ -74,102 +84,173 @@ namespace OrthancDatabases
 
     {
       MySQLDatabase::TransientAdvisoryLock lock(*db, MYSQL_LOCK_DATABASE_SETUP);
-      MySQLTransaction t(*db);
 
-      db->Execute("ALTER DATABASE " + parameters_.GetDatabase() + 
-                  " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", false);
-    
-      if (!db->DoesTableExist(t, "Resources"))
+      /**
+       * In a first transaction, we create the tables. Such a
+       * transaction cannot be rollback: "The CREATE TABLE statement
+       * in InnoDB is processed as a single transaction. This means
+       * that a ROLLBACK from the user does not undo CREATE TABLE
+       * statements the user made during that transaction."
+       * https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html
+       *
+       * As a consequence, we delay the initial population of the
+       * tables in a sequence of transactions below. This solves the
+       * error message "MySQL plugin is incompatible with database
+       * schema version: 0" that was reported in the forum:
+       * https://groups.google.com/d/msg/orthanc-users/OCFFkm1qm0k/Mbroy8VWAQAJ
+       **/      
       {
-        std::string query;
+        MySQLTransaction t(*db);
+        
+        db->Execute("ALTER DATABASE " + parameters_.GetDatabase() + 
+                    " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", false);
 
-        Orthanc::EmbeddedResources::GetFileResource
-          (query, Orthanc::EmbeddedResources::MYSQL_PREPARE_INDEX);
-        db->Execute(query, true);
+        // This is the first table to be created
+        if (!db->DoesTableExist(t, "GlobalProperties"))
+        {
+          std::string query;
+          
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::MYSQL_PREPARE_INDEX);
+          db->Execute(query, true);
+        }
 
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+        t.Commit();
       }
 
-      if (!db->DoesTableExist(t, "Resources"))
-      {
-        LOG(ERROR) << "Corrupted MySQL database";
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
-      }
+      /**
+       * This is the sequence of transactions that initially populate
+       * the database. WARNING - As table creation cannot be rollback,
+       * don't forget to add "IF NOT EXISTS" if some table must be
+       * created below this point (in order to recover from failed
+       * transaction).
+       **/
 
       int version = 0;
-      if (!LookupGlobalIntegerProperty(version, *db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
-          version != 6)
+
       {
-        LOG(ERROR) << "MySQL plugin is incompatible with database schema version: " << version;
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+        MySQLTransaction t(*db);
+
+        // This is the last table to be created
+        if (!db->DoesTableExist(t, "PatientRecyclingOrder"))
+        {
+          LOG(ERROR) << "Corrupted MySQL database";
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
+        }
+
+        // This is the last item to be created
+        if (!db->DoesTriggerExist(t, "PatientAdded"))
+        {
+          ThrowCannotCreateTrigger();
+        }
+
+        if (!LookupGlobalIntegerProperty(version, *db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion))
+        {
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+          version = expectedVersion;
+        }
+
+        if (version != 6)
+        {
+          LOG(ERROR) << "MySQL plugin is incompatible with database schema version: " << version;
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+        }
+
+        t.Commit();
       }
 
-      int revision;
-      if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
+      int revision = 0;
+
       {
-        revision = 1;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        MySQLTransaction t(*db);
+
+        if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
+        {
+          revision = 1;
+          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        }
+
+        t.Commit();
       }
 
       if (revision == 1)
       {
+        MySQLTransaction t(*db);
+        
         // The serialization of jobs as a global property can lead to
         // very long values => switch to the LONGTEXT type that can
         // store up to 4GB:
         // https://stackoverflow.com/a/13932834/881731
         db->Execute("ALTER TABLE GlobalProperties MODIFY value LONGTEXT", false);
-
+        
         revision = 2;
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+
+        t.Commit();
       }
 
       if (revision == 2)
-      {
+      {        
+        MySQLTransaction t(*db);
+
         // Install the "GetLastChangeIndex" extension
         std::string query;
 
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::MYSQL_GET_LAST_CHANGE_INDEX);
         db->Execute(query, true);
+
+        if (!db->DoesTriggerExist(t, "ChangeAdded"))
+        {
+          ThrowCannotCreateTrigger();
+        }
         
         revision = 3;
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-      }
 
+        t.Commit();
+      }
+      
       if (revision == 3)
       {
+        MySQLTransaction t(*db);
+
         // Reconfiguration of "Metadata" from TEXT type (up to 64KB)
         // to the LONGTEXT type (up to 4GB). This might be important
         // for applications such as the Osimis Web viewer that stores
         // large amount of metadata.
         // http://book.orthanc-server.com/faq/features.html#central-registry-of-metadata-and-attachments
         db->Execute("ALTER TABLE Metadata MODIFY value LONGTEXT", false);
-
+        
         revision = 4;
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-      }
 
+        t.Commit();
+      }
+      
       if (revision == 4)
       {
+        MySQLTransaction t(*db);
+        
         // Install the "CreateInstance" extension
         std::string query;
-
+        
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::MYSQL_CREATE_INSTANCE);
         db->Execute(query, true);
-
+        
         revision = 5;
         SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-      }
 
+        t.Commit();
+      }
+      
       if (revision != 5)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
       }
-
-      t.Commit();
     }
 
     /**

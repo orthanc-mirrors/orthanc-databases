@@ -420,6 +420,36 @@ namespace OrthancDatabases
   }
 
 
+  bool MySQLDatabase::DoesTriggerExist(MySQLTransaction& transaction,
+                                       const std::string& name)
+  {
+    if (mysql_ == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    if (!IsValidDatabaseIdentifier(name))
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  
+    Query query("SELECT COUNT(*) FROM information_schema.TRIGGERS "
+                "WHERE TRIGGER_NAME = ${trigger}", true);
+    query.SetType("trigger", ValueType_Utf8String);
+    
+    MySQLStatement statement(*this, query);
+
+    Dictionary args;
+    args.SetUtf8Value("trigger", name);
+
+    std::auto_ptr<IResult> result(statement.Execute(transaction, args));
+    return (!result->IsDone() &&
+            result->GetFieldsCount() == 1 &&
+            result->GetField(0).GetType() == ValueType_Integer64 &&
+            dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() == 1);            
+  }
+
+
   void MySQLDatabase::Execute(const std::string& sql,
                               bool arobaseSeparator)
   {

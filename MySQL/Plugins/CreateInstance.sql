@@ -1,3 +1,5 @@
+DROP PROCEDURE IF EXISTS CreateInstance;
+
 CREATE PROCEDURE CreateInstance(
        IN patient TEXT,
        IN study TEXT,
