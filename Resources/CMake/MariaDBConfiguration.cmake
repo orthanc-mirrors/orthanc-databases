@@ -148,10 +148,20 @@ else()
     message(FATAL_ERROR "Please install the libmysqlclient-dev package")
   endif()
 
-  check_library_exists(mysqlclient mysql_init "" HAVE_MYSQL_CLIENT_LIB)
-  if (NOT HAVE_MYSQL_CLIENT_LIB)
-    message(FATAL_ERROR "Unable to find the mysqlclient library")
-  endif()
-
-  link_libraries(mysqlclient)
+  find_library(MYSQL_CLIENT_LIB NAMES mysqlclient PATHS
+    /usr/lib/mysql
+    /usr/local/lib/mysql
+    )
+  
+  if (MYSQL_CLIENT_LIB)
+    check_library_exists(${MYSQL_CLIENT_LIB} mysql_init "" HAVE_MYSQL_CLIENT_LIB)
+    if (NOT HAVE_MYSQL_CLIENT_LIB)
+      message(FATAL_ERROR "Unable to use mysql_init from mysqlclient library")
+    endif()    
+    get_filename_component(MYSQL_CLIENT_LIB_PATH ${MYSQL_CLIENT_LIB} DIRECTORY)
+    link_directories(${MYSQL_CLIENT_LIB_PATH})
+    link_libraries(mysqlclient)
+  else()
+     message(FATAL_ERROR "Unable to find the mysqlclient library")
+   endif()
 endif()
