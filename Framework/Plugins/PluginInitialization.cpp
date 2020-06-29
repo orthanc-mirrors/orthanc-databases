@@ -45,7 +45,7 @@ namespace OrthancDatabases
                         const std::string& dbms,
                         bool isIndex)
   {
-    Orthanc::Logging::Initialize(context);
+    Orthanc::Logging::InitializePluginContext(context);
     OrthancPlugins::SetGlobalContext(context);
     ImplicitTransaction::SetErrorOnDoubleExecution(false);
 
