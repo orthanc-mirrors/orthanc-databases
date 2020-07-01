@@ -34,13 +34,14 @@
 #  undef S_IXOTH
 #endif
 
+#include "../../Framework/Plugins/GlobalProperties.h"
+#include "../../Framework/PostgreSQL/PostgreSQLLargeObject.h"
+#include "../../Framework/PostgreSQL/PostgreSQLResult.h"
+#include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
 #include "../Plugins/PostgreSQLIndex.h"
 #include "../Plugins/PostgreSQLStorageArea.h"
-#include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
-#include "../../Framework/PostgreSQL/PostgreSQLResult.h"
-#include "../../Framework/PostgreSQL/PostgreSQLLargeObject.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
 

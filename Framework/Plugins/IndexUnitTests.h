@@ -22,12 +22,27 @@
 #pragma once
 
 #include "../Common/ImplicitTransaction.h"
+#include "GlobalProperties.h"
 
 #include <orthanc/OrthancCDatabasePlugin.h>
-#include <OrthancServer/ServerEnumerations.h>
 
 #include <gtest/gtest.h>
 #include <list>
+
+
+namespace Orthanc
+{
+  /**
+   * Mock enumeration inspired from the source code of Orthanc... only
+   * for use in the unit tests!
+   * https://hg.orthanc-server.com/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
+   **/
+  enum MetadataType
+  {
+    MetadataType_ModifiedFrom,
+    MetadataType_LastUpdate
+  };
+}
 
 
 static std::auto_ptr<OrthancPluginAttachment>  expectedAttachment;

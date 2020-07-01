@@ -21,8 +21,8 @@
 
 #include "PostgreSQLParameters.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
+#include <Logging.h>
+#include <OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
 

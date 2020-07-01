@@ -28,7 +28,7 @@
 #include "../Common/ITransaction.h"
 #include "SQLiteDatabase.h"
 
-#include <Core/SQLite/Transaction.h>
+#include <SQLite/Transaction.h>
 
 namespace OrthancDatabases
 {

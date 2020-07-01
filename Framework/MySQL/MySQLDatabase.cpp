@@ -27,9 +27,9 @@
 #include "../Common/ImplicitTransaction.h"
 #include "../Common/Integer64Value.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
-#include <Core/Toolbox.h>
+#include <Logging.h>
+#include <OrthancException.h>
+#include <Toolbox.h>
 
 #include <errmsg.h>
 #include <mysqld_error.h>

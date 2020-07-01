@@ -21,7 +21,7 @@
 
 #include "NullValue.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {

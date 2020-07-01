@@ -26,7 +26,7 @@ include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginConfiguration.cmak
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
   execute_process(
     COMMAND 
-    ${PYTHON_EXECUTABLE} ${ORTHANC_ROOT}/Resources/WindowsResources.py
+    ${PYTHON_EXECUTABLE} ${ORTHANC_FRAMEWORK_ROOT}/Resources/WindowsResources.py
     ${ORTHANC_PLUGIN_VERSION} "MySQL storage area plugin" OrthancMySQLStorage.dll
     "MySQL as a database back-end to Orthanc (storage area)"
     ERROR_VARIABLE Failure
@@ -39,7 +39,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
 
   execute_process(
     COMMAND 
-    ${PYTHON_EXECUTABLE} ${ORTHANC_ROOT}/Resources/WindowsResources.py
+    ${PYTHON_EXECUTABLE} ${ORTHANC_FRAMEWORK_ROOT}/Resources/WindowsResources.py
     ${ORTHANC_PLUGIN_VERSION} "MySQL index plugin" OrthancMySQLIndex.dll
     "MySQL as a database back-end to Orthanc (index)"
     ERROR_VARIABLE Failure

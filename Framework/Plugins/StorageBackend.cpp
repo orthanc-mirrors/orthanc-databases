@@ -28,7 +28,7 @@
 #include "../../Framework/Common/BinaryStringValue.h"
 #include "../../Framework/Common/FileValue.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH                                  \

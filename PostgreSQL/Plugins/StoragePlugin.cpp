@@ -22,7 +22,7 @@
 #include "PostgreSQLStorageArea.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Core/Logging.h>
+#include <Logging.h>
 
 extern "C"
 {

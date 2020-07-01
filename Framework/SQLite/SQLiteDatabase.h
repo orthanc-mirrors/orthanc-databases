@@ -27,7 +27,7 @@
 
 #include "../Common/IDatabase.h"
 
-#include <Core/SQLite/Connection.h>
+#include <SQLite/Connection.h>
 
 namespace OrthancDatabases
 {

@@ -27,8 +27,8 @@
 #include "PostgreSQLTransaction.h"
 #include "../Common/ImplicitTransaction.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
+#include <Logging.h>
+#include <OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>

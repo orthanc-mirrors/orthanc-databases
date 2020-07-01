@@ -37,8 +37,9 @@
 #endif
 
 
-#include <Core/OrthancException.h>
-#include <OrthancServer/Search/DatabaseConstraint.h>
+#include "../../Resources/Orthanc/Databases/DatabaseConstraint.h"
+
+#include <OrthancException.h>
 
 
 

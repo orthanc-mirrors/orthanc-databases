@@ -23,9 +23,9 @@
 #include "PostgreSQLDefinitions.h"
 
 #include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
-#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
-#include <Core/Logging.h>
+#include <Logging.h>
 
 
 namespace OrthancDatabases

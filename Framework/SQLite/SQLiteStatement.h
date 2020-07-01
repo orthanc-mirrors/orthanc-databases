@@ -29,7 +29,7 @@
 #include "SQLiteTransaction.h"
 #include "../Common/GenericFormatter.h"
 
-#include <Core/SQLite/Statement.h>
+#include <SQLite/Statement.h>
 
 #include <memory>
 

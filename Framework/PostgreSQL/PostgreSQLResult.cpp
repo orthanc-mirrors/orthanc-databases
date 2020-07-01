@@ -28,9 +28,9 @@
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
 
-#include <Core/OrthancException.h>
-#include <Core/Logging.h>
-#include <Core/Endianness.h>
+#include <OrthancException.h>
+#include <Logging.h>
+#include <Endianness.h>
 
 #include <cassert>
 #include <boost/lexical_cast.hpp>

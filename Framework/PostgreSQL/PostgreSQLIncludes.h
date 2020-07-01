@@ -26,7 +26,7 @@
 #include <vector>
 #include <map>
 #include <cmath>
-#include <Core/Enumerations.h>
+#include <Enumerations.h>
 
 /**
  * This include must be before including "c.h" from PostgreSQL,
@@ -42,7 +42,7 @@
 
 #if PG_VERSION_NUM >= 110000
 #  include <postgres.h>
-#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Core/Logging.h>
+#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Logging.h>
 #endif
 
 #include <libpq-fe.h>

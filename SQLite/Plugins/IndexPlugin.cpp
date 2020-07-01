@@ -22,7 +22,7 @@
 #include "SQLiteIndex.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Core/Logging.h>
+#include <Logging.h>
 
 static std::auto_ptr<OrthancDatabases::SQLiteIndex> backend_;
 

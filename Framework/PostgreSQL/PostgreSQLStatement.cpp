@@ -30,10 +30,10 @@
 #include "../Common/Utf8StringValue.h"
 #include "PostgreSQLResult.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
-#include <Core/Toolbox.h>
-#include <Core/Endianness.h>
+#include <Logging.h>
+#include <OrthancException.h>
+#include <Toolbox.h>
+#include <Endianness.h>
 
 #include <cassert>
 

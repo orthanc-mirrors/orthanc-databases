@@ -21,7 +21,7 @@
 
 #include "../Plugins/PostgreSQLIndex.h"
 
-#include <Core/Logging.h>
+#include <Logging.h>
 #include <gtest/gtest.h>
 
 OrthancDatabases::PostgreSQLParameters  globalParameters_;

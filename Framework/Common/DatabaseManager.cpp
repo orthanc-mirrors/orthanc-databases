@@ -21,10 +21,10 @@
 
 #include "DatabaseManager.h"
 
-#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
+#include <Logging.h>
+#include <OrthancException.h>
 
 #include <boost/thread.hpp>
 

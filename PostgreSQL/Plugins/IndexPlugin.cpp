@@ -22,7 +22,7 @@
 #include "PostgreSQLIndex.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Core/Logging.h>
+#include <Logging.h>
 
 static std::auto_ptr<OrthancDatabases::PostgreSQLIndex> backend_;
 

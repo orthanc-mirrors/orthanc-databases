@@ -59,8 +59,8 @@ set(ENABLE_MODULE_IMAGES OFF)
 set(ENABLE_MODULE_JOBS OFF)
 set(ENABLE_MODULE_DICOM OFF)
 
-include(${ORTHANC_ROOT}/Resources/CMake/OrthancFrameworkConfiguration.cmake)
-include_directories(${ORTHANC_ROOT})
+include(${ORTHANC_FRAMEWORK_ROOT}/Resources/CMake/OrthancFrameworkConfiguration.cmake)
+include_directories(${ORTHANC_FRAMEWORK_ROOT}/Sources)
 
 
 #####################################################################

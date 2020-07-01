@@ -24,7 +24,7 @@
 #include "IDatabaseFactory.h"
 #include "StatementLocation.h"
 
-#include <Core/Enumerations.h>
+#include <Enumerations.h>
 
 #include <boost/thread/recursive_mutex.hpp>
 #include <memory>

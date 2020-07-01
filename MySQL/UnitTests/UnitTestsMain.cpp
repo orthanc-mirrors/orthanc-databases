@@ -31,9 +31,9 @@ OrthancDatabases::MySQLParameters globalParameters_;
 #include "../../Framework/MySQL/MySQLTransaction.h"
 #include "../../Framework/Plugins/IndexUnitTests.h"
 
-#include <Core/HttpClient.h>
-#include <Core/Logging.h>
-#include <Core/Toolbox.h>
+#include <HttpClient.h>
+#include <Logging.h>
+#include <Toolbox.h>
 
 #include <gtest/gtest.h>
 

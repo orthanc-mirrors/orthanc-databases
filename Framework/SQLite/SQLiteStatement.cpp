@@ -28,7 +28,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "SQLiteResult.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {

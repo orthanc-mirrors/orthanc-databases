@@ -25,7 +25,7 @@
 #  error MySQL support must be enabled to use this file
 #endif
 
-#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
 namespace OrthancDatabases
 {

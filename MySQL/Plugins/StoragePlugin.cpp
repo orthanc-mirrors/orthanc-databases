@@ -23,9 +23,9 @@
 #include "../../Framework/MySQL/MySQLDatabase.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Core/HttpClient.h>
-#include <Core/Logging.h>
-#include <Core/Toolbox.h>
+#include <HttpClient.h>
+#include <Logging.h>
+#include <Toolbox.h>
 
 
 extern "C"

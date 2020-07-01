@@ -24,7 +24,7 @@
 #include "FileValue.h"
 #include "NullValue.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
 

@@ -23,8 +23,8 @@
 
 #include "MySQLDatabase.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
+#include <Logging.h>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {

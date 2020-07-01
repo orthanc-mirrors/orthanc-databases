@@ -28,8 +28,8 @@
 #include "../Common/Utf8StringValue.h"
 #include "MySQLResult.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
+#include <Logging.h>
+#include <OrthancException.h>
 
 #include <list>
 #include <memory>

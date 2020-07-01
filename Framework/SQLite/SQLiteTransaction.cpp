@@ -24,7 +24,7 @@
 #include "SQLiteResult.h"
 #include "SQLiteStatement.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {

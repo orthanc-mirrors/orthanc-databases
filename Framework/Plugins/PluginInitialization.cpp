@@ -22,10 +22,10 @@
 #include "PluginInitialization.h"
 
 #include "../Common/ImplicitTransaction.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
-#include <Core/Logging.h>
-#include <Core/Toolbox.h>
-#include <Plugins/Samples/Common/OrthancPluginCppWrapper.h>
+#include <Logging.h>
+#include <Toolbox.h>
 
 
 namespace OrthancDatabases

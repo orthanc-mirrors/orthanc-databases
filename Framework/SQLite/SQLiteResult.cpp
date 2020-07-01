@@ -26,7 +26,7 @@
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {

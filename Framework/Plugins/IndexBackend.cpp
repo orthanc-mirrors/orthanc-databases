@@ -21,15 +21,14 @@
 
 #include "IndexBackend.h"
 
+#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/BinaryStringValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
 #include "GlobalProperties.h"
 
-#include <Core/Logging.h>
-#include <Core/OrthancException.h>
-#include <OrthancServer/ServerEnumerations.h>
-#include <OrthancServer/Search/ISqlLookupFormatter.h>
+#include <Logging.h>
+#include <OrthancException.h>
 
 
 namespace OrthancDatabases

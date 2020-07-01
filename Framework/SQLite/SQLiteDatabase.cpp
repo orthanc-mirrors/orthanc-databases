@@ -25,7 +25,7 @@
 #include "SQLiteTransaction.h"
 #include "../Common/ImplicitTransaction.h"
 
-#include <Core/OrthancException.h>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {

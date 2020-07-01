@@ -25,7 +25,7 @@
 #include "../../Framework/MySQL/MySQLTransaction.h"
 #include "MySQLDefinitions.h"
 
-#include <Core/Logging.h>
+#include <Logging.h>
 
 #include <boost/math/special_functions/round.hpp>
 

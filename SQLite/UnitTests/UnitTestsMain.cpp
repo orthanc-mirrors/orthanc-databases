@@ -22,8 +22,8 @@
 #include "../../Framework/SQLite/SQLiteDatabase.h"
 #include "../Plugins/SQLiteIndex.h"
 
-#include <Core/Logging.h>
-#include <Core/SystemToolbox.h>
+#include <Logging.h>
+#include <SystemToolbox.h>
 
 #include <gtest/gtest.h>
 

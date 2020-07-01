@@ -23,7 +23,7 @@
 #####################################################################
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../Resources/Orthanc/DownloadOrthancFramework.cmake)
-include(${ORTHANC_ROOT}/Resources/CMake/OrthancFrameworkParameters.cmake)
+include(${ORTHANC_FRAMEWORK_ROOT}/Resources/CMake/OrthancFrameworkParameters.cmake)
 
 
 #####################################################################
