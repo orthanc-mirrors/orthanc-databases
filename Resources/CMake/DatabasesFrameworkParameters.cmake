@@ -22,7 +22,7 @@
 ## Import the parameters of the Orthanc Framework
 #####################################################################
 
-include(${CMAKE_CURRENT_LIST_DIR}/../../Resources/Orthanc/DownloadOrthancFramework.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../Orthanc/CMake/DownloadOrthancFramework.cmake)
 include(${ORTHANC_FRAMEWORK_ROOT}/Resources/CMake/OrthancFrameworkParameters.cmake)
 
 
