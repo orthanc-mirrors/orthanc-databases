@@ -30,4 +30,3 @@ set(ORTHANC_SDK_VERSION "1.5.4" CACHE STRING "Version of the Orthanc plugin SDK 
 include(${CMAKE_CURRENT_LIST_DIR}/DatabasesFrameworkParameters.cmake)
 
 set(ENABLE_GOOGLE_TEST ON)
-set(HAS_EMBEDDED_RESOURCES ON)
