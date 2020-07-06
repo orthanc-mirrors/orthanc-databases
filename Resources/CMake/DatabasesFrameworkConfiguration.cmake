@@ -53,14 +53,29 @@ endif()
 ## Configure the Orthanc Framework
 #####################################################################
 
-# Those modules of the Orthanc framework are not needed when dealing
-# with databases
-set(ENABLE_MODULE_IMAGES OFF)
-set(ENABLE_MODULE_JOBS OFF)
-set(ENABLE_MODULE_DICOM OFF)
+if (ORTHANC_FRAMEWORK_SOURCE STREQUAL "system")
+  link_libraries(${ORTHANC_FRAMEWORK_LIBRARIES})
 
-include(${ORTHANC_FRAMEWORK_ROOT}/Resources/CMake/OrthancFrameworkConfiguration.cmake)
-include_directories(${ORTHANC_FRAMEWORK_ROOT}/Sources)
+  if (ENABLE_SQLITE_BACKEND)
+    add_definitions(-DORTHANC_ENABLE_SQLITE=1)
+  endif()
+  
+  set(USE_SYSTEM_GOOGLE_TEST ON CACHE BOOL "Use the system version of Google Test")
+  set(USE_GOOGLE_TEST_DEBIAN_PACKAGE OFF CACHE BOOL "Use the sources of Google Test shipped with libgtest-dev (Debian only)")
+  mark_as_advanced(USE_GOOGLE_TEST_DEBIAN_PACKAGE)
+  include(${CMAKE_SOURCE_DIR}/../Resources/Orthanc/CMake/GoogleTestConfiguration.cmake)
+  
+else()
+  # Those modules of the Orthanc framework are not needed when dealing
+  # with databases
+  set(ENABLE_MODULE_IMAGES OFF)
+  set(ENABLE_MODULE_JOBS OFF)
+  set(ENABLE_MODULE_DICOM OFF)
+  
+  include(${ORTHANC_FRAMEWORK_ROOT}/Resources/CMake/OrthancFrameworkConfiguration.cmake)
+  include_directories(${ORTHANC_FRAMEWORK_ROOT}/Sources)
+endif()
+
 
 
 #####################################################################
