@@ -30,6 +30,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "PostgreSQLResult.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 #include <Toolbox.h>
@@ -466,7 +467,7 @@ namespace OrthancDatabases
   class PostgreSQLStatement::ResultWrapper : public ResultBase
   {
   private:
-    std::auto_ptr<PostgreSQLResult>  result_;
+    std::unique_ptr<PostgreSQLResult>  result_;
 
   protected:
     virtual IValue* FetchField(size_t index)
@@ -544,6 +545,6 @@ namespace OrthancDatabases
   void PostgreSQLStatement::ExecuteWithoutResult(ITransaction& transaction,
                                                  const Dictionary& parameters)
   {
-    std::auto_ptr<IResult> dummy(Execute(transaction, parameters));
+    std::unique_ptr<IResult> dummy(Execute(transaction, parameters));
   }
 }

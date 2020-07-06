@@ -24,6 +24,7 @@
 #include "IDatabaseFactory.h"
 #include "StatementLocation.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Enumerations.h>
 
 #include <boost/thread/recursive_mutex.hpp>
@@ -37,9 +38,9 @@ namespace OrthancDatabases
     typedef std::map<StatementLocation, IPrecompiledStatement*>  CachedStatements;
 
     boost::recursive_mutex           mutex_;
-    std::auto_ptr<IDatabaseFactory>  factory_;
-    std::auto_ptr<IDatabase>         database_;
-    std::auto_ptr<ITransaction>      transaction_;
+    std::unique_ptr<IDatabaseFactory>  factory_;
+    std::unique_ptr<IDatabase>         database_;
+    std::unique_ptr<ITransaction>      transaction_;
     CachedStatements                 cachedStatements_;
     Dialect                          dialect_;
 
@@ -117,8 +118,8 @@ namespace OrthancDatabases
       DatabaseManager&                     manager_;
       boost::recursive_mutex::scoped_lock  lock_;
       ITransaction&                        transaction_;
-      std::auto_ptr<Query>                 query_;
-      std::auto_ptr<IResult>               result_;
+      std::unique_ptr<Query>                 query_;
+      std::unique_ptr<IResult>               result_;
 
       IResult& GetResult() const;
 
@@ -200,7 +201,7 @@ namespace OrthancDatabases
     class StandaloneStatement : public StatementBase
     {
     private:
-      std::auto_ptr<IPrecompiledStatement>  statement_;
+      std::unique_ptr<IPrecompiledStatement>  statement_;
       
     public:
       StandaloneStatement(DatabaseManager& manager,

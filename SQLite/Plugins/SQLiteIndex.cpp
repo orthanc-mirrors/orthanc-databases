@@ -28,6 +28,7 @@
 
 #include <EmbeddedResources.h>  // Auto-generated file
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -56,7 +57,7 @@ namespace OrthancDatabases
     }
 
 
-    std::auto_ptr<SQLiteDatabase> db(new SQLiteDatabase);
+    std::unique_ptr<SQLiteDatabase> db(new SQLiteDatabase);
 
     if (path_.empty())
     {

@@ -23,6 +23,7 @@
 
 #include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -141,7 +142,7 @@ namespace OrthancDatabases
   {
     LOG(TRACE) << "Caching statement from " << location.GetFile() << ":" << location.GetLine();
       
-    std::auto_ptr<IPrecompiledStatement> statement(GetDatabase().Compile(query));
+    std::unique_ptr<IPrecompiledStatement> statement(GetDatabase().Compile(query));
       
     IPrecompiledStatement* tmp = statement.get();
     if (tmp == NULL)
@@ -338,7 +339,7 @@ namespace OrthancDatabases
 
   void DatabaseManager::StatementBase::SetQuery(Query* query)
   {
-    std::auto_ptr<Query> protection(query);
+    std::unique_ptr<Query> protection(query);
     
     if (query_.get() != NULL)
     {
@@ -357,7 +358,7 @@ namespace OrthancDatabases
   
   void DatabaseManager::StatementBase::SetResult(IResult* result)
   {
-    std::auto_ptr<IResult> protection(result);
+    std::unique_ptr<IResult> protection(result);
     
     if (result_.get() != NULL)
     {
@@ -504,7 +505,7 @@ namespace OrthancDatabases
   {
     try
     {
-      std::auto_ptr<Query> query(ReleaseQuery());
+      std::unique_ptr<Query> query(ReleaseQuery());
       
       if (query.get() != NULL)
       {
@@ -556,7 +557,7 @@ namespace OrthancDatabases
   {
     try
     {
-      std::auto_ptr<Query> query(ReleaseQuery());
+      std::unique_ptr<Query> query(ReleaseQuery());
       assert(query.get() != NULL);
 
       // The "statement_" object must be kept as long as the "IResult"

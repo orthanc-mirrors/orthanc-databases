@@ -27,6 +27,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "GlobalProperties.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -692,7 +693,7 @@ namespace OrthancDatabases
     
   uint64_t IndexBackend::GetResourceCount(OrthancPluginResourceType resourceType)
   {
-    std::auto_ptr<DatabaseManager::CachedStatement> statement;
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     switch (manager_.GetDialect())
     {
@@ -757,7 +758,7 @@ namespace OrthancDatabases
     
   uint64_t IndexBackend::GetTotalCompressedSize()
   {
-    std::auto_ptr<DatabaseManager::CachedStatement> statement;
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     // NB: "COALESCE" is used to replace "NULL" by "0" if the number of rows is empty
 
@@ -794,7 +795,7 @@ namespace OrthancDatabases
     
   uint64_t IndexBackend::GetTotalUncompressedSize()
   {
-    std::auto_ptr<DatabaseManager::CachedStatement> statement;
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     // NB: "COALESCE" is used to replace "NULL" by "0" if the number of rows is empty
 
@@ -1009,7 +1010,7 @@ namespace OrthancDatabases
                                       OrthancPluginIdentifierConstraint constraint,
                                       const char* value)
   {
-    std::auto_ptr<DatabaseManager::CachedStatement> statement;
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     std::string header =
       "SELECT d.id FROM DicomIdentifiers AS d, Resources AS r WHERE "
@@ -1465,7 +1466,7 @@ namespace OrthancDatabases
   // For unit testing only!
   uint64_t IndexBackend::GetResourcesCount()
   {
-    std::auto_ptr<DatabaseManager::CachedStatement> statement;
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     switch (manager_.GetDialect())
     {
@@ -1501,7 +1502,7 @@ namespace OrthancDatabases
   // For unit testing only!
   uint64_t IndexBackend::GetUnprotectedPatientsCount()
   {
-    std::auto_ptr<DatabaseManager::CachedStatement> statement;
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     switch (manager_.GetDialect())
     {

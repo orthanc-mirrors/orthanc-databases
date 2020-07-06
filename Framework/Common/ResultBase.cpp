@@ -26,6 +26,7 @@
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -66,7 +67,7 @@ namespace OrthancDatabases
           sourceType != ValueType_Null &&
           sourceType != targetType)
       {
-        std::auto_ptr<IValue> converted(fields_[i]->Convert(targetType));
+        std::unique_ptr<IValue> converted(fields_[i]->Convert(targetType));
         
         if (converted.get() == NULL)
         {

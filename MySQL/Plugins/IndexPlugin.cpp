@@ -23,11 +23,12 @@
 #include "../../Framework/MySQL/MySQLDatabase.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <HttpClient.h>
 #include <Logging.h>
 #include <Toolbox.h>
 
-static std::auto_ptr<OrthancDatabases::MySQLIndex> backend_;
+static std::unique_ptr<OrthancDatabases::MySQLIndex> backend_;
 
 
 extern "C"

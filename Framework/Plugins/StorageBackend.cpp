@@ -28,6 +28,7 @@
 #include "../../Framework/Common/BinaryStringValue.h"
 #include "../../Framework/Common/FileValue.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <OrthancException.h>
 
 
@@ -208,7 +209,7 @@ namespace OrthancDatabases
 
 
   static OrthancPluginContext* context_ = NULL;
-  static std::auto_ptr<StorageBackend>  backend_;
+  static std::unique_ptr<StorageBackend>  backend_;
     
 
   static OrthancPluginErrorCode StorageCreate(const char* uuid,

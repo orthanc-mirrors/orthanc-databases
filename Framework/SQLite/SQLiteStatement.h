@@ -29,6 +29,7 @@
 #include "SQLiteTransaction.h"
 #include "../Common/GenericFormatter.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <SQLite/Statement.h>
 
 #include <memory>
@@ -38,7 +39,7 @@ namespace OrthancDatabases
   class SQLiteStatement : public IPrecompiledStatement
   {
   private:
-    std::auto_ptr<Orthanc::SQLite::Statement>  statement_;
+    std::unique_ptr<Orthanc::SQLite::Statement>  statement_;
     bool                                       readOnly_;
     GenericFormatter                           formatter_;
 

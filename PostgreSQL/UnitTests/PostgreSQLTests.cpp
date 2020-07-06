@@ -41,6 +41,7 @@
 #include "../Plugins/PostgreSQLIndex.h"
 #include "../Plugins/PostgreSQLStorageArea.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
@@ -52,7 +53,7 @@ extern PostgreSQLParameters  globalParameters_;
 
 static PostgreSQLDatabase* CreateTestDatabase()
 {
-  std::auto_ptr<PostgreSQLDatabase> pg
+  std::unique_ptr<PostgreSQLDatabase> pg
     (new PostgreSQLDatabase(globalParameters_));
 
   pg->Open();
@@ -73,7 +74,7 @@ static int64_t CountLargeObjects(PostgreSQLDatabase& db)
 
 TEST(PostgreSQL, Basic)
 {
-  std::auto_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
+  std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
   ASSERT_FALSE(pg->DoesTableExist("Test"));
   pg->Execute("CREATE TABLE Test(name INTEGER, value BIGINT)");
@@ -146,7 +147,7 @@ TEST(PostgreSQL, Basic)
 
 TEST(PostgreSQL, String)
 {
-  std::auto_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
+  std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
   pg->Execute("CREATE TABLE Test(name INTEGER, value VARCHAR(40))");
 
@@ -192,7 +193,7 @@ TEST(PostgreSQL, String)
 
 TEST(PostgreSQL, Transaction)
 {
-  std::auto_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
+  std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
   pg->Execute("CREATE TABLE Test(name INTEGER, value INTEGER)");
 
@@ -260,7 +261,7 @@ TEST(PostgreSQL, Transaction)
 
 TEST(PostgreSQL, LargeObject)
 {
-  std::auto_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
+  std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
   ASSERT_EQ(0, CountLargeObjects(*pg));
 
   pg->Execute("CREATE TABLE Test(name VARCHAR, value OID)");
@@ -397,21 +398,21 @@ TEST(PostgreSQL, StorageArea)
 
 TEST(PostgreSQL, ImplicitTransaction)
 {
-  std::auto_ptr<PostgreSQLDatabase> db(CreateTestDatabase());
+  std::unique_ptr<PostgreSQLDatabase> db(CreateTestDatabase());
 
   ASSERT_FALSE(db->DoesTableExist("test"));
   ASSERT_FALSE(db->DoesTableExist("test2"));
 
   {
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db->CreateTransaction(false));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db->CreateTransaction(false));
     ASSERT_FALSE(t->IsImplicit());
   }
 
   {
     Query query("CREATE TABLE test(id INT)", false);
-    std::auto_ptr<IPrecompiledStatement> s(db->Compile(query));
+    std::unique_ptr<IPrecompiledStatement> s(db->Compile(query));
     
-    std::auto_ptr<ITransaction> t(db->CreateTransaction(true));
+    std::unique_ptr<ITransaction> t(db->CreateTransaction(true));
     ASSERT_TRUE(t->IsImplicit());
     ASSERT_THROW(t->Commit(), Orthanc::OrthancException);
     ASSERT_THROW(t->Rollback(), Orthanc::OrthancException);
@@ -427,9 +428,9 @@ TEST(PostgreSQL, ImplicitTransaction)
   {
     // An implicit transaction does not need to be explicitely committed
     Query query("CREATE TABLE test2(id INT)", false);
-    std::auto_ptr<IPrecompiledStatement> s(db->Compile(query));
+    std::unique_ptr<IPrecompiledStatement> s(db->Compile(query));
     
-    std::auto_ptr<ITransaction> t(db->CreateTransaction(true));
+    std::unique_ptr<ITransaction> t(db->CreateTransaction(true));
 
     Dictionary args;
     t->ExecuteWithoutResult(*s, args);
@@ -518,7 +519,7 @@ TEST(PostgreSQLIndex, CreateInstance)
 
 TEST(PostgreSQL, Lock2)
 {
-  std::auto_ptr<PostgreSQLDatabase> db1(CreateTestDatabase());
+  std::unique_ptr<PostgreSQLDatabase> db1(CreateTestDatabase());
   db1->Open();
 
   ASSERT_FALSE(db1->ReleaseAdvisoryLock(43)); // lock counter = 0
@@ -534,7 +535,7 @@ TEST(PostgreSQL, Lock2)
   ASSERT_TRUE(db1->AcquireAdvisoryLock(43));  // lock counter = 1
 
   {
-    std::auto_ptr<PostgreSQLDatabase> db2(CreateTestDatabase());
+    std::unique_ptr<PostgreSQLDatabase> db2(CreateTestDatabase());
     db2->Open();
 
     // The "db1" is still actively locking

@@ -22,6 +22,7 @@
 #include "../../Framework/SQLite/SQLiteDatabase.h"
 #include "../Plugins/SQLiteIndex.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <SystemToolbox.h>
 
@@ -68,15 +69,15 @@ TEST(SQLite, ImplicitTransaction)
   ASSERT_FALSE(db.DoesTableExist("test2"));
 
   {
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(false));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(false));
     ASSERT_FALSE(t->IsImplicit());
   }
 
   {
     OrthancDatabases::Query query("CREATE TABLE test(id INT)", false);
-    std::auto_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
+    std::unique_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
     
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
     ASSERT_TRUE(t->IsImplicit());
     ASSERT_THROW(t->Commit(), Orthanc::OrthancException);
     ASSERT_THROW(t->Rollback(), Orthanc::OrthancException);
@@ -92,9 +93,9 @@ TEST(SQLite, ImplicitTransaction)
   {
     // An implicit transaction does not need to be explicitely committed
     OrthancDatabases::Query query("CREATE TABLE test2(id INT)", false);
-    std::auto_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
+    std::unique_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
     
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
 
     OrthancDatabases::Dictionary args;
     t->ExecuteWithoutResult(*s, args);

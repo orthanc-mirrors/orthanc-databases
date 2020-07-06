@@ -23,6 +23,7 @@
 
 #include "PostgreSQLStatement.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -101,7 +102,7 @@ namespace OrthancDatabases
   IResult* PostgreSQLTransaction::Execute(IPrecompiledStatement& statement,
                                           const Dictionary& parameters)
   {
-    std::auto_ptr<IResult> result(dynamic_cast<PostgreSQLStatement&>(statement).Execute(*this, parameters));
+    std::unique_ptr<IResult> result(dynamic_cast<PostgreSQLStatement&>(statement).Execute(*this, parameters));
 
     if (!statement.IsReadOnly())
     {

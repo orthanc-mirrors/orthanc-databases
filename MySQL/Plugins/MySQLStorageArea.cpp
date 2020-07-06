@@ -25,6 +25,7 @@
 #include "../../Framework/MySQL/MySQLTransaction.h"
 #include "MySQLDefinitions.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 
 #include <boost/math/special_functions/round.hpp>
@@ -34,7 +35,7 @@ namespace OrthancDatabases
 {
   IDatabase* MySQLStorageArea::OpenInternal()
   {
-    std::auto_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
+    std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
 
     db->Open();
 

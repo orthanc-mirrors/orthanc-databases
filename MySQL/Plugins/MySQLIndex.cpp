@@ -28,6 +28,7 @@
 
 #include <EmbeddedResources.h>  // Auto-generated file
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -77,7 +78,7 @@ namespace OrthancDatabases
       MySQLDatabase::ClearDatabase(parameters_);
     }
     
-    std::auto_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
+    std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
 
     db->Open();
     db->Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);

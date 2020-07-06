@@ -27,6 +27,7 @@
 #include "../Common/ImplicitTransaction.h"
 #include "../Common/Integer64Value.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 #include <Toolbox.h>
@@ -321,7 +322,7 @@ namespace OrthancDatabases
 
     {
       MySQLTransaction t(*this);
-      std::auto_ptr<IResult> result(t.Execute(statement, args));
+      std::unique_ptr<IResult> result(t.Execute(statement, args));
 
       success = (!result->IsDone() &&
                  result->GetField(0).GetType() == ValueType_Integer64 &&
@@ -382,7 +383,7 @@ namespace OrthancDatabases
     args.SetUtf8Value("database", parameters_.GetDatabase());
     args.SetUtf8Value("table", name);
 
-    std::auto_ptr<IResult> result(statement.Execute(transaction, args));
+    std::unique_ptr<IResult> result(statement.Execute(transaction, args));
     return (!result->IsDone() &&
             result->GetFieldsCount() == 1 &&
             result->GetField(0).GetType() == ValueType_Integer64 &&
@@ -412,7 +413,7 @@ namespace OrthancDatabases
     Dictionary args;
     args.SetUtf8Value("database", name);
 
-    std::auto_ptr<IResult> result(statement.Execute(transaction, args));
+    std::unique_ptr<IResult> result(statement.Execute(transaction, args));
     return (!result->IsDone() &&
             result->GetFieldsCount() == 1 &&
             result->GetField(0).GetType() == ValueType_Integer64 &&
@@ -442,7 +443,7 @@ namespace OrthancDatabases
     Dictionary args;
     args.SetUtf8Value("trigger", name);
 
-    std::auto_ptr<IResult> result(statement.Execute(transaction, args));
+    std::unique_ptr<IResult> result(statement.Execute(transaction, args));
     return (!result->IsDone() &&
             result->GetFieldsCount() == 1 &&
             result->GetField(0).GetType() == ValueType_Integer64 &&

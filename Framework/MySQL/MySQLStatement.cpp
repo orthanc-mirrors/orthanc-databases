@@ -28,6 +28,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "MySQLResult.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -542,6 +543,6 @@ namespace OrthancDatabases
   void MySQLStatement::ExecuteWithoutResult(ITransaction& transaction,
                                             const Dictionary& parameters)
   {
-    std::auto_ptr<IResult> dummy(Execute(transaction, parameters));
+    std::unique_ptr<IResult> dummy(Execute(transaction, parameters));
   }
 }

@@ -21,6 +21,7 @@
 
 #include "ImplicitTransaction.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -124,7 +125,7 @@ namespace OrthancDatabases
                                         const Dictionary& parameters)
   {
     CheckStateForExecution();    
-    std::auto_ptr<IResult> result(ExecuteInternal(statement, parameters));
+    std::unique_ptr<IResult> result(ExecuteInternal(statement, parameters));
 
     if (!statement.IsReadOnly())
     {

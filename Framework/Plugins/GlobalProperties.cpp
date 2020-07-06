@@ -23,6 +23,7 @@
 
 #include "../Common/Utf8StringValue.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -38,12 +39,12 @@ namespace OrthancDatabases
     Query query("SELECT value FROM GlobalProperties WHERE property=${property}", true);
     query.SetType("property", ValueType_Integer64);
 
-    std::auto_ptr<IPrecompiledStatement> statement(db.Compile(query));
+    std::unique_ptr<IPrecompiledStatement> statement(db.Compile(query));
 
     Dictionary args;
     args.SetIntegerValue("property", property);
 
-    std::auto_ptr<IResult> result(transaction.Execute(*statement, args));
+    std::unique_ptr<IResult> result(transaction.Execute(*statement, args));
 
     if (result->IsDone())
     {
@@ -127,7 +128,7 @@ namespace OrthancDatabases
       query.SetType("property", ValueType_Integer64);
       query.SetType("value", ValueType_Utf8String);
       
-      std::auto_ptr<IPrecompiledStatement> statement(db.Compile(query));
+      std::unique_ptr<IPrecompiledStatement> statement(db.Compile(query));
 
       Dictionary args;
       args.SetIntegerValue("property", static_cast<int>(property));
@@ -141,7 +142,7 @@ namespace OrthancDatabases
         Query query("DELETE FROM GlobalProperties WHERE property=${property}", false);
         query.SetType("property", ValueType_Integer64);
       
-        std::auto_ptr<IPrecompiledStatement> statement(db.Compile(query));
+        std::unique_ptr<IPrecompiledStatement> statement(db.Compile(query));
 
         Dictionary args;
         args.SetIntegerValue("property", static_cast<int>(property));
@@ -154,7 +155,7 @@ namespace OrthancDatabases
         query.SetType("property", ValueType_Integer64);
         query.SetType("value", ValueType_Utf8String);
       
-        std::auto_ptr<IPrecompiledStatement> statement(db.Compile(query));
+        std::unique_ptr<IPrecompiledStatement> statement(db.Compile(query));
 
         Dictionary args;
         args.SetIntegerValue("property", static_cast<int>(property));

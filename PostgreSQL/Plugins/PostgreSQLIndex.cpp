@@ -28,6 +28,7 @@
 
 #include <EmbeddedResources.h>  // Auto-generated file
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -66,7 +67,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
     }
 
-    std::auto_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
+    std::unique_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
 
     db->Open();
 

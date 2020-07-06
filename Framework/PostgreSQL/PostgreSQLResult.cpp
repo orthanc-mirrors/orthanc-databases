@@ -28,6 +28,7 @@
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <OrthancException.h>
 #include <Logging.h>
 #include <Endianness.h>
@@ -230,7 +231,7 @@ namespace OrthancDatabases
 
       case OIDOID:
       {
-        std::auto_ptr<FileValue> value(new FileValue);
+        std::unique_ptr<FileValue> value(new FileValue);
         GetLargeObject(value->GetContent(), column);
         return value.release();
       }

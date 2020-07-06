@@ -25,6 +25,7 @@
 #include "../../Framework/PostgreSQL/PostgreSQLTransaction.h"
 #include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 
 
@@ -32,7 +33,7 @@ namespace OrthancDatabases
 {
   IDatabase* PostgreSQLStorageArea::OpenInternal()
   {
-    std::auto_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
+    std::unique_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
 
     db->Open();
 

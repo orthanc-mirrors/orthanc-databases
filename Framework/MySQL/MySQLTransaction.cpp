@@ -23,6 +23,7 @@
 
 #include "MySQLStatement.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -93,7 +94,7 @@ namespace OrthancDatabases
   IResult* MySQLTransaction::Execute(IPrecompiledStatement& statement,
                                      const Dictionary& parameters)
   {
-    std::auto_ptr<IResult> result(dynamic_cast<MySQLStatement&>(statement).Execute(*this, parameters));
+    std::unique_ptr<IResult> result(dynamic_cast<MySQLStatement&>(statement).Execute(*this, parameters));
 
     if (!statement.IsReadOnly())
     {

@@ -24,6 +24,7 @@
 #include "SQLiteResult.h"
 #include "SQLiteStatement.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <OrthancException.h>
 
 namespace OrthancDatabases
@@ -43,7 +44,7 @@ namespace OrthancDatabases
   IResult* SQLiteTransaction::Execute(IPrecompiledStatement& statement,
                                       const Dictionary& parameters)
   {
-    std::auto_ptr<IResult> result(dynamic_cast<SQLiteStatement&>(statement).Execute(*this, parameters));
+    std::unique_ptr<IResult> result(dynamic_cast<SQLiteStatement&>(statement).Execute(*this, parameters));
 
     if (!statement.IsReadOnly())
     {

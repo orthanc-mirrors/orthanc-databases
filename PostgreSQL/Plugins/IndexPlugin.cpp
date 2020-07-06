@@ -22,9 +22,10 @@
 #include "PostgreSQLIndex.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 
-static std::auto_ptr<OrthancDatabases::PostgreSQLIndex> backend_;
+static std::unique_ptr<OrthancDatabases::PostgreSQLIndex> backend_;
 
 
 extern "C"

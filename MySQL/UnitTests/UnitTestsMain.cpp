@@ -31,6 +31,7 @@ OrthancDatabases::MySQLParameters globalParameters_;
 #include "../../Framework/MySQL/MySQLTransaction.h"
 #include "../../Framework/Plugins/IndexUnitTests.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
 #include <HttpClient.h>
 #include <Logging.h>
 #include <Toolbox.h>
@@ -138,7 +139,7 @@ static int64_t CountFiles(OrthancDatabases::MySQLDatabase& db)
   OrthancDatabases::MySQLStatement s(db, query);
   OrthancDatabases::MySQLTransaction t(db);
   OrthancDatabases::Dictionary d;
-  std::auto_ptr<OrthancDatabases::IResult> result(s.Execute(t, d));
+  std::unique_ptr<OrthancDatabases::IResult> result(s.Execute(t, d));
   return dynamic_cast<const OrthancDatabases::Integer64Value&>(result->GetField(0)).GetValue();
 }
 
@@ -215,15 +216,15 @@ TEST(MySQL, ImplicitTransaction)
   }
 
   {
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(false));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(false));
     ASSERT_FALSE(t->IsImplicit());
   }
 
   {
     OrthancDatabases::Query query("CREATE TABLE test(id INT)", false);
-    std::auto_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
+    std::unique_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
     
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
     ASSERT_TRUE(t->IsImplicit());
     ASSERT_THROW(t->Commit(), Orthanc::OrthancException);
     ASSERT_THROW(t->Rollback(), Orthanc::OrthancException);
@@ -239,9 +240,9 @@ TEST(MySQL, ImplicitTransaction)
   {
     // An implicit transaction does not need to be explicitely committed
     OrthancDatabases::Query query("CREATE TABLE test2(id INT)", false);
-    std::auto_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
+    std::unique_ptr<OrthancDatabases::IPrecompiledStatement> s(db.Compile(query));
     
-    std::auto_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(true));
 
     OrthancDatabases::Dictionary args;
     t->ExecuteWithoutResult(*s, args);

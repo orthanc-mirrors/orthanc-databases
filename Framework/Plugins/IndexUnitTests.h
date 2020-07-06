@@ -24,6 +24,8 @@
 #include "../Common/ImplicitTransaction.h"
 #include "GlobalProperties.h"
 
+#include <Compatibility.h>  // For std::unique_ptr<>
+
 #include <orthanc/OrthancCDatabasePlugin.h>
 
 #include <gtest/gtest.h>
@@ -45,9 +47,9 @@ namespace Orthanc
 }
 
 
-static std::auto_ptr<OrthancPluginAttachment>  expectedAttachment;
+static std::unique_ptr<OrthancPluginAttachment>  expectedAttachment;
 static std::list<OrthancPluginDicomTag>  expectedDicomTags;
-static std::auto_ptr<OrthancPluginExportedResource>  expectedExported;
+static std::unique_ptr<OrthancPluginExportedResource>  expectedExported;
 
 static void CheckAttachment(const OrthancPluginAttachment& attachment)
 {
