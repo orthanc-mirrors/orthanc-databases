@@ -21,12 +21,13 @@
 
 #include "PostgreSQLIndex.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
+#include "../../Framework/Plugins/OptimizedRoutes.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 
 static std::unique_ptr<OrthancDatabases::PostgreSQLIndex> backend_;
-
+static std::unique_ptr<OrthancDatabases::OptimizedRoutes> optimizedRoutes_;
 
 extern "C"
 {
@@ -66,6 +67,11 @@ extern "C"
 
       /* Register the PostgreSQL index into Orthanc */
       OrthancPlugins::DatabaseBackendAdapter::Register(context, *backend_);
+
+      if (parameters.GetEnabledOptimizedRoutes())
+      {
+        OrthancDatabases::OptimizedRoutes::EnableOptimizedRoutes(backend_.get(), context);
+      }
     }
     catch (Orthanc::OrthancException& e)
     {

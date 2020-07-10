@@ -42,6 +42,7 @@ namespace OrthancDatabases
     bool         lock_;
     unsigned int maxConnectionRetries_;
     unsigned int connectionRetryInterval_;
+    bool         enabledOptimizedRoutes_;
 
     void Reset();
 
@@ -122,6 +123,11 @@ namespace OrthancDatabases
     unsigned int GetConnectionRetryInterval() const
     {
       return connectionRetryInterval_;
+    }
+
+    bool GetEnabledOptimizedRoutes() const
+    {
+      return enabledOptimizedRoutes_;
     }
 
     void Format(std::string& target) const;

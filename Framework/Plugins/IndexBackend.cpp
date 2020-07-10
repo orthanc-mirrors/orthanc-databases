@@ -30,7 +30,7 @@
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
-
+#include <boost/algorithm/string/join.hpp>
 
 namespace OrthancDatabases
 {
@@ -1949,6 +1949,88 @@ namespace OrthancDatabases
       args.SetIntegerValue("id", patient);
         
       statement.Execute(args);
+    }
+  }
+
+  void IndexBackend::GetStudyInstancesIds(std::list<std::string>& target /*out*/,
+                                          std::string& publicStudyId)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager_,
+          "SELECT instances.publicid FROM resources instances"
+          "  INNER JOIN resources series ON instances.parentid = series.internalid"
+          "  INNER JOIN resources studies ON series.parentid = studies.internalid"
+          "  WHERE studies.publicId = ${id}"
+    );
+
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetUtf8Value("id", publicStudyId);
+
+    ReadListOfStrings(target, statement, args);
+  }
+
+
+  void IndexBackend::GetStudyInstancesMetadata(std::map<std::string, std::map<int32_t, std::string>>& target /*out*/,
+                                               std::string& publicStudyId,
+                                               std::list<int32_t> metadataTypes)
+  {
+    {
+      std::string sql = "SELECT instances.publicid, metadata.type, metadata.value FROM resources instances "
+                        "LEFT JOIN metadata ON metadata.id = instances.internalid "
+                        "INNER JOIN resources series ON instances.parentid = series.internalid "
+                        "INNER JOIN resources studies ON series.parentid = studies.internalid "
+                        "  WHERE studies.publicId = ${id} ";
+
+
+      if (metadataTypes.size() != 0)
+      {
+        std::list<std::string> metadataTypesStrings;
+        for (std::list<int32_t>::const_iterator m = metadataTypes.begin(); m != metadataTypes.end(); m++)
+        {
+          metadataTypesStrings.push_back(boost::lexical_cast<std::string>(*m));
+        }
+
+        std::string metadataTypesFilter = boost::algorithm::join(metadataTypesStrings, ",");
+        sql = sql + "    AND metadata.type IN (" + metadataTypesFilter + ")";
+      }
+
+      DatabaseManager::StandaloneStatement statement(manager_, sql);
+
+      statement.SetReadOnly(true);
+      statement.SetParameterType("id", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("id", publicStudyId);
+
+      statement.Execute(args);
+
+      target.clear();
+
+      if (!statement.IsDone())
+      {
+        if (statement.GetResultFieldsCount() != 3)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+
+        while (!statement.IsDone())
+        {
+          std::string instanceId = ReadString(statement, 0);
+          int32_t type = ReadInteger32(statement, 1);
+          std::string value = ReadString(statement, 2);
+
+          if (target.find(instanceId) == target.end())
+          {
+            target[instanceId] = std::map<std::int32_t, std::string>();
+          }
+          target[instanceId][type] = value;
+
+          statement.Next();
+        }
+      }
     }
   }
 

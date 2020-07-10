@@ -41,6 +41,7 @@ namespace OrthancDatabases
     lock_ = true;
     maxConnectionRetries_ = 10;
     connectionRetryInterval_ = 5;
+    enabledOptimizedRoutes_ = false;
   }
 
 
@@ -92,6 +93,7 @@ namespace OrthancDatabases
     }
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
+    enabledOptimizedRoutes_ = configuration.GetBooleanValue("EnableOptimizedRoutes", false);
 
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);

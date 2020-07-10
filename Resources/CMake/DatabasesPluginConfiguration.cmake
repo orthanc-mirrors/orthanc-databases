@@ -70,6 +70,7 @@ list(APPEND DATABASES_SOURCES
   ${ORTHANC_CORE_SOURCES}
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/GlobalProperties.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/IndexBackend.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/OptimizedRoutes.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Databases/DatabaseConstraint.cpp
   ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Databases/ISqlLookupFormatter.cpp

@@ -5,7 +5,7 @@ Pending changes in the mainline
 * Added "MaximumConnectionRetries" & "ConnectionRetryInterval" to configure 
   the retries when connecting to the DB at startup
 * Support of dynamic linking against the system-wide Orthanc framework library
-
+* Added new optimized Rest API routes (work-in-progress)
 
 Release 3.2 (2019-03-01)
 ========================

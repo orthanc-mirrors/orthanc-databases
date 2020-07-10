@@ -258,6 +258,15 @@ namespace OrthancDatabases
     virtual void GetChildren(std::list<std::string>& childrenPublicIds,
                              int64_t id);
 
+    // For optimized routes
+    virtual void GetStudyInstancesMetadata(std::map<std::string, std::map<int32_t, std::string>>& target /*out*/,
+                                           std::string& publicStudyId,
+                                           std::list<int32_t> metadataTypes);
+
+    // For optimized routes
+    virtual void GetStudyInstancesIds(std::list<std::string>& target /*out*/,
+                                      std::string& publicStudyId);
+
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
     virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
