@@ -355,7 +355,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
     }
 
-    LOG(INFO) << "Preparing MySQL statement: " << sql;
+    VLOG(1) << "Preparing MySQL statement: " << sql;
 
     db_.CheckErrorCode(mysql_stmt_prepare(statement_, sql.c_str(), sql.size()));
 
