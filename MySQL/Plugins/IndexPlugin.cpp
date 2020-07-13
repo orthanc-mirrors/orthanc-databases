@@ -65,7 +65,7 @@ extern "C"
 
     try
     {
-      OrthancDatabases::MySQLParameters parameters(mysql);
+      OrthancDatabases::MySQLParameters parameters(mysql, configuration);
 
       /* Create the database back-end */
       backend_.reset(new OrthancDatabases::MySQLIndex(parameters));

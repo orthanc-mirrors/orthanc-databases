@@ -8,6 +8,11 @@ Pending changes in the mainline
 * Added "MaximumConnectionRetries" & "ConnectionRetryInterval" to configure 
   the retries when connecting to the DB at startup
 * Support of dynamic linking against the system-wide Orthanc framework library
+* Added support for TLS connections: 3 new options:
+  - "EnableSsl" (false by default)
+  - "SslVerifyServerCertificates" (true by default - inactive if EnableSsl if false)
+  - "SslCACertificates" (default value is "HttpsCACertificates" from global
+    Orthanc configuration)
 
 
 Release 2.0 (2019-01-23)

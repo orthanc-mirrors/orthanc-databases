@@ -62,7 +62,7 @@ extern "C"
 
     try
     {
-      OrthancDatabases::MySQLParameters parameters(mysql);
+      OrthancDatabases::MySQLParameters parameters(mysql, configuration);
       OrthancDatabases::StorageBackend::Register
         (context, new OrthancDatabases::MySQLStorageArea(parameters));
     }

@@ -38,6 +38,9 @@ namespace OrthancDatabases
     std::string  database_;
     uint16_t     port_;
     std::string  unixSocket_;
+    bool         ssl_;
+    bool         verifySslServerCertificates_;
+    std::string  sslCaCertificates_;
     bool         lock_;
     unsigned int maxConnectionRetries_;
     unsigned int connectionRetryInterval_;
@@ -47,7 +50,7 @@ namespace OrthancDatabases
   public:
     MySQLParameters();
 
-    MySQLParameters(const OrthancPlugins::OrthancConfiguration& configuration);
+    MySQLParameters(const OrthancPlugins::OrthancConfiguration& pluginConfiguration, const OrthancPlugins::OrthancConfiguration& orthancConfiguration);
 
     const std::string& GetHost() const
     {
@@ -77,6 +80,21 @@ namespace OrthancDatabases
     uint16_t GetPort() const
     {
       return port_;
+    }
+
+    bool IsSsl() const
+    {
+      return ssl_;
+    }
+
+    bool IsVerifyServerCertificates() const
+    {
+      return verifySslServerCertificates_;
+    }
+
+    const char* GetSslCaCertificates() const
+    {
+      return sslCaCertificates_.c_str();
     }
 
     void SetHost(const std::string& host);

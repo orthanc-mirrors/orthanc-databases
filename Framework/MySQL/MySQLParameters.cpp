@@ -52,46 +52,58 @@ namespace OrthancDatabases
   }
 
 
-  MySQLParameters::MySQLParameters(const OrthancPlugins::OrthancConfiguration& configuration)
+  MySQLParameters::MySQLParameters(const OrthancPlugins::OrthancConfiguration& pluginConfiguration, const OrthancPlugins::OrthancConfiguration& orthancConfiguration)
   {
     Reset();
 
     std::string s;
-    if (configuration.LookupStringValue(s, "Host"))
+    if (pluginConfiguration.LookupStringValue(s, "Host"))
     {
       SetHost(s);
     }
 
-    if (configuration.LookupStringValue(s, "Username"))
+    if (pluginConfiguration.LookupStringValue(s, "Username"))
     {
       SetUsername(s);
     }
 
-    if (configuration.LookupStringValue(s, "Password"))
+    if (pluginConfiguration.LookupStringValue(s, "Password"))
     {
       SetPassword(s);
     }
 
-    if (configuration.LookupStringValue(s, "Database"))
+    if (pluginConfiguration.LookupStringValue(s, "Database"))
     {
       SetDatabase(s);
     }
 
     unsigned int port;
-    if (configuration.LookupUnsignedIntegerValue(port, "Port"))
+    if (pluginConfiguration.LookupUnsignedIntegerValue(port, "Port"))
     {
       SetPort(port);
     }
 
-    if (configuration.LookupStringValue(s, "UnixSocket"))
+    if (pluginConfiguration.LookupStringValue(s, "UnixSocket"))
     {
       SetUnixSocket(s);
     }
 
-    lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
+    lock_ = pluginConfiguration.GetBooleanValue("Lock", true);  // Use locking by default
 
-    maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
-    connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
+    ssl_ = pluginConfiguration.GetBooleanValue("EnableSsl", false);
+    verifySslServerCertificates_ = pluginConfiguration.GetBooleanValue("SslVerifyServerCertificates", true);
+
+    const std::string defaultCaCertificates = orthancConfiguration.GetStringValue("HttpsCACertificates", "");
+    sslCaCertificates_ = pluginConfiguration.GetStringValue("SslCACertificates", defaultCaCertificates);
+
+    if (ssl_ && verifySslServerCertificates_ && sslCaCertificates_.empty())
+    {
+      LOG(ERROR) << "MySQL: No SslCACertificates defined, unable to check SSL Server certificates";
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+
+    maxConnectionRetries_ = pluginConfiguration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
+    connectionRetryInterval_ = pluginConfiguration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
   }
 
 
