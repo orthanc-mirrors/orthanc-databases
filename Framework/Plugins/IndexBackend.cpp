@@ -1978,13 +1978,7 @@ namespace OrthancDatabases
                                                std::list<int32_t> metadataTypes)
   {
     {
-      std::string sql = "SELECT instances.publicid, metadata.type, metadata.value FROM resources instances "
-                        "LEFT JOIN metadata ON metadata.id = instances.internalid "
-                        "INNER JOIN resources series ON instances.parentid = series.internalid "
-                        "INNER JOIN resources studies ON series.parentid = studies.internalid "
-                        "  WHERE studies.publicId = ${id} ";
-
-
+      std::string metadataSqlFilter = "";
       if (metadataTypes.size() != 0)
       {
         std::list<std::string> metadataTypesStrings;
@@ -1994,8 +1988,16 @@ namespace OrthancDatabases
         }
 
         std::string metadataTypesFilter = boost::algorithm::join(metadataTypesStrings, ",");
-        sql = sql + "    AND metadata.type IN (" + metadataTypesFilter + ")";
+        metadataSqlFilter = "WHERE metadata.type IN (" + metadataTypesFilter + ")";
       }
+
+      std::string sql = "SELECT instances.publicid, metadata.type, metadata.value "
+                        "FROM resources instances "
+                        "  LEFT JOIN (select * from metadata " + metadataSqlFilter +
+                        "                                                            ) AS metadata ON metadata.id = instances.internalId "
+                        "INNER JOIN resources series ON instances.parentid = series.internalid "
+                        "INNER JOIN resources studies ON series.parentid = studies.internalid "
+                        "  WHERE studies.publicId = ${id} ";
 
       DatabaseManager::StandaloneStatement statement(manager_, sql);
 
@@ -2019,14 +2021,19 @@ namespace OrthancDatabases
         while (!statement.IsDone())
         {
           std::string instanceId = ReadString(statement, 0);
-          int32_t type = ReadInteger32(statement, 1);
-          std::string value = ReadString(statement, 2);
 
           if (target.find(instanceId) == target.end())
           {
             target[instanceId] = std::map<std::int32_t, std::string>();
           }
-          target[instanceId][type] = value;
+
+          if (statement.GetResultField(1).GetType() != ValueType_Null)
+          {
+            int32_t type = ReadInteger32(statement, 1);
+            std::string value = ReadString(statement, 2);
+
+            target[instanceId][type] = value;
+          }
 
           statement.Next();
         }

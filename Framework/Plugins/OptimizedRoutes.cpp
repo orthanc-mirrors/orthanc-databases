@@ -66,7 +66,7 @@ extern "C"
     Json::Value response(Json::objectValue);
     for (std::map<std::string, std::map<int32_t, std::string>>::const_iterator itInstance = result.begin(); itInstance != result.end(); itInstance++)
     {
-      Json::Value instanceMetadatas;
+      Json::Value instanceMetadatas(Json::objectValue);
       for (std::map<int32_t, std::string>::const_iterator itMetadata = itInstance->second.begin(); itMetadata != itInstance->second.end(); itMetadata++)
       {
         std::string id = boost::lexical_cast<std::string>(itMetadata->first);
