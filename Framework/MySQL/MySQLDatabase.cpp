@@ -147,7 +147,7 @@ namespace OrthancDatabases
       {
         my_bool verifyCert = 1;
         mysql_options(mysql_, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (void *) &verifyCert);
-        mysql_optionsv(mysql_, MYSQL_OPT_SSL_CA, (void *)(parameters_.GetSslCaCertificates()));
+        mysql_options(mysql_, MYSQL_OPT_SSL_CA, (void *)(parameters_.GetSslCaCertificates()));
       }
 
       my_bool enforceTls = 1;
