@@ -140,7 +140,20 @@ namespace OrthancDatabases
       unsigned int protocol = MYSQL_PROTOCOL_TCP;
       mysql_options(mysql_, MYSQL_OPT_PROTOCOL, (unsigned int *) &protocol);
     }
-      
+
+    if (parameters_.IsSsl())
+    {
+      if (parameters_.IsVerifyServerCertificates())
+      {
+        my_bool verifyCert = 1;
+        mysql_options(mysql_, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (void *) &verifyCert);
+        mysql_options(mysql_, MYSQL_OPT_SSL_CA, (void *)(parameters_.GetSslCaCertificates()));
+      }
+
+      my_bool enforceTls = 1;
+      mysql_options(mysql_, MYSQL_OPT_SSL_ENFORCE, (void *) &enforceTls);
+    }
+
     const char* socket = (parameters_.GetUnixSocket().empty() ? NULL :
                           parameters_.GetUnixSocket().c_str());
 

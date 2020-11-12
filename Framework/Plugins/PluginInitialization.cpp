@@ -45,7 +45,7 @@ namespace OrthancDatabases
                         const std::string& dbms,
                         bool isIndex)
   {
-#if defined(ORTHANC_FRAMEWORK_VERSION_IS_ABOVE)  // This indicates Orthanc framework >= 1.7.2
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 7, 2)
     Orthanc::Logging::InitializePluginContext(context);
 #else
     Orthanc::Logging::Initialize(context);
