@@ -5,6 +5,9 @@ Pending changes in the mainline
 * Added "MaximumConnectionRetries" & "ConnectionRetryInterval" to configure 
   the retries when connecting to the DB at startup
 * Support of dynamic linking against the system-wide Orthanc framework library
+* Upgraded dependencies for static builds (notably on Windows and LSB):
+  - openssl 1.1.1g
+  - libpq 13.1
 
 
 Release 3.2 (2019-03-01)

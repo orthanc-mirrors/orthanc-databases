@@ -40,6 +40,10 @@
 // PostgreSQL includes
 #include <pg_config.h>
 
+#if !defined(PG_VERSION_NUM)
+#  error PG_VERSION_NUM is not defined
+#endif
+
 #if PG_VERSION_NUM >= 110000
 #  include <postgres.h>
 #  undef LOG  // This one comes from <postgres.h>, and conflicts with <Logging.h>

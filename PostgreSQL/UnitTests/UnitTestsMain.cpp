@@ -34,7 +34,7 @@ OrthancDatabases::PostgreSQLParameters  globalParameters_;
 
 TEST(PostgreSQL, Version)
 {
-  ASSERT_STREQ("9.6.1", PG_VERSION);
+  ASSERT_STREQ("13.1", PG_VERSION);
 }
 #endif
 

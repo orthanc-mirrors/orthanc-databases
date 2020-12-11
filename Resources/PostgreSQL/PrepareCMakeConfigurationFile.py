@@ -6,7 +6,7 @@ import sys
 if len(sys.argv) != 3:
     raise Exception('Bad number of arguments')
 
-r = re.compile(r'^#undef ([A-Z0-9_]+)$')
+r = re.compile(r'^#undef ([a-zA-Z0-9_]+)$')
 
 with open(sys.argv[1], 'r') as f:
     with open(sys.argv[2], 'w') as g:
