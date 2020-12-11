@@ -183,16 +183,23 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
       "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     set(PG_PRINTF_ATTRIBUTE "gnu_printf")
     set(pg_restrict "__restrict")
+    set(restrict "__restrict")
   else()
-    set(pg_restrict "")
+    # The empty string below wouldn't work (it would do an #undef)
+    set(pg_restrict " ")
+    set(restrict " ")
   endif()
 
+  if (MSVC)
+    set(inline "__inline")
+  endif()
+  
   if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;winsock2.h;ws2tcpip.h")
   else()
     set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;sys/socket.h;netdb.h")
   endif()
-  
+
   check_type_size("struct addrinfo" HAVE_STRUCT_ADDRINFO)    
   check_type_size("struct sockaddr_storage" HAVE_STRUCT_SOCKADDR_STORAGE)
   check_struct_has_member("struct sockaddr_storage" ss_family
