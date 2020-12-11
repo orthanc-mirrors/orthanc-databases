@@ -200,6 +200,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
     set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;sys/socket.h;netdb.h")
   endif()
 
+  check_type_size("size_t" SIZEOF_SIZE_T)
   check_type_size("struct addrinfo" HAVE_STRUCT_ADDRINFO)    
   check_type_size("struct sockaddr_storage" HAVE_STRUCT_SOCKADDR_STORAGE)
   check_struct_has_member("struct sockaddr_storage" ss_family
@@ -216,7 +217,28 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   check_function_exists(strerror HAVE_STRERROR)
   check_function_exists(strerror_r HAVE_STRERROR_R)
   check_function_exists(unsetenv HAVE_UNSETENV)
+  check_function_exists(strlcat HAVE_STRLCAT)
+  check_function_exists(strlcpy HAVE_STRLCPY)  
+  check_function_exists(getpeereid HAVE_GETPEEREID)
+  check_function_exists(getpeerucred HAVE_GETPEERUCRED)
 
+  check_symbol_exists(strlcpy "stdio.h;string.h" HAVE_DECL_STRLCPY)
+  if (NOT HAVE_DECL_STRLCPY)
+    set(HAVE_DECL_STRLCPY 0)
+  endif()
+  check_symbol_exists(strlcat "stdio.h;string.h" HAVE_DECL_STRLCAT)
+  if (NOT HAVE_DECL_STRLCAT)
+    set(HAVE_DECL_STRLCAT 0)
+  endif()
+  check_symbol_exists(snprintf "stdio.h;string.h" HAVE_DECL_SNPRINTF)
+  if (NOT HAVE_DECL_SNPRINTF)
+    set(HAVE_DECL_SNPRINTF 0)
+  endif()
+  check_symbol_exists(vsnprintf "stdio.h;string.h" HAVE_DECL_VSNPRINTF)
+  if (NOT HAVE_DECL_VSNPRINTF)
+    set(HAVE_DECL_VSNPRINTF 0)
+  endif()
+  
   check_c_source_compiles("
 	#include <sys/time.h>
 	int main(void){
@@ -332,7 +354,6 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
     ${LIBPQ_SOURCES_DIR}/src/port/chklocale.c
     ${LIBPQ_SOURCES_DIR}/src/port/explicit_bzero.c
     ${LIBPQ_SOURCES_DIR}/src/port/getaddrinfo.c
-    ${LIBPQ_SOURCES_DIR}/src/port/getpeereid.c
     ${LIBPQ_SOURCES_DIR}/src/port/inet_net_ntop.c
     ${LIBPQ_SOURCES_DIR}/src/port/noblock.c
     ${LIBPQ_SOURCES_DIR}/src/port/pg_strong_random.c
@@ -340,9 +361,20 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
     ${LIBPQ_SOURCES_DIR}/src/port/pqsignal.c
     ${LIBPQ_SOURCES_DIR}/src/port/snprintf.c
     ${LIBPQ_SOURCES_DIR}/src/port/strerror.c
-    ${LIBPQ_SOURCES_DIR}/src/port/strlcpy.c
     ${LIBPQ_SOURCES_DIR}/src/port/thread.c
     )
+
+  if (NOT HAVE_STRLCPY)
+    LIST(APPEND LIBPQ_SOURCES
+      ${LIBPQ_SOURCES_DIR}/src/port/strlcpy.c  # Doesn't work on OS X
+      )
+  endif()
+
+  if (NOT HAVE_GETPEEREID)
+    LIST(APPEND LIBPQ_SOURCES
+      ${LIBPQ_SOURCES_DIR}/src/port/getpeereid.c  # Doesn't work on OS X
+      )
+  endif()
 
   if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     link_libraries(secur32)
