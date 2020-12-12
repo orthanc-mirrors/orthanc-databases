@@ -28,16 +28,6 @@
 #include <cmath>
 #include <Enumerations.h>
 
-/**
- * This include must be before including "c.h" from PostgreSQL,
- * otherwise the function "static bool
- * boost::date_time::special_values_parser<date_type,
- * charT>::__builtin_expect()" from Boost clashes with macro
- * "__builtin_expect()" used by PostgreSQL 11.
- **/
-#include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/system/error_code.hpp>
-
 // PostgreSQL includes
 #include <pg_config.h>
 
@@ -45,11 +35,5 @@
 #  error PG_VERSION_NUM is not defined
 #endif
 
-#if PG_VERSION_NUM >= 110000
-#  include <postgres.h>
-#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Logging.h>
-#endif
-
 #include <libpq-fe.h>
-#include <c.h>
-#include <catalog/pg_type.h>
+#include <catalog/pg_type_d.h>
