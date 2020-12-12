@@ -22,13 +22,6 @@
 #include "PostgreSQLIncludes.h"  // Must be the first
 #include "PostgreSQLResult.h"
 
-// Get "ntohl()" defined
-#if defined(_WIN32)
-#  include <winsock.h>
-#else
-#  include <arpa/inet.h>
-#endif
-
 #include "../Common/BinaryStringValue.h"
 #include "../Common/FileValue.h"
 #include "../Common/Integer64Value.h"

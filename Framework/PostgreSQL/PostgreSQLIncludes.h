@@ -28,6 +28,13 @@
 #include <cmath>
 #include <Enumerations.h>
 
+// Get "ntohl()" defined
+#if defined(_WIN32)
+#  include <winsock.h>
+#else
+#  include <arpa/inet.h>
+#endif
+
 // PostgreSQL includes
 #include <pg_config.h>
 
@@ -35,5 +42,12 @@
 #  error PG_VERSION_NUM is not defined
 #endif
 
+#if PG_VERSION_NUM >= 110000
+#  include <catalog/pg_type_d.h>
+#else
+#  include <postgres.h>
+#  undef LOG  // This one comes from <postgres.h>, and conflicts with <Core/Logging.h>
+#  include <catalog/pg_type.h>
+#endif
+
 #include <libpq-fe.h>
-#include <catalog/pg_type_d.h>

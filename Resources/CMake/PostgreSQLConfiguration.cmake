@@ -195,9 +195,9 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   endif()
   
   if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;winsock2.h;ws2tcpip.h")
+    set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;winsock2.h;ws2tcpip.h;float.h;math.h")
   else()
-    set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;sys/socket.h;netdb.h")
+    set(CMAKE_EXTRA_INCLUDE_FILES "sys/types.h;sys/socket.h;netdb.h;float.h;math.h")
   endif()
 
   check_type_size("size_t" SIZEOF_SIZE_T)
@@ -221,6 +221,8 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   check_function_exists(strlcpy HAVE_STRLCPY)  
   check_function_exists(getpeereid HAVE_GETPEEREID)
   check_function_exists(getpeerucred HAVE_GETPEERUCRED)
+  check_function_exists(isinf HAVE_ISINF)
+  check_function_exists(isnan HAVE_ISNAN)
 
   check_symbol_exists(strlcpy "stdio.h;string.h" HAVE_DECL_STRLCPY)
   if (NOT HAVE_DECL_STRLCPY)
@@ -392,9 +394,14 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
       ${LIBPQ_SOURCES_DIR}/src/port/open.c
       ${LIBPQ_SOURCES_DIR}/src/port/pgsleep.c
       ${LIBPQ_SOURCES_DIR}/src/port/system.c
-      ${LIBPQ_SOURCES_DIR}/src/port/win32error.c
       ${LIBPQ_SOURCES_DIR}/src/port/win32setlocale.c
       )
+
+    if (CMAKE_COMPILER_IS_GNUCXX OR 
+        (MSVC AND MSVC_VERSION GREATER 1800))
+      # Starting Visual Studio 2013 (version 1800), it is necessary to also add "win32error.c"
+      LIST(APPEND LIBPQ_SOURCES ${LIBPQ_SOURCES_DIR}/src/port/win32error.c)
+    endif()
 
     if (MSVC)
       include_directories(
