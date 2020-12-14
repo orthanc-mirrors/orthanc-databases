@@ -11,7 +11,7 @@ if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.8.1")
+  set(ORTHANC_FRAMEWORK_VERSION "4a3ba4bf4ba7")  # This is Orthanc Framework pre-1.8.2 (includes a fix for OpenSSL on MSVC)
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
