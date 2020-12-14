@@ -1,6 +1,10 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 3.3 (2020-12-14)
+========================
+
 * Added an advisory lock to avoid race conditions during database setup
 * Added "MaximumConnectionRetries" & "ConnectionRetryInterval" to configure 
   the retries when connecting to the DB at startup
