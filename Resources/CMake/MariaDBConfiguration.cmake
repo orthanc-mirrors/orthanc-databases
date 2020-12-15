@@ -130,6 +130,21 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
 
   if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
     link_libraries(shlwapi)
+
+    # MariaDB connector requires the fibers API (file "fibersapi.h",
+    # e.g. function "IsThreadAFiber()"), that was introduced in
+    # Windows Vista. This is done by redefining the "_WIN32_WINNT"
+    # macro that is initially set to 0x501 (Windows XP) in
+    # "OrthancFramework/Resources/CMake/Compiler.cmake".
+    # https://docs.microsoft.com/en-us/windows/win32/api/fibersapi/nf-fibersapi-isthreadafiber
+    remove_definitions(
+      -DWINVER=0x0501
+      -D_WIN32_WINNT=0x0501
+      )
+    add_definitions(
+      -DWINVER=0x0600
+      -D_WIN32_WINNT=0x0600
+      )
   endif()
 
 else()

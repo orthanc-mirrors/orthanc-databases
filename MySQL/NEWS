@@ -13,6 +13,8 @@ Pending changes in the mainline
   - "SslVerifyServerCertificates" (true by default - inactive if EnableSsl if false)
   - "SslCACertificates" (default value is "HttpsCACertificates" from global
     Orthanc configuration)
+* Upgraded dependencies for static builds (notably on Windows and LSB):
+  - openssl 1.1.1g
 
 
 Release 2.0 (2019-01-23)
