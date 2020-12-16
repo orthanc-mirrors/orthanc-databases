@@ -145,13 +145,18 @@ namespace OrthancDatabases
     {
       if (parameters_.IsVerifyServerCertificates())
       {
+#if (MYSQL_VERSION_ID > 50110 && MYSQL_VERSION_ID < 80000)  // Removed in MySQL client 8.0
         my_bool verifyCert = 1;
         mysql_options(mysql_, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (void *) &verifyCert);
+#endif
+        
         mysql_options(mysql_, MYSQL_OPT_SSL_CA, (void *)(parameters_.GetSslCaCertificates()));
       }
 
+#if (MYSQL_VERSION_ID > 50110 && MYSQL_VERSION_ID < 80000)  // Removed in MySQL client 8.0
       my_bool enforceTls = 1;
       mysql_options(mysql_, MYSQL_OPT_SSL_ENFORCE, (void *) &enforceTls);
+#endif
     }
 
     const char* socket = (parameters_.GetUnixSocket().empty() ? NULL :
