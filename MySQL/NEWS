@@ -1,6 +1,10 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 3.0 (2020-12-16)
+========================
+
 * Report issue/solution and prevent the start of Orthanc if the MySQL user is
   not allowed to run the "CREATE TRIGGER" command (missing "SUPER" privilege)
 * Implementation of new extensions: LookupResourceAndParent and GetAllMetadata
