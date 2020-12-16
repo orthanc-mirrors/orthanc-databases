@@ -58,7 +58,9 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
                               ${MARIADB_CLIENT_VERSION_MINOR} * 100   +
                               ${MARIADB_CLIENT_VERSION_PATCH}")
                             
-  #set(HAVE_DLOPEN 1)  # Not needed anymore in 3.1.11
+  add_definitions(-DHAVE_DLOPEN=1)                          
+  #set(HAVE_DLOPEN 1)  # Replaced by the C macro above in 3.1.11
+  
   set(PROTOCOL_VERSION ${MARIADB_CLIENT_VERSION_MAJOR})
   set(MARIADB_PORT 3306)
   set(MARIADB_UNIX_ADDR "/var/run/mysqld/mysqld.sock")
