@@ -19,11 +19,11 @@
 
 if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
   set(MARIADB_CLIENT_VERSION_MAJOR "10")
-  set(MARIADB_CLIENT_VERSION_MINOR "3")
-  set(MARIADB_CLIENT_VERSION_PATCH "6")
-  set(MARIADB_PACKAGE_VERSION "3.0.5")
+  set(MARIADB_CLIENT_VERSION_MINOR "5")
+  set(MARIADB_CLIENT_VERSION_PATCH "5")
+  set(MARIADB_PACKAGE_VERSION "3.1.11")
   set(MARIADB_CLIENT_SOURCES_DIR ${CMAKE_BINARY_DIR}/mariadb-connector-c-${MARIADB_PACKAGE_VERSION}-src)
-  set(MARIADB_CLIENT_MD5 "b846584b8b7a39c51a6e83986b57c71c")
+  set(MARIADB_CLIENT_MD5 "cf9da5f0ac9ec72dd8309bdc1d1c6c2f")
   set(MARIADB_CLIENT_URL "http://orthanc.osimis.io/ThirdPartyDownloads/mariadb-connector-c-${MARIADB_PACKAGE_VERSION}-src.tar.gz")
 
   if (IS_DIRECTORY "${MARIADB_CLIENT_SOURCES_DIR}")
@@ -37,7 +37,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
   if (FirstRun)
     execute_process(
       COMMAND ${PATCH_EXECUTABLE} -p0 -N -i
-      ${CMAKE_CURRENT_LIST_DIR}/../MariaDB/mariadb-connector-c-3.0.5.patch
+      ${CMAKE_CURRENT_LIST_DIR}/../MariaDB/mariadb-connector-c-${MARIADB_PACKAGE_VERSION}.patch
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
       RESULT_VARIABLE Failure
       )
@@ -52,17 +52,18 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
   include(${MARIADB_CLIENT_SOURCES_DIR}/cmake/CheckFunctions.cmake)
   include(${MARIADB_CLIENT_SOURCES_DIR}/cmake/CheckTypes.cmake)
 
-  set(MARIADB_CLIENT_VERSION "${MARIADB_CLIENT_VERSION_MAJOR}.${MARIADB_CLIENT_VERSION_MINOR}.${MARIADB_CLIENT_VERSION_PATCH}")
+  set(MARIADB_CLIENT_VERSION "${MARIADB_CLIENT_VERSION_MAJOR}.${MARIADB_CLIENT_VERSION_MINOR}")
   set(MARIADB_BASE_VERSION "mariadb-${MARIADB_CLIENT_VERSION_MAJOR}.${MARIADB_CLIENT_VERSION_MINOR}")
   math(EXPR MARIADB_VERSION_ID "${MARIADB_CLIENT_VERSION_MAJOR} * 10000 +
                               ${MARIADB_CLIENT_VERSION_MINOR} * 100   +
                               ${MARIADB_CLIENT_VERSION_PATCH}")
-
-  set(HAVE_DLOPEN 1)
+                            
+  #set(HAVE_DLOPEN 1)  # Not needed anymore in 3.1.11
   set(PROTOCOL_VERSION ${MARIADB_CLIENT_VERSION_MAJOR})
   set(MARIADB_PORT 3306)
   set(MARIADB_UNIX_ADDR "/var/run/mysqld/mysqld.sock")
   set(DEFAULT_CHARSET "latin1")
+  set(ENABLED_LOCAL_INFILE "AUTO")
 
   FOREACH(plugin mysql_native_password mysql_old_password pvio_socket)
     set(EXTERNAL_PLUGINS "${EXTERNAL_PLUGINS} extern struct st_mysql_client_plugin ${plugin}_client_plugin;\n")

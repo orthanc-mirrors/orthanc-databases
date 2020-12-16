@@ -15,6 +15,7 @@ Pending changes in the mainline
     Orthanc configuration)
 * Upgraded dependencies for static builds (notably on Windows and LSB):
   - openssl 1.1.1g
+  - mariadb-connector-c 3.1.11
 
 
 Release 2.0 (2019-01-23)

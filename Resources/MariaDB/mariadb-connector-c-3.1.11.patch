@@ -1,0 +1,29 @@
+diff -urEb mariadb-connector-c-3.1.11-src.orig/include/ma_global.h mariadb-connector-c-3.1.11-src/include/ma_global.h
+--- mariadb-connector-c-3.1.11-src.orig/include/ma_global.h	2020-12-15 12:42:41.791904385 +0100
++++ mariadb-connector-c-3.1.11-src/include/ma_global.h	2020-12-16 09:28:04.237789973 +0100
+@@ -606,7 +606,9 @@
+ #error "Neither int or long is of 4 bytes width"
+ #endif
+ 
+-#if !defined(HAVE_ULONG) && !defined(HAVE_LINUXTHREADS) && !defined(__USE_MISC)
++#if defined(__LSB_VERSION__)
++typedef unsigned long	ulong;	/* Short for unsigned long */
++#elif !defined(HAVE_ULONG) && !defined(HAVE_LINUXTHREADS) && !defined(__USE_MISC)
+ typedef unsigned long	ulong;	/* Short for unsigned long */
+ #endif
+ #ifndef longlong_defined
+diff -urEb mariadb-connector-c-3.1.11-src.orig/plugins/pvio/pvio_socket.c mariadb-connector-c-3.1.11-src/plugins/pvio/pvio_socket.c
+--- mariadb-connector-c-3.1.11-src.orig/plugins/pvio/pvio_socket.c	2020-12-15 12:42:41.795904383 +0100
++++ mariadb-connector-c-3.1.11-src/plugins/pvio/pvio_socket.c	2020-12-16 09:29:31.061052964 +0100
+@@ -60,6 +60,11 @@
+ #define IS_SOCKET_EINTR(err) 0
+ #endif
+ 
++#if defined(__LSB_VERSION__)
++// WARNING: This definition might break true Linux Standard Base compatibility!
++#  define MSG_DONTWAIT 0x40 /* Nonblocking IO.  */
++#endif
++
+ #ifndef SOCKET_ERROR
+ #define SOCKET_ERROR -1
+ #endif
