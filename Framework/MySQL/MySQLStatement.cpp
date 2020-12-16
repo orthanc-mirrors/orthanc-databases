@@ -110,8 +110,15 @@ namespace OrthancDatabases
     enum enum_field_types   mysqlType_;
     ValueType               orthancType_;
     std::string             buffer_;
+
+#if MYSQL_VERSION_ID < 80000
     my_bool                 isNull_;
     my_bool                 isError_;
+#else
+    bool                    isNull_;
+    bool                    isError_;
+#endif
+    
     unsigned long           length_;
 
   public:
