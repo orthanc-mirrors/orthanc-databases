@@ -111,7 +111,7 @@ namespace OrthancDatabases
     ValueType               orthancType_;
     std::string             buffer_;
 
-#if MYSQL_VERSION_ID < 80000
+#if (MYSQL_VERSION_ID < 80000) || defined(MARIADB_VERSION_ID)
     my_bool                 isNull_;
     my_bool                 isError_;
 #else
