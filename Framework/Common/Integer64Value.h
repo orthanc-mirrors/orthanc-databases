@@ -23,6 +23,8 @@
 
 #include "IValue.h"
 
+#include <Compatibility.h>
+
 #include <stdint.h>
 
 namespace OrthancDatabases
@@ -43,13 +45,13 @@ namespace OrthancDatabases
       return value_;
     }
 
-    virtual ValueType GetType() const
+    virtual ValueType GetType() const ORTHANC_OVERRIDE
     {
       return ValueType_Integer64;
     }
     
-    virtual IValue* Convert(ValueType target) const;
+    virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
 
-    virtual std::string Format() const;
+    virtual std::string Format() const ORTHANC_OVERRIDE;
   };
 }

@@ -53,19 +53,19 @@ namespace OrthancDatabases
 
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
-                                       const Dictionary& parameters)
+                                       const Dictionary& parameters) ORTHANC_OVERRIDE
       {
         return dynamic_cast<SQLiteStatement&>(statement).Execute(*this, parameters);
       }
 
       virtual void ExecuteWithoutResultInternal(IPrecompiledStatement& statement,
-                                                const Dictionary& parameters)
+                                                const Dictionary& parameters) ORTHANC_OVERRIDE
       {
         dynamic_cast<SQLiteStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
       
     public:
-      SQLiteImplicitTransaction(SQLiteDatabase&  db) :
+      explicit SQLiteImplicitTransaction(SQLiteDatabase&  db) :
         db_(db)
       {
       }

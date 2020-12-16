@@ -23,6 +23,8 @@
 
 #include "Query.h"
 
+#include <Compatibility.h>
+
 namespace OrthancDatabases
 {
   class GenericFormatter : public Query::IParameterFormatter
@@ -38,9 +40,9 @@ namespace OrthancDatabases
     {
     }
     
-    void Format(std::string& target,
-                const std::string& source,
-                ValueType type);
+    virtual void Format(std::string& target,
+                        const std::string& source,
+                        ValueType type) ORTHANC_OVERRIDE;
 
     size_t GetParametersCount() const
     {

@@ -51,7 +51,7 @@ namespace OrthancDatabases
 
     virtual ~MySQLStatement();
 
-    virtual bool IsReadOnly() const
+    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
     {
       return readOnly_;
     }

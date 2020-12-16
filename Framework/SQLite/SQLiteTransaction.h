@@ -39,32 +39,32 @@ namespace OrthancDatabases
     bool                          readOnly_;
     
   public:
-    SQLiteTransaction(SQLiteDatabase& database);
+    explicit SQLiteTransaction(SQLiteDatabase& database);
 
-    virtual bool IsImplicit() const
+    virtual bool IsImplicit() const ORTHANC_OVERRIDE
     {
       return false;
     }
     
-    virtual bool IsReadOnly() const
+    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
     {
       return readOnly_;
     }
 
-    virtual void Rollback()
+    virtual void Rollback() ORTHANC_OVERRIDE
     {
       transaction_.Rollback();
     }      
     
-    virtual void Commit()
+    virtual void Commit() ORTHANC_OVERRIDE
     {
       transaction_.Commit();
     }
 
     virtual IResult* Execute(IPrecompiledStatement& statement,
-                             const Dictionary& parameters);
+                             const Dictionary& parameters) ORTHANC_OVERRIDE;
 
     virtual void ExecuteWithoutResult(IPrecompiledStatement& statement,
-                                      const Dictionary& parameters);
+                                      const Dictionary& parameters) ORTHANC_OVERRIDE;
   };
 }

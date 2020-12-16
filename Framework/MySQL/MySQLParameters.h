@@ -46,11 +46,12 @@ namespace OrthancDatabases
     unsigned int connectionRetryInterval_;
 
     void Reset();
-
+    
   public:
     MySQLParameters();
 
-    MySQLParameters(const OrthancPlugins::OrthancConfiguration& pluginConfiguration, const OrthancPlugins::OrthancConfiguration& orthancConfiguration);
+    MySQLParameters(const OrthancPlugins::OrthancConfiguration& pluginConfiguration,
+                    const OrthancPlugins::OrthancConfiguration& orthancConfiguration);
 
     const std::string& GetHost() const
     {

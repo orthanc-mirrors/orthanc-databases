@@ -36,36 +36,36 @@ namespace OrthancDatabases
       MySQLStorageArea&  that_;
 
     public:
-      Factory(MySQLStorageArea& that) :
+      explicit Factory(MySQLStorageArea& that) :
         that_(that)
       {
       }
 
-      virtual Dialect GetDialect() const
+      virtual Dialect GetDialect() const ORTHANC_OVERRIDE
       {
         return Dialect_MySQL;
       }
 
-      virtual IDatabase* Open()
+      virtual IDatabase* Open() ORTHANC_OVERRIDE
       {
         return that_.OpenInternal();
       }
 
-      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries, unsigned int& connectionRetryInterval)
+      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries,
+                                                  unsigned int& connectionRetryInterval) ORTHANC_OVERRIDE
       {
         maxConnectionRetries = that_.parameters_.GetMaxConnectionRetries();
         connectionRetryInterval = that_.parameters_.GetConnectionRetryInterval();
       }
     };
 
-    OrthancPluginContext*  context_;
     MySQLParameters        parameters_;
     bool                   clearAll_;
 
     IDatabase* OpenInternal();
 
   public:
-    MySQLStorageArea(const MySQLParameters& parameters);
+    explicit MySQLStorageArea(const MySQLParameters& parameters);
 
     void SetClearAll(bool clear)
     {

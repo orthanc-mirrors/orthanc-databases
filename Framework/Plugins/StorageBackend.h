@@ -38,7 +38,7 @@ namespace OrthancDatabases
                         const std::string& content);
 
   public:
-    StorageBackend(IDatabaseFactory* factory);
+    explicit StorageBackend(IDatabaseFactory* factory);
 
     virtual ~StorageBackend()
     {

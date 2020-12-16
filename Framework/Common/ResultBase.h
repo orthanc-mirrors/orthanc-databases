@@ -23,6 +23,8 @@
 
 #include "IResult.h"
 
+#include <Compatibility.h>
+
 #include <vector>
 
 namespace OrthancDatabases
@@ -52,13 +54,13 @@ namespace OrthancDatabases
     }
 
     virtual void SetExpectedType(size_t field,
-                                 ValueType type);
+                                 ValueType type) ORTHANC_OVERRIDE;
 
-    virtual size_t GetFieldsCount() const
+    virtual size_t GetFieldsCount() const ORTHANC_OVERRIDE
     {
       return fields_.size();
     }
 
-    virtual const IValue& GetField(size_t index) const;
+    virtual const IValue& GetField(size_t index) const ORTHANC_OVERRIDE;
   };
 }

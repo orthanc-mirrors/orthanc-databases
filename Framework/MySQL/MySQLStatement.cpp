@@ -40,7 +40,7 @@ namespace OrthancDatabases
   class MySQLStatement::ResultField : public boost::noncopyable
   {
   private:     
-    IValue* CreateIntegerValue(MYSQL_BIND& bind) const
+    IValue* CreateIntegerValue(const MYSQL_BIND& bind) const
     {
       if (length_ != buffer_.size())
       {
@@ -114,10 +114,10 @@ namespace OrthancDatabases
     my_bool                 isError_;
     unsigned long           length_;
 
-
   public:
-    ResultField(const MYSQL_FIELD& field) :
-      mysqlType_(field.type)
+    explicit ResultField(const MYSQL_FIELD& field) :
+      mysqlType_(field.type),
+      length_(0)
     {
       // https://dev.mysql.com/doc/refman/8.0/en/c-api-data-structures.html
       // https://dev.mysql.com/doc/refman/8.0/en/mysql-stmt-fetch.html => size of "buffer_"
@@ -440,7 +440,6 @@ namespace OrthancDatabases
   IResult* MySQLStatement::Execute(ITransaction& transaction,
                                    const Dictionary& parameters)
   {
-    std::list<int>            intParameters;
     std::list<long long int>  int64Parameters;
 
     std::vector<MYSQL_BIND>  inputs(formatter_.GetParametersCount());

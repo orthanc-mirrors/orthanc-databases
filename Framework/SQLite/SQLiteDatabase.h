@@ -64,13 +64,13 @@ namespace OrthancDatabases
       return connection_.GetLastInsertRowId();
     }
     
-    virtual Dialect GetDialect() const
+    virtual Dialect GetDialect() const ORTHANC_OVERRIDE
     {
       return Dialect_SQLite;
     }
 
-    virtual IPrecompiledStatement* Compile(const Query& query);
+    virtual IPrecompiledStatement* Compile(const Query& query) ORTHANC_OVERRIDE;
 
-    virtual ITransaction* CreateTransaction(bool isImplicit);
+    virtual ITransaction* CreateTransaction(bool isImplicit) ORTHANC_OVERRIDE;
   };
 }

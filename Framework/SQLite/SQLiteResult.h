@@ -39,16 +39,16 @@ namespace OrthancDatabases
     void StepInternal();
 
   protected:
-    virtual IValue* FetchField(size_t index);
+    virtual IValue* FetchField(size_t index) ORTHANC_OVERRIDE;
     
   public:
-    SQLiteResult(SQLiteStatement& statement);
+    explicit SQLiteResult(SQLiteStatement& statement);
     
-    virtual bool IsDone() const
+    virtual bool IsDone() const ORTHANC_OVERRIDE
     {
       return done_;
     }
 
-    virtual void Next();
+    virtual void Next() ORTHANC_OVERRIDE;
   };
 }

@@ -49,7 +49,7 @@ namespace OrthancDatabases
     SQLiteStatement(SQLiteDatabase& database,
                     const Query& query);
 
-    virtual bool IsReadOnly() const
+    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
     {
       return readOnly_;
     }

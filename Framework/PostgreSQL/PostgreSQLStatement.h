@@ -74,7 +74,7 @@ namespace OrthancDatabases
 
     ~PostgreSQLStatement();
     
-    virtual bool IsReadOnly() const
+    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
     {
       return readOnly_;
     }

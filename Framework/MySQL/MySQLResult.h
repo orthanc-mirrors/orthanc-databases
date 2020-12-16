@@ -40,19 +40,19 @@ namespace OrthancDatabases
     void Step();
 
   protected:
-    virtual IValue* FetchField(size_t index);
+    virtual IValue* FetchField(size_t index) ORTHANC_OVERRIDE;
     
   public:
     MySQLResult(MySQLDatabase& db,
                 MySQLStatement& statement);
 
-    virtual ~MySQLResult();
+    virtual ~MySQLResult() ORTHANC_OVERRIDE;
     
-    virtual bool IsDone() const
+    virtual bool IsDone() const ORTHANC_OVERRIDE
     {
       return done_;
     }
 
-    virtual void Next();
+    virtual void Next() ORTHANC_OVERRIDE;
   };
 }

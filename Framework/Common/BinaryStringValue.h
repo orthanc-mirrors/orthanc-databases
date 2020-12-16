@@ -23,6 +23,8 @@
 
 #include "IValue.h"
 
+#include <Compatibility.h>
+
 namespace OrthancDatabases
 {
   class BinaryStringValue : public IValue
@@ -66,13 +68,13 @@ namespace OrthancDatabases
       return content_.size();
     }
 
-    virtual ValueType GetType() const
+    virtual ValueType GetType() const ORTHANC_OVERRIDE
     {
       return ValueType_BinaryString;
     }
     
-    virtual IValue* Convert(ValueType target) const;
+    virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
 
-    virtual std::string Format() const;
+    virtual std::string Format() const ORTHANC_OVERRIDE;
   };
 }

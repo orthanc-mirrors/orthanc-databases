@@ -35,8 +35,8 @@ namespace OrthancDatabases
       PostgreSQLStorageArea&  that_;
 
     public:
-      Factory(PostgreSQLStorageArea& that) :
-      that_(that)
+      explicit Factory(PostgreSQLStorageArea& that) :
+        that_(that)
       {
       }
 
@@ -57,14 +57,13 @@ namespace OrthancDatabases
       }
     };
 
-    OrthancPluginContext*  context_;
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
 
     IDatabase* OpenInternal();
 
   public:
-    PostgreSQLStorageArea(const PostgreSQLParameters& parameters);
+    explicit PostgreSQLStorageArea(const PostgreSQLParameters& parameters);
 
     void SetClearAll(bool clear)
     {

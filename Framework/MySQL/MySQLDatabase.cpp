@@ -326,14 +326,14 @@ namespace OrthancDatabases
 
     query.SetType("lock", ValueType_Utf8String);
     
-    MySQLStatement statement(*this, query);
-
     Dictionary args;
     args.SetUtf8Value("lock", prefix + "." + lock);
 
     bool success;
 
     {
+      MySQLStatement statement(*this, query);
+
       MySQLTransaction t(*this);
       std::unique_ptr<IResult> result(t.Execute(statement, args));
 
@@ -460,7 +460,7 @@ namespace OrthancDatabases
     return (!result->IsDone() &&
             result->GetFieldsCount() == 1 &&
             result->GetField(0).GetType() == ValueType_Integer64 &&
-            dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() == 1);            
+            dynamic_cast<const Integer64Value&>(result->GetField(0)).GetValue() != 0);
   }
 
 
@@ -530,7 +530,7 @@ namespace OrthancDatabases
       }
       
     public:
-      MySQLImplicitTransaction(MySQLDatabase&  db) :
+      explicit MySQLImplicitTransaction(MySQLDatabase&  db) :
         db_(db)
       {
       }

@@ -48,7 +48,7 @@ namespace OrthancDatabases
   public:
     PostgreSQLParameters();
 
-    PostgreSQLParameters(const OrthancPlugins::OrthancConfiguration& configuration);
+    explicit PostgreSQLParameters(const OrthancPlugins::OrthancConfiguration& configuration);
 
     void SetConnectionUri(const std::string& uri);
 

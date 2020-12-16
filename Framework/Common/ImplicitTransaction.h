@@ -23,6 +23,8 @@
 
 #include "ITransaction.h"
 
+#include <Compatibility.h>
+
 namespace OrthancDatabases
 {
   class ImplicitTransaction : public ITransaction
@@ -52,25 +54,25 @@ namespace OrthancDatabases
 
     virtual ~ImplicitTransaction();
     
-    virtual bool IsImplicit() const
+    virtual bool IsImplicit() const ORTHANC_OVERRIDE
     {
       return true;
     }
     
-    virtual bool IsReadOnly() const
+    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
     {
       return readOnly_;
     }
 
-    virtual void Rollback();
+    virtual void Rollback() ORTHANC_OVERRIDE;
     
-    virtual void Commit();
+    virtual void Commit() ORTHANC_OVERRIDE;
     
     virtual IResult* Execute(IPrecompiledStatement& statement,
-                             const Dictionary& parameters);
+                             const Dictionary& parameters) ORTHANC_OVERRIDE;
 
     virtual void ExecuteWithoutResult(IPrecompiledStatement& statement,
-                                      const Dictionary& parameters);
+                                      const Dictionary& parameters) ORTHANC_OVERRIDE;
 
     static void SetErrorOnDoubleExecution(bool isError);
 

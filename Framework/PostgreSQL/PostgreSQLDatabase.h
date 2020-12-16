@@ -46,9 +46,9 @@ namespace OrthancDatabases
     bool RunAdvisoryLockStatement(const std::string& statement);
 
   public:
-    PostgreSQLDatabase(const PostgreSQLParameters& parameters) :
-    parameters_(parameters),
-    pg_(NULL)
+    explicit PostgreSQLDatabase(const PostgreSQLParameters& parameters) :
+      parameters_(parameters),
+      pg_(NULL)
     {
     }
 
@@ -68,14 +68,14 @@ namespace OrthancDatabases
 
     void ClearAll();   // Only for unit tests!
 
-    virtual Dialect GetDialect() const
+    virtual Dialect GetDialect() const ORTHANC_OVERRIDE
     {
       return Dialect_PostgreSQL;
     }
 
-    virtual IPrecompiledStatement* Compile(const Query& query);
+    virtual IPrecompiledStatement* Compile(const Query& query) ORTHANC_OVERRIDE;
 
-    virtual ITransaction* CreateTransaction(bool isImplicit);
+    virtual ITransaction* CreateTransaction(bool isImplicit) ORTHANC_OVERRIDE;
 
     class TransientAdvisoryLock
     {

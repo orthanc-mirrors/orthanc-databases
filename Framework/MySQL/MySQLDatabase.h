@@ -48,7 +48,7 @@ namespace OrthancDatabases
                                   const std::string& lock);
 
   public:
-    MySQLDatabase(const MySQLParameters& parameters);
+    explicit MySQLDatabase(const MySQLParameters& parameters);
 
     virtual ~MySQLDatabase();
 
@@ -91,14 +91,14 @@ namespace OrthancDatabases
     bool DoesTriggerExist(MySQLTransaction& transaction,
                           const std::string& name);
 
-    virtual Dialect GetDialect() const
+    virtual Dialect GetDialect() const ORTHANC_OVERRIDE
     {
       return Dialect_MySQL;
     }
 
-    virtual IPrecompiledStatement* Compile(const Query& query);
+    virtual IPrecompiledStatement* Compile(const Query& query) ORTHANC_OVERRIDE;
 
-    virtual ITransaction* CreateTransaction(bool isImplicit);
+    virtual ITransaction* CreateTransaction(bool isImplicit) ORTHANC_OVERRIDE;
 
     static void GlobalFinalization();
 

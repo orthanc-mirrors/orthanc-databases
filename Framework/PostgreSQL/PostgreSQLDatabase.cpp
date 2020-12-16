@@ -249,7 +249,7 @@ namespace OrthancDatabases
       }
       
     public:
-      PostgreSQLImplicitTransaction(PostgreSQLDatabase&  db) :
+      explicit PostgreSQLImplicitTransaction(PostgreSQLDatabase&  db) :
         db_(db)
       {
       }

@@ -46,13 +46,18 @@ namespace OrthancDatabases
   }
 
   
-  MySQLParameters::MySQLParameters()
+  MySQLParameters::MySQLParameters() :
+    ssl_(false),
+    verifySslServerCertificates_(true),
+    maxConnectionRetries_(10),
+    connectionRetryInterval_(5)
   {
     Reset();
   }
 
 
-  MySQLParameters::MySQLParameters(const OrthancPlugins::OrthancConfiguration& pluginConfiguration, const OrthancPlugins::OrthancConfiguration& orthancConfiguration)
+  MySQLParameters::MySQLParameters(const OrthancPlugins::OrthancConfiguration& pluginConfiguration,
+                                   const OrthancPlugins::OrthancConfiguration& orthancConfiguration)
   {
     Reset();
 

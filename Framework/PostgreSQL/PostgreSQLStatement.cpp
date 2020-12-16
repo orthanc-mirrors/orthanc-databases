@@ -476,7 +476,7 @@ namespace OrthancDatabases
     }
 
   public:
-    ResultWrapper(PostgreSQLStatement& statement) :
+    explicit ResultWrapper(PostgreSQLStatement& statement) :
       result_(new PostgreSQLResult(statement))
     {
       SetFieldsCount(result_->GetColumnsCount());
