@@ -31,6 +31,8 @@
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <OrthancException.h>
 
+#include <limits>
+
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH                                  \
   catch (::Orthanc::OrthancException& e)                                \
@@ -52,66 +54,9 @@
 
 namespace OrthancDatabases
 {
-  void StorageBackend::ReadFromString(void*& buffer,
-                                      size_t& size,
-                                      const std::string& content)
-  {
-    size = content.size();
-
-    if (content.empty())
-    {
-      buffer = NULL;
-    }
-    else
-    {
-      buffer = malloc(size);
-
-      if (buffer == NULL)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory);
-      }
-
-      memcpy(buffer, content.c_str(), size);
-    }
-  }
-
-  
   StorageBackend::StorageBackend(IDatabaseFactory* factory) :
     manager_(factory)
   {
-  }
-
-
-  void StorageBackend::ReadToString(std::string& content,
-                                    DatabaseManager::Transaction& transaction, 
-                                    const std::string& uuid,
-                                    OrthancPluginContentType type)
-  {
-    void* buffer = NULL; 
-    size_t size;
-    Read(buffer, size, transaction, uuid, type);
-
-    try
-    {
-      content.resize(size);
-    }
-    catch (std::bad_alloc&)
-    {
-      if (size != 0)
-      {
-        free(buffer);
-      }
-
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory);
-    }
-
-    if (size != 0)
-    {
-      assert(buffer != NULL);
-      memcpy(&content[0], buffer, size);
-    }
-
-    free(buffer);
   }
 
 
@@ -138,8 +83,7 @@ namespace OrthancDatabases
   }
 
 
-  void StorageBackend::Read(void*& content,
-                            size_t& size,
+  void StorageBackend::Read(StorageAreaBuffer& target,
                             DatabaseManager::Transaction& transaction, 
                             const std::string& uuid,
                             OrthancPluginContentType type) 
@@ -172,13 +116,11 @@ namespace OrthancDatabases
       switch (value.GetType())
       {
         case ValueType_File:
-          ReadFromString(content, size,
-                         dynamic_cast<const FileValue&>(value).GetContent());
+          target.Assign(dynamic_cast<const FileValue&>(value).GetContent());
           break;
 
         case ValueType_BinaryString:
-          ReadFromString(content, size,
-                         dynamic_cast<const BinaryStringValue&>(value).GetContent());
+          target.Assign(dynamic_cast<const BinaryStringValue&>(value).GetContent());
           break;
 
         default:
@@ -235,11 +177,17 @@ namespace OrthancDatabases
   {
     try
     {
-      DatabaseManager::Transaction transaction(backend_->GetManager());
-      size_t tmp;
-      backend_->Read(*content, tmp, transaction, uuid, type);
-      *size = static_cast<int64_t>(tmp);
-      transaction.Commit();
+      StorageAreaBuffer buffer;
+
+      {
+        DatabaseManager::Transaction transaction(backend_->GetManager());
+        backend_->Read(buffer, transaction, uuid, type);
+        transaction.Commit();
+      }
+
+      *size = buffer.GetSize();
+      *content = buffer.ReleaseData();
+      
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

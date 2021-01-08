@@ -21,7 +21,9 @@
 
 #pragma once
 
+#include "StorageAreaBuffer.h"
 #include "../Common/DatabaseManager.h"
+
 #include <orthanc/OrthancCDatabasePlugin.h>
 
 
@@ -31,11 +33,6 @@ namespace OrthancDatabases
   {
   private:
     DatabaseManager   manager_;
-
-  protected:
-    void ReadFromString(void*& buffer,
-                        size_t& size,
-                        const std::string& content);
 
   public:
     explicit StorageBackend(IDatabaseFactory* factory);
@@ -58,8 +55,7 @@ namespace OrthancDatabases
                         size_t size,
                         OrthancPluginContentType type);
 
-    virtual void Read(void*& content,
-                      size_t& size,
+    virtual void Read(StorageAreaBuffer& target,
                       DatabaseManager::Transaction& transaction, 
                       const std::string& uuid,
                       OrthancPluginContentType type);
@@ -70,12 +66,6 @@ namespace OrthancDatabases
 
     static void Register(OrthancPluginContext* context,
                          StorageBackend* backend);   // Takes ownership
-
-    // For unit testing!
-    void ReadToString(std::string& content,
-                      DatabaseManager::Transaction& transaction, 
-                      const std::string& uuid,
-                      OrthancPluginContentType type);
 
     static void Finalize();
   };

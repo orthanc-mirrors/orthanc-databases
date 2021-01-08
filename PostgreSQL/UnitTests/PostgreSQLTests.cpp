@@ -356,8 +356,8 @@ TEST(PostgreSQL, StorageArea)
       storageArea.Create(transaction, uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
     }
 
-    std::string tmp;
-    ASSERT_THROW(storageArea.ReadToString(tmp, transaction, "nope", OrthancPluginContentType_Unknown), 
+    StorageAreaBuffer buffer;
+    ASSERT_THROW(storageArea.Read(buffer, transaction, "nope", OrthancPluginContentType_Unknown), 
                  Orthanc::OrthancException);
   
     ASSERT_EQ(10, CountLargeObjects(db));
@@ -369,17 +369,19 @@ TEST(PostgreSQL, StorageArea)
     {
       std::string uuid = boost::lexical_cast<std::string>(i);
       std::string expected = "Value " + boost::lexical_cast<std::string>(i * 2);
-      std::string content;
 
       if (i == 5)
       {
-        ASSERT_THROW(storageArea.ReadToString(content, transaction, uuid, OrthancPluginContentType_Unknown), 
+        ASSERT_THROW(storageArea.Read(buffer, transaction, uuid, OrthancPluginContentType_Unknown), 
                      Orthanc::OrthancException);
       }
       else
       {
-        storageArea.ReadToString(content, transaction, uuid, OrthancPluginContentType_Unknown);
-        ASSERT_EQ(expected, content);
+        storageArea.Read(buffer, transaction, uuid, OrthancPluginContentType_Unknown);
+
+        std::string s;
+        buffer.ToString(s);
+        ASSERT_EQ(expected, s);
       }
     }
 
