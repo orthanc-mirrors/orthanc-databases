@@ -170,6 +170,28 @@ namespace OrthancDatabases
   }
 
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+  static OrthancPluginErrorCode StorageReadWhole(OrthancPluginMemoryBuffer64 *target,
+                                                 const char* uuid,
+                                                 OrthancPluginContentType type)
+  {
+    try
+    {
+      StorageAreaBuffer buffer(context_);
+
+      {
+        DatabaseManager::Transaction transaction(backend_->GetManager());
+        backend_->Read(buffer, transaction, uuid, type);
+        transaction.Commit();
+      }
+
+      buffer.Move(target);
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH;
+  }
+#else
   static OrthancPluginErrorCode StorageRead(void** content,
                                             int64_t* size,
                                             const char* uuid,
@@ -177,7 +199,7 @@ namespace OrthancDatabases
   {
     try
     {
-      StorageAreaBuffer buffer;
+      StorageAreaBuffer buffer(context_);
 
       {
         DatabaseManager::Transaction transaction(backend_->GetManager());
@@ -192,6 +214,7 @@ namespace OrthancDatabases
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
+#endif
 
 
   static OrthancPluginErrorCode StorageRemove(const char* uuid,
@@ -229,7 +252,12 @@ namespace OrthancDatabases
       backend_.reset(backend);
       backend_->GetManager().Open();
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+      OrthancPluginRegisterStorageArea2(context_, StorageCreate, StorageReadWhole,
+                                        NULL /* TODO - StorageReadRange */, StorageRemove);
+#else
       OrthancPluginRegisterStorageArea(context_, StorageCreate, StorageRead, StorageRemove);
+#endif
     }
   }
 

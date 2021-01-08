@@ -21,10 +21,11 @@
 
 #pragma once
 
-#include <orthanc/OrthancCPlugin.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
 #include <boost/noncopyable.hpp>
 #include <string>
+
 
 
 namespace OrthancDatabases
@@ -32,11 +33,16 @@ namespace OrthancDatabases
   class StorageAreaBuffer : public boost::noncopyable
   {
   private:
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+    OrthancPluginContext*        context_;
+    OrthancPluginMemoryBuffer64  buffer_;
+#else
     void*    data_;
     int64_t  size_;
+#endif
 
   public:
-    StorageAreaBuffer();
+    StorageAreaBuffer(OrthancPluginContext* context);
 
     ~StorageAreaBuffer()
     {
@@ -47,17 +53,15 @@ namespace OrthancDatabases
 
     void Assign(const std::string& content);
 
-    int64_t GetSize() const
-    {
-      return size_;
-    }
+    int64_t GetSize() const;
 
-    const void* GetData() const
-    {
-      return data_;
-    }
+    const void* GetData() const;
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+    void Move(OrthancPluginMemoryBuffer64* target);
+#else
     void* ReleaseData();
+#endif
 
     void ToString(std::string& target);
   };

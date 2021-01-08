@@ -29,7 +29,108 @@
 
 namespace OrthancDatabases
 {
-  StorageAreaBuffer::StorageAreaBuffer() :
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+  /**
+   * If Orthanc SDK >= 1.9.0
+   **/
+  
+  StorageAreaBuffer::StorageAreaBuffer(OrthancPluginContext* context) :
+    context_(context)
+  {
+    buffer_.data = NULL;
+    buffer_.size = 0;
+  }
+
+  
+  void StorageAreaBuffer::Clear()
+  {
+    if (buffer_.data != NULL)
+    {
+      if (context_ == NULL)  // Are we running the unit tests?
+      {
+        free(buffer_.data);
+      }
+      else
+      {
+        OrthancPluginFreeMemoryBuffer64(context_, &buffer_);
+      }
+      
+      buffer_.data = NULL;
+      buffer_.size = 0;
+    }
+  }
+
+
+  int64_t StorageAreaBuffer::GetSize() const
+  {
+    return buffer_.size;
+  }
+
+  
+  const void* StorageAreaBuffer::GetData() const
+  {
+    return buffer_.data;
+  }
+
+
+  void StorageAreaBuffer::Assign(const std::string& content)
+  {
+    Clear();
+
+    if (context_ == NULL)  // Are we running the unit tests?
+    {
+      buffer_.size = static_cast<uint64_t>(content.size());
+
+      if (content.empty())
+      {
+        buffer_.data = NULL;
+      }
+      else
+      {
+        buffer_.data = malloc(content.size());
+      }
+    }
+    else
+    {
+      if (OrthancPluginCreateMemoryBuffer64(context_, &buffer_, static_cast<uint64_t>(content.size())) !=
+          OrthancPluginErrorCode_Success)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory);
+      }
+    }
+
+    if (!content.empty())
+    {
+      memcpy(buffer_.data, content.c_str(), content.size());
+    }
+  }
+
+
+  void StorageAreaBuffer::Move(OrthancPluginMemoryBuffer64* target)
+  {
+    *target = buffer_;
+    buffer_.data = NULL;
+    buffer_.size = 0;
+  }
+
+
+  void StorageAreaBuffer::ToString(std::string& target)
+  {
+    target.resize(buffer_.size);
+
+    if (buffer_.size != 0)
+    {
+      memcpy(&target[0], buffer_.data, buffer_.size);
+    }
+  }
+  
+
+#else
+  /**
+   * If Orthanc SDK <= 1.8.2
+   **/
+  
+  StorageAreaBuffer::StorageAreaBuffer(OrthancPluginContext* /* not used in this flavor */) :
     data_(NULL),
     size_(0)
   {
@@ -44,6 +145,18 @@ namespace OrthancDatabases
       data_ = NULL;
       size_ = 0;
     }
+  }
+
+
+  int64_t StorageAreaBuffer::GetSize() const
+  {
+    return size_;
+  }
+
+  
+  const void* StorageAreaBuffer::GetData() const
+  {
+    return data_;
   }
 
 
@@ -95,4 +208,5 @@ namespace OrthancDatabases
       memcpy(&target[0], data_, size_);
     }
   }
+#endif
 }

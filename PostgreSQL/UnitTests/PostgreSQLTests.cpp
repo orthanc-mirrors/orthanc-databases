@@ -356,7 +356,7 @@ TEST(PostgreSQL, StorageArea)
       storageArea.Create(transaction, uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
     }
 
-    StorageAreaBuffer buffer;
+    StorageAreaBuffer buffer(NULL /* we are running unit tests */);
     ASSERT_THROW(storageArea.Read(buffer, transaction, "nope", OrthancPluginContentType_Unknown), 
                  Orthanc::OrthancException);
   
