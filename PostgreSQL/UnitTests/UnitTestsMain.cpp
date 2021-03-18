@@ -89,19 +89,19 @@ TEST(PostgreSQLIndex, Lock)
   OrthancDatabases::PostgreSQLParameters lock = globalParameters_;
   lock.SetLock(true);
 
-  OrthancDatabases::PostgreSQLIndex db1(noLock);
+  OrthancDatabases::PostgreSQLIndex db1(NULL, noLock);
   db1.SetClearAll(true);
   db1.Open();
 
   {
-    OrthancDatabases::PostgreSQLIndex db2(lock);
+    OrthancDatabases::PostgreSQLIndex db2(NULL, lock);
     db2.Open();
 
-    OrthancDatabases::PostgreSQLIndex db3(lock);
+    OrthancDatabases::PostgreSQLIndex db3(NULL, lock);
     ASSERT_THROW(db3.Open(), Orthanc::OrthancException);
   }
 
-  OrthancDatabases::PostgreSQLIndex db4(lock);
+  OrthancDatabases::PostgreSQLIndex db4(NULL, lock);
   db4.Open();
 }
 

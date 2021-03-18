@@ -63,7 +63,8 @@ namespace OrthancDatabases
     IDatabase* OpenInternal();
 
   public:
-    PostgreSQLIndex(const PostgreSQLParameters& parameters);
+    PostgreSQLIndex(OrthancPluginContext* context,
+                    const PostgreSQLParameters& parameters);
 
     void SetClearAll(bool clear)
     {

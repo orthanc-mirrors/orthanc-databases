@@ -132,8 +132,9 @@ namespace OrthancDatabases
   }
 
 
-  SQLiteIndex::SQLiteIndex(const std::string& path) :
-    IndexBackend(new Factory(*this)),
+  SQLiteIndex::SQLiteIndex(OrthancPluginContext* context,
+                           const std::string& path) :
+    IndexBackend(context, new Factory(*this)),
     path_(path),
     fast_(true)
   {
@@ -144,8 +145,8 @@ namespace OrthancDatabases
   }
 
 
-  SQLiteIndex::SQLiteIndex() :
-    IndexBackend(new Factory(*this)),
+  SQLiteIndex::SQLiteIndex(OrthancPluginContext* context) :
+    IndexBackend(context, new Factory(*this)),
     fast_(true)
   {
   }

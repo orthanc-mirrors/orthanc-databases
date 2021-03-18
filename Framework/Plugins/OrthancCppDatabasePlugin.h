@@ -73,6 +73,16 @@ namespace OrthancPlugins
   class IDatabaseBackendOutput : public boost::noncopyable
   {
   public:
+    class IFactory : public boost::noncopyable
+    {
+    public:
+      virtual ~IFactory()
+      {
+      }
+
+      virtual IDatabaseBackendOutput* CreateOutput() = 0;
+    };
+    
     virtual ~IDatabaseBackendOutput()
     {
     }
@@ -134,41 +144,16 @@ namespace OrthancPlugins
    **/
   class IDatabaseBackend : public boost::noncopyable
   {
-  private:
-    OrthancPluginContext*                    context_;
-    std::unique_ptr<IDatabaseBackendOutput>  output_;
-
   public:
-    // "context" can be NULL iff. running the unit tests
-    IDatabaseBackend() :
-      context_(NULL)
+    virtual ~IDatabaseBackend()
     {
     }
 
-    IDatabaseBackendOutput& GetOutput()
-    {
-      if (output_.get() == NULL)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-      }
-      else
-      {
-        return *output_;
-      }
-    }
+    virtual OrthancPluginContext* GetContext() = 0;
 
-    OrthancPluginContext* GetContext() const
-    {
-      return context_;
-    }
-
-    // This takes the ownership of the "output"
-    void RegisterOutput(OrthancPluginContext* context,
-                        IDatabaseBackendOutput* output)
-    {
-      context_ = context;
-      output_.reset(output);
-    }
+    virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
+                        
+    virtual IDatabaseBackendOutput* CreateOutput() = 0;
 
     virtual void Open() = 0;
 
@@ -187,13 +172,15 @@ namespace OrthancPlugins
     virtual int64_t CreateResource(const char* publicId,
                                    OrthancPluginResourceType type) = 0;
 
-    virtual void DeleteAttachment(int64_t id,
+    virtual void DeleteAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+                                  int64_t id,
                                   int32_t attachment) = 0;
 
     virtual void DeleteMetadata(int64_t id,
                                 int32_t metadataType) = 0;
 
-    virtual void DeleteResource(int64_t id) = 0;
+    virtual void DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+                                int64_t id) = 0;
 
     virtual void GetAllInternalIds(std::list<int64_t>& target,
                                    OrthancPluginResourceType resourceType) = 0;
@@ -207,7 +194,8 @@ namespace OrthancPlugins
                                  uint64_t limit) = 0;
 
     /* Use GetOutput().AnswerChange() */
-    virtual void GetChanges(bool& done /*out*/,
+    virtual void GetChanges(OrthancPlugins::IDatabaseBackendOutput& output,
+                            bool& done /*out*/,
                             int64_t since,
                             uint32_t maxResults) = 0;
 
@@ -218,18 +206,20 @@ namespace OrthancPlugins
                                      int64_t id) = 0;
 
     /* Use GetOutput().AnswerExportedResource() */
-    virtual void GetExportedResources(bool& done /*out*/,
+    virtual void GetExportedResources(OrthancPlugins::IDatabaseBackendOutput& output,
+                                      bool& done /*out*/,
                                       int64_t since,
                                       uint32_t maxResults) = 0;
 
     /* Use GetOutput().AnswerChange() */
-    virtual void GetLastChange() = 0;
+    virtual void GetLastChange(OrthancPlugins::IDatabaseBackendOutput& output) = 0;
 
     /* Use GetOutput().AnswerExportedResource() */
-    virtual void GetLastExportedResource() = 0;
+    virtual void GetLastExportedResource(OrthancPlugins::IDatabaseBackendOutput& output) = 0;
 
     /* Use GetOutput().AnswerDicomTag() */
-    virtual void GetMainDicomTags(int64_t id) = 0;
+    virtual void GetMainDicomTags(OrthancPlugins::IDatabaseBackendOutput& output,
+                                  int64_t id) = 0;
 
     virtual std::string GetPublicId(int64_t resourceId) = 0;
 
@@ -256,7 +246,8 @@ namespace OrthancPlugins
     virtual void LogExportedResource(const OrthancPluginExportedResource& resource) = 0;
     
     /* Use GetOutput().AnswerAttachment() */
-    virtual bool LookupAttachment(int64_t id,
+    virtual bool LookupAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+                                  int64_t id,
                                   int32_t contentType) = 0;
 
     virtual bool LookupGlobalProperty(std::string& target /*out*/,
@@ -336,7 +327,8 @@ namespace OrthancPlugins
     }
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    virtual void LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+    virtual void LookupResources(OrthancPlugins::IDatabaseBackendOutput& output,
+                                 const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
@@ -415,6 +407,26 @@ namespace OrthancPlugins
     AllowedAnswers                allowedAnswers_;
 
   public:
+    class Factory : public IFactory
+    {
+    private:
+      OrthancPluginContext*         context_;
+      OrthancPluginDatabaseContext* database_;
+
+    public:
+      Factory(OrthancPluginContext*         context,
+              OrthancPluginDatabaseContext* database) :
+        context_(context),
+        database_(database)
+      {
+      }
+
+      virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE
+      {
+        return new DatabaseBackendOutputV2(context_, database_);
+      }
+    };
+    
     DatabaseBackendOutputV2(OrthancPluginContext*         context,
                             OrthancPluginDatabaseContext* database) :
       context_(context),
@@ -630,8 +642,6 @@ namespace OrthancPlugins
                                                  const OrthancPluginAttachment* attachment)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -647,8 +657,6 @@ namespace OrthancPlugins
                                                int64_t child)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -662,8 +670,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode  ClearChanges(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -677,8 +683,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode  ClearExportedResources(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -695,8 +699,6 @@ namespace OrthancPlugins
                                                   OrthancPluginResourceType resourceType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -712,12 +714,12 @@ namespace OrthancPlugins
                                                     int32_t contentType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
-        backend->DeleteAttachment(id, contentType);
+        backend->DeleteAttachment(*output, id, contentType);
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -729,8 +731,6 @@ namespace OrthancPlugins
                                                   int32_t metadataType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -745,12 +745,12 @@ namespace OrthancPlugins
                                                   int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
-        backend->DeleteResource(id);
+        backend->DeleteResource(*output, id);
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -762,8 +762,8 @@ namespace OrthancPlugins
                                                      OrthancPluginResourceType resourceType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -774,7 +774,7 @@ namespace OrthancPlugins
                it = target.begin(); it != target.end(); ++it)
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), *it);
+                                           output->GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -788,8 +788,8 @@ namespace OrthancPlugins
                                                    OrthancPluginResourceType resourceType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -800,7 +800,7 @@ namespace OrthancPlugins
                it = ids.begin(); it != ids.end(); ++it)
         {
           OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                            output.GetDatabase(),
+                                            output->GetDatabase(),
                                             it->c_str());
         }
 
@@ -817,8 +817,8 @@ namespace OrthancPlugins
                                                             uint64_t limit)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -829,7 +829,7 @@ namespace OrthancPlugins
                it = ids.begin(); it != ids.end(); ++it)
         {
           OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                            output.GetDatabase(),
+                                            output->GetDatabase(),
                                             it->c_str());
         }
 
@@ -845,18 +845,18 @@ namespace OrthancPlugins
                                               uint32_t maxResult)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Change);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Change);
 
       try
       {
         bool done;
-        backend->GetChanges(done, since, maxResult);
+        backend->GetChanges(*output, done, since, maxResult);
         
         if (done)
         {
           OrthancPluginDatabaseAnswerChangesDone(backend->GetContext(),
-                                                 output.GetDatabase());
+                                                 output->GetDatabase());
         }
 
         return OrthancPluginErrorCode_Success;
@@ -870,8 +870,8 @@ namespace OrthancPlugins
                                                          int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -882,7 +882,7 @@ namespace OrthancPlugins
                it = target.begin(); it != target.end(); ++it)
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), *it);
+                                           output->GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -896,8 +896,8 @@ namespace OrthancPlugins
                                                        int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -908,7 +908,7 @@ namespace OrthancPlugins
                it = ids.begin(); it != ids.end(); ++it)
         {
           OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                            output.GetDatabase(),
+                                            output->GetDatabase(),
                                             it->c_str());
         }
 
@@ -924,18 +924,18 @@ namespace OrthancPlugins
                                                         uint32_t  maxResult)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_ExportedResource);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_ExportedResource);
 
       try
       {
         bool done;
-        backend->GetExportedResources(done, since, maxResult);
+        backend->GetExportedResources(*output, done, since, maxResult);
 
         if (done)
         {
           OrthancPluginDatabaseAnswerExportedResourcesDone(backend->GetContext(),
-                                                           output.GetDatabase());
+                                                           output->GetDatabase());
         }
         return OrthancPluginErrorCode_Success;
       }
@@ -947,12 +947,12 @@ namespace OrthancPlugins
                                                  void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Change);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Change);
 
       try
       {
-        backend->GetLastChange();
+        backend->GetLastChange(*output);
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -963,12 +963,12 @@ namespace OrthancPlugins
                                                            void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_ExportedResource);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_ExportedResource);
 
       try
       {
-        backend->GetLastExportedResource();
+        backend->GetLastExportedResource(*output);
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -980,12 +980,12 @@ namespace OrthancPlugins
                                                     int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_DicomTag);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_DicomTag);
 
       try
       {
-        backend->GetMainDicomTags(id);
+        backend->GetMainDicomTags(*output, id);
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -997,14 +997,14 @@ namespace OrthancPlugins
                                                int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
         std::string s = backend->GetPublicId(id);
         OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                          output.GetDatabase(),
+                                          output->GetDatabase(),
                                           s.c_str());
 
         return OrthancPluginErrorCode_Success;
@@ -1018,8 +1018,6 @@ namespace OrthancPlugins
                                                     OrthancPluginResourceType  resourceType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1035,8 +1033,6 @@ namespace OrthancPlugins
                                                    int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1051,8 +1047,6 @@ namespace OrthancPlugins
                                                           void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1067,8 +1061,6 @@ namespace OrthancPlugins
                                                             void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1084,8 +1076,6 @@ namespace OrthancPlugins
                                                       int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1101,8 +1091,6 @@ namespace OrthancPlugins
                                                       int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1118,8 +1106,8 @@ namespace OrthancPlugins
                                                          int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1130,7 +1118,7 @@ namespace OrthancPlugins
                it = target.begin(); it != target.end(); ++it)
         {
           OrthancPluginDatabaseAnswerInt32(backend->GetContext(),
-                                           output.GetDatabase(),
+                                           output->GetDatabase(),
                                            *it);
         }
 
@@ -1145,8 +1133,8 @@ namespace OrthancPlugins
                                                             int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1157,7 +1145,7 @@ namespace OrthancPlugins
                it = target.begin(); it != target.end(); ++it)
         {
           OrthancPluginDatabaseAnswerInt32(backend->GetContext(),
-                                           output.GetDatabase(),
+                                           output->GetDatabase(),
                                            *it);
         }
 
@@ -1171,8 +1159,6 @@ namespace OrthancPlugins
                                              const OrthancPluginChange* change)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1187,8 +1173,6 @@ namespace OrthancPlugins
                                                        const OrthancPluginExportedResource* exported)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1205,12 +1189,12 @@ namespace OrthancPlugins
                                                     int32_t contentType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Attachment);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Attachment);
 
       try
       {
-        backend->LookupAttachment(id, contentType);
+        backend->LookupAttachment(*output, id, contentType);
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1222,8 +1206,8 @@ namespace OrthancPlugins
                                                         int32_t property)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1231,7 +1215,7 @@ namespace OrthancPlugins
         if (backend->LookupGlobalProperty(s, property))
         {
           OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                            output.GetDatabase(),
+                                            output->GetDatabase(),
                                             s.c_str());
         }
 
@@ -1248,8 +1232,8 @@ namespace OrthancPlugins
                                                      OrthancPluginIdentifierConstraint constraint)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1260,7 +1244,7 @@ namespace OrthancPlugins
                it = target.begin(); it != target.end(); ++it)
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), *it);
+                                           output->GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1278,8 +1262,8 @@ namespace OrthancPlugins
                                                          const char* end)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1290,7 +1274,7 @@ namespace OrthancPlugins
                it = target.begin(); it != target.end(); ++it)
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), *it);
+                                           output->GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1305,8 +1289,8 @@ namespace OrthancPlugins
                                                   int32_t metadata)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1314,7 +1298,7 @@ namespace OrthancPlugins
         if (backend->LookupMetadata(s, id, metadata))
         {
           OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                            output.GetDatabase(), s.c_str());
+                                            output->GetDatabase(), s.c_str());
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1328,8 +1312,8 @@ namespace OrthancPlugins
                                                 int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1337,7 +1321,7 @@ namespace OrthancPlugins
         if (backend->LookupParent(parent, id))
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), parent);
+                                           output->GetDatabase(), parent);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1351,8 +1335,8 @@ namespace OrthancPlugins
                                                   const char* publicId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1361,7 +1345,7 @@ namespace OrthancPlugins
         if (backend->LookupResource(id, type, publicId))
         {
           OrthancPluginDatabaseAnswerResource(backend->GetContext(),
-                                              output.GetDatabase(), 
+                                              output->GetDatabase(), 
                                               id, type);
         }
 
@@ -1375,8 +1359,8 @@ namespace OrthancPlugins
                                                           void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1384,7 +1368,7 @@ namespace OrthancPlugins
         if (backend->SelectPatientToRecycle(id))
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), id);
+                                           output->GetDatabase(), id);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1398,8 +1382,8 @@ namespace OrthancPlugins
                                                            int64_t patientIdToAvoid)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1407,7 +1391,7 @@ namespace OrthancPlugins
         if (backend->SelectPatientToRecycle(id, patientIdToAvoid))
         {
           OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
-                                           output.GetDatabase(), id);
+                                           output->GetDatabase(), id);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1421,8 +1405,6 @@ namespace OrthancPlugins
                                                      const char* value)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1438,8 +1420,6 @@ namespace OrthancPlugins
                                                    const OrthancPluginDicomTag* tag)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1455,8 +1435,6 @@ namespace OrthancPlugins
                                                     const OrthancPluginDicomTag* tag)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1473,8 +1451,6 @@ namespace OrthancPlugins
                                                const char* value)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1490,8 +1466,6 @@ namespace OrthancPlugins
                                                        int32_t isProtected)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1505,8 +1479,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode StartTransaction(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1520,8 +1492,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode RollbackTransaction(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1535,8 +1505,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode CommitTransaction(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1550,8 +1518,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode Open(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1565,8 +1531,6 @@ namespace OrthancPlugins
     static OrthancPluginErrorCode Close(void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1581,8 +1545,6 @@ namespace OrthancPlugins
                                                      void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
       
       try
       {
@@ -1598,8 +1560,6 @@ namespace OrthancPlugins
                                                   OrthancPluginStorageArea* storageArea)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
       
       try
       {
@@ -1614,8 +1574,6 @@ namespace OrthancPlugins
                                                      int64_t internalId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
       
       try
       {
@@ -1638,8 +1596,8 @@ namespace OrthancPlugins
       uint8_t requestSomeInstance)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_MatchingResource);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_MatchingResource);
 
       try
       {
@@ -1651,7 +1609,7 @@ namespace OrthancPlugins
           lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
         }
         
-        backend->LookupResources(lookup, queryLevel, limit, (requestSomeInstance != 0));
+        backend->LookupResources(*output, lookup, queryLevel, limit, (requestSomeInstance != 0));
         return OrthancPluginErrorCode_Success;
       }
       ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1668,8 +1626,6 @@ namespace OrthancPlugins
                                                  const char* hashInstance)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1692,8 +1648,6 @@ namespace OrthancPlugins
       const OrthancPluginResourcesContentMetadata* metadata)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1714,8 +1668,8 @@ namespace OrthancPlugins
                                                       int32_t metadata)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1726,7 +1680,7 @@ namespace OrthancPlugins
                it = values.begin(); it != values.end(); ++it)
         {
           OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                            output.GetDatabase(),
+                                            output->GetDatabase(),
                                             it->c_str());
         }
 
@@ -1741,8 +1695,6 @@ namespace OrthancPlugins
                                                      void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1758,8 +1710,6 @@ namespace OrthancPlugins
                                                        int64_t patientId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
 
       try
       {
@@ -1778,8 +1728,8 @@ namespace OrthancPlugins
                                                  int64_t resourceId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Metadata);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Metadata);
 
       try
       {
@@ -1790,7 +1740,7 @@ namespace OrthancPlugins
                it = result.begin(); it != result.end(); ++it)
         {
           OrthancPluginDatabaseAnswerMetadata(backend->GetContext(),
-                                              output.GetDatabase(),
+                                              output->GetDatabase(),
                                               resourceId, it->first, it->second.c_str());
         }
         
@@ -1813,8 +1763,8 @@ namespace OrthancPlugins
                                                           const char* publicId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      DatabaseBackendOutputV2& output = dynamic_cast<DatabaseBackendOutputV2&>(backend->GetOutput());
-      output.SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_String);
+      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_String);
 
       try
       {
@@ -1826,7 +1776,7 @@ namespace OrthancPlugins
           if (!parent.empty())
           {
             OrthancPluginDatabaseAnswerString(backend->GetContext(),
-                                              output.GetDatabase(),
+                                              output->GetDatabase(),
                                               parent.c_str());
           }
         }
@@ -1969,7 +1919,7 @@ namespace OrthancPlugins
         throw std::runtime_error("Unable to register the database backend");
       }
 
-      backend.RegisterOutput(context, new DatabaseBackendOutputV2(context, database));
+      backend.SetOutputFactory(new DatabaseBackendOutputV2::Factory(context, database));
     }
   };
 }

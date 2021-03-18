@@ -47,19 +47,19 @@ TEST(MySQLIndex, Lock)
   OrthancDatabases::MySQLParameters lock = globalParameters_;
   lock.SetLock(true);
 
-  OrthancDatabases::MySQLIndex db1(noLock);
+  OrthancDatabases::MySQLIndex db1(NULL, noLock);
   db1.SetClearAll(true);
   db1.Open();
 
   {
-    OrthancDatabases::MySQLIndex db2(lock);
+    OrthancDatabases::MySQLIndex db2(NULL, lock);
     db2.Open();
 
-    OrthancDatabases::MySQLIndex db3(lock);
+    OrthancDatabases::MySQLIndex db3(NULL, lock);
     ASSERT_THROW(db3.Open(), Orthanc::OrthancException);
   }
 
-  OrthancDatabases::MySQLIndex db4(lock);
+  OrthancDatabases::MySQLIndex db4(NULL, lock);
   db4.Open();
 }
 

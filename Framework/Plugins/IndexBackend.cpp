@@ -171,7 +171,8 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ReadChangesInternal(bool& done,
+  void IndexBackend::ReadChangesInternal(OrthancPlugins::IDatabaseBackendOutput& output,
+                                         bool& done,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
                                          uint32_t maxResults)
@@ -183,7 +184,7 @@ namespace OrthancDatabases
     while (count < maxResults &&
            !statement.IsDone())
     {
-      GetOutput().AnswerChange(
+      output.AnswerChange(
         ReadInteger64(statement, 0),
         ReadInteger32(statement, 1),
         static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 3)),
@@ -199,7 +200,8 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ReadExportedResourcesInternal(bool& done,
+  void IndexBackend::ReadExportedResourcesInternal(OrthancPlugins::IDatabaseBackendOutput& output,
+                                                   bool& done,
                                                    DatabaseManager::CachedStatement& statement,
                                                    const Dictionary& args,
                                                    uint32_t maxResults)
@@ -216,16 +218,16 @@ namespace OrthancDatabases
         static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
       std::string publicId = ReadString(statement, 2);
 
-      GetOutput().AnswerExportedResource(seq, 
-                                         resourceType,
-                                         publicId,
-                                         ReadString(statement, 3),  // modality
-                                         ReadString(statement, 8),  // date
-                                         ReadString(statement, 4),  // patient ID
-                                         ReadString(statement, 5),  // study instance UID
-                                         ReadString(statement, 6),  // series instance UID
-                                         ReadString(statement, 7)); // sop instance UID
-
+      output.AnswerExportedResource(seq, 
+                                    resourceType,
+                                    publicId,
+                                    ReadString(statement, 3),  // modality
+                                    ReadString(statement, 8),  // date
+                                    ReadString(statement, 4),  // patient ID
+                                    ReadString(statement, 5),  // study instance UID
+                                    ReadString(statement, 6),  // series instance UID
+                                    ReadString(statement, 7)); // sop instance UID
+      
       statement.Next();
       count++;
     }
@@ -255,7 +257,7 @@ namespace OrthancDatabases
   }
     
 
-  void IndexBackend::SignalDeletedFiles()
+  void IndexBackend::SignalDeletedFiles(OrthancPlugins::IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -270,20 +272,20 @@ namespace OrthancDatabases
       std::string b = ReadString(statement, 5);
       std::string c = ReadString(statement, 6);
 
-      GetOutput().SignalDeletedAttachment(a.c_str(),
-                                          ReadInteger32(statement, 1),
-                                          ReadInteger64(statement, 3),
-                                          b.c_str(),
-                                          ReadInteger32(statement, 4),
-                                          ReadInteger64(statement, 2),
-                                          c.c_str());
-
+      output.SignalDeletedAttachment(a.c_str(),
+                                     ReadInteger32(statement, 1),
+                                     ReadInteger64(statement, 3),
+                                     b.c_str(),
+                                     ReadInteger32(statement, 4),
+                                     ReadInteger64(statement, 2),
+                                     c.c_str());
+      
       statement.Next();
     }
   }
 
 
-  void IndexBackend::SignalDeletedResources()
+  void IndexBackend::SignalDeletedResources(OrthancPlugins::IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -294,7 +296,7 @@ namespace OrthancDatabases
 
     while (!statement.IsDone())
     {
-      GetOutput().SignalDeletedResource(
+      output.SignalDeletedResource(
         ReadString(statement, 1),
         static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 0)));
 
@@ -303,12 +305,44 @@ namespace OrthancDatabases
   }
 
 
-  IndexBackend::IndexBackend(IDatabaseFactory* factory) :
+  IndexBackend::IndexBackend(OrthancPluginContext* context,
+                             IDatabaseFactory* factory) :
+    context_(context),
     manager_(factory)
   {
   }
 
-    
+
+  void IndexBackend::SetOutputFactory(OrthancPlugins::IDatabaseBackendOutput::IFactory* factory)
+  {
+    if (factory == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    else if (outputFactory_.get() != NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+    else
+    {
+      outputFactory_.reset(factory);
+    }
+  }
+
+
+  OrthancPlugins::IDatabaseBackendOutput* IndexBackend::CreateOutput()
+  {
+    if (outputFactory_.get() == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+    else
+    {
+      return outputFactory_->CreateOutput();
+    }
+  }
+
+  
   void IndexBackend::AddAttachment(int64_t id,
                                    const OrthancPluginAttachment& attachment)
   {
@@ -378,7 +412,8 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::DeleteAttachment(int64_t id,
+  void IndexBackend::DeleteAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+                                      int64_t id,
                                       int32_t attachment)
   {
     ClearDeletedFiles();
@@ -398,7 +433,7 @@ namespace OrthancDatabases
       statement.Execute(args);
     }
 
-    SignalDeletedFiles();
+    SignalDeletedFiles(output);
   }
 
     
@@ -420,7 +455,8 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::DeleteResource(int64_t id)
+  void IndexBackend::DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+                                    int64_t id)
   {
     assert(manager_.GetDialect() != Dialect_MySQL);
     
@@ -458,7 +494,7 @@ namespace OrthancDatabases
 
       if (!statement.IsDone())
       {
-        GetOutput().SignalRemainingAncestor(
+        output.SignalRemainingAncestor(
           ReadString(statement, 1),
           static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 0)));
           
@@ -467,8 +503,8 @@ namespace OrthancDatabases
       }
     }
     
-    SignalDeletedFiles();
-    SignalDeletedResources();
+    SignalDeletedFiles(output);
+    SignalDeletedResources(output);
   }
 
 
@@ -532,7 +568,8 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerChange() */
-  void IndexBackend::GetChanges(bool& done /*out*/,
+  void IndexBackend::GetChanges(OrthancPlugins::IDatabaseBackendOutput& output,
+                                bool& done /*out*/,
                                 int64_t since,
                                 uint32_t maxResults)
   {
@@ -548,7 +585,7 @@ namespace OrthancDatabases
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(done, statement, args, maxResults);
+    ReadChangesInternal(output, done, statement, args, maxResults);
   }
 
     
@@ -589,7 +626,8 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerExportedResource() */
-  void IndexBackend::GetExportedResources(bool& done /*out*/,
+  void IndexBackend::GetExportedResources(OrthancPlugins::IDatabaseBackendOutput& output,
+                                          bool& done /*out*/,
                                           int64_t since,
                                           uint32_t maxResults)
   {
@@ -605,12 +643,12 @@ namespace OrthancDatabases
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(done, statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
   }
 
     
   /* Use GetOutput().AnswerChange() */
-  void IndexBackend::GetLastChange()
+  void IndexBackend::GetLastChange(OrthancPlugins::IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -621,12 +659,12 @@ namespace OrthancDatabases
     Dictionary args;
 
     bool done;  // Ignored
-    ReadChangesInternal(done, statement, args, 1);
+    ReadChangesInternal(output, done, statement, args, 1);
   }
 
     
   /* Use GetOutput().AnswerExportedResource() */
-  void IndexBackend::GetLastExportedResource()
+  void IndexBackend::GetLastExportedResource(OrthancPlugins::IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -637,12 +675,13 @@ namespace OrthancDatabases
     Dictionary args;
 
     bool done;  // Ignored
-    ReadExportedResourcesInternal(done, statement, args, 1);
+    ReadExportedResourcesInternal(output, done, statement, args, 1);
   }
 
     
   /* Use GetOutput().AnswerDicomTag() */
-  void IndexBackend::GetMainDicomTags(int64_t id)
+  void IndexBackend::GetMainDicomTags(OrthancPlugins::IDatabaseBackendOutput& output,
+                                      int64_t id)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -658,9 +697,9 @@ namespace OrthancDatabases
 
     while (!statement.IsDone())
     {
-      GetOutput().AnswerDicomTag(static_cast<uint16_t>(ReadInteger64(statement, 1)),
-                                 static_cast<uint16_t>(ReadInteger64(statement, 2)),
-                                 ReadString(statement, 3));
+      output.AnswerDicomTag(static_cast<uint16_t>(ReadInteger64(statement, 1)),
+                            static_cast<uint16_t>(ReadInteger64(statement, 2)),
+                            ReadString(statement, 3));
       statement.Next();
     }
   }
@@ -960,7 +999,8 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerAttachment() */
-  bool IndexBackend::LookupAttachment(int64_t id,
+  bool IndexBackend::LookupAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+                                      int64_t id,
                                       int32_t contentType)
   {
     DatabaseManager::CachedStatement statement(
@@ -984,13 +1024,13 @@ namespace OrthancDatabases
     }
     else
     {
-      GetOutput().AnswerAttachment(ReadString(statement, 0),
-                                   contentType,
-                                   ReadInteger64(statement, 1),
-                                   ReadString(statement, 4),
-                                   ReadInteger32(statement, 2),
-                                   ReadInteger64(statement, 3),
-                                   ReadString(statement, 5));
+      output.AnswerAttachment(ReadString(statement, 0),
+                              contentType,
+                              ReadInteger64(statement, 1),
+                              ReadString(statement, 4),
+                              ReadInteger32(statement, 2),
+                              ReadInteger64(statement, 3),
+                              ReadString(statement, 5));
       return true;
     }
   }
@@ -1653,7 +1693,8 @@ namespace OrthancDatabases
   
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
-  void IndexBackend::LookupResources(const std::vector<Orthanc::DatabaseConstraint>& lookup,
+  void IndexBackend::LookupResources(OrthancPlugins::IDatabaseBackendOutput& output,
+                                     const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
                                      uint32_t limit,
                                      bool requestSomeInstance)
@@ -1708,11 +1749,11 @@ namespace OrthancDatabases
     {
       if (requestSomeInstance)
       {
-        GetOutput().AnswerMatchingResource(ReadString(statement, 0), ReadString(statement, 1));
+        output.AnswerMatchingResource(ReadString(statement, 0), ReadString(statement, 1));
       }
       else
       {
-        GetOutput().AnswerMatchingResource(ReadString(statement, 0));
+        output.AnswerMatchingResource(ReadString(statement, 0));
       }
 
       statement.Next();

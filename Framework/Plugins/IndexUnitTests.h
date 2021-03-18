@@ -168,19 +168,21 @@ TEST(IndexBackend, Basic)
   ImplicitTransaction::SetErrorOnDoubleExecution(true);
 
 #if ORTHANC_ENABLE_POSTGRESQL == 1
-  PostgreSQLIndex db(globalParameters_);
+  PostgreSQLIndex db(&context, globalParameters_);
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_MYSQL == 1
-  MySQLIndex db(globalParameters_);
+  MySQLIndex db(&context, globalParameters_);
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_SQLITE == 1
-  SQLiteIndex db;  // Open in memory
+  SQLiteIndex db(&context);  // Open in memory
 #else
 #  error Unsupported database backend
 #endif
 
-  db.RegisterOutput(&context, new OrthancPlugins::DatabaseBackendOutputV2(&context, NULL));
+  db.SetOutputFactory(new OrthancPlugins::DatabaseBackendOutputV2::Factory(&context, NULL));
   db.Open();
+
+  std::unique_ptr<OrthancPlugins::IDatabaseBackendOutput> output(db.CreateOutput());
   
 
   std::string s;
@@ -329,7 +331,7 @@ TEST(IndexBackend, Basic)
   db.AddAttachment(a, a2);
   db.ListAvailableAttachments(fc, a);
   ASSERT_EQ(2u, fc.size());
-  ASSERT_FALSE(db.LookupAttachment(b, Orthanc::FileContentType_Dicom));
+  ASSERT_FALSE(db.LookupAttachment(*output, b, Orthanc::FileContentType_Dicom));
 
   ASSERT_EQ(4284u, db.GetTotalCompressedSize());
   ASSERT_EQ(4284u, db.GetTotalUncompressedSize());
@@ -342,7 +344,7 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressionType = Orthanc::CompressionType_None;
   expectedAttachment->compressedSize = 42;
   expectedAttachment->compressedHash = "md5_1";
-  ASSERT_TRUE(db.LookupAttachment(a, Orthanc::FileContentType_Dicom));
+  ASSERT_TRUE(db.LookupAttachment(*output, a, Orthanc::FileContentType_Dicom));
 
   expectedAttachment.reset(new OrthancPluginAttachment);
   expectedAttachment->uuid = "uuid2";
@@ -352,15 +354,15 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressionType = Orthanc::CompressionType_None;
   expectedAttachment->compressedSize = 4242;
   expectedAttachment->compressedHash = "md5_2";
-  ASSERT_TRUE(db.LookupAttachment(a, Orthanc::FileContentType_DicomAsJson));
+  ASSERT_TRUE(db.LookupAttachment(*output, a, Orthanc::FileContentType_DicomAsJson));
 
   db.ListAvailableAttachments(fc, b);
   ASSERT_EQ(0u, fc.size());
-  db.DeleteAttachment(a, Orthanc::FileContentType_Dicom);
+  db.DeleteAttachment(*output, a, Orthanc::FileContentType_Dicom);
   db.ListAvailableAttachments(fc, a);
   ASSERT_EQ(1u, fc.size());
   ASSERT_EQ(Orthanc::FileContentType_DicomAsJson, fc.front());
-  db.DeleteAttachment(a, Orthanc::FileContentType_DicomAsJson);
+  db.DeleteAttachment(*output, a, Orthanc::FileContentType_DicomAsJson);
   db.ListAvailableAttachments(fc, a);
   ASSERT_EQ(0u, fc.size());
 
@@ -377,7 +379,7 @@ TEST(IndexBackend, Basic)
   expectedDicomTags.back().group = 0x0020;
   expectedDicomTags.back().element = 0x000d;
   expectedDicomTags.back().value = "study";
-  db.GetMainDicomTags(a);
+  db.GetMainDicomTags(*output, a);
 
 
   db.LookupIdentifier(ci, OrthancPluginResourceType_Study, 0x0010, 0x0020, 
@@ -406,7 +408,7 @@ TEST(IndexBackend, Basic)
   expectedExported->seq = 1;
 
   bool done;
-  db.GetExportedResources(done, 0, 10);
+  db.GetExportedResources(*output, done, 0, 10);
   
 
   db.GetAllPublicIds(pub, OrthancPluginResourceType_Patient); ASSERT_EQ(0u, pub.size());
@@ -423,7 +425,7 @@ TEST(IndexBackend, Basic)
     // to implement recursive deletion of resources using pure SQL
     // statements
     db.StartTransaction();    
-    db.DeleteResource(c);
+    db.DeleteResource(*output, c);
     db.CommitTransaction();
   }
   
@@ -431,7 +433,7 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.IsExistingResource(a));
   ASSERT_TRUE(db.IsExistingResource(b));
   ASSERT_EQ(2u, db.GetResourcesCount());
-  db.DeleteResource(a);
+  db.DeleteResource(*output, a);
   ASSERT_EQ(0u, db.GetResourcesCount());
   ASSERT_FALSE(db.IsExistingResource(a));
   ASSERT_FALSE(db.IsExistingResource(b));
@@ -457,7 +459,7 @@ TEST(IndexBackend, Basic)
   ASSERT_FALSE(db.IsProtectedPatient(p1));
   ASSERT_TRUE(db.SelectPatientToRecycle(r));
   ASSERT_EQ(p2, r);
-  db.DeleteResource(p2);
+  db.DeleteResource(*output, p2);
   ASSERT_TRUE(db.SelectPatientToRecycle(r, p3));
   ASSERT_EQ(p1, r);
 }

@@ -257,8 +257,9 @@ namespace OrthancDatabases
   }
 
 
-  PostgreSQLIndex::PostgreSQLIndex(const PostgreSQLParameters& parameters) :
-    IndexBackend(new Factory(*this)),
+  PostgreSQLIndex::PostgreSQLIndex(OrthancPluginContext* context,
+                                   const PostgreSQLParameters& parameters) :
+    IndexBackend(context, new Factory(*this)),
     parameters_(parameters),
     clearAll_(false)
   {

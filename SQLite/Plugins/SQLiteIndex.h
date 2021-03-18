@@ -64,9 +64,10 @@ namespace OrthancDatabases
     IDatabase* OpenInternal();
 
   public:
-    SQLiteIndex();  // Opens in memory
+    SQLiteIndex(OrthancPluginContext* context);  // Opens in memory
 
-    SQLiteIndex(const std::string& path);
+    SQLiteIndex(OrthancPluginContext* context,
+                const std::string& path);
 
     void SetFast(bool fast)
     {

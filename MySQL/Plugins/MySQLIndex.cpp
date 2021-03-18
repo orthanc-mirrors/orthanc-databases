@@ -267,8 +267,9 @@ namespace OrthancDatabases
   }
 
 
-  MySQLIndex::MySQLIndex(const MySQLParameters& parameters) :
-    IndexBackend(new Factory(*this)),
+  MySQLIndex::MySQLIndex(OrthancPluginContext* context,
+                         const MySQLParameters& parameters) :
+    IndexBackend(context, new Factory(*this)),
     parameters_(parameters),
     clearAll_(false)
   {
@@ -305,7 +306,8 @@ namespace OrthancDatabases
   }
 
 
-  void MySQLIndex::DeleteResource(int64_t id)
+  void MySQLIndex::DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+                                  int64_t id)
   {
     ClearDeletedFiles();
 
@@ -363,7 +365,7 @@ namespace OrthancDatabases
     
             parent.Execute(args);
 
-            GetOutput().SignalRemainingAncestor(
+            output.SignalRemainingAncestor(
               ReadString(parent, 0),
               static_cast<OrthancPluginResourceType>(ReadInteger32(parent, 1)));
           }
@@ -384,7 +386,7 @@ namespace OrthancDatabases
       deleteHierarchy.Execute(args);
     }
 
-    SignalDeletedFiles();
+    SignalDeletedFiles(output);
   }
 
   

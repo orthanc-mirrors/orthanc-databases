@@ -446,7 +446,7 @@ TEST(PostgreSQL, ImplicitTransaction)
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
 TEST(PostgreSQLIndex, CreateInstance)
 {
-  OrthancDatabases::PostgreSQLIndex db(globalParameters_);
+  OrthancDatabases::PostgreSQLIndex db(NULL, globalParameters_);
   db.SetClearAll(true);
   db.Open();
 

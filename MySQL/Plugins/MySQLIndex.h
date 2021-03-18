@@ -63,7 +63,8 @@ namespace OrthancDatabases
     IDatabase* OpenInternal();
 
   public:
-    MySQLIndex(const MySQLParameters& parameters);
+    MySQLIndex(OrthancPluginContext* context,
+               const MySQLParameters& parameters);
 
     void SetClearAll(bool clear)
     {
@@ -74,7 +75,8 @@ namespace OrthancDatabases
                                    OrthancPluginResourceType type)
       ORTHANC_OVERRIDE;
 
-    virtual void DeleteResource(int64_t id) ORTHANC_OVERRIDE;
+    virtual void DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+                                int64_t id) ORTHANC_OVERRIDE;
 
     virtual int64_t GetLastChangeIndex() ORTHANC_OVERRIDE;
 

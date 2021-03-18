@@ -62,7 +62,7 @@ extern "C"
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
 
       /* Create the database back-end */
-      backend_.reset(new OrthancDatabases::PostgreSQLIndex(parameters));
+      backend_.reset(new OrthancDatabases::PostgreSQLIndex(context, parameters));
 
       /* Register the PostgreSQL index into Orthanc */
       OrthancPlugins::DatabaseBackendAdapterV2::Register(context, *backend_);
