@@ -179,7 +179,7 @@ TEST(IndexBackend, Basic)
 #  error Unsupported database backend
 #endif
 
-  db.RegisterOutput(&context, new OrthancPlugins::DatabaseBackendOutput(&context, NULL));
+  db.RegisterOutput(&context, new OrthancPlugins::DatabaseBackendOutputV2(&context, NULL));
   db.Open();
   
 
