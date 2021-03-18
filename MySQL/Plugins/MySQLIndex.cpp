@@ -49,14 +49,10 @@ namespace OrthancDatabases
   IDatabase* MySQLIndex::OpenInternal()
   {
     uint32_t expectedVersion = 6;
-    if (context_)
+
+    if (GetContext())   // "GetContext()" can possibly be NULL in the unit tests
     {
-      expectedVersion = OrthancPluginGetExpectedDatabaseVersion(context_);
-    }
-    else
-    {
-      // This case only occurs during unit testing
-      expectedVersion = 6;
+      expectedVersion = OrthancPluginGetExpectedDatabaseVersion(GetContext());
     }
 
     // Check the expected version of the database
@@ -273,7 +269,6 @@ namespace OrthancDatabases
 
   MySQLIndex::MySQLIndex(const MySQLParameters& parameters) :
     IndexBackend(new Factory(*this)),
-    context_(NULL),
     parameters_(parameters),
     clearAll_(false)
   {

@@ -98,44 +98,60 @@ static OrthancPluginErrorCode InvokeService(struct _OrthancPluginContext_t* cont
                                             _OrthancPluginService service,
                                             const void* params)
 {
-  if (service == _OrthancPluginService_DatabaseAnswer)
+  switch (service)
   {
-    const _OrthancPluginDatabaseAnswer& answer = 
-      *reinterpret_cast<const _OrthancPluginDatabaseAnswer*>(params);
-
-    switch (answer.type)
+    case _OrthancPluginService_DatabaseAnswer:
     {
-      case _OrthancPluginDatabaseAnswerType_Attachment:
+      const _OrthancPluginDatabaseAnswer& answer = 
+        *reinterpret_cast<const _OrthancPluginDatabaseAnswer*>(params);
+
+      switch (answer.type)
       {
-        const OrthancPluginAttachment& attachment = 
-          *reinterpret_cast<const OrthancPluginAttachment*>(answer.valueGeneric);
-        CheckAttachment(attachment);
-        break;
+        case _OrthancPluginDatabaseAnswerType_Attachment:
+        {
+          const OrthancPluginAttachment& attachment = 
+            *reinterpret_cast<const OrthancPluginAttachment*>(answer.valueGeneric);
+          CheckAttachment(attachment);
+          break;
+        }
+
+        case _OrthancPluginDatabaseAnswerType_ExportedResource:
+        {
+          const OrthancPluginExportedResource& attachment = 
+            *reinterpret_cast<const OrthancPluginExportedResource*>(answer.valueGeneric);
+          CheckExportedResource(attachment);
+          break;
+        }
+
+        case _OrthancPluginDatabaseAnswerType_DicomTag:
+        {
+          const OrthancPluginDicomTag& tag = 
+            *reinterpret_cast<const OrthancPluginDicomTag*>(answer.valueGeneric);
+          CheckDicomTag(tag);
+          break;
+        }
+
+        default:
+          printf("Unhandled message: %d\n", answer.type);
+          break;
       }
 
-      case _OrthancPluginDatabaseAnswerType_ExportedResource:
-      {
-        const OrthancPluginExportedResource& attachment = 
-          *reinterpret_cast<const OrthancPluginExportedResource*>(answer.valueGeneric);
-        CheckExportedResource(attachment);
-        break;
-      }
-
-      case _OrthancPluginDatabaseAnswerType_DicomTag:
-      {
-        const OrthancPluginDicomTag& tag = 
-          *reinterpret_cast<const OrthancPluginDicomTag*>(answer.valueGeneric);
-        CheckDicomTag(tag);
-        break;
-      }
-
-      default:
-        printf("Unhandled message: %d\n", answer.type);
-        break;
+      return OrthancPluginErrorCode_Success;
     }
-  }
 
-  return OrthancPluginErrorCode_Success;
+    case _OrthancPluginService_GetExpectedDatabaseVersion:
+    {
+      const _OrthancPluginReturnSingleValue& p =
+        *reinterpret_cast<const _OrthancPluginReturnSingleValue*>(params);
+      *(p.resultUint32) = ORTHANC_DATABASE_VERSION;
+      return OrthancPluginErrorCode_Success;
+    }
+
+    default:
+      assert(0);
+      printf("Service not emulated: %d\n", service);
+      return OrthancPluginErrorCode_NotImplemented;
+  }
 }
 
 
@@ -163,7 +179,7 @@ TEST(IndexBackend, Basic)
 #  error Unsupported database backend
 #endif
 
-  db.RegisterOutput(new OrthancPlugins::DatabaseBackendOutput(&context, NULL));
+  db.RegisterOutput(&context, new OrthancPlugins::DatabaseBackendOutput(&context, NULL));
   db.Open();
   
 

@@ -55,7 +55,7 @@
   }                                                               \
   catch (...)                                                     \
   {                                                               \
-    OrthancPluginLogError(backend->GetOutput().GetContext(), "Native exception"); \
+    OrthancPluginLogError(backend->GetContext(), "Native exception");   \
     return OrthancPluginErrorCode_DatabasePlugin;                 \
   }
 
@@ -71,9 +71,7 @@ namespace OrthancPlugins
    **/
   class DatabaseBackendOutput : public boost::noncopyable
   {
-    friend class DatabaseBackendAdapter;
-
-  private:
+  public:
     enum AllowedAnswers
     {
       AllowedAnswers_All,
@@ -87,14 +85,10 @@ namespace OrthancPlugins
       AllowedAnswers_Metadata
     };
 
+  private:
     OrthancPluginContext*         context_;
     OrthancPluginDatabaseContext* database_;
     AllowedAnswers                allowedAnswers_;
-
-    void SetAllowedAnswers(AllowedAnswers allowed)
-    {
-      allowedAnswers_ = allowed;
-    }
 
   public:
     DatabaseBackendOutput(OrthancPluginContext*         context,
@@ -105,9 +99,14 @@ namespace OrthancPlugins
     {
     }
 
-    OrthancPluginContext* GetContext()
+    void SetAllowedAnswers(AllowedAnswers allowed)
     {
-      return context_;
+      allowedAnswers_ = allowed;
+    }
+
+    OrthancPluginDatabaseContext* GetDatabase() const
+    {
+      return database_;
     }
 
     void SignalDeletedAttachment(const std::string& uuid,
@@ -282,9 +281,8 @@ namespace OrthancPlugins
    **/
   class IDatabaseBackend : public boost::noncopyable
   {
-    friend class DatabaseBackendAdapter;
-
   private:
+    OrthancPluginContext*   context_;
     DatabaseBackendOutput*  output_;
 
     void Finalize()
@@ -296,14 +294,11 @@ namespace OrthancPlugins
       }
     }
 
-  protected:
-    DatabaseBackendOutput& GetOutput()
-    {
-      return *output_;
-    }
-
   public:
-    IDatabaseBackend() : output_(NULL)
+    // "context" can be NULL iff. running the unit tests
+    IDatabaseBackend() :
+      context_(NULL),
+      output_(NULL)
     {
     }
 
@@ -312,10 +307,22 @@ namespace OrthancPlugins
       Finalize();
     }
 
+    DatabaseBackendOutput& GetOutput()
+    {
+      return *output_;
+    }
+
+    OrthancPluginContext* GetContext() const
+    {
+      return context_;
+    }
+
     // This takes the ownership
-    void RegisterOutput(DatabaseBackendOutput* output)
+    void RegisterOutput(OrthancPluginContext* context,
+                        DatabaseBackendOutput* output)
     {
       Finalize();
+      context_ = context;
       output_ = output;
     }
 
@@ -563,7 +570,7 @@ namespace OrthancPlugins
                          const std::runtime_error& e)
     {
       const std::string message = "Exception in database back-end: " + std::string(e.what());
-      OrthancPluginLogError(backend->GetOutput().GetContext(), message.c_str());
+      OrthancPluginLogError(backend->GetContext(), message.c_str());
     }
 
 
@@ -706,8 +713,8 @@ namespace OrthancPlugins
         for (std::list<int64_t>::const_iterator
                it = target.begin(); it != target.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, *it);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -731,8 +738,8 @@ namespace OrthancPlugins
         for (std::list<std::string>::const_iterator
                it = ids.begin(); it != ids.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                            backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(),
                                             it->c_str());
         }
 
@@ -759,8 +766,8 @@ namespace OrthancPlugins
         for (std::list<std::string>::const_iterator
                it = ids.begin(); it != ids.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                            backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(),
                                             it->c_str());
         }
 
@@ -785,8 +792,8 @@ namespace OrthancPlugins
         
         if (done)
         {
-          OrthancPluginDatabaseAnswerChangesDone(backend->GetOutput().context_,
-                                                 backend->GetOutput().database_);
+          OrthancPluginDatabaseAnswerChangesDone(backend->GetContext(),
+                                                 backend->GetOutput().GetDatabase());
         }
 
         return OrthancPluginErrorCode_Success;
@@ -810,8 +817,8 @@ namespace OrthancPlugins
         for (std::list<int64_t>::const_iterator
                it = target.begin(); it != target.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, *it);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -835,8 +842,8 @@ namespace OrthancPlugins
         for (std::list<std::string>::const_iterator
                it = ids.begin(); it != ids.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                            backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(),
                                             it->c_str());
         }
 
@@ -861,8 +868,8 @@ namespace OrthancPlugins
 
         if (done)
         {
-          OrthancPluginDatabaseAnswerExportedResourcesDone(backend->GetOutput().context_,
-                                                           backend->GetOutput().database_);
+          OrthancPluginDatabaseAnswerExportedResourcesDone(backend->GetContext(),
+                                                           backend->GetOutput().GetDatabase());
         }
         return OrthancPluginErrorCode_Success;
       }
@@ -926,8 +933,8 @@ namespace OrthancPlugins
       try
       {
         std::string s = backend->GetPublicId(id);
-        OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                          backend->GetOutput().database_,
+        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                          backend->GetOutput().GetDatabase(),
                                           s.c_str());
 
         return OrthancPluginErrorCode_Success;
@@ -1045,8 +1052,8 @@ namespace OrthancPlugins
         for (std::list<int32_t>::const_iterator
                it = target.begin(); it != target.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerInt32(backend->GetOutput().context_,
-                                           backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerInt32(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(),
                                            *it);
         }
 
@@ -1071,8 +1078,8 @@ namespace OrthancPlugins
         for (std::list<int32_t>::const_iterator
                it = target.begin(); it != target.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerInt32(backend->GetOutput().context_,
-                                           backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerInt32(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(),
                                            *it);
         }
 
@@ -1141,8 +1148,8 @@ namespace OrthancPlugins
         std::string s;
         if (backend->LookupGlobalProperty(s, property))
         {
-          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                            backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(),
                                             s.c_str());
         }
 
@@ -1169,8 +1176,8 @@ namespace OrthancPlugins
         for (std::list<int64_t>::const_iterator
                it = target.begin(); it != target.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, *it);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1198,8 +1205,8 @@ namespace OrthancPlugins
         for (std::list<int64_t>::const_iterator
                it = target.begin(); it != target.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, *it);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), *it);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1221,8 +1228,8 @@ namespace OrthancPlugins
         std::string s;
         if (backend->LookupMetadata(s, id, metadata))
         {
-          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                            backend->GetOutput().database_, s.c_str());
+          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(), s.c_str());
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1243,8 +1250,8 @@ namespace OrthancPlugins
         int64_t parent;
         if (backend->LookupParent(parent, id))
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, parent);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), parent);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1266,8 +1273,8 @@ namespace OrthancPlugins
         OrthancPluginResourceType type;
         if (backend->LookupResource(id, type, publicId))
         {
-          OrthancPluginDatabaseAnswerResource(backend->GetOutput().context_,
-                                              backend->GetOutput().database_, 
+          OrthancPluginDatabaseAnswerResource(backend->GetContext(),
+                                              backend->GetOutput().GetDatabase(), 
                                               id, type);
         }
 
@@ -1288,8 +1295,8 @@ namespace OrthancPlugins
         int64_t id;
         if (backend->SelectPatientToRecycle(id))
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, id);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), id);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1310,8 +1317,8 @@ namespace OrthancPlugins
         int64_t id;
         if (backend->SelectPatientToRecycle(id, patientIdToAvoid))
         {
-          OrthancPluginDatabaseAnswerInt64(backend->GetOutput().context_,
-                                           backend->GetOutput().database_, id);
+          OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+                                           backend->GetOutput().GetDatabase(), id);
         }
 
         return OrthancPluginErrorCode_Success;
@@ -1612,8 +1619,8 @@ namespace OrthancPlugins
         for (std::list<std::string>::const_iterator
                it = values.begin(); it != values.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                            backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(),
                                             it->c_str());
         }
 
@@ -1673,8 +1680,8 @@ namespace OrthancPlugins
         for (std::map<int32_t, std::string>::const_iterator
                it = result.begin(); it != result.end(); ++it)
         {
-          OrthancPluginDatabaseAnswerMetadata(backend->GetOutput().context_,
-                                            backend->GetOutput().database_,
+          OrthancPluginDatabaseAnswerMetadata(backend->GetContext(),
+                                            backend->GetOutput().GetDatabase(),
                                             resourceId, it->first, it->second.c_str());
         }
         
@@ -1708,8 +1715,8 @@ namespace OrthancPlugins
 
           if (!parent.empty())
           {
-            OrthancPluginDatabaseAnswerString(backend->GetOutput().context_,
-                                              backend->GetOutput().database_,
+            OrthancPluginDatabaseAnswerString(backend->GetContext(),
+                                              backend->GetOutput().GetDatabase(),
                                               parent.c_str());
           }
         }
@@ -1852,7 +1859,7 @@ namespace OrthancPlugins
         throw std::runtime_error("Unable to register the database backend");
       }
 
-      backend.RegisterOutput(new DatabaseBackendOutput(context, database));
+      backend.RegisterOutput(context, new DatabaseBackendOutput(context, database));
     }
   };
 }

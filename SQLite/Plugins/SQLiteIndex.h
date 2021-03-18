@@ -58,7 +58,6 @@ namespace OrthancDatabases
       }
     };
 
-    OrthancPluginContext*  context_;
     std::string            path_;
     bool                   fast_;
 
@@ -68,11 +67,6 @@ namespace OrthancDatabases
     SQLiteIndex();  // Opens in memory
 
     SQLiteIndex(const std::string& path);
-
-    void SetOrthancPluginContext(OrthancPluginContext* context)
-    {
-      context_ = context;
-    }
 
     void SetFast(bool fast)
     {

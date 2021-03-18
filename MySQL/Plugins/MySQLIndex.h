@@ -57,7 +57,6 @@ namespace OrthancDatabases
       }
     };
 
-    OrthancPluginContext*  context_;
     MySQLParameters        parameters_;
     bool                   clearAll_;
 
@@ -65,11 +64,6 @@ namespace OrthancDatabases
 
   public:
     MySQLIndex(const MySQLParameters& parameters);
-
-    void SetOrthancPluginContext(OrthancPluginContext* context)
-    {
-      context_ = context;
-    }
 
     void SetClearAll(bool clear)
     {

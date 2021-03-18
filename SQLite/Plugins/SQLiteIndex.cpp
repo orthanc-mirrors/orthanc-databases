@@ -37,14 +37,10 @@ namespace OrthancDatabases
   IDatabase* SQLiteIndex::OpenInternal()
   {
     uint32_t expectedVersion = 6;
-    if (context_)
+
+    if (GetContext())   // "GetContext()" can possibly be NULL in the unit tests
     {
-      expectedVersion = OrthancPluginGetExpectedDatabaseVersion(context_);
-    }
-    else
-    {
-      // This case only occurs during unit testing
-      expectedVersion = 6;
+      expectedVersion = OrthancPluginGetExpectedDatabaseVersion(GetContext());
     }
 
     // Check the expected version of the database
@@ -138,7 +134,6 @@ namespace OrthancDatabases
 
   SQLiteIndex::SQLiteIndex(const std::string& path) :
     IndexBackend(new Factory(*this)),
-    context_(NULL),
     path_(path),
     fast_(true)
   {
@@ -151,7 +146,6 @@ namespace OrthancDatabases
 
   SQLiteIndex::SQLiteIndex() :
     IndexBackend(new Factory(*this)),
-    context_(NULL),
     fast_(true)
   {
   }

@@ -57,7 +57,6 @@ namespace OrthancDatabases
       }
     };
 
-    OrthancPluginContext*  context_;
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
 
@@ -65,11 +64,6 @@ namespace OrthancDatabases
 
   public:
     PostgreSQLIndex(const PostgreSQLParameters& parameters);
-
-    void SetOrthancPluginContext(OrthancPluginContext* context)
-    {
-      context_ = context;
-    }
 
     void SetClearAll(bool clear)
     {
