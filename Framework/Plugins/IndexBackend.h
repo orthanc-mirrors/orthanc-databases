@@ -22,7 +22,9 @@
 #pragma once
 
 #include "../Common/DatabaseManager.h"
-#include "OrthancCppDatabasePlugin.h"
+#include "DatabaseBackendAdapterV2.h"
+
+#include <OrthancException.h>
 
 
 namespace OrthancDatabases
