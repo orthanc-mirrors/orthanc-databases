@@ -55,7 +55,7 @@
   }                                                               \
   catch (...)                                                     \
   {                                                               \
-    backend->GetOutput().LogError("Native exception");            \
+    OrthancPluginLogError(backend->GetOutput().GetContext(), "Native exception"); \
     return OrthancPluginErrorCode_DatabasePlugin;                 \
   }
 
@@ -108,21 +108,6 @@ namespace OrthancPlugins
     OrthancPluginContext* GetContext()
     {
       return context_;
-    }
-
-    void LogError(const std::string& message)
-    {
-      OrthancPluginLogError(context_, message.c_str());
-    }
-
-    void LogWarning(const std::string& message)
-    {
-      OrthancPluginLogWarning(context_, message.c_str());
-    }
-
-    void LogInfo(const std::string& message)
-    {
-      OrthancPluginLogInfo(context_, message.c_str());
     }
 
     void SignalDeletedAttachment(const std::string& uuid,
@@ -577,7 +562,8 @@ namespace OrthancPlugins
     static void LogError(IDatabaseBackend* backend,
                          const std::runtime_error& e)
     {
-      backend->GetOutput().LogError("Exception in database back-end: " + std::string(e.what()));
+      const std::string message = "Exception in database back-end: " + std::string(e.what());
+      OrthancPluginLogError(backend->GetOutput().GetContext(), message.c_str());
     }
 
 
