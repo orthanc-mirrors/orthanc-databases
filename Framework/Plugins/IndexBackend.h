@@ -323,5 +323,21 @@ namespace OrthancDatabases
                                 int64_t id) ORTHANC_OVERRIDE;
 #  endif
 #endif
+
+    virtual bool HasCreateInstance() const ORTHANC_OVERRIDE
+    {
+      return false;  // TODO - Shouldn't this be "true"?
+    }
+      
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                const char* hashPatient,
+                                const char* hashStudy,
+                                const char* hashSeries,
+                                const char* hashInstance)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+#endif
   };
 }
