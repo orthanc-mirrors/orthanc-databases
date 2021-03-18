@@ -179,7 +179,7 @@ TEST(IndexBackend, Basic)
 #  error Unsupported database backend
 #endif
 
-  db.SetOutputFactory(new DatabaseBackendOutputV2::Factory(&context, NULL));
+  db.SetOutputFactory(new DatabaseBackendAdapterV2::Factory(&context, NULL));
   db.Open();
 
   std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());

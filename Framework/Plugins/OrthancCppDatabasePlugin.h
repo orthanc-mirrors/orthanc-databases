@@ -28,15 +28,6 @@
 
 #pragma once
 
-#if HAS_ORTHANC_EXCEPTION != 1
-#  error HAS_ORTHANC_EXCEPTION must be set to 1
-#endif
-
-#if ORTHANC_ENABLE_PLUGINS != 1
-#  error ORTHANC_ENABLE_PLUGINS must be set to 1
-#endif
-
-
 #include "IDatabaseBackend.h"
 
 #include <OrthancException.h>
@@ -64,247 +55,228 @@
 #include <list>
 #include <string>
 
+
 namespace OrthancDatabases
-{ 
-  class DatabaseBackendOutputV2 : public IDatabaseBackendOutput
-  {
-  public:
-    enum AllowedAnswers
-    {
-      AllowedAnswers_All,
-      AllowedAnswers_None,
-      AllowedAnswers_Attachment,
-      AllowedAnswers_Change,
-      AllowedAnswers_DicomTag,
-      AllowedAnswers_ExportedResource,
-      AllowedAnswers_MatchingResource,
-      AllowedAnswers_String,
-      AllowedAnswers_Metadata
-    };
-
-  private:
-    OrthancPluginContext*         context_;
-    OrthancPluginDatabaseContext* database_;
-    AllowedAnswers                allowedAnswers_;
-
-  public:
-    class Factory : public IFactory
-    {
-    private:
-      OrthancPluginContext*         context_;
-      OrthancPluginDatabaseContext* database_;
-
-    public:
-      Factory(OrthancPluginContext*         context,
-              OrthancPluginDatabaseContext* database) :
-        context_(context),
-        database_(database)
-      {
-      }
-
-      virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE
-      {
-        return new DatabaseBackendOutputV2(context_, database_);
-      }
-    };
-    
-    DatabaseBackendOutputV2(OrthancPluginContext*         context,
-                            OrthancPluginDatabaseContext* database) :
-      context_(context),
-      database_(database),
-      allowedAnswers_(AllowedAnswers_All /* for unit tests */)
-    {
-    }
-
-    void SetAllowedAnswers(AllowedAnswers allowed)
-    {
-      allowedAnswers_ = allowed;
-    }
-
-    OrthancPluginDatabaseContext* GetDatabase() const
-    {
-      return database_;
-    }
-
-    virtual void SignalDeletedAttachment(const std::string& uuid,
-                                         int32_t            contentType,
-                                         uint64_t           uncompressedSize,
-                                         const std::string& uncompressedHash,
-                                         int32_t            compressionType,
-                                         uint64_t           compressedSize,
-                                         const std::string& compressedHash) ORTHANC_OVERRIDE
-    {
-      OrthancPluginAttachment attachment;
-      attachment.uuid = uuid.c_str();
-      attachment.contentType = contentType;
-      attachment.uncompressedSize = uncompressedSize;
-      attachment.uncompressedHash = uncompressedHash.c_str();
-      attachment.compressionType = compressionType;
-      attachment.compressedSize = compressedSize;
-      attachment.compressedHash = compressedHash.c_str();
-
-      OrthancPluginDatabaseSignalDeletedAttachment(context_, database_, &attachment);
-    }
-
-    virtual void SignalDeletedResource(const std::string& publicId,
-                                       OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE
-    {
-      OrthancPluginDatabaseSignalDeletedResource(context_, database_, publicId.c_str(), resourceType);
-    }
-
-    virtual void SignalRemainingAncestor(const std::string& ancestorId,
-                                         OrthancPluginResourceType ancestorType) ORTHANC_OVERRIDE
-    {
-      OrthancPluginDatabaseSignalRemainingAncestor(context_, database_, ancestorId.c_str(), ancestorType);
-    }
-
-    virtual void AnswerAttachment(const std::string& uuid,
-                                  int32_t            contentType,
-                                  uint64_t           uncompressedSize,
-                                  const std::string& uncompressedHash,
-                                  int32_t            compressionType,
-                                  uint64_t           compressedSize,
-                                  const std::string& compressedHash) ORTHANC_OVERRIDE
-    {
-      if (allowedAnswers_ != AllowedAnswers_All &&
-          allowedAnswers_ != AllowedAnswers_Attachment)
-      {
-        throw std::runtime_error("Cannot answer with an attachment in the current state");
-      }
-
-      OrthancPluginAttachment attachment;
-      attachment.uuid = uuid.c_str();
-      attachment.contentType = contentType;
-      attachment.uncompressedSize = uncompressedSize;
-      attachment.uncompressedHash = uncompressedHash.c_str();
-      attachment.compressionType = compressionType;
-      attachment.compressedSize = compressedSize;
-      attachment.compressedHash = compressedHash.c_str();
-
-      OrthancPluginDatabaseAnswerAttachment(context_, database_, &attachment);
-    }
-
-    virtual void AnswerChange(int64_t                    seq,
-                              int32_t                    changeType,
-                              OrthancPluginResourceType  resourceType,
-                              const std::string&         publicId,
-                              const std::string&         date) ORTHANC_OVERRIDE
-    {
-      if (allowedAnswers_ != AllowedAnswers_All &&
-          allowedAnswers_ != AllowedAnswers_Change)
-      {
-        throw std::runtime_error("Cannot answer with a change in the current state");
-      }
-
-      OrthancPluginChange change;
-      change.seq = seq;
-      change.changeType = changeType;
-      change.resourceType = resourceType;
-      change.publicId = publicId.c_str();
-      change.date = date.c_str();
-
-      OrthancPluginDatabaseAnswerChange(context_, database_, &change);
-    }
-
-    virtual void AnswerDicomTag(uint16_t group,
-                                uint16_t element,
-                                const std::string& value) ORTHANC_OVERRIDE
-    {
-      if (allowedAnswers_ != AllowedAnswers_All &&
-          allowedAnswers_ != AllowedAnswers_DicomTag)
-      {
-        throw std::runtime_error("Cannot answer with a DICOM tag in the current state");
-      }
-
-      OrthancPluginDicomTag tag;
-      tag.group = group;
-      tag.element = element;
-      tag.value = value.c_str();
-
-      OrthancPluginDatabaseAnswerDicomTag(context_, database_, &tag);
-    }
-
-    virtual void AnswerExportedResource(int64_t                    seq,
-                                        OrthancPluginResourceType  resourceType,
-                                        const std::string&         publicId,
-                                        const std::string&         modality,
-                                        const std::string&         date,
-                                        const std::string&         patientId,
-                                        const std::string&         studyInstanceUid,
-                                        const std::string&         seriesInstanceUid,
-                                        const std::string&         sopInstanceUid) ORTHANC_OVERRIDE
-    {
-      if (allowedAnswers_ != AllowedAnswers_All &&
-          allowedAnswers_ != AllowedAnswers_ExportedResource)
-      {
-        throw std::runtime_error("Cannot answer with an exported resource in the current state");
-      }
-
-      OrthancPluginExportedResource exported;
-      exported.seq = seq;
-      exported.resourceType = resourceType;
-      exported.publicId = publicId.c_str();
-      exported.modality = modality.c_str();
-      exported.date = date.c_str();
-      exported.patientId = patientId.c_str();
-      exported.studyInstanceUid = studyInstanceUid.c_str();
-      exported.seriesInstanceUid = seriesInstanceUid.c_str();
-      exported.sopInstanceUid = sopInstanceUid.c_str();
-
-      OrthancPluginDatabaseAnswerExportedResource(context_, database_, &exported);
-    }
-
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    virtual void AnswerMatchingResource(const std::string& resourceId) ORTHANC_OVERRIDE
-    {
-      if (allowedAnswers_ != AllowedAnswers_All &&
-          allowedAnswers_ != AllowedAnswers_MatchingResource)
-      {
-        throw std::runtime_error("Cannot answer with an exported resource in the current state");
-      }
-
-      OrthancPluginMatchingResource match;
-      match.resourceId = resourceId.c_str();
-      match.someInstanceId = NULL;
-
-      OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
-    }
-#endif
-
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    virtual void AnswerMatchingResource(const std::string& resourceId,
-                                        const std::string& someInstanceId) ORTHANC_OVERRIDE
-    {
-      if (allowedAnswers_ != AllowedAnswers_All &&
-          allowedAnswers_ != AllowedAnswers_MatchingResource)
-      {
-        throw std::runtime_error("Cannot answer with an exported resource in the current state");
-      }
-
-      OrthancPluginMatchingResource match;
-      match.resourceId = resourceId.c_str();
-      match.someInstanceId = someInstanceId.c_str();
-
-      OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
-    }
-#endif
-  };
-
-
+{  
   /**
    * @brief Bridge between C and C++ database engines.
    * 
    * Class creating the bridge between the C low-level primitives for
    * custom database engines, and the high-level IDatabaseBackend C++
-   * interface.
+   * interface, for Orthanc <= 1.9.1.
    *
    * @ingroup Callbacks
    **/
   class DatabaseBackendAdapterV2
   {
   private:
+    class Output : public IDatabaseBackendOutput
+    {
+    public:
+      enum AllowedAnswers
+      {
+        AllowedAnswers_All,
+        AllowedAnswers_None,
+        AllowedAnswers_Attachment,
+        AllowedAnswers_Change,
+        AllowedAnswers_DicomTag,
+        AllowedAnswers_ExportedResource,
+        AllowedAnswers_MatchingResource,
+        AllowedAnswers_String,
+        AllowedAnswers_Metadata
+      };
+
+    private:
+      OrthancPluginContext*         context_;
+      OrthancPluginDatabaseContext* database_;
+      AllowedAnswers                allowedAnswers_;
+
+    public:   
+      Output(OrthancPluginContext*         context,
+             OrthancPluginDatabaseContext* database) :
+        context_(context),
+        database_(database),
+        allowedAnswers_(AllowedAnswers_All /* for unit tests */)
+      {
+      }
+
+      void SetAllowedAnswers(AllowedAnswers allowed)
+      {
+        allowedAnswers_ = allowed;
+      }
+
+      OrthancPluginDatabaseContext* GetDatabase() const
+      {
+        return database_;
+      }
+
+      virtual void SignalDeletedAttachment(const std::string& uuid,
+                                           int32_t            contentType,
+                                           uint64_t           uncompressedSize,
+                                           const std::string& uncompressedHash,
+                                           int32_t            compressionType,
+                                           uint64_t           compressedSize,
+                                           const std::string& compressedHash) ORTHANC_OVERRIDE
+      {
+        OrthancPluginAttachment attachment;
+        attachment.uuid = uuid.c_str();
+        attachment.contentType = contentType;
+        attachment.uncompressedSize = uncompressedSize;
+        attachment.uncompressedHash = uncompressedHash.c_str();
+        attachment.compressionType = compressionType;
+        attachment.compressedSize = compressedSize;
+        attachment.compressedHash = compressedHash.c_str();
+
+        OrthancPluginDatabaseSignalDeletedAttachment(context_, database_, &attachment);
+      }
+
+      virtual void SignalDeletedResource(const std::string& publicId,
+                                         OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE
+      {
+        OrthancPluginDatabaseSignalDeletedResource(context_, database_, publicId.c_str(), resourceType);
+      }
+
+      virtual void SignalRemainingAncestor(const std::string& ancestorId,
+                                           OrthancPluginResourceType ancestorType) ORTHANC_OVERRIDE
+      {
+        OrthancPluginDatabaseSignalRemainingAncestor(context_, database_, ancestorId.c_str(), ancestorType);
+      }
+
+      virtual void AnswerAttachment(const std::string& uuid,
+                                    int32_t            contentType,
+                                    uint64_t           uncompressedSize,
+                                    const std::string& uncompressedHash,
+                                    int32_t            compressionType,
+                                    uint64_t           compressedSize,
+                                    const std::string& compressedHash) ORTHANC_OVERRIDE
+      {
+        if (allowedAnswers_ != AllowedAnswers_All &&
+            allowedAnswers_ != AllowedAnswers_Attachment)
+        {
+          throw std::runtime_error("Cannot answer with an attachment in the current state");
+        }
+
+        OrthancPluginAttachment attachment;
+        attachment.uuid = uuid.c_str();
+        attachment.contentType = contentType;
+        attachment.uncompressedSize = uncompressedSize;
+        attachment.uncompressedHash = uncompressedHash.c_str();
+        attachment.compressionType = compressionType;
+        attachment.compressedSize = compressedSize;
+        attachment.compressedHash = compressedHash.c_str();
+
+        OrthancPluginDatabaseAnswerAttachment(context_, database_, &attachment);
+      }
+
+      virtual void AnswerChange(int64_t                    seq,
+                                int32_t                    changeType,
+                                OrthancPluginResourceType  resourceType,
+                                const std::string&         publicId,
+                                const std::string&         date) ORTHANC_OVERRIDE
+      {
+        if (allowedAnswers_ != AllowedAnswers_All &&
+            allowedAnswers_ != AllowedAnswers_Change)
+        {
+          throw std::runtime_error("Cannot answer with a change in the current state");
+        }
+
+        OrthancPluginChange change;
+        change.seq = seq;
+        change.changeType = changeType;
+        change.resourceType = resourceType;
+        change.publicId = publicId.c_str();
+        change.date = date.c_str();
+
+        OrthancPluginDatabaseAnswerChange(context_, database_, &change);
+      }
+
+      virtual void AnswerDicomTag(uint16_t group,
+                                  uint16_t element,
+                                  const std::string& value) ORTHANC_OVERRIDE
+      {
+        if (allowedAnswers_ != AllowedAnswers_All &&
+            allowedAnswers_ != AllowedAnswers_DicomTag)
+        {
+          throw std::runtime_error("Cannot answer with a DICOM tag in the current state");
+        }
+
+        OrthancPluginDicomTag tag;
+        tag.group = group;
+        tag.element = element;
+        tag.value = value.c_str();
+
+        OrthancPluginDatabaseAnswerDicomTag(context_, database_, &tag);
+      }
+
+      virtual void AnswerExportedResource(int64_t                    seq,
+                                          OrthancPluginResourceType  resourceType,
+                                          const std::string&         publicId,
+                                          const std::string&         modality,
+                                          const std::string&         date,
+                                          const std::string&         patientId,
+                                          const std::string&         studyInstanceUid,
+                                          const std::string&         seriesInstanceUid,
+                                          const std::string&         sopInstanceUid) ORTHANC_OVERRIDE
+      {
+        if (allowedAnswers_ != AllowedAnswers_All &&
+            allowedAnswers_ != AllowedAnswers_ExportedResource)
+        {
+          throw std::runtime_error("Cannot answer with an exported resource in the current state");
+        }
+
+        OrthancPluginExportedResource exported;
+        exported.seq = seq;
+        exported.resourceType = resourceType;
+        exported.publicId = publicId.c_str();
+        exported.modality = modality.c_str();
+        exported.date = date.c_str();
+        exported.patientId = patientId.c_str();
+        exported.studyInstanceUid = studyInstanceUid.c_str();
+        exported.seriesInstanceUid = seriesInstanceUid.c_str();
+        exported.sopInstanceUid = sopInstanceUid.c_str();
+
+        OrthancPluginDatabaseAnswerExportedResource(context_, database_, &exported);
+      }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+      virtual void AnswerMatchingResource(const std::string& resourceId) ORTHANC_OVERRIDE
+      {
+        if (allowedAnswers_ != AllowedAnswers_All &&
+            allowedAnswers_ != AllowedAnswers_MatchingResource)
+        {
+          throw std::runtime_error("Cannot answer with an exported resource in the current state");
+        }
+
+        OrthancPluginMatchingResource match;
+        match.resourceId = resourceId.c_str();
+        match.someInstanceId = NULL;
+
+        OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
+      }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+      virtual void AnswerMatchingResource(const std::string& resourceId,
+                                          const std::string& someInstanceId) ORTHANC_OVERRIDE
+      {
+        if (allowedAnswers_ != AllowedAnswers_All &&
+            allowedAnswers_ != AllowedAnswers_MatchingResource)
+        {
+          throw std::runtime_error("Cannot answer with an exported resource in the current state");
+        }
+
+        OrthancPluginMatchingResource match;
+        match.resourceId = resourceId.c_str();
+        match.someInstanceId = someInstanceId.c_str();
+
+        OrthancPluginDatabaseAnswerMatchingResource(context_, database_, &match);
+      }
+#endif
+    };
+    
+
     // This class cannot be instantiated
     DatabaseBackendAdapterV2()
     {
@@ -395,8 +367,8 @@ namespace OrthancDatabases
                                                     int32_t contentType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -426,8 +398,8 @@ namespace OrthancDatabases
                                                   int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -443,8 +415,8 @@ namespace OrthancDatabases
                                                      OrthancPluginResourceType resourceType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -469,8 +441,8 @@ namespace OrthancDatabases
                                                    OrthancPluginResourceType resourceType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -498,8 +470,8 @@ namespace OrthancDatabases
                                                             uint64_t limit)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -526,8 +498,8 @@ namespace OrthancDatabases
                                               uint32_t maxResult)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Change);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_Change);
 
       try
       {
@@ -551,8 +523,8 @@ namespace OrthancDatabases
                                                          int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -577,8 +549,8 @@ namespace OrthancDatabases
                                                        int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -605,8 +577,8 @@ namespace OrthancDatabases
                                                         uint32_t  maxResult)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_ExportedResource);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_ExportedResource);
 
       try
       {
@@ -628,8 +600,8 @@ namespace OrthancDatabases
                                                  void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Change);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_Change);
 
       try
       {
@@ -644,8 +616,8 @@ namespace OrthancDatabases
                                                            void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_ExportedResource);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_ExportedResource);
 
       try
       {
@@ -661,8 +633,8 @@ namespace OrthancDatabases
                                                     int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_DicomTag);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_DicomTag);
 
       try
       {
@@ -678,8 +650,8 @@ namespace OrthancDatabases
                                                int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -787,8 +759,8 @@ namespace OrthancDatabases
                                                          int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -814,8 +786,8 @@ namespace OrthancDatabases
                                                             int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -870,8 +842,8 @@ namespace OrthancDatabases
                                                     int32_t contentType)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Attachment);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_Attachment);
 
       try
       {
@@ -887,8 +859,8 @@ namespace OrthancDatabases
                                                         int32_t property)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -913,8 +885,8 @@ namespace OrthancDatabases
                                                      OrthancPluginIdentifierConstraint constraint)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -943,8 +915,8 @@ namespace OrthancDatabases
                                                          const char* end)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -970,8 +942,8 @@ namespace OrthancDatabases
                                                   int32_t metadata)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -993,8 +965,8 @@ namespace OrthancDatabases
                                                 int64_t id)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -1016,8 +988,8 @@ namespace OrthancDatabases
                                                   const char* publicId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -1040,8 +1012,8 @@ namespace OrthancDatabases
                                                           void* payload)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -1063,8 +1035,8 @@ namespace OrthancDatabases
                                                            int64_t patientIdToAvoid)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -1277,8 +1249,8 @@ namespace OrthancDatabases
       uint8_t requestSomeInstance)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_MatchingResource);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_MatchingResource);
 
       try
       {
@@ -1349,8 +1321,8 @@ namespace OrthancDatabases
                                                       int32_t metadata)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_None);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_None);
 
       try
       {
@@ -1409,8 +1381,8 @@ namespace OrthancDatabases
                                                  int64_t resourceId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_Metadata);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_Metadata);
 
       try
       {
@@ -1444,8 +1416,8 @@ namespace OrthancDatabases
                                                           const char* publicId)
     {
       IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-      std::unique_ptr<DatabaseBackendOutputV2> output(dynamic_cast<DatabaseBackendOutputV2*>(backend->CreateOutput()));
-      output->SetAllowedAnswers(DatabaseBackendOutputV2::AllowedAnswers_String);
+      std::unique_ptr<Output> output(dynamic_cast<Output*>(backend->CreateOutput()));
+      output->SetAllowedAnswers(Output::AllowedAnswers_String);
 
       try
       {
@@ -1475,6 +1447,27 @@ namespace OrthancDatabases
    
 
   public:
+    class Factory : public IDatabaseBackendOutput::IFactory
+    {
+    private:
+      OrthancPluginContext*         context_;
+      OrthancPluginDatabaseContext* database_;
+
+    public:
+      Factory(OrthancPluginContext*         context,
+              OrthancPluginDatabaseContext* database) :
+        context_(context),
+        database_(database)
+      {
+      }
+
+      virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE
+      {
+        return new Output(context_, database_);
+      }
+    };
+
+
     /**
      * Register a custom database back-end written in C++.
      *
@@ -1600,7 +1593,7 @@ namespace OrthancDatabases
         throw std::runtime_error("Unable to register the database backend");
       }
 
-      backend.SetOutputFactory(new DatabaseBackendOutputV2::Factory(context, database));
+      backend.SetOutputFactory(new Factory(context, database));
     }
   };
 }
