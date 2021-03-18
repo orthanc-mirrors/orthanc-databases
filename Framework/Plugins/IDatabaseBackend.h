@@ -26,7 +26,7 @@
 
 #include <list>
 
-namespace OrthancPlugins
+namespace OrthancDatabases
 {
   class IDatabaseBackend : public boost::noncopyable
   {
@@ -58,14 +58,14 @@ namespace OrthancPlugins
     virtual int64_t CreateResource(const char* publicId,
                                    OrthancPluginResourceType type) = 0;
 
-    virtual void DeleteAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void DeleteAttachment(IDatabaseBackendOutput& output,
                                   int64_t id,
                                   int32_t attachment) = 0;
 
     virtual void DeleteMetadata(int64_t id,
                                 int32_t metadataType) = 0;
 
-    virtual void DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void DeleteResource(IDatabaseBackendOutput& output,
                                 int64_t id) = 0;
 
     virtual void GetAllInternalIds(std::list<int64_t>& target,
@@ -80,7 +80,7 @@ namespace OrthancPlugins
                                  uint64_t limit) = 0;
 
     /* Use GetOutput().AnswerChange() */
-    virtual void GetChanges(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
                             int64_t since,
                             uint32_t maxResults) = 0;
@@ -92,19 +92,19 @@ namespace OrthancPlugins
                                      int64_t id) = 0;
 
     /* Use GetOutput().AnswerExportedResource() */
-    virtual void GetExportedResources(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void GetExportedResources(IDatabaseBackendOutput& output,
                                       bool& done /*out*/,
                                       int64_t since,
                                       uint32_t maxResults) = 0;
 
     /* Use GetOutput().AnswerChange() */
-    virtual void GetLastChange(OrthancPlugins::IDatabaseBackendOutput& output) = 0;
+    virtual void GetLastChange(IDatabaseBackendOutput& output) = 0;
 
     /* Use GetOutput().AnswerExportedResource() */
-    virtual void GetLastExportedResource(OrthancPlugins::IDatabaseBackendOutput& output) = 0;
+    virtual void GetLastExportedResource(IDatabaseBackendOutput& output) = 0;
 
     /* Use GetOutput().AnswerDicomTag() */
-    virtual void GetMainDicomTags(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void GetMainDicomTags(IDatabaseBackendOutput& output,
                                   int64_t id) = 0;
 
     virtual std::string GetPublicId(int64_t resourceId) = 0;
@@ -132,7 +132,7 @@ namespace OrthancPlugins
     virtual void LogExportedResource(const OrthancPluginExportedResource& resource) = 0;
     
     /* Use GetOutput().AnswerAttachment() */
-    virtual bool LookupAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual bool LookupAttachment(IDatabaseBackendOutput& output,
                                   int64_t id,
                                   int32_t contentType) = 0;
 
@@ -210,7 +210,7 @@ namespace OrthancPlugins
     virtual bool HasCreateInstance() const = 0;
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    virtual void LookupResources(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void LookupResources(IDatabaseBackendOutput& output,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  uint32_t limit,

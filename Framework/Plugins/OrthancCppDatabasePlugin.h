@@ -64,7 +64,7 @@
 #include <list>
 #include <string>
 
-namespace OrthancPlugins
+namespace OrthancDatabases
 { 
   class DatabaseBackendOutputV2 : public IDatabaseBackendOutput
   {

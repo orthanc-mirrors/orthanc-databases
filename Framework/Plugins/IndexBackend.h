@@ -27,7 +27,7 @@
 
 namespace OrthancDatabases
 {
-  class IndexBackend : public OrthancPlugins::IDatabaseBackend
+  class IndexBackend : public IDatabaseBackend
   {
   private:
     class LookupFormatter;
@@ -35,7 +35,7 @@ namespace OrthancDatabases
     OrthancPluginContext*  context_;
     DatabaseManager        manager_;
 
-    std::unique_ptr<OrthancPlugins::IDatabaseBackendOutput::IFactory>  outputFactory_;
+    std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
     DatabaseManager& GetManager()
@@ -65,18 +65,18 @@ namespace OrthancDatabases
 
     void ClearDeletedResources();
 
-    void SignalDeletedFiles(OrthancPlugins::IDatabaseBackendOutput& output);
+    void SignalDeletedFiles(IDatabaseBackendOutput& output);
 
-    void SignalDeletedResources(OrthancPlugins::IDatabaseBackendOutput& output);
+    void SignalDeletedResources(IDatabaseBackendOutput& output);
 
   private:
-    void ReadChangesInternal(OrthancPlugins::IDatabaseBackendOutput& output,
+    void ReadChangesInternal(IDatabaseBackendOutput& output,
                              bool& done,
                              DatabaseManager::CachedStatement& statement,
                              const Dictionary& args,
                              uint32_t maxResults);
 
-    void ReadExportedResourcesInternal(OrthancPlugins::IDatabaseBackendOutput& output,
+    void ReadExportedResourcesInternal(IDatabaseBackendOutput& output,
                                        bool& done,
                                        DatabaseManager::CachedStatement& statement,
                                        const Dictionary& args,
@@ -91,9 +91,9 @@ namespace OrthancDatabases
       return context_;
     }
 
-    virtual void SetOutputFactory(OrthancPlugins::IDatabaseBackendOutput::IFactory* factory) ORTHANC_OVERRIDE;
+    virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) ORTHANC_OVERRIDE;
     
-    virtual OrthancPlugins::IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE;
+    virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE;
     
     virtual void Open() ORTHANC_OVERRIDE
     {
@@ -115,14 +115,14 @@ namespace OrthancDatabases
     
     virtual void ClearExportedResources() ORTHANC_OVERRIDE;
 
-    virtual void DeleteAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void DeleteAttachment(IDatabaseBackendOutput& output,
                                   int64_t id,
                                   int32_t attachment) ORTHANC_OVERRIDE;
     
     virtual void DeleteMetadata(int64_t id,
                                 int32_t metadataType) ORTHANC_OVERRIDE;
     
-    virtual void DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void DeleteResource(IDatabaseBackendOutput& output,
                                 int64_t id) ORTHANC_OVERRIDE;
 
     virtual void GetAllInternalIds(std::list<int64_t>& target,
@@ -136,7 +136,7 @@ namespace OrthancDatabases
                                  uint64_t since,
                                  uint64_t limit) ORTHANC_OVERRIDE;
     
-    virtual void GetChanges(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
                             int64_t since,
                             uint32_t maxResults) ORTHANC_OVERRIDE;
@@ -147,16 +147,16 @@ namespace OrthancDatabases
     virtual void GetChildrenPublicId(std::list<std::string>& target /*out*/,
                                      int64_t id) ORTHANC_OVERRIDE;
     
-    virtual void GetExportedResources(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void GetExportedResources(IDatabaseBackendOutput& output,
                                       bool& done /*out*/,
                                       int64_t since,
                                       uint32_t maxResults) ORTHANC_OVERRIDE;
     
-    virtual void GetLastChange(OrthancPlugins::IDatabaseBackendOutput& output) ORTHANC_OVERRIDE;
+    virtual void GetLastChange(IDatabaseBackendOutput& output) ORTHANC_OVERRIDE;
     
-    virtual void GetLastExportedResource(OrthancPlugins::IDatabaseBackendOutput& output) ORTHANC_OVERRIDE;
+    virtual void GetLastExportedResource(IDatabaseBackendOutput& output) ORTHANC_OVERRIDE;
     
-    virtual void GetMainDicomTags(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void GetMainDicomTags(IDatabaseBackendOutput& output,
                                   int64_t id) ORTHANC_OVERRIDE;
     
     virtual std::string GetPublicId(int64_t resourceId) ORTHANC_OVERRIDE;
@@ -183,7 +183,7 @@ namespace OrthancDatabases
     
     virtual void LogExportedResource(const OrthancPluginExportedResource& resource) ORTHANC_OVERRIDE;
     
-    virtual bool LookupAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual bool LookupAttachment(IDatabaseBackendOutput& output,
                                   int64_t id,
                                   int32_t contentType) ORTHANC_OVERRIDE;
     
@@ -281,7 +281,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // New primitive since Orthanc 1.5.2
-    virtual void LookupResources(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void LookupResources(IDatabaseBackendOutput& output,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  uint32_t limit,

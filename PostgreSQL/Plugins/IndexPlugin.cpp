@@ -65,7 +65,7 @@ extern "C"
       backend_.reset(new OrthancDatabases::PostgreSQLIndex(context, parameters));
 
       /* Register the PostgreSQL index into Orthanc */
-      OrthancPlugins::DatabaseBackendAdapterV2::Register(context, *backend_);
+      OrthancDatabases::DatabaseBackendAdapterV2::Register(context, *backend_);
     }
     catch (Orthanc::OrthancException& e)
     {

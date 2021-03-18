@@ -171,7 +171,7 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ReadChangesInternal(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
                                          bool& done,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
@@ -200,7 +200,7 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ReadExportedResourcesInternal(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::ReadExportedResourcesInternal(IDatabaseBackendOutput& output,
                                                    bool& done,
                                                    DatabaseManager::CachedStatement& statement,
                                                    const Dictionary& args,
@@ -257,7 +257,7 @@ namespace OrthancDatabases
   }
     
 
-  void IndexBackend::SignalDeletedFiles(OrthancPlugins::IDatabaseBackendOutput& output)
+  void IndexBackend::SignalDeletedFiles(IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -285,7 +285,7 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::SignalDeletedResources(OrthancPlugins::IDatabaseBackendOutput& output)
+  void IndexBackend::SignalDeletedResources(IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -313,7 +313,7 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::SetOutputFactory(OrthancPlugins::IDatabaseBackendOutput::IFactory* factory)
+  void IndexBackend::SetOutputFactory(IDatabaseBackendOutput::IFactory* factory)
   {
     if (factory == NULL)
     {
@@ -330,7 +330,7 @@ namespace OrthancDatabases
   }
 
 
-  OrthancPlugins::IDatabaseBackendOutput* IndexBackend::CreateOutput()
+  IDatabaseBackendOutput* IndexBackend::CreateOutput()
   {
     if (outputFactory_.get() == NULL)
     {
@@ -412,7 +412,7 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::DeleteAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::DeleteAttachment(IDatabaseBackendOutput& output,
                                       int64_t id,
                                       int32_t attachment)
   {
@@ -455,7 +455,7 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::DeleteResource(IDatabaseBackendOutput& output,
                                     int64_t id)
   {
     assert(manager_.GetDialect() != Dialect_MySQL);
@@ -568,7 +568,7 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerChange() */
-  void IndexBackend::GetChanges(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::GetChanges(IDatabaseBackendOutput& output,
                                 bool& done /*out*/,
                                 int64_t since,
                                 uint32_t maxResults)
@@ -626,7 +626,7 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerExportedResource() */
-  void IndexBackend::GetExportedResources(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::GetExportedResources(IDatabaseBackendOutput& output,
                                           bool& done /*out*/,
                                           int64_t since,
                                           uint32_t maxResults)
@@ -648,7 +648,7 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerChange() */
-  void IndexBackend::GetLastChange(OrthancPlugins::IDatabaseBackendOutput& output)
+  void IndexBackend::GetLastChange(IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -664,7 +664,7 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerExportedResource() */
-  void IndexBackend::GetLastExportedResource(OrthancPlugins::IDatabaseBackendOutput& output)
+  void IndexBackend::GetLastExportedResource(IDatabaseBackendOutput& output)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
@@ -680,7 +680,7 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerDicomTag() */
-  void IndexBackend::GetMainDicomTags(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::GetMainDicomTags(IDatabaseBackendOutput& output,
                                       int64_t id)
   {
     DatabaseManager::CachedStatement statement(
@@ -999,7 +999,7 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerAttachment() */
-  bool IndexBackend::LookupAttachment(OrthancPlugins::IDatabaseBackendOutput& output,
+  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
                                       int64_t id,
                                       int32_t contentType)
   {
@@ -1693,7 +1693,7 @@ namespace OrthancDatabases
   
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
-  void IndexBackend::LookupResources(OrthancPlugins::IDatabaseBackendOutput& output,
+  void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
                                      uint32_t limit,
@@ -1997,62 +1997,62 @@ namespace OrthancDatabases
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
   // New primitive since Orthanc 1.5.4
-  bool IndexBackend::LookupResourceAndParent(int64_t& id,
-                                             OrthancPluginResourceType& type,
-                                             std::string& parentPublicId,
-                                             const char* publicId)
-  {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
-      "SELECT resource.internalId, resource.resourceType, parent.publicId "
-      "FROM Resources AS resource LEFT JOIN Resources parent ON parent.internalId=resource.parentId "
-      "WHERE resource.publicId=${id}");
+bool IndexBackend::LookupResourceAndParent(int64_t& id,
+                                           OrthancPluginResourceType& type,
+                                           std::string& parentPublicId,
+                                           const char* publicId)
+{
+  DatabaseManager::CachedStatement statement(
+    STATEMENT_FROM_HERE, manager_,
+    "SELECT resource.internalId, resource.resourceType, parent.publicId "
+    "FROM Resources AS resource LEFT JOIN Resources parent ON parent.internalId=resource.parentId "
+    "WHERE resource.publicId=${id}");
 
-    statement.SetParameterType("id", ValueType_Utf8String);
+  statement.SetParameterType("id", ValueType_Utf8String);
         
-    Dictionary args;
-    args.SetUtf8Value("id", publicId);
+  Dictionary args;
+  args.SetUtf8Value("id", publicId);
 
-    statement.Execute(args);
+  statement.Execute(args);
 
-    if (statement.IsDone())
-    {
-      return false;
-    }
-    else
-    {
-      if (statement.GetResultFieldsCount() != 3)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-      }
-
-      statement.SetResultFieldType(0, ValueType_Integer64);
-      statement.SetResultFieldType(1, ValueType_Integer64);      
-      statement.SetResultFieldType(2, ValueType_Utf8String);
-
-      id = ReadInteger64(statement, 0);
-      type = static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
-
-      const IValue& value = statement.GetResultField(2);
-      
-      switch (value.GetType())
-      {
-        case ValueType_Null:
-          parentPublicId.clear();
-          break;
-
-        case ValueType_Utf8String:
-          parentPublicId = dynamic_cast<const Utf8StringValue&>(value).GetContent();
-          break;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-      }
-      
-      assert((statement.Next(), statement.IsDone()));
-      return true;
-    }
+  if (statement.IsDone())
+  {
+    return false;
   }
+  else
+  {
+    if (statement.GetResultFieldsCount() != 3)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+
+    statement.SetResultFieldType(0, ValueType_Integer64);
+    statement.SetResultFieldType(1, ValueType_Integer64);      
+    statement.SetResultFieldType(2, ValueType_Utf8String);
+
+    id = ReadInteger64(statement, 0);
+    type = static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
+
+    const IValue& value = statement.GetResultField(2);
+      
+    switch (value.GetType())
+    {
+      case ValueType_Null:
+        parentPublicId.clear();
+        break;
+
+      case ValueType_Utf8String:
+        parentPublicId = dynamic_cast<const Utf8StringValue&>(value).GetContent();
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+      
+    assert((statement.Next(), statement.IsDone()));
+    return true;
+  }
+}
 #  endif
 #endif
   

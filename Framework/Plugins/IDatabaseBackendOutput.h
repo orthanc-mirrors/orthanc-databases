@@ -23,7 +23,7 @@
 
 #include "../../Resources/Orthanc/Databases/DatabaseConstraint.h"
 
-namespace OrthancPlugins
+namespace OrthancDatabases
 {
   class IDatabaseBackendOutput : public boost::noncopyable
   {

@@ -75,7 +75,7 @@ namespace OrthancDatabases
                                    OrthancPluginResourceType type)
       ORTHANC_OVERRIDE;
 
-    virtual void DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+    virtual void DeleteResource(IDatabaseBackendOutput& output,
                                 int64_t id) ORTHANC_OVERRIDE;
 
     virtual int64_t GetLastChangeIndex() ORTHANC_OVERRIDE;

@@ -65,7 +65,7 @@ extern "C"
       backend_.reset(new OrthancDatabases::SQLiteIndex(context, "index.db"));  // TODO parameter
 
       /* Register the SQLite index into Orthanc */
-      OrthancPlugins::DatabaseBackendAdapterV2::Register(context, *backend_);
+      OrthancDatabases::DatabaseBackendAdapterV2::Register(context, *backend_);
     }
     catch (Orthanc::OrthancException& e)
     {

@@ -306,7 +306,7 @@ namespace OrthancDatabases
   }
 
 
-  void MySQLIndex::DeleteResource(OrthancPlugins::IDatabaseBackendOutput& output,
+  void MySQLIndex::DeleteResource(IDatabaseBackendOutput& output,
                                   int64_t id)
   {
     ClearDeletedFiles();

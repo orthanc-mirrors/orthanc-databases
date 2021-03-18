@@ -179,10 +179,10 @@ TEST(IndexBackend, Basic)
 #  error Unsupported database backend
 #endif
 
-  db.SetOutputFactory(new OrthancPlugins::DatabaseBackendOutputV2::Factory(&context, NULL));
+  db.SetOutputFactory(new DatabaseBackendOutputV2::Factory(&context, NULL));
   db.Open();
 
-  std::unique_ptr<OrthancPlugins::IDatabaseBackendOutput> output(db.CreateOutput());
+  std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());
   
 
   std::string s;
