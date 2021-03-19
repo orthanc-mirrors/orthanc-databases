@@ -379,7 +379,7 @@ namespace OrthancDatabases
 #endif
 
 
-  uint64_t PostgreSQLIndex::GetResourceCount(OrthancPluginResourceType resourceType)
+  uint64_t PostgreSQLIndex::GetResourcesCount(OrthancPluginResourceType resourceType)
   {
     // Optimized version thanks to the "FastCountResources.sql" extension
 
@@ -408,7 +408,7 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(ReadInteger64(statement, 0));
     }
       
-    assert(result == IndexBackend::GetResourceCount(resourceType));
+    assert(result == IndexBackend::GetResourcesCount(resourceType));
     return result;
   }
 

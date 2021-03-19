@@ -103,19 +103,67 @@ namespace OrthancDatabases
     
     void Clear()
     {
+      // We don't systematically clear all the vectors, in order to
+      // avoid spending unnecessary time
+      
+      switch (answerType_)
+      {
+        case _OrthancPluginDatabaseAnswerType_None:
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_Attachment:
+          attachments_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_Change:
+          changes_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_DicomTag:
+          tags_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_ExportedResource:
+          exported_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_Int32:
+          integers32_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_Int64:
+          integers64_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_MatchingResource:
+          matches_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_Metadata:
+          metadata_.clear();
+          break;
+        
+        case _OrthancPluginDatabaseAnswerType_String:
+          stringAnswers_.clear();
+          break;
+        
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+      
       answerType_ = _OrthancPluginDatabaseAnswerType_None;
       stringsStore_.clear();
       
-      attachments_.clear();
-      changes_.clear();
-      tags_.clear();
-      exported_.clear();
-      events_.clear();
-      integers32_.clear();
-      integers64_.clear();
-      matches_.clear();
-      metadata_.clear();
-      stringAnswers_.clear();
+      assert(attachments_.empty());
+      assert(changes_.empty());
+      assert(tags_.empty());
+      assert(exported_.empty());
+      assert(events_.empty());
+      assert(integers32_.empty());
+      assert(integers64_.empty());
+      assert(matches_.empty());
+      assert(metadata_.empty());
+      assert(stringAnswers_.empty());
     }
 
 
@@ -196,8 +244,8 @@ namespace OrthancDatabases
 
 
     static OrthancPluginErrorCode ReadAnswerChange(OrthancPluginDatabaseTransaction* transaction,
-                                                       OrthancPluginChange* target /* out */,
-                                                       uint32_t index)
+                                                   OrthancPluginChange* target /* out */,
+                                                   uint32_t index)
     {
       const Output& that = *reinterpret_cast<const Output*>(transaction);
 
@@ -567,6 +615,21 @@ namespace OrthancDatabases
       stringAnswers_.reserve(values.size());
       std::copy(std::begin(values), std::end(values), std::back_inserter(stringAnswers_));
     }
+
+
+    void AnswerString(const std::string& value)
+    {
+      SetupAnswerType(_OrthancPluginDatabaseAnswerType_String);
+
+      if (stringAnswers_.empty())
+      {
+        stringAnswers_.push_back(value);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+    }
   };
 
 
@@ -587,11 +650,19 @@ namespace OrthancDatabases
   class Transaction : public boost::noncopyable
   {
   private:
-    IDatabaseBackend&        backend_;
-    std::unique_ptr<Output>  output_;
+    boost::mutex::scoped_lock  lock_;    // TODO - REMOVE
+    IDatabaseBackend&          backend_;
+    std::unique_ptr<Output>    output_;
 
+    static boost::mutex& GetMutex()   // TODO - REMOVE
+    {
+      static boost::mutex mutex_;
+      return mutex_;
+    }
+    
   public:
     Transaction(IDatabaseBackend& backend) :
+      lock_(GetMutex()),
       backend_(backend),
       output_(new Output)
     {
@@ -965,6 +1036,398 @@ namespace OrthancDatabases
   }
 
   
+  static OrthancPluginErrorCode GetChildrenInternalId(OrthancPluginDatabaseTransaction* transaction,
+                                                      int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::list<int64_t> values;
+      t->GetBackend().GetChildrenInternalId(values, id);
+      t->GetOutput().AnswerIntegers64(values);
+        
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                                    int64_t resourceId,
+                                                    int32_t metadata)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::list<std::string> values;
+      t->GetBackend().GetChildrenMetadata(values, resourceId, metadata);
+      t->GetOutput().AnswerStrings(values);
+        
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetChildrenPublicId(OrthancPluginDatabaseTransaction* transaction,
+                                                    int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::list<std::string> values;
+      t->GetBackend().GetChildrenPublicId(values, id);
+      t->GetOutput().AnswerStrings(values);
+        
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetExportedResources(OrthancPluginDatabaseTransaction* transaction,
+                                                     uint8_t* targetDone /* out */,
+                                                     int64_t since,
+                                                     uint32_t maxResults)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      bool done;
+      t->GetBackend().GetExportedResources(t->GetOutput(), done, since, maxResults);
+      *targetDone = (done ? 1 : 0);
+        
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetLastChange(OrthancPluginDatabaseTransaction* transaction)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().GetLastChange(t->GetOutput());
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetLastChangeIndex(OrthancPluginDatabaseTransaction* transaction,
+                                                   int64_t* target)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      *target = t->GetBackend().GetLastChangeIndex();
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetLastExportedResource(OrthancPluginDatabaseTransaction* transaction)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().GetLastExportedResource(t->GetOutput());
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetMainDicomTags(OrthancPluginDatabaseTransaction* transaction,
+                                                 int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().GetMainDicomTags(t->GetOutput(), id);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetPublicId(OrthancPluginDatabaseTransaction* transaction,
+                                            int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetOutput().AnswerString(t->GetBackend().GetPublicId(id));
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode GetResourcesCount(OrthancPluginDatabaseTransaction* transaction,
+                                                  uint64_t* target /* out */,
+                                                  OrthancPluginResourceType resourceType)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      *target = t->GetBackend().GetResourcesCount(resourceType);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode GetResourceType(OrthancPluginDatabaseTransaction* transaction,
+                                                OrthancPluginResourceType* target /* out */,
+                                                uint64_t resourceId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      *target = t->GetBackend().GetResourceType(resourceId);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode GetTotalCompressedSize(OrthancPluginDatabaseTransaction* transaction,
+                                                       uint64_t* target /* out */)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      *target = t->GetBackend().GetTotalCompressedSize();
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode GetTotalUncompressedSize(OrthancPluginDatabaseTransaction* transaction,
+                                                         uint64_t* target /* out */)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      *target = t->GetBackend().GetTotalUncompressedSize();
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode IsDiskSizeAbove(OrthancPluginDatabaseTransaction* transaction,
+                                                uint8_t* target,
+                                                uint64_t threshold)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      bool above = (t->GetBackend().GetTotalCompressedSize() >= threshold);
+      *target = (above ? 1 : 0);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode IsExistingResource(OrthancPluginDatabaseTransaction* transaction,
+                                                   uint8_t* target,
+                                                   int64_t resourceId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      bool exists = t->GetBackend().IsExistingResource(resourceId);
+      *target = (exists ? 1 : 0);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode IsProtectedPatient(OrthancPluginDatabaseTransaction* transaction,
+                                                   uint8_t* target,
+                                                   int64_t resourceId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      bool isProtected = t->GetBackend().IsProtectedPatient(resourceId);
+      *target = (isProtected ? 1 : 0);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode ListAvailableAttachments(OrthancPluginDatabaseTransaction* transaction,
+                                                         int64_t resourceId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::list<int32_t> values;
+      t->GetBackend().ListAvailableAttachments(values, resourceId);
+      t->GetOutput().AnswerIntegers32(values);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode LogChange(OrthancPluginDatabaseTransaction* transaction,
+                                          int32_t changeType,
+                                          int64_t resourceId,
+                                          OrthancPluginResourceType resourceType,
+                                          const char* date)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().LogChange(changeType, resourceId, resourceType, date);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+  
+
+  static OrthancPluginErrorCode LogExportedResource(OrthancPluginDatabaseTransaction* transaction,
+                                                    OrthancPluginResourceType resourceType,
+                                                    const char* publicId,
+                                                    const char* modality,
+                                                    const char* date,
+                                                    const char* patientId,
+                                                    const char* studyInstanceUid,
+                                                    const char* seriesInstanceUid,
+                                                    const char* sopInstanceUid)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      OrthancPluginExportedResource exported;
+      exported.seq = 0;
+      exported.resourceType = resourceType;
+      exported.publicId = publicId;
+      exported.modality = modality;
+      exported.date = date;
+      exported.patientId = patientId;
+      exported.studyInstanceUid = studyInstanceUid;
+      exported.seriesInstanceUid = seriesInstanceUid;
+      exported.sopInstanceUid = sopInstanceUid;
+        
+      t->GetOutput().Clear();
+      t->GetBackend().LogExportedResource(exported);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode LookupAttachment(OrthancPluginDatabaseTransaction* transaction,
+                                                 int64_t resourceId,
+                                                 int32_t contentType)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().LookupAttachment(t->GetOutput(), resourceId, contentType);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode LookupGlobalProperty(OrthancPluginDatabaseTransaction* transaction,
+                                                     int32_t property)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::string s;
+      if (t->GetBackend().LookupGlobalProperty(s, property))
+      {
+        t->GetOutput().AnswerString(s);
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode LookupMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                               int64_t id,
+                                               int32_t metadata)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::string s;
+      if (t->GetBackend().LookupMetadata(s, id, metadata))
+      {
+        t->GetOutput().AnswerString(s);
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
 
   static void RegisterV3(IDatabaseBackend& database)
   {
@@ -1007,6 +1470,28 @@ namespace OrthancDatabases
     params.getAllPublicIds = GetAllPublicIds;
     params.getAllPublicIdsWithLimit = GetAllPublicIdsWithLimit;
     params.getChanges = GetChanges;
+    params.getChildrenInternalId = GetChildrenInternalId;
+    params.getChildrenMetadata = GetChildrenMetadata;
+    params.getChildrenPublicId = GetChildrenPublicId;
+    params.getExportedResources = GetExportedResources;
+    params.getLastChange = GetLastChange;
+    params.getLastChangeIndex = GetLastChangeIndex;
+    params.getLastExportedResource = GetLastExportedResource;
+    params.getMainDicomTags = GetMainDicomTags;
+    params.getPublicId = GetPublicId;
+    params.getResourcesCount = GetResourcesCount;
+    params.getResourceType = GetResourceType;
+    params.getTotalCompressedSize = GetTotalCompressedSize;
+    params.getTotalUncompressedSize = GetTotalUncompressedSize;
+    params.isDiskSizeAbove = IsDiskSizeAbove;
+    params.isExistingResource = IsExistingResource;
+    params.isProtectedPatient = IsProtectedPatient;
+    params.listAvailableAttachments = ListAvailableAttachments;
+    params.logChange = LogChange;
+    params.logExportedResource = LogExportedResource;
+    params.lookupAttachment = LookupAttachment;
+    params.lookupGlobalProperty = LookupGlobalProperty;
+    params.lookupMetadata = LookupMetadata;
 
     OrthancPluginContext* context = database.GetContext();
  

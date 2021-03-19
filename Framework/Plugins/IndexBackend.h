@@ -163,7 +163,7 @@ namespace OrthancDatabases
     
     virtual std::string GetPublicId(int64_t resourceId) ORTHANC_OVERRIDE;
     
-    virtual uint64_t GetResourceCount(OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE;
+    virtual uint64_t GetResourcesCount(OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE;
     
     virtual OrthancPluginResourceType GetResourceType(int64_t resourceId) ORTHANC_OVERRIDE;
     
@@ -181,7 +181,10 @@ namespace OrthancDatabases
     virtual void ListAvailableAttachments(std::list<int32_t>& target /*out*/,
                                           int64_t id) ORTHANC_OVERRIDE;
     
-    virtual void LogChange(const OrthancPluginChange& change) ORTHANC_OVERRIDE;
+    virtual void LogChange(int32_t changeType,
+                           int64_t resourceId,
+                           OrthancPluginResourceType resourceType,
+                           const char* date) ORTHANC_OVERRIDE;
     
     virtual void LogExportedResource(const OrthancPluginExportedResource& resource) ORTHANC_OVERRIDE;
     
@@ -268,7 +271,7 @@ namespace OrthancDatabases
     virtual void ClearMainDicomTags(int64_t internalId) ORTHANC_OVERRIDE;
 
     // For unit testing only!
-    virtual uint64_t GetResourcesCount();
+    virtual uint64_t GetAllResourcesCount();
 
     // For unit testing only!
     virtual uint64_t GetUnprotectedPatientsCount();

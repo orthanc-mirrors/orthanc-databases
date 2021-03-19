@@ -226,10 +226,10 @@ TEST(IndexBackend, Basic)
   c = db.CreateResource("series2", OrthancPluginResourceType_Series);
   db.AttachChild(a, c);
 
-  ASSERT_EQ(3u, db.GetResourcesCount());
-  ASSERT_EQ(0u, db.GetResourceCount(OrthancPluginResourceType_Patient));
-  ASSERT_EQ(1u, db.GetResourceCount(OrthancPluginResourceType_Study));
-  ASSERT_EQ(2u, db.GetResourceCount(OrthancPluginResourceType_Series));
+  ASSERT_EQ(3u, db.GetAllResourcesCount());
+  ASSERT_EQ(0u, db.GetResourcesCount(OrthancPluginResourceType_Patient));
+  ASSERT_EQ(1u, db.GetResourcesCount(OrthancPluginResourceType_Study));
+  ASSERT_EQ(2u, db.GetResourcesCount(OrthancPluginResourceType_Series));
 
   ASSERT_FALSE(db.GetParentPublicId(s, a));
   ASSERT_TRUE(db.GetParentPublicId(s, b));  ASSERT_EQ("study", s);
@@ -415,7 +415,7 @@ TEST(IndexBackend, Basic)
   db.GetAllPublicIds(pub, OrthancPluginResourceType_Study); ASSERT_EQ(1u, pub.size());
   db.GetAllPublicIds(pub, OrthancPluginResourceType_Series); ASSERT_EQ(2u, pub.size());
   db.GetAllPublicIds(pub, OrthancPluginResourceType_Instance); ASSERT_EQ(0u, pub.size());
-  ASSERT_EQ(3u, db.GetResourcesCount());
+  ASSERT_EQ(3u, db.GetAllResourcesCount());
 
   ASSERT_EQ(0u, db.GetUnprotectedPatientsCount());  // No patient was inserted
   ASSERT_TRUE(db.IsExistingResource(c));
@@ -432,14 +432,14 @@ TEST(IndexBackend, Basic)
   ASSERT_FALSE(db.IsExistingResource(c));
   ASSERT_TRUE(db.IsExistingResource(a));
   ASSERT_TRUE(db.IsExistingResource(b));
-  ASSERT_EQ(2u, db.GetResourcesCount());
+  ASSERT_EQ(2u, db.GetAllResourcesCount());
   db.DeleteResource(*output, a);
-  ASSERT_EQ(0u, db.GetResourcesCount());
+  ASSERT_EQ(0u, db.GetAllResourcesCount());
   ASSERT_FALSE(db.IsExistingResource(a));
   ASSERT_FALSE(db.IsExistingResource(b));
   ASSERT_FALSE(db.IsExistingResource(c));
 
-  ASSERT_EQ(0u, db.GetResourcesCount());
+  ASSERT_EQ(0u, db.GetAllResourcesCount());
   ASSERT_EQ(0u, db.GetUnprotectedPatientsCount());
   int64_t p1 = db.CreateResource("patient1", OrthancPluginResourceType_Patient);
   int64_t p2 = db.CreateResource("patient2", OrthancPluginResourceType_Patient);

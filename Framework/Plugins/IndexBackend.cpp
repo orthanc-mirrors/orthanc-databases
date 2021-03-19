@@ -730,7 +730,7 @@ namespace OrthancDatabases
   }
 
     
-  uint64_t IndexBackend::GetResourceCount(OrthancPluginResourceType resourceType)
+  uint64_t IndexBackend::GetResourcesCount(OrthancPluginResourceType resourceType)
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
@@ -939,16 +939,11 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::LogChange(const OrthancPluginChange& change)
+  void IndexBackend::LogChange(int32_t changeType,
+                               int64_t resourceId,
+                               OrthancPluginResourceType resourceType,
+                               const char* date)
   {
-    int64_t id;
-    OrthancPluginResourceType type;
-    if (!LookupResource(id, type, change.publicId) ||
-        type != change.resourceType)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-    }
-      
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager_,
       "INSERT INTO Changes VALUES(${}, ${changeType}, ${id}, ${resourceType}, ${date})");
@@ -959,10 +954,10 @@ namespace OrthancDatabases
     statement.SetParameterType("date", ValueType_Utf8String);
 
     Dictionary args;
-    args.SetIntegerValue("changeType", change.changeType);
-    args.SetIntegerValue("id", id);
-    args.SetIntegerValue("resourceType", change.resourceType);
-    args.SetUtf8Value("date", change.date);
+    args.SetIntegerValue("changeType", changeType);
+    args.SetIntegerValue("id", resourceId);
+    args.SetIntegerValue("resourceType", resourceType);
+    args.SetUtf8Value("date", date);
 
     statement.Execute(args);
   }
@@ -1504,7 +1499,7 @@ namespace OrthancDatabases
 
 
   // For unit testing only!
-  uint64_t IndexBackend::GetResourcesCount()
+  uint64_t IndexBackend::GetAllResourcesCount()
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 

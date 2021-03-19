@@ -93,8 +93,7 @@ namespace OrthancDatabases
       ORTHANC_OVERRIDE;
 #endif
 
-    virtual uint64_t GetResourceCount(OrthancPluginResourceType resourceType)
-      ORTHANC_OVERRIDE;
+    virtual uint64_t GetResourcesCount(OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE;
 
     virtual int64_t GetLastChangeIndex() ORTHANC_OVERRIDE;
 

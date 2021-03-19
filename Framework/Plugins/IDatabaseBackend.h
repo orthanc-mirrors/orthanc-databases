@@ -110,7 +110,7 @@ namespace OrthancDatabases
 
     virtual std::string GetPublicId(int64_t resourceId) = 0;
 
-    virtual uint64_t GetResourceCount(OrthancPluginResourceType resourceType) = 0;
+    virtual uint64_t GetResourcesCount(OrthancPluginResourceType resourceType) = 0;
 
     virtual OrthancPluginResourceType GetResourceType(int64_t resourceId) = 0;
 
@@ -128,8 +128,11 @@ namespace OrthancDatabases
     virtual void ListAvailableAttachments(std::list<int32_t>& target /*out*/,
                                           int64_t id) = 0;
 
-    virtual void LogChange(const OrthancPluginChange& change) = 0;
-
+    virtual void LogChange(int32_t changeType,
+                           int64_t resourceId,
+                           OrthancPluginResourceType resourceType,
+                           const char* date) = 0;
+    
     virtual void LogExportedResource(const OrthancPluginExportedResource& resource) = 0;
     
     /* Use GetOutput().AnswerAttachment() */

@@ -648,7 +648,7 @@ namespace OrthancDatabases
 
     try
     {
-      *target = backend->GetResourceCount(resourceType);
+      *target = backend->GetResourcesCount(resourceType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -789,7 +789,18 @@ namespace OrthancDatabases
 
     try
     {
-      backend->LogChange(*change);
+      int64_t id;
+      OrthancPluginResourceType type;
+      if (!backend->LookupResource(id, type, change->publicId) ||
+          type != change->resourceType)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+      }
+      else
+      {
+        backend->LogChange(change->changeType, id, type, change->date);
+      }
+      
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
