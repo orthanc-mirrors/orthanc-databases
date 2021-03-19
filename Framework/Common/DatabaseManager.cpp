@@ -212,8 +212,10 @@ namespace OrthancDatabases
   }
 
   
-  void DatabaseManager::StartTransaction()
+  void DatabaseManager::StartTransaction(TransactionType type)
   {
+    // TODO - Deal with TransactionType
+    
     boost::recursive_mutex::scoped_lock lock(mutex_);
 
     try
@@ -284,13 +286,14 @@ namespace OrthancDatabases
   }
 
 
-  DatabaseManager::Transaction::Transaction(DatabaseManager& manager) :
+  DatabaseManager::Transaction::Transaction(DatabaseManager& manager,
+                                            TransactionType type) :
     lock_(manager.mutex_),
     manager_(manager),
     database_(manager.GetDatabase()),
     committed_(false)
   {
-    manager_.StartTransaction();
+    manager_.StartTransaction(type);
   }
 
 

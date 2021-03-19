@@ -343,7 +343,7 @@ TEST(PostgreSQL, StorageArea)
   storageArea.SetClearAll(true);
 
   {
-    DatabaseManager::Transaction transaction(storageArea.GetManager());
+    DatabaseManager::Transaction transaction(storageArea.GetManager(), TransactionType_ReadWrite);
     PostgreSQLDatabase& db = 
       dynamic_cast<PostgreSQLDatabase&>(transaction.GetDatabase());
 

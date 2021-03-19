@@ -39,4 +39,10 @@ namespace OrthancDatabases
     Dialect_PostgreSQL,
     Dialect_SQLite
   };
+
+  enum TransactionType
+  {
+    TransactionType_ReadOnly,
+    TransactionType_ReadWrite
+  };
 }

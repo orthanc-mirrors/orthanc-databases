@@ -1109,7 +1109,7 @@ namespace OrthancDatabases
 
     try
     {
-      backend->StartTransaction();
+      backend->StartTransaction(TransactionType_ReadWrite);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1426,8 +1426,7 @@ namespace OrthancDatabases
   }
 
 
-  void DatabaseBackendAdapterV2::Register(OrthancPluginContext* context,
-                                          IDatabaseBackend& backend)
+  void DatabaseBackendAdapterV2::Register(IDatabaseBackend& backend)
   {
     OrthancPluginDatabaseBackend  params;
     memset(&params, 0, sizeof(params));
@@ -1520,6 +1519,8 @@ namespace OrthancDatabases
 #  endif
 #endif
 
+    OrthancPluginContext* context = backend.GetContext();
+    
     if (performanceWarning)
     {
       char info[1024];
@@ -1539,7 +1540,7 @@ namespace OrthancDatabases
 
     OrthancPluginDatabaseContext* database =
       OrthancPluginRegisterDatabaseBackendV2(context, &params, &extensions, &backend);
-    if (!context)
+    if (database == NULL)
     {
       throw std::runtime_error("Unable to register the database backend");
     }

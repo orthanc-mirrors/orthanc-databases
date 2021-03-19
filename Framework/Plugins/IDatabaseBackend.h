@@ -23,6 +23,7 @@
 #pragma once
 
 #include "IDatabaseBackendOutput.h"
+#include "../Common/DatabasesEnumerations.h"
 
 #include <list>
 
@@ -189,7 +190,7 @@ namespace OrthancDatabases
     virtual void SetProtectedPatient(int64_t internalId, 
                                      bool isProtected) = 0;
 
-    virtual void StartTransaction() = 0;
+    virtual void StartTransaction(TransactionType type) = 0;
 
     virtual void RollbackTransaction() = 0;
 

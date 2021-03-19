@@ -424,7 +424,7 @@ TEST(IndexBackend, Basic)
     // A transaction is needed here for MySQL, as it was not possible
     // to implement recursive deletion of resources using pure SQL
     // statements
-    db.StartTransaction();    
+    db.StartTransaction(TransactionType_ReadWrite);    
     db.DeleteResource(*output, c);
     db.CommitTransaction();
   }

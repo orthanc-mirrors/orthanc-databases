@@ -78,7 +78,6 @@ namespace OrthancDatabases
      * @param backend Your custom database engine.
      **/
 
-    static void Register(OrthancPluginContext* context,
-                         IDatabaseBackend& backend);
+    static void Register(IDatabaseBackend& backend);
   };
 }

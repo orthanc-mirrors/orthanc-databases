@@ -242,9 +242,9 @@ namespace OrthancDatabases
     virtual void SetProtectedPatient(int64_t internalId, 
                                      bool isProtected) ORTHANC_OVERRIDE;
     
-    virtual void StartTransaction() ORTHANC_OVERRIDE
+    virtual void StartTransaction(TransactionType type) ORTHANC_OVERRIDE
     {
-      manager_.StartTransaction();
+      manager_.StartTransaction(type);
     }
 
     

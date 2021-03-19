@@ -150,7 +150,7 @@ TEST(MySQL, StorageArea)
   storageArea.SetClearAll(true);
 
   {
-    OrthancDatabases::DatabaseManager::Transaction transaction(storageArea.GetManager());
+    OrthancDatabases::DatabaseManager::Transaction transaction(storageArea.GetManager(), OrthancDatabases::TransactionType_ReadWrite);
     OrthancDatabases::MySQLDatabase& db = 
       dynamic_cast<OrthancDatabases::MySQLDatabase&>(transaction.GetDatabase());
 

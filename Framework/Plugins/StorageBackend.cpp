@@ -161,7 +161,7 @@ namespace OrthancDatabases
   {
     try
     {
-      DatabaseManager::Transaction transaction(backend_->GetManager());
+      DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadWrite);
       backend_->Create(transaction, uuid, content, static_cast<size_t>(size), type);
       transaction.Commit();
       return OrthancPluginErrorCode_Success;
@@ -180,7 +180,7 @@ namespace OrthancDatabases
       StorageAreaBuffer buffer(context_);
 
       {
-        DatabaseManager::Transaction transaction(backend_->GetManager());
+        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
         backend_->Read(buffer, transaction, uuid, type);
         transaction.Commit();
       }
@@ -222,7 +222,7 @@ namespace OrthancDatabases
   {
     try
     {
-      DatabaseManager::Transaction transaction(backend_->GetManager());
+      DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadWrite);
       backend_->Remove(transaction, uuid, type);
       transaction.Commit();
       return OrthancPluginErrorCode_Success;

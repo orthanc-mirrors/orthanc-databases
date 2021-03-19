@@ -77,7 +77,7 @@ namespace OrthancDatabases
 
     void Close();
     
-    void StartTransaction();
+    void StartTransaction(TransactionType type);
 
     void CommitTransaction();
     
@@ -94,7 +94,8 @@ namespace OrthancDatabases
       bool                                 committed_;
 
     public:
-      explicit Transaction(DatabaseManager& manager);
+      explicit Transaction(DatabaseManager& manager,
+                           TransactionType type);
 
       ~Transaction();
 
