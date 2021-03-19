@@ -83,6 +83,7 @@ namespace OrthancDatabases
                                         const std::string&         studyInstanceUid,
                                         const std::string&         seriesInstanceUid,
                                         const std::string&         sopInstanceUid) = 0;
+    
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void AnswerMatchingResource(const std::string& resourceId) = 0;
 #endif
