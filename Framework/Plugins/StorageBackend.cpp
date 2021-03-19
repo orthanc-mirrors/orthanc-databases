@@ -202,7 +202,7 @@ namespace OrthancDatabases
       StorageAreaBuffer buffer(context_);
 
       {
-        DatabaseManager::Transaction transaction(backend_->GetManager());
+        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
         backend_->Read(buffer, transaction, uuid, type);
         transaction.Commit();
       }

@@ -558,6 +558,15 @@ namespace OrthancDatabases
 
       metadata_.push_back(tmp);
     }
+
+
+    void AnswerStrings(const std::list<std::string>& values)
+    {
+      SetupAnswerType(_OrthancPluginDatabaseAnswerType_String);
+
+      stringAnswers_.reserve(values.size());
+      std::copy(std::begin(values), std::end(values), std::back_inserter(stringAnswers_));
+    }
   };
 
 
@@ -763,6 +772,199 @@ namespace OrthancDatabases
   }
 
   
+  static OrthancPluginErrorCode ClearChanges(OrthancPluginDatabaseTransaction* transaction)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().ClearChanges();
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode ClearExportedResources(OrthancPluginDatabaseTransaction* transaction)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().ClearExportedResources();
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode ClearMainDicomTags(OrthancPluginDatabaseTransaction* transaction,
+                                                   int64_t resourceId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().ClearMainDicomTags(resourceId);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode CreateInstance(OrthancPluginDatabaseTransaction* transaction,
+                                               OrthancPluginCreateInstanceResult* target /* out */,
+                                               const char* hashPatient,
+                                               const char* hashStudy,
+                                               const char* hashSeries,
+                                               const char* hashInstance)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode DeleteAttachment(OrthancPluginDatabaseTransaction* transaction,
+                                                 int64_t id,
+                                                 int32_t contentType)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().DeleteAttachment(t->GetOutput(), id, contentType);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode DeleteMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                               int64_t id,
+                                               int32_t metadataType)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().DeleteMetadata(id, metadataType);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode DeleteResource(OrthancPluginDatabaseTransaction* transaction,
+                                               int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().DeleteResource(t->GetOutput(), id);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetAllMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                               int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::map<int32_t, std::string> values;
+      t->GetBackend().GetAllMetadata(values, id);
+
+      for (std::map<int32_t, std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+      {
+        t->GetOutput().AnswerMetadata(it->first, it->second);
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetAllPublicIds(OrthancPluginDatabaseTransaction* transaction,
+                                                OrthancPluginResourceType resourceType)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::list<std::string> values;
+      t->GetBackend().GetAllPublicIds(values, resourceType);
+      t->GetOutput().AnswerStrings(values);
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetAllPublicIdsWithLimit(OrthancPluginDatabaseTransaction* transaction,
+                                                         OrthancPluginResourceType resourceType,
+                                                         uint64_t since,
+                                                         uint64_t limit)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::list<std::string> values;
+      t->GetBackend().GetAllPublicIds(values, resourceType, since, limit);
+      t->GetOutput().AnswerStrings(values);
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode GetChanges(OrthancPluginDatabaseTransaction* transaction,
+                                           uint8_t* targetDone /* out */,
+                                           int64_t since,
+                                           uint32_t maxResults)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      bool done;
+      t->GetBackend().GetChanges(t->GetOutput(), done, since, maxResults);
+      *targetDone = (done ? 1 : 0);
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
 
   static void RegisterV3(IDatabaseBackend& database)
   {
@@ -794,6 +996,17 @@ namespace OrthancDatabases
     params.commit = Commit;
 
     params.addAttachment = AddAttachment;
+    params.clearChanges = ClearChanges;
+    params.clearExportedResources = ClearExportedResources;
+    params.clearMainDicomTags = ClearMainDicomTags;
+    params.createInstance = CreateInstance;
+    params.deleteAttachment = DeleteAttachment;
+    params.deleteMetadata = DeleteMetadata;
+    params.deleteResource = DeleteResource;
+    params.getAllMetadata = GetAllMetadata;
+    params.getAllPublicIds = GetAllPublicIds;
+    params.getAllPublicIdsWithLimit = GetAllPublicIdsWithLimit;
+    params.getChanges = GetChanges;
 
     OrthancPluginContext* context = database.GetContext();
  
