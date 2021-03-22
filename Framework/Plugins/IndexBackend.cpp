@@ -2091,4 +2091,121 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 #  endif
 #endif
+
+
+  void IndexBackend::CreateInstanceGeneric(OrthancPluginCreateInstanceResult& result,
+                                           const char* hashPatient,
+                                           const char* hashStudy,
+                                           const char* hashSeries,
+                                           const char* hashInstance)
+  {
+    // Check out "OrthancServer/Sources/Database/Compatibility/ICreateInstance.cpp"
+    
+    {
+      OrthancPluginResourceType type;
+      int64_t tmp;
+        
+      if (LookupResource(tmp, type, hashInstance))
+      {
+        // The instance already exists
+        assert(type == OrthancPluginResourceType_Instance);
+        result.instanceId = tmp;
+        result.isNewInstance = false;
+        return;
+      }
+    }
+
+    result.instanceId = CreateResource(hashInstance, OrthancPluginResourceType_Instance);
+    result.isNewInstance = true;
+
+    result.isNewPatient = false;
+    result.isNewStudy = false;
+    result.isNewSeries = false;
+    result.patientId = -1;
+    result.studyId = -1;
+    result.seriesId = -1;
+      
+    // Detect up to which level the patient/study/series/instance
+    // hierarchy must be created
+
+    {
+      OrthancPluginResourceType dummy;
+
+      if (LookupResource(result.seriesId, dummy, hashSeries))
+      {
+        assert(dummy == OrthancPluginResourceType_Series);
+        // The patient, the study and the series already exist
+
+        bool ok = (LookupResource(result.patientId, dummy, hashPatient) &&
+                   LookupResource(result.studyId, dummy, hashStudy));
+        (void) ok;  // Remove warning about unused variable in release builds
+        assert(ok);
+      }
+      else if (LookupResource(result.studyId, dummy, hashStudy))
+      {
+        assert(dummy == OrthancPluginResourceType_Study);
+
+        // New series: The patient and the study already exist
+        result.isNewSeries = true;
+
+        bool ok = LookupResource(result.patientId, dummy, hashPatient);
+        (void) ok;  // Remove warning about unused variable in release builds
+        assert(ok);
+      }
+      else if (LookupResource(result.patientId, dummy, hashPatient))
+      {
+        assert(dummy == OrthancPluginResourceType_Patient);
+
+        // New study and series: The patient already exist
+        result.isNewStudy = true;
+        result.isNewSeries = true;
+      }
+      else
+      {
+        // New patient, study and series: Nothing exists
+        result.isNewPatient = true;
+        result.isNewStudy = true;
+        result.isNewSeries = true;
+      }
+    }
+
+    // Create the series if needed
+    if (result.isNewSeries)
+    {
+      result.seriesId = CreateResource(hashSeries, OrthancPluginResourceType_Series);
+    }
+
+    // Create the study if needed
+    if (result.isNewStudy)
+    {
+      result.studyId = CreateResource(hashStudy, OrthancPluginResourceType_Study);
+    }
+
+    // Create the patient if needed
+    if (result.isNewPatient)
+    {
+      result.patientId = CreateResource(hashPatient, OrthancPluginResourceType_Patient);
+    }
+
+    // Create the parent-to-child links
+    AttachChild(result.seriesId, result.instanceId);
+
+    if (result.isNewSeries)
+    {
+      AttachChild(result.studyId, result.seriesId);
+    }
+
+    if (result.isNewStudy)
+    {
+      AttachChild(result.patientId, result.studyId);
+    }
+
+    TagMostRecentPatient(result.patientId);
+      
+    // Sanity checks
+    assert(result.patientId != -1);
+    assert(result.studyId != -1);
+    assert(result.seriesId != -1);
+    assert(result.instanceId != -1);
+  }
 }

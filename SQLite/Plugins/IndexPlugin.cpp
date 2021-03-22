@@ -99,8 +99,7 @@ namespace OrthancDatabases
       answerType_(_OrthancPluginDatabaseAnswerType_None)
     {
     }
-    
-    
+
     void Clear()
     {
       // We don't systematically clear all the vectors, in order to
@@ -153,6 +152,7 @@ namespace OrthancDatabases
       
       answerType_ = _OrthancPluginDatabaseAnswerType_None;
       stringsStore_.clear();
+      events_.clear();
       
       assert(attachments_.empty());
       assert(changes_.empty());
@@ -167,252 +167,64 @@ namespace OrthancDatabases
     }
 
 
-    static OrthancPluginErrorCode ReadAnswersCount(OrthancPluginDatabaseTransaction* transaction,
-                                                   uint32_t* target /* out */)
+    OrthancPluginErrorCode ReadAnswersCount(uint32_t& target) const
     {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      size_t size;
-      
-      switch (that.answerType_)
+      switch (answerType_)
       {
         case _OrthancPluginDatabaseAnswerType_None:
-          size = 0;
+          target = static_cast<uint32_t>(0);
           break;
-        
+          
         case _OrthancPluginDatabaseAnswerType_Attachment:
-          size = that.attachments_.size();
+          target = static_cast<uint32_t>(attachments_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_Change:
-          size = that.changes_.size();
+          target = static_cast<uint32_t>(changes_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_DicomTag:
-          size = that.tags_.size();
+          target = static_cast<uint32_t>(tags_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_ExportedResource:
-          size = that.exported_.size();
+          target = static_cast<uint32_t>(exported_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_Int32:
-          size = that.integers32_.size();
+          target = static_cast<uint32_t>(integers32_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_Int64:
-          size = that.integers64_.size();
+          target = static_cast<uint32_t>(integers64_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_MatchingResource:
-          size = that.matches_.size();
+          target = static_cast<uint32_t>(matches_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_Metadata:
-          size = that.metadata_.size();
+          target = static_cast<uint32_t>(metadata_.size());
           break;
         
         case _OrthancPluginDatabaseAnswerType_String:
-          size = that.stringAnswers_.size();
+          target = static_cast<uint32_t>(stringAnswers_.size());
           break;
         
         default:
           return OrthancPluginErrorCode_InternalError;
       }
 
-      *target = static_cast<uint32_t>(size);
       return OrthancPluginErrorCode_Success;
     }
 
 
-    static OrthancPluginErrorCode ReadAnswerAttachment(OrthancPluginDatabaseTransaction* transaction,
-                                                       OrthancPluginAttachment* target /* out */,
-                                                       uint32_t index)
+    OrthancPluginErrorCode ReadAnswerAttachment(OrthancPluginAttachment& target /* out */,
+                                                uint32_t index) const
     {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.attachments_.size())
+      if (index < attachments_.size())
       {
-        *target = that.attachments_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerChange(OrthancPluginDatabaseTransaction* transaction,
-                                                   OrthancPluginChange* target /* out */,
-                                                   uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.changes_.size())
-      {
-        *target = that.changes_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerDicomTag(OrthancPluginDatabaseTransaction* transaction,
-                                                     uint16_t* group,
-                                                     uint16_t* element,
-                                                     const char** value,
-                                                     uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.tags_.size())
-      {
-        const OrthancPluginDicomTag& tag = that.tags_[index];
-        *group = tag.group;
-        *element = tag.element;
-        *value = tag.value;
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerExportedResource(OrthancPluginDatabaseTransaction* transaction,
-                                                             OrthancPluginExportedResource* target /* out */,
-                                                             uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.exported_.size())
-      {
-        *target = that.exported_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerInt32(OrthancPluginDatabaseTransaction* transaction,
-                                                  int32_t* target,
-                                                  uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.integers32_.size())
-      {
-        *target = that.integers32_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerInt64(OrthancPluginDatabaseTransaction* transaction,
-                                                  int64_t* target,
-                                                  uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.integers64_.size())
-      {
-        *target = that.integers64_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerMatchingResource(OrthancPluginDatabaseTransaction* transaction,
-                                                             OrthancPluginMatchingResource* target,
-                                                             uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.matches_.size())
-      {
-        *target = that.matches_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                                     int32_t* metadata,
-                                                     const char** value,
-                                                     uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.metadata_.size())
-      {
-        const Metadata& tmp = that.metadata_[index];
-        *metadata = tmp.metadata;
-        *value = tmp.value;
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadAnswerString(OrthancPluginDatabaseTransaction* transaction,
-                                                   const char** target,
-                                                   uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.stringAnswers_.size())
-      {
-        *target = that.stringAnswers_[index].c_str();
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    static OrthancPluginErrorCode ReadEventsCount(OrthancPluginDatabaseTransaction* transaction,
-                                                  uint32_t* target /* out */)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-      *target = static_cast<uint32_t>(that.events_.size());
-      return OrthancPluginErrorCode_Success;
-    }
-
-    
-    static OrthancPluginErrorCode ReadEvent(OrthancPluginDatabaseTransaction* transaction,
-                                            OrthancPluginDatabaseEvent* event /* out */,
-                                            uint32_t index)
-    {
-      const Output& that = *reinterpret_cast<const Output*>(transaction);
-
-      if (index < that.events_.size())
-      {
-        *event = that.events_[index];
+        target = attachments_[index];
         return OrthancPluginErrorCode_Success;
       }
       else
@@ -421,7 +233,157 @@ namespace OrthancDatabases
       }
     }
 
+
+    OrthancPluginErrorCode ReadAnswerChange(OrthancPluginChange& target /* out */,
+                                            uint32_t index) const
+    {
+      if (index < changes_.size())
+      {
+        target = changes_[index];
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerDicomTag(uint16_t& group,
+                                              uint16_t& element,
+                                              const char*& value,
+                                              uint32_t index) const
+    {
+      if (index < tags_.size())
+      {
+        const OrthancPluginDicomTag& tag = tags_[index];
+        group = tag.group;
+        element = tag.element;
+        value = tag.value;
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerExportedResource(OrthancPluginExportedResource& target /* out */,
+                                                      uint32_t index) const
+    {
+      if (index < exported_.size())
+      {
+        target = exported_[index];
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerInt32(int32_t& target,
+                                           uint32_t index) const
+    {
+      if (index < integers32_.size())
+      {
+        target = integers32_[index];
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerInt64(int64_t& target,
+                                           uint32_t index) const
+    {
+      if (index < integers64_.size())
+      {
+        target = integers64_[index];
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerMatchingResource(OrthancPluginMatchingResource& target,
+                                                      uint32_t index) const
+    {
+      if (index < matches_.size())
+      {
+        target = matches_[index];
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerMetadata(int32_t& metadata,
+                                              const char*& value,
+                                              uint32_t index) const
+    {
+      if (index < metadata_.size())
+      {
+        const Metadata& tmp = metadata_[index];
+        metadata = tmp.metadata;
+        value = tmp.value;
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadAnswerString(const char*& target,
+                                            uint32_t index) const
+    {
+      if (index < stringAnswers_.size())
+      {
+        target = stringAnswers_[index].c_str();
+        return OrthancPluginErrorCode_Success;        
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;        
+      }
+    }
+
+
+    OrthancPluginErrorCode ReadEventsCount(uint32_t& target /* out */) const
+    {
+      target = static_cast<uint32_t>(events_.size());
+      return OrthancPluginErrorCode_Success;
+    }
+
     
+    OrthancPluginErrorCode ReadEvent(OrthancPluginDatabaseEvent& event /* out */,
+                                     uint32_t index) const
+    {
+      if (index < events_.size())
+      {
+        event = events_[index];
+        return OrthancPluginErrorCode_Success;
+      }
+      else
+      {
+        return OrthancPluginErrorCode_ParameterOutOfRange;
+      }
+    }
+
+
     virtual void SignalDeletedAttachment(const std::string& uuid,
                                          int32_t            contentType,
                                          uint64_t           uncompressedSize,
@@ -595,6 +557,15 @@ namespace OrthancDatabases
     }
 
 
+    void AnswerInteger64(int64_t value)
+    {
+      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Int64);
+
+      integers64_.resize(1);
+      integers64_[0] = value;
+    }
+
+
     void AnswerMetadata(int32_t metadata,
                         const std::string& value)
     {
@@ -651,7 +622,7 @@ namespace OrthancDatabases
   {
   private:
     boost::mutex::scoped_lock  lock_;    // TODO - REMOVE
-    IDatabaseBackend&          backend_;
+    IndexBackend&          backend_;
     std::unique_ptr<Output>    output_;
 
     static boost::mutex& GetMutex()   // TODO - REMOVE
@@ -661,14 +632,18 @@ namespace OrthancDatabases
     }
     
   public:
-    Transaction(IDatabaseBackend& backend) :
+    Transaction(IndexBackend& backend) :
       lock_(GetMutex()),
       backend_(backend),
       output_(new Output)
     {
     }
 
-    IDatabaseBackend& GetBackend() const
+    ~Transaction()
+    {
+    }
+
+    IndexBackend& GetBackend() const
     {
       return backend_;
     }
@@ -685,9 +660,133 @@ namespace OrthancDatabases
   };
 
   
+  static OrthancPluginErrorCode ReadAnswersCount(OrthancPluginDatabaseTransaction* transaction,
+                                                 uint32_t* target /* out */)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswersCount(*target);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerAttachment(OrthancPluginDatabaseTransaction* transaction,
+                                                     OrthancPluginAttachment* target /* out */,
+                                                     uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerAttachment(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerChange(OrthancPluginDatabaseTransaction* transaction,
+                                                 OrthancPluginChange* target /* out */,
+                                                 uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerChange(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerDicomTag(OrthancPluginDatabaseTransaction* transaction,
+                                                   uint16_t* group,
+                                                   uint16_t* element,
+                                                   const char** value,
+                                                   uint32_t index)
+  {
+    assert(group != NULL);
+    assert(element != NULL);
+    assert(value != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerDicomTag(*group, *element, *value, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerExportedResource(OrthancPluginDatabaseTransaction* transaction,
+                                                           OrthancPluginExportedResource* target /* out */,
+                                                           uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerExportedResource(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerInt32(OrthancPluginDatabaseTransaction* transaction,
+                                                int32_t* target,
+                                                uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerInt32(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerInt64(OrthancPluginDatabaseTransaction* transaction,
+                                                int64_t* target,
+                                                uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerInt64(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerMatchingResource(OrthancPluginDatabaseTransaction* transaction,
+                                                           OrthancPluginMatchingResource* target,
+                                                           uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerMatchingResource(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                                   int32_t* metadata,
+                                                   const char** value,
+                                                   uint32_t index)
+  {
+    assert(metadata != NULL);
+    assert(value != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerMetadata(*metadata, *value, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadAnswerString(OrthancPluginDatabaseTransaction* transaction,
+                                                 const char** target,
+                                                 uint32_t index)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadAnswerString(*target, index);
+  }
+
+
+  static OrthancPluginErrorCode ReadEventsCount(OrthancPluginDatabaseTransaction* transaction,
+                                                uint32_t* target /* out */)
+  {
+    assert(target != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadEventsCount(*target);
+  }
+
+    
+  static OrthancPluginErrorCode ReadEvent(OrthancPluginDatabaseTransaction* transaction,
+                                          OrthancPluginDatabaseEvent* event /* out */,
+                                          uint32_t index)
+  {
+    assert(event != NULL);
+    const Transaction& that = *reinterpret_cast<const Transaction*>(transaction);
+    return that.GetOutput().ReadEvent(*event, index);
+  }
+
+    
   static OrthancPluginErrorCode Open(void* database)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(database);
+    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
 
     try
     {
@@ -700,7 +799,7 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode Close(void* database)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(database);
+    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
 
     try
     {
@@ -728,7 +827,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetDatabaseVersion(void* database,
                                                    uint32_t* version)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(database);
+    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
       
     try
     {
@@ -743,7 +842,7 @@ namespace OrthancDatabases
                                                 OrthancPluginStorageArea* storageArea,
                                                 uint32_t  targetVersion)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(database);
+    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
       
     try
     {
@@ -758,7 +857,7 @@ namespace OrthancDatabases
                                                  OrthancPluginDatabaseTransaction** target /* out */,
                                                  OrthancPluginDatabaseTransactionType type)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(database);
+    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
       
     try
     {
@@ -794,7 +893,7 @@ namespace OrthancDatabases
     }
     else
     {
-      delete reinterpret_cast<Output*>(transaction);
+      delete reinterpret_cast<Transaction*>(transaction);
       return OrthancPluginErrorCode_Success;
     }
   }
@@ -806,6 +905,7 @@ namespace OrthancDatabases
 
     try
     {
+      t->GetOutput().Clear();
       t->GetBackend().RollbackTransaction();
       return OrthancPluginErrorCode_Success;
     }
@@ -820,6 +920,7 @@ namespace OrthancDatabases
 
     try
     {
+      t->GetOutput().Clear();
       t->GetBackend().CommitTransaction();
       return OrthancPluginErrorCode_Success;
     }
@@ -898,7 +999,16 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+
+      if (t->GetBackend().HasCreateInstance())
+      {
+        t->GetBackend().CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+      }
+      else
+      {
+        t->GetBackend().CreateInstanceGeneric(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+      }
+      
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
@@ -1429,24 +1539,245 @@ namespace OrthancDatabases
   }
 
 
-  static void RegisterV3(IDatabaseBackend& database)
+  static OrthancPluginErrorCode LookupParent(OrthancPluginDatabaseTransaction* transaction,
+                                             int64_t id)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      int64_t parentId;
+      if (t->GetBackend().LookupParent(parentId, id))
+      {
+        t->GetOutput().AnswerInteger64(parentId);
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode LookupResource(OrthancPluginDatabaseTransaction* transaction,
+                                               uint8_t* isExisting /* out */,
+                                               int64_t* id /* out */,
+                                               OrthancPluginResourceType* type /* out */,
+                                               const char* publicId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      if (t->GetBackend().LookupResource(*id, *type, publicId))
+      {
+        *isExisting = 1;
+      }
+      else
+      {
+        *isExisting = 0;
+      }
+        
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode LookupResources(OrthancPluginDatabaseTransaction* transaction,
+                                                uint32_t constraintsCount,
+                                                const OrthancPluginDatabaseConstraint* constraints,
+                                                OrthancPluginResourceType queryLevel,
+                                                uint32_t limit,
+                                                uint8_t requestSomeInstanceId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::vector<Orthanc::DatabaseConstraint> lookup;
+      lookup.reserve(constraintsCount);
+
+      for (uint32_t i = 0; i < constraintsCount; i++)
+      {
+        lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
+      }
+        
+      t->GetBackend().LookupResources(t->GetOutput(), lookup, queryLevel, limit, (requestSomeInstanceId != 0));
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+
+  static OrthancPluginErrorCode LookupResourceAndParent(OrthancPluginDatabaseTransaction* transaction,
+                                                        uint8_t* isExisting /* out */,
+                                                        int64_t* id /* out */,
+                                                        OrthancPluginResourceType* type /* out */,
+                                                        const char* publicId)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+
+      std::string parent;
+      if (t->GetBackend().LookupResourceAndParent(*id, *type, parent, publicId))
+      {
+        *isExisting = 1;
+
+        if (!parent.empty())
+        {
+          t->GetOutput().AnswerString(parent);
+        }
+      }
+      else
+      {
+        *isExisting = 0;
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+  
+  static OrthancPluginErrorCode SelectPatientToRecycle(OrthancPluginDatabaseTransaction* transaction)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      
+      int64_t id;
+      if (t->GetBackend().SelectPatientToRecycle(id))
+      {
+        t->GetOutput().AnswerInteger64(id);
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+    
+  static OrthancPluginErrorCode SelectPatientToRecycle2(OrthancPluginDatabaseTransaction* transaction,
+                                                        int64_t patientIdToAvoid)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      
+      int64_t id;
+      if (t->GetBackend().SelectPatientToRecycle(id, patientIdToAvoid))
+      {
+        t->GetOutput().AnswerInteger64(id);
+      }
+      
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+    
+  static OrthancPluginErrorCode SetGlobalProperty(OrthancPluginDatabaseTransaction* transaction,
+                                                  int32_t property,
+                                                  const char* value)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().SetGlobalProperty(property, value);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+    
+  static OrthancPluginErrorCode SetMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                            int64_t id,
+                                            int32_t metadata,
+                                            const char* value)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().SetMetadata(id, metadata, value);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+    
+  static OrthancPluginErrorCode SetProtectedPatient(OrthancPluginDatabaseTransaction* transaction,
+                                                    int64_t id,
+                                                    uint8_t isProtected)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().SetProtectedPatient(id, (isProtected != 0));
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+    
+  static OrthancPluginErrorCode SetResourcesContent(OrthancPluginDatabaseTransaction* transaction,
+                                                    uint32_t countIdentifierTags,
+                                                    const OrthancPluginResourcesContentTags* identifierTags,
+                                                    uint32_t countMainDicomTags,
+                                                    const OrthancPluginResourcesContentTags* mainDicomTags,
+                                                    uint32_t countMetadata,
+                                                    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    Transaction* t = reinterpret_cast<Transaction*>(transaction);
+
+    try
+    {
+      t->GetOutput().Clear();
+      t->GetBackend().SetResourcesContent(countIdentifierTags, identifierTags,
+                                          countMainDicomTags, mainDicomTags,
+                                          countMetadata, metadata);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+  }
+
+    
+  static void RegisterV3(IndexBackend& database)
   {
     OrthancPluginDatabaseBackendV3 params;
     memset(&params, 0, sizeof(params));
 
-    params.readAnswersCount = Output::ReadAnswersCount;
-    params.readAnswerAttachment = Output::ReadAnswerAttachment;
-    params.readAnswerChange = Output::ReadAnswerChange;
-    params.readAnswerDicomTag = Output::ReadAnswerDicomTag;
-    params.readAnswerExportedResource = Output::ReadAnswerExportedResource;
-    params.readAnswerInt32 = Output::ReadAnswerInt32;
-    params.readAnswerInt64 = Output::ReadAnswerInt64;
-    params.readAnswerMatchingResource = Output::ReadAnswerMatchingResource;
-    params.readAnswerMetadata = Output::ReadAnswerMetadata;
-    params.readAnswerString = Output::ReadAnswerString;
+    params.readAnswersCount = ReadAnswersCount;
+    params.readAnswerAttachment = ReadAnswerAttachment;
+    params.readAnswerChange = ReadAnswerChange;
+    params.readAnswerDicomTag = ReadAnswerDicomTag;
+    params.readAnswerExportedResource = ReadAnswerExportedResource;
+    params.readAnswerInt32 = ReadAnswerInt32;
+    params.readAnswerInt64 = ReadAnswerInt64;
+    params.readAnswerMatchingResource = ReadAnswerMatchingResource;
+    params.readAnswerMetadata = ReadAnswerMetadata;
+    params.readAnswerString = ReadAnswerString;
     
-    params.readEventsCount = Output::ReadEventsCount;
-    params.readEvent = Output::ReadEvent;
+    params.readEventsCount = ReadEventsCount;
+    params.readEvent = ReadEvent;
 
     params.open = Open;
     params.close = Close;
@@ -1492,6 +1823,16 @@ namespace OrthancDatabases
     params.lookupAttachment = LookupAttachment;
     params.lookupGlobalProperty = LookupGlobalProperty;
     params.lookupMetadata = LookupMetadata;
+    params.lookupParent = LookupParent;
+    params.lookupResource = LookupResource;
+    params.lookupResources = LookupResources;
+    params.lookupResourceAndParent = LookupResourceAndParent;
+    params.selectPatientToRecycle = SelectPatientToRecycle;
+    params.selectPatientToRecycle2 = SelectPatientToRecycle2;
+    params.setGlobalProperty = SetGlobalProperty;
+    params.setMetadata = SetMetadata;
+    params.setProtectedPatient = SetProtectedPatient;
+    params.setResourcesContent = SetResourcesContent;
 
     OrthancPluginContext* context = database.GetContext();
  

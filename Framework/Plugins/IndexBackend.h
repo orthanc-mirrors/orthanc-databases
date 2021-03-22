@@ -344,5 +344,13 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
 #endif
+
+    // This function corresponds to
+    // "Orthanc::Compatibility::ICreateInstance::Apply()"
+    void CreateInstanceGeneric(OrthancPluginCreateInstanceResult& result,
+                               const char* hashPatient,
+                               const char* hashStudy,
+                               const char* hashSeries,
+                               const char* hashInstance);
   };
 }
