@@ -30,7 +30,7 @@ static std::unique_ptr<OrthancDatabases::SQLiteIndex> backend_;
 
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 10, 0)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
 
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH(context)                         \
@@ -49,6 +49,7 @@ static std::unique_ptr<OrthancDatabases::SQLiteIndex> backend_;
     OrthancPluginLogError(context, "Native exception");                 \
     return OrthancPluginErrorCode_DatabasePlugin;                       \
   }
+
 
 
 namespace OrthancDatabases
@@ -1891,8 +1892,8 @@ extern "C"
       bool hasLoadedV3 = false;
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 10, 0)
-      if (OrthancPluginCheckVersionAdvanced(context, 1, 10, 0) == 1)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+      if (OrthancPluginCheckVersionAdvanced(context, 1, 9, 2) == 1)
       {
         RegisterV3(*backend_);
         hasLoadedV3 = true;
