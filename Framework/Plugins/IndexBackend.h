@@ -22,7 +22,7 @@
 #pragma once
 
 #include "../Common/DatabaseManager.h"
-#include "DatabaseBackendAdapterV2.h"
+#include "IDatabaseBackend.h"
 
 #include <OrthancException.h>
 
@@ -339,7 +339,7 @@ namespace OrthancDatabases
                                 const char* hashPatient,
                                 const char* hashStudy,
                                 const char* hashSeries,
-                                const char* hashInstance)
+                                const char* hashInstance) ORTHANC_OVERRIDE
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
@@ -352,5 +352,7 @@ namespace OrthancDatabases
                                const char* hashStudy,
                                const char* hashSeries,
                                const char* hashInstance);
+
+    static void Register(IndexBackend& backend);
   };
 }

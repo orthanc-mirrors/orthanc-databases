@@ -71,7 +71,7 @@ extern "C"
       backend_.reset(new OrthancDatabases::MySQLIndex(context, parameters));
 
       /* Register the MySQL index into Orthanc */
-      OrthancDatabases::DatabaseBackendAdapterV2::Register(*backend_);
+      OrthancDatabases::IndexBackend::Register(*backend_);
     }
     catch (Orthanc::OrthancException& e)
     {

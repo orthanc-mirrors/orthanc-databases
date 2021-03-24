@@ -22,6 +22,7 @@
 #pragma once
 
 #include "../Common/ImplicitTransaction.h"
+#include "DatabaseBackendAdapterV2.h"
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>

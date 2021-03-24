@@ -25,6 +25,8 @@
 #include "../Common/BinaryStringValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
+#include "DatabaseBackendAdapterV2.h"
+#include "DatabaseBackendAdapterV3.h"
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -2207,5 +2209,29 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     assert(result.studyId != -1);
     assert(result.seriesId != -1);
     assert(result.instanceId != -1);
+  }
+
+
+  void IndexBackend::Register(IndexBackend& backend)
+  {
+    OrthancPluginContext* context = backend.GetContext();
+    
+    bool hasLoadedV3 = false;
+      
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+    if (OrthancPluginCheckVersionAdvanced(context, 1, 9, 2) == 1)
+    {
+      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend);
+      hasLoadedV3 = true;
+    }
+#  endif
+#endif
+
+    if (!hasLoadedV3)
+    {
+      LOG(WARNING) << "Performance warning: Your version of Orthanc doesn't support multiple readers/writers";
+      OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
+    }
   }
 }

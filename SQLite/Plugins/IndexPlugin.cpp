@@ -66,23 +66,7 @@ extern "C"
       backend_.reset(new OrthancDatabases::SQLiteIndex(context, "index.db"));  // TODO parameter
 
       /* Register the SQLite index into Orthanc */
-
-      bool hasLoadedV3 = false;
-      
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-      if (OrthancPluginCheckVersionAdvanced(context, 1, 9, 2) == 1)
-      {
-        OrthancDatabases::DatabaseBackendAdapterV3::Register(*backend_);
-        hasLoadedV3 = true;
-      }
-#  endif
-#endif
-
-      if (!hasLoadedV3)
-      {
-        OrthancDatabases::DatabaseBackendAdapterV2::Register(*backend_);
-      }
+      OrthancDatabases::IndexBackend::Register(*backend_);
     }
     catch (Orthanc::OrthancException& e)
     {
