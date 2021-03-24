@@ -24,6 +24,10 @@
 
 #include <OrthancException.h>
 
+#include <stdexcept>
+#include <list>
+#include <string>
+
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH                                  \
   catch (::Orthanc::OrthancException& e)                                \
@@ -40,11 +44,6 @@
     OrthancPluginLogError(backend->GetContext(), "Native exception");   \
     return OrthancPluginErrorCode_DatabasePlugin;                       \
   }
-
-
-#include <stdexcept>
-#include <list>
-#include <string>
 
 
 namespace OrthancDatabases
