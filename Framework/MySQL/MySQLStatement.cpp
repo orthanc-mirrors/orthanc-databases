@@ -348,7 +348,6 @@ namespace OrthancDatabases
   MySQLStatement::MySQLStatement(MySQLDatabase& db,
                                  const Query& query) :
     db_(db),
-    readOnly_(query.IsReadOnly()),
     statement_(NULL),
     formatter_(Dialect_MySQL)
   {

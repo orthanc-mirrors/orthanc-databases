@@ -35,8 +35,6 @@ namespace OrthancDatabases
     }
 
     virtual bool IsImplicit() const = 0;
-    
-    virtual bool IsReadOnly() const = 0;
 
     virtual void Rollback() = 0;
     

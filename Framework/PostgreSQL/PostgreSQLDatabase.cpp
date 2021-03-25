@@ -194,7 +194,7 @@ namespace OrthancDatabases
                                   "SELECT 1 FROM pg_catalog.pg_class c "
                                   "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
                                   "WHERE n.nspname = 'public' AND c.relkind='r' "
-                                  "AND c.relname=$1", true);
+                                  "AND c.relname=$1");
 
     statement.DeclareInputString(0);
     statement.BindString(0, lower);

@@ -33,8 +33,7 @@ namespace OrthancDatabases
   
   
   ImplicitTransaction::ImplicitTransaction() :
-    state_(State_Ready),
-    readOnly_(true)
+    state_(State_Ready)
   {
   }
 
@@ -127,11 +126,6 @@ namespace OrthancDatabases
     CheckStateForExecution();    
     std::unique_ptr<IResult> result(ExecuteInternal(statement, parameters));
 
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
-
     state_ = State_Executed;
     return result.release();
   }
@@ -143,11 +137,6 @@ namespace OrthancDatabases
     CheckStateForExecution();    
     ExecuteWithoutResultInternal(statement, parameters);
 
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
-    
     state_ = State_Executed;
   }
 

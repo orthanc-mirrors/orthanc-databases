@@ -30,8 +30,7 @@
 namespace OrthancDatabases
 {
   SQLiteTransaction::SQLiteTransaction(SQLiteDatabase& database) :
-    transaction_(database.GetObject()),
-    readOnly_(true)
+    transaction_(database.GetObject())
   {
     transaction_.Begin();
 
@@ -44,24 +43,12 @@ namespace OrthancDatabases
   IResult* SQLiteTransaction::Execute(IPrecompiledStatement& statement,
                                       const Dictionary& parameters)
   {
-    std::unique_ptr<IResult> result(dynamic_cast<SQLiteStatement&>(statement).Execute(*this, parameters));
-
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
-    
-    return result.release();
+    return dynamic_cast<SQLiteStatement&>(statement).Execute(*this, parameters);
   }
 
   void SQLiteTransaction::ExecuteWithoutResult(IPrecompiledStatement& statement,
                                                const Dictionary& parameters)
   {
     dynamic_cast<SQLiteStatement&>(statement).ExecuteWithoutResult(*this, parameters);
-
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
   }
 }

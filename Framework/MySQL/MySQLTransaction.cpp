@@ -33,7 +33,6 @@ namespace OrthancDatabases
 {
   MySQLTransaction::MySQLTransaction(MySQLDatabase& db) :
     db_(db),
-    readOnly_(true),
     active_(false)
   {
     db_.Execute("START TRANSACTION", false);
@@ -65,7 +64,6 @@ namespace OrthancDatabases
     {
       db_.Execute("ROLLBACK", false);
       active_ = false;
-      readOnly_ = true;
     }
     else
     {
@@ -81,7 +79,6 @@ namespace OrthancDatabases
     {
       db_.Execute("COMMIT", false);
       active_ = false;
-      readOnly_ = true;
     }
     else
     {
@@ -94,14 +91,7 @@ namespace OrthancDatabases
   IResult* MySQLTransaction::Execute(IPrecompiledStatement& statement,
                                      const Dictionary& parameters)
   {
-    std::unique_ptr<IResult> result(dynamic_cast<MySQLStatement&>(statement).Execute(*this, parameters));
-
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
-    
-    return result.release();
+    return dynamic_cast<MySQLStatement&>(statement).Execute(*this, parameters);
   }
 
 
@@ -109,10 +99,5 @@ namespace OrthancDatabases
                                               const Dictionary& parameters)
   {
     dynamic_cast<MySQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
-
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
   }
 }

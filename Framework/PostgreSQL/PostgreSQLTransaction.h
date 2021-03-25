@@ -36,7 +36,6 @@ namespace OrthancDatabases
   private:
     PostgreSQLDatabase& database_;
     bool isOpen_;
-    bool readOnly_;
 
   public:
     explicit PostgreSQLTransaction(PostgreSQLDatabase& database);
@@ -48,11 +47,6 @@ namespace OrthancDatabases
       return false;
     }
     
-    virtual bool IsReadOnly() const  ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
-
     void Begin();
 
     virtual void Rollback() ORTHANC_OVERRIDE;

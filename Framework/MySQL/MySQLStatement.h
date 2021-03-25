@@ -39,7 +39,6 @@ namespace OrthancDatabases
     void Close();
 
     MySQLDatabase&             db_;
-    bool                       readOnly_;
     MYSQL_STMT                *statement_;
     GenericFormatter           formatter_;
     std::vector<ResultField*>  result_;
@@ -50,11 +49,6 @@ namespace OrthancDatabases
                    const Query& query);
 
     virtual ~MySQLStatement();
-
-    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
 
     MYSQL_STMT* GetObject();
 

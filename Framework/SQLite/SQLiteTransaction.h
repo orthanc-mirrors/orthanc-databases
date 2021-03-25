@@ -36,7 +36,6 @@ namespace OrthancDatabases
   {
   private:
     Orthanc::SQLite::Transaction  transaction_;
-    bool                          readOnly_;
     
   public:
     explicit SQLiteTransaction(SQLiteDatabase& database);
@@ -46,11 +45,6 @@ namespace OrthancDatabases
       return false;
     }
     
-    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
-
     virtual void Rollback() ORTHANC_OVERRIDE
     {
       transaction_.Rollback();

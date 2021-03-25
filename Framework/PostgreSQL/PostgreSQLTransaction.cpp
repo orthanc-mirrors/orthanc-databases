@@ -31,8 +31,7 @@ namespace OrthancDatabases
 {
   PostgreSQLTransaction::PostgreSQLTransaction(PostgreSQLDatabase& database) :
     database_(database),
-    isOpen_(false),
-    readOnly_(true)
+    isOpen_(false)
   {
     Begin();
   }
@@ -66,7 +65,6 @@ namespace OrthancDatabases
 
     database_.Execute("BEGIN");
     database_.Execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
-    readOnly_ = true;
     isOpen_ = true;
   }
 
@@ -102,14 +100,7 @@ namespace OrthancDatabases
   IResult* PostgreSQLTransaction::Execute(IPrecompiledStatement& statement,
                                           const Dictionary& parameters)
   {
-    std::unique_ptr<IResult> result(dynamic_cast<PostgreSQLStatement&>(statement).Execute(*this, parameters));
-
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
-
-    return result.release();
+    return dynamic_cast<PostgreSQLStatement&>(statement).Execute(*this, parameters);
   }
 
 
@@ -117,10 +108,5 @@ namespace OrthancDatabases
                                                    const Dictionary& parameters)
   {
     dynamic_cast<PostgreSQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
-
-    if (!statement.IsReadOnly())
-    {
-      readOnly_ = false;
-    }
   }
 }

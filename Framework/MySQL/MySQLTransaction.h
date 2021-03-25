@@ -34,7 +34,6 @@ namespace OrthancDatabases
   {
   private:
     MySQLDatabase&  db_;
-    bool            readOnly_;
     bool            active_;
 
   public:
@@ -47,11 +46,6 @@ namespace OrthancDatabases
       return false;
     }
     
-    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
-
     virtual void Rollback() ORTHANC_OVERRIDE;
     
     virtual void Commit() ORTHANC_OVERRIDE;

@@ -40,7 +40,6 @@ namespace OrthancDatabases
   {
   private:
     std::unique_ptr<Orthanc::SQLite::Statement>  statement_;
-    bool                                       readOnly_;
     GenericFormatter                           formatter_;
 
     void BindParameters(const Dictionary& parameters);
@@ -48,11 +47,6 @@ namespace OrthancDatabases
   public:
     SQLiteStatement(SQLiteDatabase& database,
                     const Query& query);
-
-    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
 
     Orthanc::SQLite::Statement& GetObject();
 

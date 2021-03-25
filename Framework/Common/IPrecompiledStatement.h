@@ -31,7 +31,5 @@ namespace OrthancDatabases
     virtual ~IPrecompiledStatement()
     {
     }
-
-    virtual bool IsReadOnly() const = 0;
   };
 }

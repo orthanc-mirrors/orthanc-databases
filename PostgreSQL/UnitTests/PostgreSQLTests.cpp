@@ -66,7 +66,7 @@ static PostgreSQLDatabase* CreateTestDatabase()
 static int64_t CountLargeObjects(PostgreSQLDatabase& db)
 {
   // Count the number of large objects in the DB
-  PostgreSQLStatement s(db, "SELECT COUNT(*) FROM pg_catalog.pg_largeobject", true);
+  PostgreSQLStatement s(db, "SELECT COUNT(*) FROM pg_catalog.pg_largeobject");
   PostgreSQLResult r(s);
   return r.GetInteger64(0);
 }
@@ -80,7 +80,7 @@ TEST(PostgreSQL, Basic)
   pg->Execute("CREATE TABLE Test(name INTEGER, value BIGINT)");
   ASSERT_TRUE(pg->DoesTableExist("Test"));
 
-  PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)", false);
+  PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
   s.DeclareInputInteger(0);
   s.DeclareInputInteger64(1);
 
@@ -99,7 +99,7 @@ TEST(PostgreSQL, Basic)
   s.Run();
 
   {
-    PostgreSQLStatement t(*pg, "SELECT name, value FROM Test ORDER BY name", true);
+    PostgreSQLStatement t(*pg, "SELECT name, value FROM Test ORDER BY name");
     PostgreSQLResult r(t);
 
     ASSERT_FALSE(r.IsDone());
@@ -121,7 +121,7 @@ TEST(PostgreSQL, Basic)
   }
 
   {
-    PostgreSQLStatement t(*pg, "SELECT name, value FROM Test WHERE name=$1", true);
+    PostgreSQLStatement t(*pg, "SELECT name, value FROM Test WHERE name=$1");
     t.DeclareInputInteger(0);
 
     {
@@ -151,7 +151,7 @@ TEST(PostgreSQL, String)
 
   pg->Execute("CREATE TABLE Test(name INTEGER, value VARCHAR(40))");
 
-  PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)", false);
+  PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
   s.DeclareInputInteger(0);
   s.DeclareInputString(1);
 
@@ -168,7 +168,7 @@ TEST(PostgreSQL, String)
   s.Run();
 
   {
-    PostgreSQLStatement t(*pg, "SELECT name, value FROM Test ORDER BY name", true);
+    PostgreSQLStatement t(*pg, "SELECT name, value FROM Test ORDER BY name");
     PostgreSQLResult r(t);
 
     ASSERT_FALSE(r.IsDone());
@@ -198,7 +198,7 @@ TEST(PostgreSQL, Transaction)
   pg->Execute("CREATE TABLE Test(name INTEGER, value INTEGER)");
 
   {
-    PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)", false);
+    PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
     s.DeclareInputInteger(0);
     s.DeclareInputInteger(1);
     s.BindInteger(0, 42);
@@ -214,7 +214,7 @@ TEST(PostgreSQL, Transaction)
       s.BindInteger(1, 4444);
       s.Run();
 
-      PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test", true);
+      PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test");
       PostgreSQLResult r(u);
       ASSERT_EQ(3, r.GetInteger64(0));
 
@@ -222,7 +222,7 @@ TEST(PostgreSQL, Transaction)
     }
 
     {
-      PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test", true);
+      PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test");
       PostgreSQLResult r(u);
       ASSERT_EQ(1, r.GetInteger64(0));  // Just "1" because of implicit rollback
     }
@@ -237,7 +237,7 @@ TEST(PostgreSQL, Transaction)
       s.Run();
 
       {
-        PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test", true);
+        PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test");
         PostgreSQLResult r(u);
         ASSERT_EQ(3, r.GetInteger64(0));
 
@@ -248,7 +248,7 @@ TEST(PostgreSQL, Transaction)
     }
 
     {
-      PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test", true);
+      PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test");
       PostgreSQLResult r(u);
       ASSERT_EQ(3, r.GetInteger64(0));
     }
@@ -270,7 +270,7 @@ TEST(PostgreSQL, LargeObject)
   pg->Execute("CREATE RULE TestDelete AS ON DELETE TO Test DO SELECT lo_unlink(old.value);");
 
   {
-    PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)", false);
+    PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
     s.DeclareInputString(0);
     s.DeclareInputLargeObject(1);
     
@@ -298,7 +298,7 @@ TEST(PostgreSQL, LargeObject)
 
   {
     PostgreSQLTransaction t(*pg);
-    PostgreSQLStatement s(*pg, "SELECT * FROM Test ORDER BY name DESC", true);
+    PostgreSQLStatement s(*pg, "SELECT * FROM Test ORDER BY name DESC");
     PostgreSQLResult r(s);
 
     ASSERT_FALSE(r.IsDone());
@@ -319,7 +319,7 @@ TEST(PostgreSQL, LargeObject)
 
   {
     PostgreSQLTransaction t(*pg);
-    PostgreSQLStatement s(*pg, "DELETE FROM Test WHERE name='Index 9'", false);
+    PostgreSQLStatement s(*pg, "DELETE FROM Test WHERE name='Index 9'");
     s.Run();
     t.Commit();
   }
@@ -328,7 +328,7 @@ TEST(PostgreSQL, LargeObject)
   {
     // Count the number of items in the DB
     PostgreSQLTransaction t(*pg);
-    PostgreSQLStatement s(*pg, "SELECT COUNT(*) FROM Test", true);
+    PostgreSQLStatement s(*pg, "SELECT COUNT(*) FROM Test");
     PostgreSQLResult r(s);
     ASSERT_EQ(9, r.GetInteger64(0));
   }

@@ -288,10 +288,8 @@ namespace OrthancDatabases
 
 
   PostgreSQLStatement::PostgreSQLStatement(PostgreSQLDatabase& database,
-                                           const std::string& sql,
-                                           bool readOnly) :
+                                           const std::string& sql) :
     database_(database),
-    readOnly_(readOnly),
     sql_(sql),
     inputs_(new Inputs),
     formatter_(Dialect_PostgreSQL)
@@ -303,7 +301,6 @@ namespace OrthancDatabases
   PostgreSQLStatement::PostgreSQLStatement(PostgreSQLDatabase& database,
                                            const Query& query) :
     database_(database),
-    readOnly_(query.IsReadOnly()),
     inputs_(new Inputs),
     formatter_(Dialect_PostgreSQL)
   {

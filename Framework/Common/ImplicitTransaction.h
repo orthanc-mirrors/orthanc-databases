@@ -38,7 +38,6 @@ namespace OrthancDatabases
     };
 
     State   state_;
-    bool    readOnly_;
 
     void CheckStateForExecution();
     
@@ -59,11 +58,6 @@ namespace OrthancDatabases
       return true;
     }
     
-    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
-
     virtual void Rollback() ORTHANC_OVERRIDE;
     
     virtual void Commit() ORTHANC_OVERRIDE;

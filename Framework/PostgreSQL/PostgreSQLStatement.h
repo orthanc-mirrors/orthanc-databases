@@ -47,7 +47,6 @@ namespace OrthancDatabases
     friend class PostgreSQLResult;
 
     PostgreSQLDatabase& database_;
-    bool readOnly_;
     std::string id_;
     std::string sql_;
     std::vector<unsigned int /*Oid*/>  oids_;
@@ -66,19 +65,13 @@ namespace OrthancDatabases
 
   public:
     PostgreSQLStatement(PostgreSQLDatabase& database,
-                        const std::string& sql,
-                        bool readOnly);
+                        const std::string& sql);
 
     PostgreSQLStatement(PostgreSQLDatabase& database,
                         const Query& query);
 
     ~PostgreSQLStatement();
     
-    virtual bool IsReadOnly() const ORTHANC_OVERRIDE
-    {
-      return readOnly_;
-    }
-
     void DeclareInputInteger(unsigned int param);
     
     void DeclareInputInteger64(unsigned int param);

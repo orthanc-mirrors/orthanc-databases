@@ -34,7 +34,6 @@ namespace OrthancDatabases
 {
   SQLiteStatement::SQLiteStatement(SQLiteDatabase& database,
                                    const Query& query) :
-    readOnly_(query.IsReadOnly()),
     formatter_(Dialect_SQLite)
   {
     std::string sql;
