@@ -37,7 +37,8 @@ namespace OrthancDatabases
     bool            active_;
 
   public:
-    explicit MySQLTransaction(MySQLDatabase& db);
+    explicit MySQLTransaction(MySQLDatabase& db,
+                              TransactionType type);
 
     virtual ~MySQLTransaction();
 

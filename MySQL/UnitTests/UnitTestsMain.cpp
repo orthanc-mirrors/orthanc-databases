@@ -137,7 +137,7 @@ static int64_t CountFiles(OrthancDatabases::MySQLDatabase& db)
 {
   OrthancDatabases::Query query("SELECT COUNT(*) FROM StorageArea", true);
   OrthancDatabases::MySQLStatement s(db, query);
-  OrthancDatabases::MySQLTransaction t(db);
+  OrthancDatabases::MySQLTransaction t(db, OrthancDatabases::TransactionType_ReadOnly);
   OrthancDatabases::Dictionary d;
   std::unique_ptr<OrthancDatabases::IResult> result(s.Execute(t, d));
   return dynamic_cast<const OrthancDatabases::Integer64Value&>(result->GetField(0)).GetValue();
@@ -213,7 +213,7 @@ TEST(MySQL, ImplicitTransaction)
   db.Open();
 
   {
-    OrthancDatabases::MySQLTransaction t(db);
+    OrthancDatabases::MySQLTransaction t(db, OrthancDatabases::TransactionType_ReadOnly);
     ASSERT_FALSE(db.DoesTableExist(t, "test"));
     ASSERT_FALSE(db.DoesTableExist(t, "test2"));
   }
@@ -252,7 +252,7 @@ TEST(MySQL, ImplicitTransaction)
   }
 
   {
-    OrthancDatabases::MySQLTransaction t(db);
+    OrthancDatabases::MySQLTransaction t(db, OrthancDatabases::TransactionType_ReadOnly);
     ASSERT_TRUE(db.DoesTableExist(t, "test"));
     ASSERT_TRUE(db.DoesTableExist(t, "test2"));
   }

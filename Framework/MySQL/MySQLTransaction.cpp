@@ -31,11 +31,25 @@
 
 namespace OrthancDatabases
 {
-  MySQLTransaction::MySQLTransaction(MySQLDatabase& db) :
+  MySQLTransaction::MySQLTransaction(MySQLDatabase& db,
+                                     TransactionType type) :
     db_(db),
     active_(false)
   {
-    db_.Execute("START TRANSACTION", false);
+    switch (type)
+    {
+      case TransactionType_ReadWrite:
+        db_.Execute("START TRANSACTION READ WRITE", false);
+        break;
+
+      case TransactionType_ReadOnly:
+        db_.Execute("START TRANSACTION READ ONLY", false);
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+        
     active_ = true;
   }
 

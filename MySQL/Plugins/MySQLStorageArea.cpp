@@ -41,7 +41,7 @@ namespace OrthancDatabases
 
     {
       MySQLDatabase::TransientAdvisoryLock lock(*db, MYSQL_LOCK_DATABASE_SETUP);    
-      MySQLTransaction t(*db);
+      MySQLTransaction t(*db, TransactionType_ReadWrite);
 
       int64_t size;
       if (db->LookupGlobalIntegerVariable(size, "max_allowed_packet"))

@@ -207,7 +207,7 @@ namespace OrthancDatabases
     const std::string& database = parameters.GetDatabase();
     
     {
-      MySQLTransaction t(db);
+      MySQLTransaction t(db, TransactionType_ReadWrite);
 
       if (!db.DoesDatabaseExist(t, database))
       {
@@ -339,7 +339,7 @@ namespace OrthancDatabases
     {
       MySQLStatement statement(*this, query);
 
-      MySQLTransaction t(*this);
+      MySQLTransaction t(*this, TransactionType_ReadWrite);
       std::unique_ptr<IResult> result(t.Execute(statement, args));
 
       success = (!result->IsDone() &&
@@ -547,11 +547,8 @@ namespace OrthancDatabases
         return new MySQLImplicitTransaction;
 
       case TransactionType_ReadOnly:
-        // TODO => READ-ONLY
-        return new MySQLTransaction(*this);
-
       case TransactionType_ReadWrite:
-        return new MySQLTransaction(*this);
+        return new MySQLTransaction(*this, type);
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

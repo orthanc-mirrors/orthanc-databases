@@ -97,7 +97,7 @@ namespace OrthancDatabases
        * https://groups.google.com/d/msg/orthanc-users/OCFFkm1qm0k/Mbroy8VWAQAJ
        **/      
       {
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
         
         db->Execute("ALTER DATABASE " + parameters_.GetDatabase() + 
                     " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", false);
@@ -126,7 +126,7 @@ namespace OrthancDatabases
       int version = 0;
 
       {
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
 
         // This is the last table to be created
         if (!db->DoesTableExist(t, "PatientRecyclingOrder"))
@@ -160,7 +160,7 @@ namespace OrthancDatabases
       int revision = 0;
 
       {
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
 
         if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
         {
@@ -173,7 +173,7 @@ namespace OrthancDatabases
 
       if (revision == 1)
       {
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
         
         // The serialization of jobs as a global property can lead to
         // very long values => switch to the LONGTEXT type that can
@@ -189,7 +189,7 @@ namespace OrthancDatabases
 
       if (revision == 2)
       {        
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
 
         // Install the "GetLastChangeIndex" extension
         std::string query;
@@ -211,7 +211,7 @@ namespace OrthancDatabases
       
       if (revision == 3)
       {
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
 
         // Reconfiguration of "Metadata" from TEXT type (up to 64KB)
         // to the LONGTEXT type (up to 4GB). This might be important
@@ -228,7 +228,7 @@ namespace OrthancDatabases
       
       if (revision == 4)
       {
-        MySQLTransaction t(*db);
+        MySQLTransaction t(*db, TransactionType_ReadWrite);
         
         // Install the "CreateInstance" extension
         std::string query;
