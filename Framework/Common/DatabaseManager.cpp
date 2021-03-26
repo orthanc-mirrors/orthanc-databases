@@ -165,7 +165,7 @@ namespace OrthancDatabases
 
       try
       {
-        transaction_.reset(GetDatabase().CreateTransaction(true));
+        transaction_.reset(GetDatabase().CreateTransaction(TransactionType_Implicit));
       }
       catch (Orthanc::OrthancException& e)
       {
@@ -226,7 +226,7 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
 
-      transaction_.reset(GetDatabase().CreateTransaction(false));
+      transaction_.reset(GetDatabase().CreateTransaction(type));
     }
     catch (Orthanc::OrthancException& e)
     {

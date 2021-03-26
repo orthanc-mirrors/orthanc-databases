@@ -232,9 +232,6 @@ namespace OrthancDatabases
   {
     class PostgreSQLImplicitTransaction : public ImplicitTransaction
     {
-    private:
-      PostgreSQLDatabase&  db_;
-
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
                                        const Dictionary& parameters)
@@ -247,25 +244,26 @@ namespace OrthancDatabases
       {
         dynamic_cast<PostgreSQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
-      
-    public:
-      explicit PostgreSQLImplicitTransaction(PostgreSQLDatabase&  db) :
-        db_(db)
-      {
-      }
     };
   }
   
   
-  ITransaction* PostgreSQLDatabase::CreateTransaction(bool isImplicit)
+  ITransaction* PostgreSQLDatabase::CreateTransaction(TransactionType type)
   {
-    if (isImplicit)
+    switch (type)
     {
-      return new PostgreSQLImplicitTransaction(*this);
-    }
-    else
-    {
-      return new PostgreSQLTransaction(*this);
+      case TransactionType_Implicit:
+        return new PostgreSQLImplicitTransaction;
+
+      case TransactionType_ReadOnly:
+        // TODO => READ-ONLY
+        return new PostgreSQLTransaction(*this);
+
+      case TransactionType_ReadWrite:
+        return new PostgreSQLTransaction(*this);
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
 

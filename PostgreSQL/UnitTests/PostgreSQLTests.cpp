@@ -406,7 +406,7 @@ TEST(PostgreSQL, ImplicitTransaction)
   ASSERT_FALSE(db->DoesTableExist("test2"));
 
   {
-    std::unique_ptr<OrthancDatabases::ITransaction> t(db->CreateTransaction(false));
+    std::unique_ptr<OrthancDatabases::ITransaction> t(db->CreateTransaction(TransactionType_ReadWrite));
     ASSERT_FALSE(t->IsImplicit());
   }
 
@@ -414,7 +414,7 @@ TEST(PostgreSQL, ImplicitTransaction)
     Query query("CREATE TABLE test(id INT)", false);
     std::unique_ptr<IPrecompiledStatement> s(db->Compile(query));
     
-    std::unique_ptr<ITransaction> t(db->CreateTransaction(true));
+    std::unique_ptr<ITransaction> t(db->CreateTransaction(TransactionType_Implicit));
     ASSERT_TRUE(t->IsImplicit());
     ASSERT_THROW(t->Commit(), Orthanc::OrthancException);
     ASSERT_THROW(t->Rollback(), Orthanc::OrthancException);
@@ -432,7 +432,7 @@ TEST(PostgreSQL, ImplicitTransaction)
     Query query("CREATE TABLE test2(id INT)", false);
     std::unique_ptr<IPrecompiledStatement> s(db->Compile(query));
     
-    std::unique_ptr<ITransaction> t(db->CreateTransaction(true));
+    std::unique_ptr<ITransaction> t(db->CreateTransaction(TransactionType_Implicit));
 
     Dictionary args;
     t->ExecuteWithoutResult(*s, args);

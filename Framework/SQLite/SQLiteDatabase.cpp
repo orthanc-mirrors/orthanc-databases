@@ -48,9 +48,6 @@ namespace OrthancDatabases
   {
     class SQLiteImplicitTransaction : public ImplicitTransaction
     {
-    private:
-      SQLiteDatabase&  db_;
-
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
                                        const Dictionary& parameters) ORTHANC_OVERRIDE
@@ -63,24 +60,22 @@ namespace OrthancDatabases
       {
         dynamic_cast<SQLiteStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
-      
-    public:
-      explicit SQLiteImplicitTransaction(SQLiteDatabase&  db) :
-        db_(db)
-      {
-      }
     };
   }
   
-  ITransaction* SQLiteDatabase::CreateTransaction(bool isImplicit)
+  ITransaction* SQLiteDatabase::CreateTransaction(TransactionType type)
   {
-    if (isImplicit)
+    switch (type)
     {
-      return new SQLiteImplicitTransaction(*this);
-    }
-    else
-    {
-      return new SQLiteTransaction(*this);
+      case TransactionType_Implicit:
+        return new SQLiteImplicitTransaction;
+
+      case TransactionType_ReadOnly:
+      case TransactionType_ReadWrite:
+        return new SQLiteTransaction(*this);
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
 }

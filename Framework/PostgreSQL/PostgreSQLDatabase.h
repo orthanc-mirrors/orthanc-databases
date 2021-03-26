@@ -75,7 +75,7 @@ namespace OrthancDatabases
 
     virtual IPrecompiledStatement* Compile(const Query& query) ORTHANC_OVERRIDE;
 
-    virtual ITransaction* CreateTransaction(bool isImplicit) ORTHANC_OVERRIDE;
+    virtual ITransaction* CreateTransaction(TransactionType type) ORTHANC_OVERRIDE;
 
     class TransientAdvisoryLock
     {

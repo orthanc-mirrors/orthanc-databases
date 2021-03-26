@@ -518,9 +518,6 @@ namespace OrthancDatabases
   {
     class MySQLImplicitTransaction : public ImplicitTransaction
     {
-    private:
-      MySQLDatabase&  db_;
-
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
                                        const Dictionary& parameters)
@@ -533,30 +530,31 @@ namespace OrthancDatabases
       {
         dynamic_cast<MySQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
-      
-    public:
-      explicit MySQLImplicitTransaction(MySQLDatabase&  db) :
-        db_(db)
-      {
-      }
     };
   }
   
 
-  ITransaction* MySQLDatabase::CreateTransaction(bool isImplicit)
+  ITransaction* MySQLDatabase::CreateTransaction(TransactionType type)
   {
     if (mysql_ == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    if (isImplicit)
+    switch (type)
     {
-      return new MySQLImplicitTransaction(*this);
-    }
-    else
-    {
-      return new MySQLTransaction(*this);
+      case TransactionType_Implicit:
+        return new MySQLImplicitTransaction;
+
+      case TransactionType_ReadOnly:
+        // TODO => READ-ONLY
+        return new MySQLTransaction(*this);
+
+      case TransactionType_ReadWrite:
+        return new MySQLTransaction(*this);
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
 
