@@ -37,8 +37,11 @@ namespace OrthancDatabases
     PostgreSQLDatabase& database_;
     bool isOpen_;
 
+    void Begin(TransactionType type);
+
   public:
-    explicit PostgreSQLTransaction(PostgreSQLDatabase& database);
+    explicit PostgreSQLTransaction(PostgreSQLDatabase& database,
+                                   TransactionType type);
 
     ~PostgreSQLTransaction();
 
@@ -47,8 +50,6 @@ namespace OrthancDatabases
       return false;
     }
     
-    void Begin();
-
     virtual void Rollback() ORTHANC_OVERRIDE;
 
     virtual void Commit() ORTHANC_OVERRIDE;

@@ -206,7 +206,15 @@ TEST(PostgreSQL, Transaction)
     s.Run();
 
     {
-      PostgreSQLTransaction t(*pg);
+      PostgreSQLTransaction t(*pg, TransactionType_ReadOnly);
+      s.BindInteger(0, 0);
+      s.BindInteger(1, 1);
+      // Failure, as INSERT in a read-only transaction
+      ASSERT_THROW(s.Run(), Orthanc::OrthancException);
+    }
+
+    {
+      PostgreSQLTransaction t(*pg, TransactionType_ReadWrite);
       s.BindInteger(0, 43);
       s.BindInteger(1, 4343);
       s.Run();
@@ -222,13 +230,14 @@ TEST(PostgreSQL, Transaction)
     }
 
     {
+      // Implicit transaction
       PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test");
       PostgreSQLResult r(u);
       ASSERT_EQ(1, r.GetInteger64(0));  // Just "1" because of implicit rollback
     }
     
     {
-      PostgreSQLTransaction t(*pg);
+      PostgreSQLTransaction t(*pg, TransactionType_ReadWrite);
       s.BindInteger(0, 43);
       s.BindInteger(1, 4343);
       s.Run();
@@ -248,6 +257,7 @@ TEST(PostgreSQL, Transaction)
     }
 
     {
+      PostgreSQLTransaction t(*pg, TransactionType_ReadOnly);
       PostgreSQLStatement u(*pg, "SELECT COUNT(*) FROM Test");
       PostgreSQLResult r(u);
       ASSERT_EQ(3, r.GetInteger64(0));
@@ -276,7 +286,7 @@ TEST(PostgreSQL, LargeObject)
     
     for (int i = 0; i < 10; i++)
     {
-      PostgreSQLTransaction t(*pg);
+      PostgreSQLTransaction t(*pg, TransactionType_ReadWrite);
 
       std::string value = "Value " + boost::lexical_cast<std::string>(i * 2);
       PostgreSQLLargeObject obj(*pg, value);
@@ -297,7 +307,7 @@ TEST(PostgreSQL, LargeObject)
   ASSERT_EQ(10, CountLargeObjects(*pg));
 
   {
-    PostgreSQLTransaction t(*pg);
+    PostgreSQLTransaction t(*pg, TransactionType_ReadOnly);
     PostgreSQLStatement s(*pg, "SELECT * FROM Test ORDER BY name DESC");
     PostgreSQLResult r(s);
 
@@ -318,7 +328,7 @@ TEST(PostgreSQL, LargeObject)
 
 
   {
-    PostgreSQLTransaction t(*pg);
+    PostgreSQLTransaction t(*pg, TransactionType_ReadWrite);
     PostgreSQLStatement s(*pg, "DELETE FROM Test WHERE name='Index 9'");
     s.Run();
     t.Commit();
@@ -327,7 +337,7 @@ TEST(PostgreSQL, LargeObject)
 
   {
     // Count the number of items in the DB
-    PostgreSQLTransaction t(*pg);
+    PostgreSQLTransaction t(*pg, TransactionType_ReadOnly);
     PostgreSQLStatement s(*pg, "SELECT COUNT(*) FROM Test");
     PostgreSQLResult r(s);
     ASSERT_EQ(9, r.GetInteger64(0));

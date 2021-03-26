@@ -112,7 +112,7 @@ namespace OrthancDatabases
 
   bool PostgreSQLDatabase::RunAdvisoryLockStatement(const std::string& statement)
   {
-    PostgreSQLTransaction transaction(*this);
+    PostgreSQLTransaction transaction(*this, TransactionType_ReadWrite);
 
     Query query(statement, false);
     PostgreSQLStatement s(*this, query);
@@ -206,7 +206,7 @@ namespace OrthancDatabases
 
   void PostgreSQLDatabase::ClearAll()
   {
-    PostgreSQLTransaction transaction(*this);
+    PostgreSQLTransaction transaction(*this, TransactionType_ReadWrite);
     
     // Remove all the large objects
     Execute("SELECT lo_unlink(loid) FROM (SELECT DISTINCT loid FROM pg_catalog.pg_largeobject) as loids;");
@@ -255,12 +255,9 @@ namespace OrthancDatabases
       case TransactionType_Implicit:
         return new PostgreSQLImplicitTransaction;
 
-      case TransactionType_ReadOnly:
-        // TODO => READ-ONLY
-        return new PostgreSQLTransaction(*this);
-
       case TransactionType_ReadWrite:
-        return new PostgreSQLTransaction(*this);
+      case TransactionType_ReadOnly:
+        return new PostgreSQLTransaction(*this, type);
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

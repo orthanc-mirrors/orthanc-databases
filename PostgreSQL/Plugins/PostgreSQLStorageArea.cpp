@@ -51,7 +51,7 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(*db);
+        PostgreSQLTransaction t(*db, TransactionType_ReadWrite);
 
         if (!db->DoesTableExist("StorageArea"))
         {

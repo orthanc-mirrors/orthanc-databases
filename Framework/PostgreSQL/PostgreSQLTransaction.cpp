@@ -29,11 +29,12 @@
 
 namespace OrthancDatabases
 {
-  PostgreSQLTransaction::PostgreSQLTransaction(PostgreSQLDatabase& database) :
+  PostgreSQLTransaction::PostgreSQLTransaction(PostgreSQLDatabase& database,
+                                               TransactionType type) :
     database_(database),
     isOpen_(false)
   {
-    Begin();
+    Begin(type);
   }
 
 
@@ -55,7 +56,7 @@ namespace OrthancDatabases
   }
 
 
-  void PostgreSQLTransaction::Begin()
+  void PostgreSQLTransaction::Begin(TransactionType type)
   {
     if (isOpen_) 
     {
@@ -64,7 +65,21 @@ namespace OrthancDatabases
     }
 
     database_.Execute("BEGIN");
-    database_.Execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
+
+    switch (type)
+    {
+      case TransactionType_ReadWrite:
+        database_.Execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
+        break;
+
+      case TransactionType_ReadOnly:
+        database_.Execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY");
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+        
     isOpen_ = true;
   }
 

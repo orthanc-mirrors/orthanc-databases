@@ -81,7 +81,7 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(*db);
+        PostgreSQLTransaction t(*db, TransactionType_ReadWrite);
 
         if (!db->DoesTableExist("Resources"))
         {
@@ -127,7 +127,7 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(*db);
+        PostgreSQLTransaction t(*db, TransactionType_ReadWrite);
 
         int hasTrigram = 0;
         if (!LookupGlobalIntegerProperty(hasTrigram, *db, t,
@@ -174,7 +174,7 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(*db);
+        PostgreSQLTransaction t(*db, TransactionType_ReadWrite);
 
         int property = 0;
         if (!LookupGlobalIntegerProperty(property, *db, t,
