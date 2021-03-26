@@ -214,8 +214,6 @@ namespace OrthancDatabases
   
   void DatabaseManager::StartTransaction(TransactionType type)
   {
-    // TODO - Deal with TransactionType
-    
     boost::recursive_mutex::scoped_lock lock(mutex_);
 
     try

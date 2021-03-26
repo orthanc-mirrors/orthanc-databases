@@ -331,7 +331,9 @@ namespace OrthancDatabases
 
     virtual bool HasCreateInstance() const ORTHANC_OVERRIDE
     {
-      return false;  // TODO - Shouldn't this be "true"?
+      // This extension is available in PostgreSQL and MySQL, but is
+      // emulated by "CreateInstanceGeneric()" in SQLite
+      return false;
     }
       
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
