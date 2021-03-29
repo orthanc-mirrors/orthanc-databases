@@ -1439,6 +1439,11 @@ namespace OrthancDatabases
     
   uint32_t IndexBackend::GetDatabaseVersion()
   {
+    // Create a read-only, explicit transaction to read the database
+    // version (this was a read-write, implicit transaction in
+    // PostgreSQL plugin <= 3.3 and MySQL plugin <= 3.0)
+    DatabaseManager::Transaction transaction(GetManager(), TransactionType_ReadOnly);
+    
     std::string version = "unknown";
       
     if (LookupGlobalProperty(version, Orthanc::GlobalProperty_DatabaseSchemaVersion))
