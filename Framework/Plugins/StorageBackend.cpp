@@ -83,7 +83,7 @@ namespace OrthancDatabases
   }
 
 
-  void StorageBackend::Read(StorageAreaBuffer& target,
+  void StorageBackend::Read(StorageBackend::IFileContentVisitor& target,
                             DatabaseManager::Transaction& transaction, 
                             const std::string& uuid,
                             OrthancPluginContentType type) 
@@ -161,6 +161,11 @@ namespace OrthancDatabases
   {
     try
     {
+      if (backend_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+
       DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadWrite);
       backend_->Create(transaction, uuid, content, static_cast<size_t>(size), type);
       transaction.Commit();
@@ -171,50 +176,182 @@ namespace OrthancDatabases
 
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
-  static OrthancPluginErrorCode StorageReadWhole(OrthancPluginMemoryBuffer64 *target,
+  static OrthancPluginErrorCode StorageReadWhole(OrthancPluginMemoryBuffer64* target,
                                                  const char* uuid,
                                                  OrthancPluginContentType type)
   {
-    try
+    class Visitor : public StorageBackend::IFileContentVisitor
     {
-      StorageAreaBuffer buffer(context_);
-
-      {
-        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
-        backend_->Read(buffer, transaction, uuid, type);
-        transaction.Commit();
-      }
-
-      buffer.Move(target);
+    private:
+      OrthancPluginMemoryBuffer64* target_;
+      bool                         success_;
       
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH;
-  }
-#else
-  static OrthancPluginErrorCode StorageRead(void** content,
-                                            int64_t* size,
-                                            const char* uuid,
-                                            OrthancPluginContentType type)
-  {
-    try
-    {
-      StorageAreaBuffer buffer(context_);
-
+    public:
+      Visitor(OrthancPluginMemoryBuffer64* target) :
+        target_(target),
+        success_(false)
       {
-        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
-        backend_->Read(buffer, transaction, uuid, type);
-        transaction.Commit();
       }
 
-      *size = buffer.GetSize();
-      *content = buffer.ReleaseData();
+      bool IsSuccess() const
+      {
+        return success_;
+      }
+      
+      virtual void Assign(const std::string& content) ORTHANC_OVERRIDE
+      {
+        if (success_)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        else
+        {
+          assert(context_ != NULL);
+          
+          if (OrthancPluginCreateMemoryBuffer64(context_, target_, static_cast<uint64_t>(content.size())) !=
+              OrthancPluginErrorCode_Success)
+          {
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory);
+          }
+
+          if (!content.empty())
+          {
+            memcpy(target_->data, content.c_str(), content.size());
+          }
+
+          success_ = true;
+        }
+      }
+    };
+    
+    try
+    {
+      if (backend_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      
+      if (target == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+      }
+      
+      Visitor visitor(target);
+      
+      {
+        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
+        backend_->Read(visitor, transaction, uuid, type);
+
+        if (!visitor.IsSuccess())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);          
+        }
+        
+        transaction.Commit();
+      }
       
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
 #endif
+
+  
+  static OrthancPluginErrorCode StorageRead(void** data,
+                                            int64_t* size,
+                                            const char* uuid,
+                                            OrthancPluginContentType type)
+  {
+    class Visitor : public StorageBackend::IFileContentVisitor
+    {
+    private:
+      void**    data_;
+      int64_t*  size_;
+      bool      success_;
+      
+    public:
+      Visitor(void** data,
+              int64_t* size) :
+        data_(data),
+        size_(size),
+        success_(false)
+      {
+      }
+
+      bool IsSuccess() const
+      {
+        return success_;
+      }
+      
+      virtual void Assign(const std::string& content) ORTHANC_OVERRIDE
+      {
+        if (success_)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        else
+        {
+          if (content.empty())
+          {
+            *data_ = NULL;
+            *size_ = 0;
+          }
+          else
+          {
+            *size_ = static_cast<int64_t>(content.size());
+    
+            if (static_cast<size_t>(*size_) != content.size())
+            {
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory,
+                                              "File cannot be stored in a 63bit buffer");
+            }
+
+            *data_ = malloc(*size_);
+            if (*data_ == NULL)
+            {
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory);
+            }
+
+            memcpy(*data_, content.c_str(), *size_);
+          }
+          
+          success_ = true;
+        }
+      }
+    };
+
+
+    try
+    {
+      if (backend_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      
+      if (data == NULL ||
+          size == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+      }
+      
+      Visitor visitor(data, size);
+
+      {
+        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
+        backend_->Read(visitor, transaction, uuid, type);
+
+        if (!visitor.IsSuccess())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);          
+        }        
+        
+        transaction.Commit();
+      }
+
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH;
+  }
 
 
   static OrthancPluginErrorCode StorageRemove(const char* uuid,
@@ -252,12 +389,23 @@ namespace OrthancDatabases
       backend_.reset(backend);
       backend_->GetManager().Open();
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
-      OrthancPluginRegisterStorageArea2(context_, StorageCreate, StorageReadWhole,
-                                        NULL /* TODO - StorageReadRange */, StorageRemove);
-#else
-      OrthancPluginRegisterStorageArea(context_, StorageCreate, StorageRead, StorageRemove);
+      bool hasLoadedV2 = false;
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+      if (OrthancPluginCheckVersionAdvanced(context, 1, 9, 0) == 1)
+      {
+        OrthancPluginRegisterStorageArea2(context_, StorageCreate, StorageReadWhole,
+                                          NULL /* TODO - StorageReadRange */, StorageRemove);
+        hasLoadedV2 = true;
+      }
+#  endif
 #endif
+
+      if (!hasLoadedV2)
+      {
+        OrthancPluginRegisterStorageArea(context_, StorageCreate, StorageRead, StorageRemove);
+      }
     }
   }
 
@@ -266,5 +414,54 @@ namespace OrthancDatabases
   {
     backend_.reset(NULL);
     context_ = NULL;
+  }
+
+
+  void StorageBackend::ReadToString(std::string& target,
+                                    DatabaseManager::Transaction& transaction, 
+                                    const std::string& uuid,
+                                    OrthancPluginContentType type)
+  {
+    class Visitor : public StorageBackend::IFileContentVisitor
+    {
+    private:
+      std::string&  target_;
+      bool          success_;
+      
+    public:
+      Visitor(std::string& target) :
+        target_(target),
+        success_(false)
+      {
+      }
+
+      bool IsSuccess() const
+      {
+        return success_;
+      }
+      
+      virtual void Assign(const std::string& content) ORTHANC_OVERRIDE
+      {
+        if (success_)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        else
+        {
+          target_.assign(content);
+          success_ = true;
+        }
+      }
+    };
+    
+
+    Visitor visitor(target);
+      
+    Read(visitor, transaction, uuid, type);
+      
+    if (!visitor.IsSuccess())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);          
+    }
   }
 }

@@ -2214,13 +2214,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   void IndexBackend::Register(IndexBackend& backend)
   {
-    OrthancPluginContext* context = backend.GetContext();
-    
     bool hasLoadedV3 = false;
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    if (OrthancPluginCheckVersionAdvanced(context, 1, 9, 2) == 1)
+    if (OrthancPluginCheckVersionAdvanced(backend.GetContext(), 1, 9, 2) == 1)
     {
       OrthancDatabases::DatabaseBackendAdapterV3::Register(backend);
       hasLoadedV3 = true;
