@@ -75,8 +75,8 @@ namespace OrthancDatabases
           (query, Orthanc::EmbeddedResources::SQLITE_PREPARE_INDEX);
         db->Execute(query);
  
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
      }
           
       t.Commit();
@@ -105,7 +105,7 @@ namespace OrthancDatabases
       }
 
       int version = 0;
-      if (!LookupGlobalIntegerProperty(version, *db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+      if (!LookupGlobalIntegerProperty(version, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
           version != 6)
       {
         LOG(ERROR) << "SQLite plugin is incompatible with database schema version: " << version;
@@ -113,10 +113,10 @@ namespace OrthancDatabases
       }
 
       int revision;
-      if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
+      if (!LookupGlobalIntegerProperty(revision, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
       {
         revision = 1;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
       if (revision != 1)

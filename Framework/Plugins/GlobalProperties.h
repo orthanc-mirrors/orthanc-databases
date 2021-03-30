@@ -23,6 +23,8 @@
 
 #include "../Common/DatabaseManager.h"
 
+#define MISSING_SERVER_IDENTIFIER ""
+
 
 namespace Orthanc
 {
@@ -63,28 +65,34 @@ namespace OrthancDatabases
   bool LookupGlobalProperty(std::string& target /* out */,
                             IDatabase& db,
                             ITransaction& transaction,
+                            const std::string& serverIdentifier,
                             Orthanc::GlobalProperty property);
 
   bool LookupGlobalProperty(std::string& target /* out */,
                             DatabaseManager& manager,
+                            const std::string& serverIdentifier,
                             Orthanc::GlobalProperty property);
 
   void SetGlobalProperty(IDatabase& db,
                          ITransaction& transaction,
+                         const std::string& serverIdentifier,
                          Orthanc::GlobalProperty property,
                          const std::string& utf8);
 
   void SetGlobalProperty(DatabaseManager& manager,
+                         const std::string& serverIdentifier,
                          Orthanc::GlobalProperty property,
                          const std::string& utf8);
 
   bool LookupGlobalIntegerProperty(int& target,
                                    IDatabase& db,
                                    ITransaction& transaction,
+                                   const std::string& serverIdentifier,
                                    Orthanc::GlobalProperty property);
 
   void SetGlobalIntegerProperty(IDatabase& db,
                                 ITransaction& transaction,
+                                const std::string& serverIdentifier,
                                 Orthanc::GlobalProperty property,
                                 int value);
 }

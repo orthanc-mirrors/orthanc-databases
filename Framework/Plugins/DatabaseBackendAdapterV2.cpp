@@ -21,6 +21,7 @@
 
 
 #include "DatabaseBackendAdapterV2.h"
+#include "GlobalProperties.h"
 
 #include <OrthancException.h>
 
@@ -849,7 +850,7 @@ namespace OrthancDatabases
     try
     {
       std::string s;
-      if (backend->LookupGlobalProperty(s, property))
+      if (backend->LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, property))
       {
         OrthancPluginDatabaseAnswerString(backend->GetContext(),
                                           output->GetDatabase(),
@@ -1045,7 +1046,7 @@ namespace OrthancDatabases
 
     try
     {
-      backend->SetGlobalProperty(property, value);
+      backend->SetGlobalProperty(MISSING_SERVER_IDENTIFIER, property, value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

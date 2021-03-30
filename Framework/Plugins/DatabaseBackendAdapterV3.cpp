@@ -1490,6 +1490,7 @@ namespace OrthancDatabases
 
 
   static OrthancPluginErrorCode LookupGlobalProperty(OrthancPluginDatabaseTransaction* transaction,
+                                                     const char* serverIdentifier,
                                                      int32_t property)
   {
     DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
@@ -1499,7 +1500,7 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::string s;
-      if (t->GetBackend().LookupGlobalProperty(s, property))
+      if (t->GetBackend().LookupGlobalProperty(s, serverIdentifier, property))
       {
         t->GetOutput().AnswerString(s);
       }
@@ -1683,6 +1684,7 @@ namespace OrthancDatabases
 
     
   static OrthancPluginErrorCode SetGlobalProperty(OrthancPluginDatabaseTransaction* transaction,
+                                                  const char* serverIdentifier,
                                                   int32_t property,
                                                   const char* value)
   {
@@ -1691,7 +1693,7 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().SetGlobalProperty(property, value);
+      t->GetBackend().SetGlobalProperty(serverIdentifier, property, value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());

@@ -34,6 +34,7 @@ namespace OrthancDatabases
   bool LookupGlobalProperty(std::string& target,
                             IDatabase& db,
                             ITransaction& transaction,
+                            const std::string& serverIdentifier,
                             Orthanc::GlobalProperty property)
   {
     Query query("SELECT value FROM GlobalProperties WHERE property=${property}", true);
@@ -73,6 +74,7 @@ namespace OrthancDatabases
 
   bool LookupGlobalProperty(std::string& target /* out */,
                             DatabaseManager& manager,
+                            const std::string& serverIdentifier,
                             Orthanc::GlobalProperty property)
   {
     DatabaseManager::CachedStatement statement(
@@ -113,6 +115,7 @@ namespace OrthancDatabases
 
   void SetGlobalProperty(IDatabase& db,
                          ITransaction& transaction,
+                         const std::string& serverIdentifier,
                          Orthanc::GlobalProperty property,
                          const std::string& utf8)
   {
@@ -168,6 +171,7 @@ namespace OrthancDatabases
 
 
   void SetGlobalProperty(DatabaseManager& manager,
+                         const std::string& serverIdentifier,
                          Orthanc::GlobalProperty property,
                          const std::string& utf8)
   {
@@ -227,11 +231,12 @@ namespace OrthancDatabases
   bool LookupGlobalIntegerProperty(int& target,
                                    IDatabase& db,
                                    ITransaction& transaction,
+                                   const std::string& serverIdentifier,
                                    Orthanc::GlobalProperty property)
   {
     std::string value;
 
-    if (LookupGlobalProperty(value, db, transaction, property))
+    if (LookupGlobalProperty(value, db, transaction, serverIdentifier, property))
     {
       try
       {
@@ -253,9 +258,10 @@ namespace OrthancDatabases
 
   void SetGlobalIntegerProperty(IDatabase& db,
                                 ITransaction& transaction,
+                                const std::string& serverIdentifier,
                                 Orthanc::GlobalProperty property,
                                 int value)
   {
-    SetGlobalProperty(db, transaction, property, boost::lexical_cast<std::string>(value));
+    SetGlobalProperty(db, transaction, serverIdentifier, property, boost::lexical_cast<std::string>(value));
   }
 }

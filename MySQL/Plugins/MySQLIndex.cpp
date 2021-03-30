@@ -141,10 +141,10 @@ namespace OrthancDatabases
           ThrowCannotCreateTrigger();
         }
 
-        if (!LookupGlobalIntegerProperty(version, *db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion))
+        if (!LookupGlobalIntegerProperty(version, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
         {
-          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+          SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+          SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
           version = expectedVersion;
         }
 
@@ -162,10 +162,10 @@ namespace OrthancDatabases
       {
         MySQLTransaction t(*db, TransactionType_ReadWrite);
 
-        if (!LookupGlobalIntegerProperty(revision, *db, t, Orthanc::GlobalProperty_DatabasePatchLevel))
+        if (!LookupGlobalIntegerProperty(revision, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
         {
           revision = 1;
-          SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+          SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
         }
 
         t.Commit();
@@ -182,7 +182,7 @@ namespace OrthancDatabases
         db->Execute("ALTER TABLE GlobalProperties MODIFY value LONGTEXT", false);
         
         revision = 2;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
@@ -204,7 +204,7 @@ namespace OrthancDatabases
         }
         
         revision = 3;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
@@ -221,7 +221,7 @@ namespace OrthancDatabases
         db->Execute("ALTER TABLE Metadata MODIFY value LONGTEXT", false);
         
         revision = 4;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
@@ -238,7 +238,7 @@ namespace OrthancDatabases
         db->Execute(query, true);
         
         revision = 5;
-        SetGlobalIntegerProperty(*db, t, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }

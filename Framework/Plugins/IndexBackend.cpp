@@ -1034,9 +1034,11 @@ namespace OrthancDatabases
 
     
   bool IndexBackend::LookupGlobalProperty(std::string& target /*out*/,
+                                          const char* serverIdentifier,
                                           int32_t property)
   {
-    return ::OrthancDatabases::LookupGlobalProperty(target, manager_, static_cast<Orthanc::GlobalProperty>(property));
+    return ::OrthancDatabases::LookupGlobalProperty(target, manager_, serverIdentifier,
+                                                    static_cast<Orthanc::GlobalProperty>(property));
   }
 
     
@@ -1289,10 +1291,12 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::SetGlobalProperty(int32_t property,
+  void IndexBackend::SetGlobalProperty(const char* serverIdentifier,
+                                       int32_t property,
                                        const char* value)
   {
-    return ::OrthancDatabases::SetGlobalProperty(manager_, static_cast<Orthanc::GlobalProperty>(property), value);
+    return ::OrthancDatabases::SetGlobalProperty(
+      manager_, serverIdentifier, static_cast<Orthanc::GlobalProperty>(property), value);
   }
 
 
@@ -1446,7 +1450,7 @@ namespace OrthancDatabases
     
     std::string version = "unknown";
       
-    if (LookupGlobalProperty(version, Orthanc::GlobalProperty_DatabaseSchemaVersion))
+    if (LookupGlobalProperty(version, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
     {
       try
       {

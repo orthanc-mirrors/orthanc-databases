@@ -30,6 +30,7 @@
 #include <boost/thread/recursive_mutex.hpp>
 #include <memory>
 
+
 namespace OrthancDatabases
 {
   class DatabaseManager : public boost::noncopyable

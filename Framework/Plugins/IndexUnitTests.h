@@ -187,15 +187,15 @@ TEST(IndexBackend, Basic)
   
 
   std::string s;
-  ASSERT_TRUE(db.LookupGlobalProperty(s, Orthanc::GlobalProperty_DatabaseSchemaVersion));
+  ASSERT_TRUE(db.LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
   ASSERT_EQ("6", s);
 
-  ASSERT_FALSE(db.LookupGlobalProperty(s, Orthanc::GlobalProperty_AnonymizationSequence));
-  db.SetGlobalProperty(Orthanc::GlobalProperty_AnonymizationSequence, "Hello");
-  ASSERT_TRUE(db.LookupGlobalProperty(s, Orthanc::GlobalProperty_AnonymizationSequence));
+  ASSERT_FALSE(db.LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
+  db.SetGlobalProperty(MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence, "Hello");
+  ASSERT_TRUE(db.LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
   ASSERT_EQ("Hello", s);
-  db.SetGlobalProperty(Orthanc::GlobalProperty_AnonymizationSequence, "HelloWorld");
-  ASSERT_TRUE(db.LookupGlobalProperty(s, Orthanc::GlobalProperty_AnonymizationSequence));
+  db.SetGlobalProperty(MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence, "HelloWorld");
+  ASSERT_TRUE(db.LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
   ASSERT_EQ("HelloWorld", s);
 
   int64_t a = db.CreateResource("study", OrthancPluginResourceType_Study);

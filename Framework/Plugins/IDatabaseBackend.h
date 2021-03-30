@@ -141,6 +141,7 @@ namespace OrthancDatabases
                                   int32_t contentType) = 0;
 
     virtual bool LookupGlobalProperty(std::string& target /*out*/,
+                                      const char* serverIdentifier,
                                       int32_t property) = 0;
 
     virtual void LookupIdentifier(std::list<int64_t>& target /*out*/,
@@ -173,7 +174,8 @@ namespace OrthancDatabases
     virtual bool SelectPatientToRecycle(int64_t& internalId /*out*/,
                                         int64_t patientIdToAvoid) = 0;
 
-    virtual void SetGlobalProperty(int32_t property,
+    virtual void SetGlobalProperty(const char* serverIdentifier,
+                                   int32_t property,
                                    const char* value) = 0;
 
     virtual void SetMainDicomTag(int64_t id,
