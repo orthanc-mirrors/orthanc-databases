@@ -54,6 +54,8 @@
 
 namespace OrthancDatabases
 {
+  static bool isBackendInUse_ = false;  // Only for sanity checks
+  
   class DatabaseBackendAdapterV3::Output : public IDatabaseBackendOutput
   {
   private:
@@ -805,13 +807,25 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode DestructDatabase(void* database)
   {
-    // Nothing to delete, as this plugin uses a singleton to store backend
-    if (database == NULL)
+    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+
+    if (backend == NULL)
     {
       return OrthancPluginErrorCode_InternalError;
     }
     else
     {
+      if (isBackendInUse_)
+      {
+        isBackendInUse_ = false;
+      }
+      else
+      {
+        OrthancPluginLogError(backend->GetContext(), "More than one index backend was registered, internal error");
+      }
+      
+      delete backend;
+
       return OrthancPluginErrorCode_Success;
     }
   }
@@ -1755,21 +1769,17 @@ namespace OrthancDatabases
   }
 
     
-  static std::unique_ptr<IndexBackend> backend_;
-
   void DatabaseBackendAdapterV3::Register(IndexBackend* backend)
   {
+    if (isBackendInUse_)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+    
     if (backend == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
-
-    if (backend_.get() != NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
-
-    backend_.reset(backend);
 
     OrthancPluginDatabaseBackendV3 params;
     memset(&params, 0, sizeof(params));
@@ -1843,20 +1853,25 @@ namespace OrthancDatabases
     params.setProtectedPatient = SetProtectedPatient;
     params.setResourcesContent = SetResourcesContent;
 
-    OrthancPluginContext* context = backend_->GetContext();
+    OrthancPluginContext* context = backend->GetContext();
  
-    if (OrthancPluginRegisterDatabaseBackendV3(context, &params, sizeof(params), backend_.get()) != OrthancPluginErrorCode_Success)
+    if (OrthancPluginRegisterDatabaseBackendV3(context, &params, sizeof(params), backend) != OrthancPluginErrorCode_Success)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }
 
-    backend_->SetOutputFactory(new Factory);
+    backend->SetOutputFactory(new Factory);
+
+    isBackendInUse_ = true;
   }
 
 
   void DatabaseBackendAdapterV3::Finalize()
   {
-    backend_.reset(NULL);
+    if (isBackendInUse_)
+    {
+      fprintf(stderr, "The Orthanc core has not destructed the index backend, internal error\n");
+    }
   }
 }
 
