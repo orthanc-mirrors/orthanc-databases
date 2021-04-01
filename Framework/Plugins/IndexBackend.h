@@ -357,6 +357,8 @@ namespace OrthancDatabases
                                const char* hashSeries,
                                const char* hashInstance);
 
-    static void Register(IndexBackend& backend);
+    static void Register(IndexBackend* backend);
+
+    static void Finalize();
   };
 }

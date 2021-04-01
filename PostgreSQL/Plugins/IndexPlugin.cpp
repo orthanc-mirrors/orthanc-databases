@@ -22,10 +22,7 @@
 #include "PostgreSQLIndex.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-
-static std::unique_ptr<OrthancDatabases::PostgreSQLIndex> backend_;
 
 
 extern "C"
@@ -60,12 +57,7 @@ extern "C"
     try
     {
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
-
-      /* Create the database back-end */
-      backend_.reset(new OrthancDatabases::PostgreSQLIndex(context, parameters));
-
-      /* Register the PostgreSQL index into Orthanc */
-      OrthancDatabases::IndexBackend::Register(*backend_);
+      OrthancDatabases::IndexBackend::Register(new OrthancDatabases::PostgreSQLIndex(context, parameters));
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -85,7 +77,7 @@ extern "C"
   ORTHANC_PLUGINS_API void OrthancPluginFinalize()
   {
     LOG(WARNING) << "PostgreSQL index is finalizing";
-    backend_.reset(NULL);
+    OrthancDatabases::IndexBackend::Finalize();
   }
 
 

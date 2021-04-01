@@ -2221,13 +2221,18 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 
 
-  void IndexBackend::Register(IndexBackend& backend)
+  void IndexBackend::Register(IndexBackend* backend)
   {
+    if (backend == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    
     bool hasLoadedV3 = false;
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    if (OrthancPluginCheckVersionAdvanced(backend.GetContext(), 1, 9, 2) == 1)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
       OrthancDatabases::DatabaseBackendAdapterV3::Register(backend);
       hasLoadedV3 = true;
@@ -2240,5 +2245,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       LOG(WARNING) << "Performance warning: Your version of Orthanc doesn't support multiple readers/writers";
       OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
     }
+  }
+
+
+  void IndexBackend::Finalize()
+  {
+    OrthancDatabases::DatabaseBackendAdapterV2::Finalize();
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+    OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
+#  endif
+#endif
   }
 }

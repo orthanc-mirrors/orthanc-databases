@@ -1437,8 +1437,22 @@ namespace OrthancDatabases
   }
 
 
-  void DatabaseBackendAdapterV2::Register(IDatabaseBackend& backend)
+  static std::unique_ptr<IDatabaseBackend> backend_;
+
+  void DatabaseBackendAdapterV2::Register(IDatabaseBackend* backend)
   {
+    if (backend == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+
+    if (backend_.get() != NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    backend_.reset(backend);
+    
     OrthancPluginDatabaseBackend  params;
     memset(&params, 0, sizeof(params));
 
@@ -1515,7 +1529,7 @@ namespace OrthancDatabases
     extensions.getLastChangeIndex = GetLastChangeIndex;
     extensions.tagMostRecentPatient = TagMostRecentPatient;
 
-    if (backend.HasCreateInstance())
+    if (backend_->HasCreateInstance())
     {
       extensions.createInstance = CreateInstance;          // Fast creation of resources
     }
@@ -1530,7 +1544,7 @@ namespace OrthancDatabases
 #  endif
 #endif
 
-    OrthancPluginContext* context = backend.GetContext();
+    OrthancPluginContext* context = backend_->GetContext();
     
     if (performanceWarning)
     {
@@ -1550,12 +1564,18 @@ namespace OrthancDatabases
     }
 
     OrthancPluginDatabaseContext* database =
-      OrthancPluginRegisterDatabaseBackendV2(context, &params, &extensions, &backend);
+      OrthancPluginRegisterDatabaseBackendV2(context, &params, &extensions, backend_.get());
     if (database == NULL)
     {
       throw std::runtime_error("Unable to register the database backend");
     }
 
-    backend.SetOutputFactory(new Factory(context, database));
+    backend_->SetOutputFactory(new Factory(context, database));
+  }
+
+
+  void DatabaseBackendAdapterV2::Finalize()
+  {
+    backend_.reset(NULL);
   }
 }

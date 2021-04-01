@@ -23,12 +23,9 @@
 #include "../../Framework/MySQL/MySQLDatabase.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Compatibility.h>  // For std::unique_ptr<>
 #include <HttpClient.h>
 #include <Logging.h>
 #include <Toolbox.h>
-
-static std::unique_ptr<OrthancDatabases::MySQLIndex> backend_;
 
 
 extern "C"
@@ -66,12 +63,7 @@ extern "C"
     try
     {
       OrthancDatabases::MySQLParameters parameters(mysql, configuration);
-
-      /* Create the database back-end */
-      backend_.reset(new OrthancDatabases::MySQLIndex(context, parameters));
-
-      /* Register the MySQL index into Orthanc */
-      OrthancDatabases::IndexBackend::Register(*backend_);
+      OrthancDatabases::IndexBackend::Register(new OrthancDatabases::MySQLIndex(context, parameters));
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -91,8 +83,8 @@ extern "C"
   ORTHANC_PLUGINS_API void OrthancPluginFinalize()
   {
     LOG(WARNING) << "MySQL index is finalizing";
+    OrthancDatabases::IndexBackend::Finalize();
 
-    backend_.reset(NULL);
     OrthancDatabases::MySQLDatabase::GlobalFinalization();
     Orthanc::HttpClient::GlobalFinalize();
     Orthanc::Toolbox::FinalizeOpenSsl();

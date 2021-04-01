@@ -1755,8 +1755,22 @@ namespace OrthancDatabases
   }
 
     
-  void DatabaseBackendAdapterV3::Register(IndexBackend& database)
+  static std::unique_ptr<IndexBackend> backend_;
+
+  void DatabaseBackendAdapterV3::Register(IndexBackend* backend)
   {
+    if (backend == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+
+    if (backend_.get() != NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    backend_.reset(backend);
+
     OrthancPluginDatabaseBackendV3 params;
     memset(&params, 0, sizeof(params));
 
@@ -1829,14 +1843,20 @@ namespace OrthancDatabases
     params.setProtectedPatient = SetProtectedPatient;
     params.setResourcesContent = SetResourcesContent;
 
-    OrthancPluginContext* context = database.GetContext();
+    OrthancPluginContext* context = backend_->GetContext();
  
-    if (OrthancPluginRegisterDatabaseBackendV3(context, &params, sizeof(params), &database) != OrthancPluginErrorCode_Success)
+    if (OrthancPluginRegisterDatabaseBackendV3(context, &params, sizeof(params), backend_.get()) != OrthancPluginErrorCode_Success)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }
 
-    database.SetOutputFactory(new Factory);
+    backend_->SetOutputFactory(new Factory);
+  }
+
+
+  void DatabaseBackendAdapterV3::Finalize()
+  {
+    backend_.reset(NULL);
   }
 }
 

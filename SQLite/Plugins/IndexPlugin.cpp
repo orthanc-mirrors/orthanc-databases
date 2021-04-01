@@ -20,13 +20,9 @@
 
 
 #include "SQLiteIndex.h"
-#include "../../Framework/Plugins/DatabaseBackendAdapterV3.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 
-#include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-
-static std::unique_ptr<OrthancDatabases::SQLiteIndex> backend_;
 
 
 extern "C"
@@ -62,11 +58,9 @@ extern "C"
 
     try
     {
-      /* Create the database back-end */
-      backend_.reset(new OrthancDatabases::SQLiteIndex(context, "index.db"));  // TODO parameter
-
       /* Register the SQLite index into Orthanc */
-      OrthancDatabases::IndexBackend::Register(*backend_);
+      OrthancDatabases::IndexBackend::Register(
+        new OrthancDatabases::SQLiteIndex(context, "index.db"));  // TODO parameter
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -86,7 +80,7 @@ extern "C"
   ORTHANC_PLUGINS_API void OrthancPluginFinalize()
   {
     LOG(WARNING) << "SQLite index is finalizing";
-    backend_.reset(NULL);
+    OrthancDatabases::IndexBackend::Finalize();
   }
 
 

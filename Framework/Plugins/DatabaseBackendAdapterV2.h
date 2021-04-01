@@ -70,14 +70,8 @@ namespace OrthancDatabases
       virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE;
     };
 
+    static void Register(IDatabaseBackend* backend);
 
-    /**
-     * Register a custom database back-end written in C++.
-     *
-     * @param context The Orthanc plugin context, as received by OrthancPluginInitialize().
-     * @param backend Your custom database engine.
-     **/
-
-    static void Register(IDatabaseBackend& backend);
+    static void Finalize();
   };
 }
