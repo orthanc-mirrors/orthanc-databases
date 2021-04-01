@@ -51,6 +51,7 @@ namespace OrthancDatabases
     }
 
   public:
+    class Adapter;
     class Output;
     
     class Factory : public IDatabaseBackendOutput::IFactory

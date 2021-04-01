@@ -25,8 +25,9 @@
 
 #include <OrthancException.h>
 
-#include <stdexcept>
+#include <boost/thread/mutex.hpp>
 #include <list>
+#include <stdexcept>
 #include <string>
 
 
@@ -37,18 +38,96 @@
   }                                                                     \
   catch (::std::runtime_error& e)                                       \
   {                                                                     \
-    LogError(backend, e);                                               \
+    LogError(adapter->GetBackend(), e);                                 \
     return OrthancPluginErrorCode_DatabasePlugin;                       \
   }                                                                     \
   catch (...)                                                           \
   {                                                                     \
-    OrthancPluginLogError(backend->GetContext(), "Native exception");   \
+    OrthancPluginLogError(adapter->GetBackend().GetContext(), "Native exception"); \
     return OrthancPluginErrorCode_DatabasePlugin;                       \
   }
 
 
 namespace OrthancDatabases
-{  
+{
+  class DatabaseBackendAdapterV2::Adapter : public boost::noncopyable
+  {
+  private:
+    std::unique_ptr<IDatabaseBackend>  backend_;
+    boost::mutex                       databaseMutex_;
+    std::unique_ptr<DatabaseManager>   database_;
+
+  public:
+    Adapter(IDatabaseBackend* backend) :
+      backend_(backend)
+    {
+      if (backend == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+      }
+    }
+
+    IDatabaseBackend& GetBackend() const
+    {
+      return *backend_;
+    }
+
+    void OpenConnection()
+    {
+      boost::mutex::scoped_lock  lock(databaseMutex_);
+
+      if (database_.get() == NULL)
+      {
+        database_.reset(new DatabaseManager(backend_->CreateDatabaseFactory()));
+        database_->Open();
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+    }
+
+    void CloseConnection()
+    {
+      boost::mutex::scoped_lock  lock(databaseMutex_);
+
+      if (database_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      else
+      {
+        database_->Close();
+        database_.reset(NULL);
+      }
+    }
+
+    class DatabaseAccessor : public boost::noncopyable
+    {
+    private:
+      boost::mutex::scoped_lock  lock_;
+      DatabaseManager*           database_;
+      
+    public:
+      DatabaseAccessor(Adapter& adapter) :
+        lock_(adapter.databaseMutex_),
+        database_(adapter.database_.get())
+      {
+        if (database_ == NULL)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+      }
+
+      DatabaseManager& GetDatabase() const
+      {
+        assert(database_ != NULL);
+        return *database_;
+      }
+    };
+  };
+
+  
   class DatabaseBackendAdapterV2::Output : public IDatabaseBackendOutput
   {
   public:
@@ -256,11 +335,11 @@ namespace OrthancDatabases
   };
     
 
-  static void LogError(IDatabaseBackend* backend,
+  static void LogError(IDatabaseBackend& backend,
                        const std::runtime_error& e)
   {
     const std::string message = "Exception in database back-end: " + std::string(e.what());
-    OrthancPluginLogError(backend->GetContext(), message.c_str());
+    OrthancPluginLogError(backend.GetContext(), message.c_str());
   }
 
 
@@ -268,11 +347,13 @@ namespace OrthancDatabases
                                                int64_t id,
                                                const OrthancPluginAttachment* attachment)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->AddAttachment(id, *attachment);
+      //DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);    // TODO
+      
+      adapter->GetBackend().AddAttachment(id, *attachment);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -283,11 +364,11 @@ namespace OrthancDatabases
                                              int64_t parent,
                                              int64_t child)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->AttachChild(parent, child);
+      adapter->GetBackend().AttachChild(parent, child);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -296,11 +377,11 @@ namespace OrthancDatabases
                    
   static OrthancPluginErrorCode  ClearChanges(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->ClearChanges();
+      adapter->GetBackend().ClearChanges();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -309,11 +390,11 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode  ClearExportedResources(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->ClearExportedResources();
+      adapter->GetBackend().ClearExportedResources();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -325,11 +406,11 @@ namespace OrthancDatabases
                                                 const char* publicId,
                                                 OrthancPluginResourceType resourceType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *id = backend->CreateResource(publicId, resourceType);
+      *id = adapter->GetBackend().CreateResource(publicId, resourceType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -340,13 +421,13 @@ namespace OrthancDatabases
                                                   int64_t id,
                                                   int32_t contentType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
-      backend->DeleteAttachment(*output, id, contentType);
+      adapter->GetBackend().DeleteAttachment(*output, id, contentType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -357,11 +438,11 @@ namespace OrthancDatabases
                                                 int64_t id,
                                                 int32_t metadataType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->DeleteMetadata(id, metadataType);
+      adapter->GetBackend().DeleteMetadata(id, metadataType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -371,13 +452,13 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  DeleteResource(void* payload,
                                                 int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
-      backend->DeleteResource(*output, id);
+      adapter->GetBackend().DeleteResource(*output, id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -388,19 +469,19 @@ namespace OrthancDatabases
                                                    void* payload,
                                                    OrthancPluginResourceType resourceType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<int64_t> target;
-      backend->GetAllInternalIds(target, resourceType);
+      adapter->GetBackend().GetAllInternalIds(target, resourceType);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), *it);
       }
 
@@ -414,19 +495,19 @@ namespace OrthancDatabases
                                                  void* payload,
                                                  OrthancPluginResourceType resourceType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<std::string> ids;
-      backend->GetAllPublicIds(ids, resourceType);
+      adapter->GetBackend().GetAllPublicIds(ids, resourceType);
 
       for (std::list<std::string>::const_iterator
              it = ids.begin(); it != ids.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+        OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(),
                                           it->c_str());
       }
@@ -443,19 +524,19 @@ namespace OrthancDatabases
                                                           uint64_t since,
                                                           uint64_t limit)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<std::string> ids;
-      backend->GetAllPublicIds(ids, resourceType, since, limit);
+      adapter->GetBackend().GetAllPublicIds(ids, resourceType, since, limit);
 
       for (std::list<std::string>::const_iterator
              it = ids.begin(); it != ids.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+        OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(),
                                           it->c_str());
       }
@@ -471,18 +552,18 @@ namespace OrthancDatabases
                                             int64_t since,
                                             uint32_t maxResult)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_Change);
 
     try
     {
       bool done;
-      backend->GetChanges(*output, done, since, maxResult);
+      adapter->GetBackend().GetChanges(*output, done, since, maxResult);
         
       if (done)
       {
-        OrthancPluginDatabaseAnswerChangesDone(backend->GetContext(),
+        OrthancPluginDatabaseAnswerChangesDone(adapter->GetBackend().GetContext(),
                                                output->GetDatabase());
       }
 
@@ -496,19 +577,19 @@ namespace OrthancDatabases
                                                        void* payload,
                                                        int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<int64_t> target;
-      backend->GetChildrenInternalId(target, id);
+      adapter->GetBackend().GetChildrenInternalId(target, id);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), *it);
       }
 
@@ -522,19 +603,19 @@ namespace OrthancDatabases
                                                      void* payload,
                                                      int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<std::string> ids;
-      backend->GetChildrenPublicId(ids, id);
+      adapter->GetBackend().GetChildrenPublicId(ids, id);
 
       for (std::list<std::string>::const_iterator
              it = ids.begin(); it != ids.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+        OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(),
                                           it->c_str());
       }
@@ -550,18 +631,18 @@ namespace OrthancDatabases
                                                       int64_t  since,
                                                       uint32_t  maxResult)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_ExportedResource);
 
     try
     {
       bool done;
-      backend->GetExportedResources(*output, done, since, maxResult);
+      adapter->GetBackend().GetExportedResources(*output, done, since, maxResult);
 
       if (done)
       {
-        OrthancPluginDatabaseAnswerExportedResourcesDone(backend->GetContext(),
+        OrthancPluginDatabaseAnswerExportedResourcesDone(adapter->GetBackend().GetContext(),
                                                          output->GetDatabase());
       }
       return OrthancPluginErrorCode_Success;
@@ -573,13 +654,13 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  GetLastChange(OrthancPluginDatabaseContext* context,
                                                void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_Change);
 
     try
     {
-      backend->GetLastChange(*output);
+      adapter->GetBackend().GetLastChange(*output);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -589,13 +670,13 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  GetLastExportedResource(OrthancPluginDatabaseContext* context,
                                                          void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_ExportedResource);
 
     try
     {
-      backend->GetLastExportedResource(*output);
+      adapter->GetBackend().GetLastExportedResource(*output);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -606,13 +687,13 @@ namespace OrthancDatabases
                                                   void* payload,
                                                   int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_DicomTag);
 
     try
     {
-      backend->GetMainDicomTags(*output, id);
+      adapter->GetBackend().GetMainDicomTags(*output, id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -623,14 +704,14 @@ namespace OrthancDatabases
                                              void* payload,
                                              int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
-      std::string s = backend->GetPublicId(id);
-      OrthancPluginDatabaseAnswerString(backend->GetContext(),
+      std::string s = adapter->GetBackend().GetPublicId(id);
+      OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                         output->GetDatabase(),
                                         s.c_str());
 
@@ -644,11 +725,11 @@ namespace OrthancDatabases
                                                   void* payload,
                                                   OrthancPluginResourceType  resourceType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *target = backend->GetResourcesCount(resourceType);
+      *target = adapter->GetBackend().GetResourcesCount(resourceType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -659,11 +740,11 @@ namespace OrthancDatabases
                                                  void* payload,
                                                  int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *resourceType = backend->GetResourceType(id);
+      *resourceType = adapter->GetBackend().GetResourceType(id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -673,11 +754,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  GetTotalCompressedSize(uint64_t* target,
                                                         void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *target = backend->GetTotalCompressedSize();
+      *target = adapter->GetBackend().GetTotalCompressedSize();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -687,11 +768,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  GetTotalUncompressedSize(uint64_t* target,
                                                           void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *target = backend->GetTotalUncompressedSize();
+      *target = adapter->GetBackend().GetTotalUncompressedSize();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -702,11 +783,11 @@ namespace OrthancDatabases
                                                     void* payload,
                                                     int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *existing = backend->IsExistingResource(id);
+      *existing = adapter->GetBackend().IsExistingResource(id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -717,11 +798,11 @@ namespace OrthancDatabases
                                                     void* payload,
                                                     int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *isProtected = backend->IsProtectedPatient(id);
+      *isProtected = adapter->GetBackend().IsProtectedPatient(id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -732,19 +813,19 @@ namespace OrthancDatabases
                                                        void* payload,
                                                        int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<int32_t> target;
-      backend->ListAvailableMetadata(target, id);
+      adapter->GetBackend().ListAvailableMetadata(target, id);
 
       for (std::list<int32_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerInt32(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt32(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(),
                                          *it);
       }
@@ -759,19 +840,19 @@ namespace OrthancDatabases
                                                           void* payload,
                                                           int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<int32_t> target;
-      backend->ListAvailableAttachments(target, id);
+      adapter->GetBackend().ListAvailableAttachments(target, id);
 
       for (std::list<int32_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerInt32(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt32(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(),
                                          *it);
       }
@@ -785,20 +866,20 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  LogChange(void* payload,
                                            const OrthancPluginChange* change)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
       int64_t id;
       OrthancPluginResourceType type;
-      if (!backend->LookupResource(id, type, change->publicId) ||
+      if (!adapter->GetBackend().LookupResource(id, type, change->publicId) ||
           type != change->resourceType)
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
       else
       {
-        backend->LogChange(change->changeType, id, type, change->date);
+        adapter->GetBackend().LogChange(change->changeType, id, type, change->date);
       }
       
       return OrthancPluginErrorCode_Success;
@@ -810,11 +891,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  LogExportedResource(void* payload,
                                                      const OrthancPluginExportedResource* exported)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->LogExportedResource(*exported);
+      adapter->GetBackend().LogExportedResource(*exported);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -826,13 +907,13 @@ namespace OrthancDatabases
                                                   int64_t id,
                                                   int32_t contentType)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_Attachment);
 
     try
     {
-      backend->LookupAttachment(*output, id, contentType);
+      adapter->GetBackend().LookupAttachment(*output, id, contentType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -843,16 +924,16 @@ namespace OrthancDatabases
                                                       void* payload,
                                                       int32_t property)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::string s;
-      if (backend->LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, property))
+      if (adapter->GetBackend().LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, property))
       {
-        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+        OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(),
                                           s.c_str());
       }
@@ -869,19 +950,19 @@ namespace OrthancDatabases
                                                    const OrthancPluginDicomTag* tag,
                                                    OrthancPluginIdentifierConstraint constraint)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<int64_t> target;
-      backend->LookupIdentifier(target, resourceType, tag->group, tag->element, constraint, tag->value);
+      adapter->GetBackend().LookupIdentifier(target, resourceType, tag->group, tag->element, constraint, tag->value);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), *it);
       }
 
@@ -899,19 +980,19 @@ namespace OrthancDatabases
                                                        const char* start,
                                                        const char* end)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<int64_t> target;
-      backend->LookupIdentifierRange(target, resourceType, group, element, start, end);
+      adapter->GetBackend().LookupIdentifierRange(target, resourceType, group, element, start, end);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), *it);
       }
 
@@ -926,16 +1007,16 @@ namespace OrthancDatabases
                                                 int64_t id,
                                                 int32_t metadata)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::string s;
-      if (backend->LookupMetadata(s, id, metadata))
+      if (adapter->GetBackend().LookupMetadata(s, id, metadata))
       {
-        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+        OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(), s.c_str());
       }
 
@@ -949,16 +1030,16 @@ namespace OrthancDatabases
                                               void* payload,
                                               int64_t id)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       int64_t parent;
-      if (backend->LookupParent(parent, id))
+      if (adapter->GetBackend().LookupParent(parent, id))
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), parent);
       }
 
@@ -972,17 +1053,17 @@ namespace OrthancDatabases
                                                 void* payload,
                                                 const char* publicId)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       int64_t id;
       OrthancPluginResourceType type;
-      if (backend->LookupResource(id, type, publicId))
+      if (adapter->GetBackend().LookupResource(id, type, publicId))
       {
-        OrthancPluginDatabaseAnswerResource(backend->GetContext(),
+        OrthancPluginDatabaseAnswerResource(adapter->GetBackend().GetContext(),
                                             output->GetDatabase(), 
                                             id, type);
       }
@@ -996,16 +1077,16 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode  SelectPatientToRecycle(OrthancPluginDatabaseContext* context,
                                                         void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       int64_t id;
-      if (backend->SelectPatientToRecycle(id))
+      if (adapter->GetBackend().SelectPatientToRecycle(id))
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), id);
       }
 
@@ -1019,16 +1100,16 @@ namespace OrthancDatabases
                                                          void* payload,
                                                          int64_t patientIdToAvoid)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       int64_t id;
-      if (backend->SelectPatientToRecycle(id, patientIdToAvoid))
+      if (adapter->GetBackend().SelectPatientToRecycle(id, patientIdToAvoid))
       {
-        OrthancPluginDatabaseAnswerInt64(backend->GetContext(),
+        OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), id);
       }
 
@@ -1042,11 +1123,11 @@ namespace OrthancDatabases
                                                    int32_t property,
                                                    const char* value)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->SetGlobalProperty(MISSING_SERVER_IDENTIFIER, property, value);
+      adapter->GetBackend().SetGlobalProperty(MISSING_SERVER_IDENTIFIER, property, value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1057,11 +1138,11 @@ namespace OrthancDatabases
                                                  int64_t id,
                                                  const OrthancPluginDicomTag* tag)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->SetMainDicomTag(id, tag->group, tag->element, tag->value);
+      adapter->GetBackend().SetMainDicomTag(id, tag->group, tag->element, tag->value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1072,11 +1153,11 @@ namespace OrthancDatabases
                                                   int64_t id,
                                                   const OrthancPluginDicomTag* tag)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->SetIdentifierTag(id, tag->group, tag->element, tag->value);
+      adapter->GetBackend().SetIdentifierTag(id, tag->group, tag->element, tag->value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1088,11 +1169,11 @@ namespace OrthancDatabases
                                              int32_t metadata,
                                              const char* value)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->SetMetadata(id, metadata, value);
+      adapter->GetBackend().SetMetadata(id, metadata, value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1103,11 +1184,11 @@ namespace OrthancDatabases
                                                      int64_t id,
                                                      int32_t isProtected)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->SetProtectedPatient(id, (isProtected != 0));
+      adapter->GetBackend().SetProtectedPatient(id, (isProtected != 0));
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1116,11 +1197,11 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode StartTransaction(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->StartTransaction(TransactionType_ReadWrite);
+      adapter->GetBackend().StartTransaction(TransactionType_ReadWrite);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1129,11 +1210,11 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode RollbackTransaction(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->RollbackTransaction();
+      adapter->GetBackend().RollbackTransaction();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1142,11 +1223,11 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode CommitTransaction(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->CommitTransaction();
+      adapter->GetBackend().CommitTransaction();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1155,11 +1236,12 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode Open(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->Open();
+      //adapter->OpenConnection();  // TODO
+      adapter->GetBackend().Open();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1168,11 +1250,12 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode Close(void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->Close();
+      adapter->GetBackend().Close();
+      //adapter->CloseConnection();  // TODO
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1182,11 +1265,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetDatabaseVersion(uint32_t* version,
                                                    void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
       
     try
     {
-      *version = backend->GetDatabaseVersion();
+      *version = adapter->GetBackend().GetDatabaseVersion();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1197,11 +1280,11 @@ namespace OrthancDatabases
                                                 uint32_t  targetVersion,
                                                 OrthancPluginStorageArea* storageArea)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
       
     try
     {
-      backend->UpgradeDatabase(targetVersion, storageArea);
+      adapter->GetBackend().UpgradeDatabase(targetVersion, storageArea);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1211,11 +1294,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode ClearMainDicomTags(void* payload,
                                                    int64_t internalId)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
       
     try
     {
-      backend->ClearMainDicomTags(internalId);
+      adapter->GetBackend().ClearMainDicomTags(internalId);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1233,8 +1316,8 @@ namespace OrthancDatabases
     uint32_t limit,
     uint8_t requestSomeInstance)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_MatchingResource);
 
     try
@@ -1247,7 +1330,7 @@ namespace OrthancDatabases
         lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
       }
         
-      backend->LookupResources(*output, lookup, queryLevel, limit, (requestSomeInstance != 0));
+      adapter->GetBackend().LookupResources(*output, lookup, queryLevel, limit, (requestSomeInstance != 0));
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1263,11 +1346,11 @@ namespace OrthancDatabases
                                                const char* hashSeries,
                                                const char* hashInstance)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+      adapter->GetBackend().CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1285,11 +1368,11 @@ namespace OrthancDatabases
     uint32_t countMetadata,
     const OrthancPluginResourcesContentMetadata* metadata)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->SetResourcesContent(countIdentifierTags, identifierTags,
+      adapter->GetBackend().SetResourcesContent(countIdentifierTags, identifierTags,
                                    countMainDicomTags, mainDicomTags,
                                    countMetadata, metadata);
       return OrthancPluginErrorCode_Success;
@@ -1305,19 +1388,19 @@ namespace OrthancDatabases
                                                     int64_t resourceId,
                                                     int32_t metadata)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_None);
 
     try
     {
       std::list<std::string> values;
-      backend->GetChildrenMetadata(values, resourceId, metadata);
+      adapter->GetBackend().GetChildrenMetadata(values, resourceId, metadata);
 
       for (std::list<std::string>::const_iterator
              it = values.begin(); it != values.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerString(backend->GetContext(),
+        OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(),
                                           it->c_str());
       }
@@ -1332,11 +1415,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetLastChangeIndex(int64_t* result,
                                                    void* payload)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      *result = backend->GetLastChangeIndex();
+      *result = adapter->GetBackend().GetLastChangeIndex();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1347,11 +1430,11 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode TagMostRecentPatient(void* payload,
                                                      int64_t patientId)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
 
     try
     {
-      backend->TagMostRecentPatient(patientId);
+      adapter->GetBackend().TagMostRecentPatient(patientId);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1365,19 +1448,19 @@ namespace OrthancDatabases
                                                void* payload,
                                                int64_t resourceId)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_Metadata);
 
     try
     {
       std::map<int32_t, std::string> result;
-      backend->GetAllMetadata(result, resourceId);
+      adapter->GetBackend().GetAllMetadata(result, resourceId);
 
       for (std::map<int32_t, std::string>::const_iterator
              it = result.begin(); it != result.end(); ++it)
       {
-        OrthancPluginDatabaseAnswerMetadata(backend->GetContext(),
+        OrthancPluginDatabaseAnswerMetadata(adapter->GetBackend().GetContext(),
                                             output->GetDatabase(),
                                             resourceId, it->first, it->second.c_str());
       }
@@ -1400,20 +1483,20 @@ namespace OrthancDatabases
                                                         void* payload,
                                                         const char* publicId)
   {
-    IDatabaseBackend* backend = reinterpret_cast<IDatabaseBackend*>(payload);
-    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(backend->CreateOutput()));
+    DatabaseBackendAdapterV2::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV2::Adapter*>(payload);
+    std::unique_ptr<DatabaseBackendAdapterV2::Output> output(dynamic_cast<DatabaseBackendAdapterV2::Output*>(adapter->GetBackend().CreateOutput()));
     output->SetAllowedAnswers(DatabaseBackendAdapterV2::Output::AllowedAnswers_String);
 
     try
     {
       std::string parent;
-      if (backend->LookupResourceAndParent(*id, *type, parent, publicId))
+      if (adapter->GetBackend().LookupResourceAndParent(*id, *type, parent, publicId))
       {
         *isExisting = 1;
 
         if (!parent.empty())
         {
-          OrthancPluginDatabaseAnswerString(backend->GetContext(),
+          OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                             output->GetDatabase(),
                                             parent.c_str());
         }
@@ -1437,7 +1520,7 @@ namespace OrthancDatabases
   }
 
 
-  static std::unique_ptr<IDatabaseBackend> backend_;
+  static std::unique_ptr<DatabaseBackendAdapterV2::Adapter> adapter_;
 
   void DatabaseBackendAdapterV2::Register(IDatabaseBackend* backend)
   {
@@ -1446,12 +1529,12 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
 
-    if (backend_.get() != NULL)
+    if (adapter_.get() != NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    backend_.reset(backend);
+    adapter_.reset(new Adapter(backend));
     
     OrthancPluginDatabaseBackend  params;
     memset(&params, 0, sizeof(params));
@@ -1529,7 +1612,7 @@ namespace OrthancDatabases
     extensions.getLastChangeIndex = GetLastChangeIndex;
     extensions.tagMostRecentPatient = TagMostRecentPatient;
 
-    if (backend_->HasCreateInstance())
+    if (adapter_->GetBackend().HasCreateInstance())
     {
       extensions.createInstance = CreateInstance;          // Fast creation of resources
     }
@@ -1544,7 +1627,7 @@ namespace OrthancDatabases
 #  endif
 #endif
 
-    OrthancPluginContext* context = backend_->GetContext();
+    OrthancPluginContext* context = adapter_->GetBackend().GetContext();
     
     if (performanceWarning)
     {
@@ -1564,18 +1647,18 @@ namespace OrthancDatabases
     }
 
     OrthancPluginDatabaseContext* database =
-      OrthancPluginRegisterDatabaseBackendV2(context, &params, &extensions, backend_.get());
+      OrthancPluginRegisterDatabaseBackendV2(context, &params, &extensions, adapter_.get());
     if (database == NULL)
     {
       throw std::runtime_error("Unable to register the database backend");
     }
 
-    backend_->SetOutputFactory(new Factory(context, database));
+    adapter_->GetBackend().SetOutputFactory(new Factory(context, database));
   }
 
 
   void DatabaseBackendAdapterV2::Finalize()
   {
-    backend_.reset(NULL);
+    adapter_.reset(NULL);
   }
 }

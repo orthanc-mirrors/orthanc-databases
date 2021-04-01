@@ -24,6 +24,7 @@
 
 #include "IDatabaseBackendOutput.h"
 #include "../Common/DatabasesEnumerations.h"
+#include "../Common/IDatabaseFactory.h"
 
 #include <list>
 
@@ -37,6 +38,8 @@ namespace OrthancDatabases
     }
 
     virtual OrthancPluginContext* GetContext() = 0;
+
+    virtual IDatabaseFactory* CreateDatabaseFactory() = 0;
 
     virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
                         

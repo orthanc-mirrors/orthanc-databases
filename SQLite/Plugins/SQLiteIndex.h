@@ -74,6 +74,11 @@ namespace OrthancDatabases
       fast_ = fast;
     }
 
+    virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE
+    {
+      return new Factory(*this);
+    }
+    
     virtual int64_t CreateResource(const char* publicId,
                                    OrthancPluginResourceType type);
 
