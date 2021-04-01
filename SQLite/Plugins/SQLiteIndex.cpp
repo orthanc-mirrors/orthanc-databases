@@ -134,7 +134,7 @@ namespace OrthancDatabases
 
   SQLiteIndex::SQLiteIndex(OrthancPluginContext* context,
                            const std::string& path) :
-    IndexBackend(context, new Factory(*this)),
+    IndexBackend(context),
     path_(path),
     fast_(true)
   {
@@ -146,17 +146,18 @@ namespace OrthancDatabases
 
 
   SQLiteIndex::SQLiteIndex(OrthancPluginContext* context) :
-    IndexBackend(context, new Factory(*this)),
+    IndexBackend(context),
     fast_(true)
   {
   }
 
 
-  int64_t SQLiteIndex::CreateResource(const char* publicId,
+  int64_t SQLiteIndex::CreateResource(DatabaseManager& manager,
+                                      const char* publicId,
                                       OrthancPluginResourceType type)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO Resources VALUES(NULL, ${type}, ${id}, NULL)");
     
     statement.SetParameterType("id", ValueType_Utf8String);
@@ -172,10 +173,10 @@ namespace OrthancDatabases
   }
 
 
-  int64_t SQLiteIndex::GetLastChangeIndex()
+  int64_t SQLiteIndex::GetLastChangeIndex(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "SELECT seq FROM sqlite_sequence WHERE name='Changes'");
 
     statement.SetReadOnly(true);

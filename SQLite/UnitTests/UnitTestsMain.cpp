@@ -37,25 +37,32 @@ TEST(SQLiteIndex, Lock)
   {
     // No locking if using memory backend
     OrthancDatabases::SQLiteIndex db1(NULL);
-    OrthancDatabases::SQLiteIndex db2(NULL);
+    OrthancDatabases::DatabaseManager manager1(db1.CreateDatabaseFactory());
 
-    db1.Open();
-    db2.Open();
+    OrthancDatabases::SQLiteIndex db2(NULL);
+    OrthancDatabases::DatabaseManager manager2(db2.CreateDatabaseFactory());
+    
+    manager1.Open();
+    manager2.Open();
   }
 
   Orthanc::SystemToolbox::RemoveFile("index.db");
 
   {
     OrthancDatabases::SQLiteIndex db1(NULL, "index.db");
-    OrthancDatabases::SQLiteIndex db2(NULL, "index.db");
+    OrthancDatabases::DatabaseManager manager1(db1.CreateDatabaseFactory());
 
-    db1.Open();
-    ASSERT_THROW(db2.Open(), Orthanc::OrthancException);
+    OrthancDatabases::SQLiteIndex db2(NULL, "index.db");
+    OrthancDatabases::DatabaseManager manager2(db2.CreateDatabaseFactory());
+
+    manager1.Open();
+    ASSERT_THROW(manager2.Open(), Orthanc::OrthancException);
   }
 
   {
     OrthancDatabases::SQLiteIndex db3(NULL, "index.db");
-    db3.Open();
+    OrthancDatabases::DatabaseManager manager3(db3.CreateDatabaseFactory());
+    manager3.Open();
   }
 }
 

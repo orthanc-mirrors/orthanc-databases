@@ -269,19 +269,20 @@ namespace OrthancDatabases
 
   MySQLIndex::MySQLIndex(OrthancPluginContext* context,
                          const MySQLParameters& parameters) :
-    IndexBackend(context, new Factory(*this)),
+    IndexBackend(context),
     parameters_(parameters),
     clearAll_(false)
   {
   }
 
 
-  int64_t MySQLIndex::CreateResource(const char* publicId,
+  int64_t MySQLIndex::CreateResource(DatabaseManager& manager,
+                                     const char* publicId,
                                      OrthancPluginResourceType type)
   {
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "INSERT INTO Resources VALUES(${}, ${type}, ${id}, NULL)");
     
       statement.SetParameterType("id", ValueType_Utf8String);
@@ -296,7 +297,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "SELECT LAST_INSERT_ID()");
 
       statement.Execute();
@@ -307,9 +308,10 @@ namespace OrthancDatabases
 
 
   void MySQLIndex::DeleteResource(IDatabaseBackendOutput& output,
+                                  DatabaseManager& manager,
                                   int64_t id)
   {
-    ClearDeletedFiles();
+    ClearDeletedFiles(manager);
 
     // Recursive exploration of resources to be deleted, from the "id"
     // resource to the top of the tree of resources
@@ -322,7 +324,7 @@ namespace OrthancDatabases
       
       {
         DatabaseManager::CachedStatement lookupSiblings(
-          STATEMENT_FROM_HERE, GetManager(),
+          STATEMENT_FROM_HERE, manager,
           "SELECT parentId FROM Resources "
           "WHERE parentId = (SELECT parentId FROM Resources WHERE internalId=${id});");
 
@@ -355,7 +357,7 @@ namespace OrthancDatabases
             done = true;
 
             DatabaseManager::CachedStatement parent(
-              STATEMENT_FROM_HERE, GetManager(),
+              STATEMENT_FROM_HERE, manager,
               "SELECT publicId, resourceType FROM Resources WHERE internalId=${id};");
             
             parent.SetParameterType("id", ValueType_Integer64);
@@ -375,7 +377,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement deleteHierarchy(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM Resources WHERE internalId IN (SELECT * FROM (SELECT internalId FROM Resources WHERE internalId=${id} OR parentId=${id} OR parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}) OR parentId IN (SELECT internalId FROM Resources WHERE parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}))) as t);");
       
       deleteHierarchy.SetParameterType("id", ValueType_Integer64);
@@ -386,14 +388,14 @@ namespace OrthancDatabases
       deleteHierarchy.Execute(args);
     }
 
-    SignalDeletedFiles(output);
+    SignalDeletedFiles(output, manager);
   }
 
   
-  int64_t MySQLIndex::GetLastChangeIndex()
+  int64_t MySQLIndex::GetLastChangeIndex(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "SELECT value FROM GlobalIntegers WHERE property = 0");
     
     statement.SetReadOnly(true);
@@ -405,6 +407,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   void MySQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                  DatabaseManager& manager,
                                   const char* hashPatient,
                                   const char* hashStudy,
                                   const char* hashSeries,
@@ -412,7 +415,7 @@ namespace OrthancDatabases
   {
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "CALL CreateInstance(${patient}, ${study}, ${series}, ${instance}, "
         "@isNewPatient, @isNewStudy, @isNewSeries, @isNewInstance, "
         "@patientKey, @studyKey, @seriesKey, @instanceKey)");
@@ -438,7 +441,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "SELECT @isNewPatient, @isNewStudy, @isNewSeries, @isNewInstance, "
         "@patientKey, @studyKey, @seriesKey, @instanceKey");
 

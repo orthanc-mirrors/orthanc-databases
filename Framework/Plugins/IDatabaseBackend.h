@@ -24,7 +24,7 @@
 
 #include "IDatabaseBackendOutput.h"
 #include "../Common/DatabasesEnumerations.h"
-#include "../Common/IDatabaseFactory.h"
+#include "../Common/DatabaseManager.h"
 
 #include <list>
 
@@ -45,40 +45,45 @@ namespace OrthancDatabases
                         
     virtual IDatabaseBackendOutput* CreateOutput() = 0;
 
-    virtual void Open() = 0;
-
-    virtual void Close() = 0;
-
-    virtual void AddAttachment(int64_t id,
+    virtual void AddAttachment(DatabaseManager& manager,
+                               int64_t id,
                                const OrthancPluginAttachment& attachment) = 0;
 
-    virtual void AttachChild(int64_t parent,
+    virtual void AttachChild(DatabaseManager& manager,
+                             int64_t parent,
                              int64_t child) = 0;
 
-    virtual void ClearChanges() = 0;
+    virtual void ClearChanges(DatabaseManager& manager) = 0;
 
-    virtual void ClearExportedResources() = 0;
+    virtual void ClearExportedResources(DatabaseManager& manager) = 0;
 
-    virtual int64_t CreateResource(const char* publicId,
+    virtual int64_t CreateResource(DatabaseManager& manager,
+                                   const char* publicId,
                                    OrthancPluginResourceType type) = 0;
 
     virtual void DeleteAttachment(IDatabaseBackendOutput& output,
+                                  DatabaseManager& manager,
                                   int64_t id,
                                   int32_t attachment) = 0;
 
-    virtual void DeleteMetadata(int64_t id,
+    virtual void DeleteMetadata(DatabaseManager& manager,
+                                int64_t id,
                                 int32_t metadataType) = 0;
 
     virtual void DeleteResource(IDatabaseBackendOutput& output,
+                                DatabaseManager& manager,
                                 int64_t id) = 0;
 
     virtual void GetAllInternalIds(std::list<int64_t>& target,
+                                   DatabaseManager& manager,
                                    OrthancPluginResourceType resourceType) = 0;
 
     virtual void GetAllPublicIds(std::list<std::string>& target,
+                                 DatabaseManager& manager,
                                  OrthancPluginResourceType resourceType) = 0;
 
     virtual void GetAllPublicIds(std::list<std::string>& target,
+                                 DatabaseManager& manager,
                                  OrthancPluginResourceType resourceType,
                                  uint64_t since,
                                  uint64_t limit) = 0;
@@ -86,68 +91,87 @@ namespace OrthancDatabases
     /* Use GetOutput().AnswerChange() */
     virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
+                            DatabaseManager& manager,
                             int64_t since,
                             uint32_t maxResults) = 0;
 
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
+                                       DatabaseManager& manager,
                                        int64_t id) = 0;
 
     virtual void GetChildrenPublicId(std::list<std::string>& target /*out*/,
+                                     DatabaseManager& manager,
                                      int64_t id) = 0;
 
     /* Use GetOutput().AnswerExportedResource() */
     virtual void GetExportedResources(IDatabaseBackendOutput& output,
                                       bool& done /*out*/,
+                                      DatabaseManager& manager,
                                       int64_t since,
                                       uint32_t maxResults) = 0;
 
     /* Use GetOutput().AnswerChange() */
-    virtual void GetLastChange(IDatabaseBackendOutput& output) = 0;
+    virtual void GetLastChange(IDatabaseBackendOutput& output,
+                               DatabaseManager& manager) = 0;
 
     /* Use GetOutput().AnswerExportedResource() */
-    virtual void GetLastExportedResource(IDatabaseBackendOutput& output) = 0;
+    virtual void GetLastExportedResource(IDatabaseBackendOutput& output,
+                                         DatabaseManager& manager) = 0;
 
     /* Use GetOutput().AnswerDicomTag() */
     virtual void GetMainDicomTags(IDatabaseBackendOutput& output,
+                                  DatabaseManager& manager,
                                   int64_t id) = 0;
 
-    virtual std::string GetPublicId(int64_t resourceId) = 0;
+    virtual std::string GetPublicId(DatabaseManager& manager,
+                                    int64_t resourceId) = 0;
 
-    virtual uint64_t GetResourcesCount(OrthancPluginResourceType resourceType) = 0;
+    virtual uint64_t GetResourcesCount(DatabaseManager& manager,
+                                       OrthancPluginResourceType resourceType) = 0;
 
-    virtual OrthancPluginResourceType GetResourceType(int64_t resourceId) = 0;
+    virtual OrthancPluginResourceType GetResourceType(DatabaseManager& manager,
+                                                      int64_t resourceId) = 0;
 
-    virtual uint64_t GetTotalCompressedSize() = 0;
+    virtual uint64_t GetTotalCompressedSize(DatabaseManager& manager) = 0;
     
-    virtual uint64_t GetTotalUncompressedSize() = 0;
+    virtual uint64_t GetTotalUncompressedSize(DatabaseManager& manager) = 0;
 
-    virtual bool IsExistingResource(int64_t internalId) = 0;
+    virtual bool IsExistingResource(DatabaseManager& manager,
+                                    int64_t internalId) = 0;
 
-    virtual bool IsProtectedPatient(int64_t internalId) = 0;
+    virtual bool IsProtectedPatient(DatabaseManager& manager,
+                                    int64_t internalId) = 0;
 
     virtual void ListAvailableMetadata(std::list<int32_t>& target /*out*/,
+                                       DatabaseManager& manager,
                                        int64_t id) = 0;
 
     virtual void ListAvailableAttachments(std::list<int32_t>& target /*out*/,
+                                          DatabaseManager& manager,
                                           int64_t id) = 0;
 
-    virtual void LogChange(int32_t changeType,
+    virtual void LogChange(DatabaseManager& manager,
+                           int32_t changeType,
                            int64_t resourceId,
                            OrthancPluginResourceType resourceType,
                            const char* date) = 0;
     
-    virtual void LogExportedResource(const OrthancPluginExportedResource& resource) = 0;
+    virtual void LogExportedResource(DatabaseManager& manager,
+                                     const OrthancPluginExportedResource& resource) = 0;
     
     /* Use GetOutput().AnswerAttachment() */
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
+                                  DatabaseManager& manager,
                                   int64_t id,
                                   int32_t contentType) = 0;
 
     virtual bool LookupGlobalProperty(std::string& target /*out*/,
+                                      DatabaseManager& manager,
                                       const char* serverIdentifier,
                                       int32_t property) = 0;
 
     virtual void LookupIdentifier(std::list<int64_t>& target /*out*/,
+                                  DatabaseManager& manager,
                                   OrthancPluginResourceType resourceType,
                                   uint16_t group,
                                   uint16_t element,
@@ -155,6 +179,7 @@ namespace OrthancDatabases
                                   const char* value) = 0;
 
     virtual void LookupIdentifierRange(std::list<int64_t>& target /*out*/,
+                                       DatabaseManager& manager,
                                        OrthancPluginResourceType resourceType,
                                        uint16_t group,
                                        uint16_t element,
@@ -162,64 +187,71 @@ namespace OrthancDatabases
                                        const char* end) = 0;
 
     virtual bool LookupMetadata(std::string& target /*out*/,
+                                DatabaseManager& manager,
                                 int64_t id,
                                 int32_t metadataType) = 0;
 
     virtual bool LookupParent(int64_t& parentId /*out*/,
+                              DatabaseManager& manager,
                               int64_t resourceId) = 0;
 
     virtual bool LookupResource(int64_t& id /*out*/,
                                 OrthancPluginResourceType& type /*out*/,
+                                DatabaseManager& manager,
                                 const char* publicId) = 0;
 
-    virtual bool SelectPatientToRecycle(int64_t& internalId /*out*/) = 0;
+    virtual bool SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                        DatabaseManager& manager) = 0;
 
     virtual bool SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                        DatabaseManager& manager,
                                         int64_t patientIdToAvoid) = 0;
 
-    virtual void SetGlobalProperty(const char* serverIdentifier,
+    virtual void SetGlobalProperty(DatabaseManager& manager,
+                                   const char* serverIdentifier,
                                    int32_t property,
                                    const char* value) = 0;
 
-    virtual void SetMainDicomTag(int64_t id,
+    virtual void SetMainDicomTag(DatabaseManager& manager,
+                                 int64_t id,
                                  uint16_t group,
                                  uint16_t element,
                                  const char* value) = 0;
 
-    virtual void SetIdentifierTag(int64_t id,
+    virtual void SetIdentifierTag(DatabaseManager& manager,
+                                  int64_t id,
                                   uint16_t group,
                                   uint16_t element,
                                   const char* value) = 0;
 
-    virtual void SetMetadata(int64_t id,
+    virtual void SetMetadata(DatabaseManager& manager,
+                             int64_t id,
                              int32_t metadataType,
                              const char* value) = 0;
 
-    virtual void SetProtectedPatient(int64_t internalId, 
+    virtual void SetProtectedPatient(DatabaseManager& manager,
+                                     int64_t internalId, 
                                      bool isProtected) = 0;
 
-    virtual void StartTransaction(TransactionType type) = 0;
-
-    virtual void RollbackTransaction() = 0;
-
-    virtual void CommitTransaction() = 0;
-
-    virtual uint32_t GetDatabaseVersion() = 0;
+    virtual uint32_t GetDatabaseVersion(DatabaseManager& manager) = 0;
 
     /**
      * Upgrade the database to the specified version of the database
      * schema.  The upgrade script is allowed to make calls to
      * OrthancPluginReconstructMainDicomTags().
      **/
-    virtual void UpgradeDatabase(uint32_t  targetVersion,
+    virtual void UpgradeDatabase(DatabaseManager& manager,
+                                 uint32_t  targetVersion,
                                  OrthancPluginStorageArea* storageArea) = 0;
 
-    virtual void ClearMainDicomTags(int64_t internalId) = 0;
+    virtual void ClearMainDicomTags(DatabaseManager& manager,
+                                    int64_t internalId) = 0;
 
     virtual bool HasCreateInstance() const = 0;
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void LookupResources(IDatabaseBackendOutput& output,
+                                 DatabaseManager& manager,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  uint32_t limit,
@@ -228,6 +260,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                DatabaseManager& manager,
                                 const char* hashPatient,
                                 const char* hashStudy,
                                 const char* hashSeries,
@@ -237,6 +270,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void SetResourcesContent(
+      DatabaseManager& manager,
       uint32_t countIdentifierTags,
       const OrthancPluginResourcesContentTags* identifierTags,
       uint32_t countMainDicomTags,
@@ -247,12 +281,14 @@ namespace OrthancDatabases
 
     
     virtual void GetChildrenMetadata(std::list<std::string>& target,
+                                     DatabaseManager& manager,
                                      int64_t resourceId,
                                      int32_t metadata) = 0;
 
-    virtual int64_t GetLastChangeIndex() = 0;
+    virtual int64_t GetLastChangeIndex(DatabaseManager& manager) = 0;
 
-    virtual void TagMostRecentPatient(int64_t patientId) = 0;
+    virtual void TagMostRecentPatient(DatabaseManager& manager,
+                                      int64_t patientId) = 0;
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
@@ -260,6 +296,7 @@ namespace OrthancDatabases
     virtual bool LookupResourceAndParent(int64_t& id,
                                          OrthancPluginResourceType& type,
                                          std::string& parentPublicId,
+                                         DatabaseManager& manager,
                                          const char* publicId) = 0;
 #  endif
 #endif
@@ -267,6 +304,7 @@ namespace OrthancDatabases
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
+                                DatabaseManager& manager,
                                 int64_t id) = 0;
 #  endif
 #endif

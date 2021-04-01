@@ -54,8 +54,8 @@ namespace OrthancDatabases
   {
   private:
     std::unique_ptr<IDatabaseBackend>  backend_;
-    boost::mutex                       databaseMutex_;
-    std::unique_ptr<DatabaseManager>   database_;
+    boost::mutex                       managerMutex_;
+    std::unique_ptr<DatabaseManager>   manager_;
 
   public:
     Adapter(IDatabaseBackend* backend) :
@@ -74,12 +74,12 @@ namespace OrthancDatabases
 
     void OpenConnection()
     {
-      boost::mutex::scoped_lock  lock(databaseMutex_);
+      boost::mutex::scoped_lock  lock(managerMutex_);
 
-      if (database_.get() == NULL)
+      if (manager_.get() == NULL)
       {
-        database_.reset(new DatabaseManager(backend_->CreateDatabaseFactory()));
-        database_->Open();
+        manager_.reset(new DatabaseManager(backend_->CreateDatabaseFactory()));
+        manager_->Open();
       }
       else
       {
@@ -89,16 +89,16 @@ namespace OrthancDatabases
 
     void CloseConnection()
     {
-      boost::mutex::scoped_lock  lock(databaseMutex_);
+      boost::mutex::scoped_lock  lock(managerMutex_);
 
-      if (database_.get() == NULL)
+      if (manager_.get() == NULL)
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
       }
       else
       {
-        database_->Close();
-        database_.reset(NULL);
+        manager_->Close();
+        manager_.reset(NULL);
       }
     }
 
@@ -106,23 +106,23 @@ namespace OrthancDatabases
     {
     private:
       boost::mutex::scoped_lock  lock_;
-      DatabaseManager*           database_;
+      DatabaseManager*           manager_;
       
     public:
       DatabaseAccessor(Adapter& adapter) :
-        lock_(adapter.databaseMutex_),
-        database_(adapter.database_.get())
+        lock_(adapter.managerMutex_),
+        manager_(adapter.manager_.get())
       {
-        if (database_ == NULL)
+        if (manager_ == NULL)
         {
           throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
         }
       }
 
-      DatabaseManager& GetDatabase() const
+      DatabaseManager& GetManager() const
       {
-        assert(database_ != NULL);
-        return *database_;
+        assert(manager_ != NULL);
+        return *manager_;
       }
     };
   };
@@ -351,9 +351,8 @@ namespace OrthancDatabases
 
     try
     {
-      //DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);    // TODO
-      
-      adapter->GetBackend().AddAttachment(id, *attachment);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().AddAttachment(accessor.GetManager(), id, *attachment);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -368,7 +367,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().AttachChild(parent, child);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().AttachChild(accessor.GetManager(), parent, child);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -381,7 +381,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().ClearChanges();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().ClearChanges(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -394,7 +395,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().ClearExportedResources();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().ClearExportedResources(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -410,7 +412,9 @@ namespace OrthancDatabases
 
     try
     {
-      *id = adapter->GetBackend().CreateResource(publicId, resourceType);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      
+      *id = adapter->GetBackend().CreateResource(accessor.GetManager(), publicId, resourceType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -427,7 +431,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().DeleteAttachment(*output, id, contentType);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().DeleteAttachment(*output, accessor.GetManager(), id, contentType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -442,7 +447,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().DeleteMetadata(id, metadataType);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().DeleteMetadata(accessor.GetManager(), id, metadataType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -458,7 +464,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().DeleteResource(*output, id);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().DeleteResource(*output, accessor.GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -475,8 +482,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<int64_t> target;
-      adapter->GetBackend().GetAllInternalIds(target, resourceType);
+      adapter->GetBackend().GetAllInternalIds(target, accessor.GetManager(), resourceType);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
@@ -501,8 +510,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+
       std::list<std::string> ids;
-      adapter->GetBackend().GetAllPublicIds(ids, resourceType);
+      adapter->GetBackend().GetAllPublicIds(ids, accessor.GetManager(), resourceType);
 
       for (std::list<std::string>::const_iterator
              it = ids.begin(); it != ids.end(); ++it)
@@ -530,8 +541,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<std::string> ids;
-      adapter->GetBackend().GetAllPublicIds(ids, resourceType, since, limit);
+      adapter->GetBackend().GetAllPublicIds(ids, accessor.GetManager(), resourceType, since, limit);
 
       for (std::list<std::string>::const_iterator
              it = ids.begin(); it != ids.end(); ++it)
@@ -558,8 +571,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       bool done;
-      adapter->GetBackend().GetChanges(*output, done, since, maxResult);
+      adapter->GetBackend().GetChanges(*output, done, accessor.GetManager(), since, maxResult);
         
       if (done)
       {
@@ -583,8 +598,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<int64_t> target;
-      adapter->GetBackend().GetChildrenInternalId(target, id);
+      adapter->GetBackend().GetChildrenInternalId(target, accessor.GetManager(), id);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
@@ -609,8 +626,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<std::string> ids;
-      adapter->GetBackend().GetChildrenPublicId(ids, id);
+      adapter->GetBackend().GetChildrenPublicId(ids, accessor.GetManager(), id);
 
       for (std::list<std::string>::const_iterator
              it = ids.begin(); it != ids.end(); ++it)
@@ -637,8 +656,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       bool done;
-      adapter->GetBackend().GetExportedResources(*output, done, since, maxResult);
+      adapter->GetBackend().GetExportedResources(*output, done, accessor.GetManager(), since, maxResult);
 
       if (done)
       {
@@ -660,7 +681,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().GetLastChange(*output);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().GetLastChange(*output, accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -676,7 +698,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().GetLastExportedResource(*output);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().GetLastExportedResource(*output, accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -693,7 +716,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().GetMainDicomTags(*output, id);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().GetMainDicomTags(*output, accessor.GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -710,7 +734,9 @@ namespace OrthancDatabases
 
     try
     {
-      std::string s = adapter->GetBackend().GetPublicId(id);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
+      std::string s = adapter->GetBackend().GetPublicId(accessor.GetManager(), id);
       OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                         output->GetDatabase(),
                                         s.c_str());
@@ -729,7 +755,8 @@ namespace OrthancDatabases
 
     try
     {
-      *target = adapter->GetBackend().GetResourcesCount(resourceType);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      *target = adapter->GetBackend().GetResourcesCount(accessor.GetManager(), resourceType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -744,7 +771,8 @@ namespace OrthancDatabases
 
     try
     {
-      *resourceType = adapter->GetBackend().GetResourceType(id);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      *resourceType = adapter->GetBackend().GetResourceType(accessor.GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -758,7 +786,8 @@ namespace OrthancDatabases
 
     try
     {
-      *target = adapter->GetBackend().GetTotalCompressedSize();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      *target = adapter->GetBackend().GetTotalCompressedSize(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -772,7 +801,8 @@ namespace OrthancDatabases
 
     try
     {
-      *target = adapter->GetBackend().GetTotalUncompressedSize();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      *target = adapter->GetBackend().GetTotalUncompressedSize(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -787,7 +817,8 @@ namespace OrthancDatabases
 
     try
     {
-      *existing = adapter->GetBackend().IsExistingResource(id);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      *existing = adapter->GetBackend().IsExistingResource(accessor.GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -802,7 +833,8 @@ namespace OrthancDatabases
 
     try
     {
-      *isProtected = adapter->GetBackend().IsProtectedPatient(id);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      *isProtected = adapter->GetBackend().IsProtectedPatient(accessor.GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -819,8 +851,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<int32_t> target;
-      adapter->GetBackend().ListAvailableMetadata(target, id);
+      adapter->GetBackend().ListAvailableMetadata(target, accessor.GetManager(), id);
 
       for (std::list<int32_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
@@ -846,8 +880,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<int32_t> target;
-      adapter->GetBackend().ListAvailableAttachments(target, id);
+      adapter->GetBackend().ListAvailableAttachments(target, accessor.GetManager(), id);
 
       for (std::list<int32_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
@@ -870,16 +906,18 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       int64_t id;
       OrthancPluginResourceType type;
-      if (!adapter->GetBackend().LookupResource(id, type, change->publicId) ||
+      if (!adapter->GetBackend().LookupResource(id, type, accessor.GetManager(), change->publicId) ||
           type != change->resourceType)
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
       else
       {
-        adapter->GetBackend().LogChange(change->changeType, id, type, change->date);
+        adapter->GetBackend().LogChange(accessor.GetManager(), change->changeType, id, type, change->date);
       }
       
       return OrthancPluginErrorCode_Success;
@@ -895,7 +933,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().LogExportedResource(*exported);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().LogExportedResource(accessor.GetManager(), *exported);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -913,7 +952,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().LookupAttachment(*output, id, contentType);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().LookupAttachment(*output, accessor.GetManager(), id, contentType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -930,8 +970,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::string s;
-      if (adapter->GetBackend().LookupGlobalProperty(s, MISSING_SERVER_IDENTIFIER, property))
+      if (adapter->GetBackend().LookupGlobalProperty(s, accessor.GetManager(), MISSING_SERVER_IDENTIFIER, property))
       {
         OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(),
@@ -956,8 +998,11 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<int64_t> target;
-      adapter->GetBackend().LookupIdentifier(target, resourceType, tag->group, tag->element, constraint, tag->value);
+      adapter->GetBackend().LookupIdentifier(target, accessor.GetManager(), resourceType,
+                                             tag->group, tag->element, constraint, tag->value);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
@@ -986,8 +1031,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::list<int64_t> target;
-      adapter->GetBackend().LookupIdentifierRange(target, resourceType, group, element, start, end);
+      adapter->GetBackend().LookupIdentifierRange(target, accessor.GetManager(), resourceType, group, element, start, end);
 
       for (std::list<int64_t>::const_iterator
              it = target.begin(); it != target.end(); ++it)
@@ -1013,8 +1060,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       std::string s;
-      if (adapter->GetBackend().LookupMetadata(s, id, metadata))
+      if (adapter->GetBackend().LookupMetadata(s, accessor.GetManager(), id, metadata))
       {
         OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(), s.c_str());
@@ -1036,8 +1085,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       int64_t parent;
-      if (adapter->GetBackend().LookupParent(parent, id))
+      if (adapter->GetBackend().LookupParent(parent, accessor.GetManager(), id))
       {
         OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), parent);
@@ -1059,9 +1110,11 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       int64_t id;
       OrthancPluginResourceType type;
-      if (adapter->GetBackend().LookupResource(id, type, publicId))
+      if (adapter->GetBackend().LookupResource(id, type, accessor.GetManager(), publicId))
       {
         OrthancPluginDatabaseAnswerResource(adapter->GetBackend().GetContext(),
                                             output->GetDatabase(), 
@@ -1083,8 +1136,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       int64_t id;
-      if (adapter->GetBackend().SelectPatientToRecycle(id))
+      if (adapter->GetBackend().SelectPatientToRecycle(id, accessor.GetManager()))
       {
         OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), id);
@@ -1106,8 +1161,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+
       int64_t id;
-      if (adapter->GetBackend().SelectPatientToRecycle(id, patientIdToAvoid))
+      if (adapter->GetBackend().SelectPatientToRecycle(id, accessor.GetManager(), patientIdToAvoid))
       {
         OrthancPluginDatabaseAnswerInt64(adapter->GetBackend().GetContext(),
                                          output->GetDatabase(), id);
@@ -1127,7 +1184,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().SetGlobalProperty(MISSING_SERVER_IDENTIFIER, property, value);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().SetGlobalProperty(accessor.GetManager(), MISSING_SERVER_IDENTIFIER, property, value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1142,7 +1200,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().SetMainDicomTag(id, tag->group, tag->element, tag->value);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().SetMainDicomTag(accessor.GetManager(), id, tag->group, tag->element, tag->value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1157,7 +1216,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().SetIdentifierTag(id, tag->group, tag->element, tag->value);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().SetIdentifierTag(accessor.GetManager(), id, tag->group, tag->element, tag->value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1173,7 +1233,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().SetMetadata(id, metadata, value);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().SetMetadata(accessor.GetManager(), id, metadata, value);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1188,7 +1249,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().SetProtectedPatient(id, (isProtected != 0));
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
+      adapter->GetBackend().SetProtectedPatient(accessor.GetManager(), id, (isProtected != 0));
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1201,7 +1263,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().StartTransaction(TransactionType_ReadWrite);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      accessor.GetManager().StartTransaction(TransactionType_ReadWrite);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1214,7 +1277,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().RollbackTransaction();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      accessor.GetManager().RollbackTransaction();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1227,7 +1291,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().CommitTransaction();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      accessor.GetManager().CommitTransaction();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1240,8 +1305,7 @@ namespace OrthancDatabases
 
     try
     {
-      //adapter->OpenConnection();  // TODO
-      adapter->GetBackend().Open();
+      adapter->OpenConnection();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1254,8 +1318,7 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().Close();
-      //adapter->CloseConnection();  // TODO
+      adapter->CloseConnection();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1269,7 +1332,8 @@ namespace OrthancDatabases
       
     try
     {
-      *version = adapter->GetBackend().GetDatabaseVersion();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      *version = adapter->GetBackend().GetDatabaseVersion(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1284,7 +1348,8 @@ namespace OrthancDatabases
       
     try
     {
-      adapter->GetBackend().UpgradeDatabase(targetVersion, storageArea);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().UpgradeDatabase(accessor.GetManager(), targetVersion, storageArea);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1298,7 +1363,8 @@ namespace OrthancDatabases
       
     try
     {
-      adapter->GetBackend().ClearMainDicomTags(internalId);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().ClearMainDicomTags(accessor.GetManager(), internalId);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1322,6 +1388,8 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+
       std::vector<Orthanc::DatabaseConstraint> lookup;
       lookup.reserve(constraintsCount);
 
@@ -1330,7 +1398,7 @@ namespace OrthancDatabases
         lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
       }
         
-      adapter->GetBackend().LookupResources(*output, lookup, queryLevel, limit, (requestSomeInstance != 0));
+      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, limit, (requestSomeInstance != 0));
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1350,7 +1418,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().CreateInstance(*target, accessor.GetManager(), hashPatient, hashStudy, hashSeries, hashInstance);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1372,9 +1441,9 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().SetResourcesContent(countIdentifierTags, identifierTags,
-                                   countMainDicomTags, mainDicomTags,
-                                   countMetadata, metadata);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().SetResourcesContent(accessor.GetManager(), countIdentifierTags, identifierTags,
+                                                countMainDicomTags, mainDicomTags, countMetadata, metadata);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1394,8 +1463,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+
       std::list<std::string> values;
-      adapter->GetBackend().GetChildrenMetadata(values, resourceId, metadata);
+      adapter->GetBackend().GetChildrenMetadata(values, accessor.GetManager(), resourceId, metadata);
 
       for (std::list<std::string>::const_iterator
              it = values.begin(); it != values.end(); ++it)
@@ -1419,7 +1490,8 @@ namespace OrthancDatabases
 
     try
     {
-      *result = adapter->GetBackend().GetLastChangeIndex();
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      *result = adapter->GetBackend().GetLastChangeIndex(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1434,7 +1506,8 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->GetBackend().TagMostRecentPatient(patientId);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().TagMostRecentPatient(accessor.GetManager(), patientId);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
@@ -1454,8 +1527,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+
       std::map<int32_t, std::string> result;
-      adapter->GetBackend().GetAllMetadata(result, resourceId);
+      adapter->GetBackend().GetAllMetadata(result, accessor.GetManager(), resourceId);
 
       for (std::map<int32_t, std::string>::const_iterator
              it = result.begin(); it != result.end(); ++it)
@@ -1489,8 +1564,10 @@ namespace OrthancDatabases
 
     try
     {
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+
       std::string parent;
-      if (adapter->GetBackend().LookupResourceAndParent(*id, *type, parent, publicId))
+      if (adapter->GetBackend().LookupResourceAndParent(*id, *type, parent, accessor.GetManager(), publicId))
       {
         *isExisting = 1;
 

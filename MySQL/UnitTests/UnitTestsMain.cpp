@@ -49,18 +49,23 @@ TEST(MySQLIndex, Lock)
 
   OrthancDatabases::MySQLIndex db1(NULL, noLock);
   db1.SetClearAll(true);
-  db1.Open();
+
+  OrthancDatabases::DatabaseManager manager1(db1.CreateDatabaseFactory());
+  manager1.Open();
 
   {
     OrthancDatabases::MySQLIndex db2(NULL, lock);
-    db2.Open();
+    OrthancDatabases::DatabaseManager manager2(db2.CreateDatabaseFactory());
+    manager2.Open();
 
     OrthancDatabases::MySQLIndex db3(NULL, lock);
-    ASSERT_THROW(db3.Open(), Orthanc::OrthancException);
+    OrthancDatabases::DatabaseManager manager3(db3.CreateDatabaseFactory());
+    ASSERT_THROW(manager3.Open(), Orthanc::OrthancException);
   }
 
   OrthancDatabases::MySQLIndex db4(NULL, lock);
-  db4.Open();
+  OrthancDatabases::DatabaseManager manager4(db4.CreateDatabaseFactory());
+  manager4.Open();
 }
 
 

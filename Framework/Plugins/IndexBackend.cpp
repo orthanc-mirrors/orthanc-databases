@@ -175,6 +175,7 @@ namespace OrthancDatabases
 
   void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
                                          bool& done,
+                                         DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
                                          uint32_t maxResults)
@@ -190,7 +191,7 @@ namespace OrthancDatabases
         ReadInteger64(statement, 0),
         ReadInteger32(statement, 1),
         static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 3)),
-        GetPublicId(ReadInteger64(statement, 2)),
+        GetPublicId(manager, ReadInteger64(statement, 2)),
         ReadString(statement, 4));
 
       statement.Next();
@@ -239,30 +240,31 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ClearDeletedFiles()
+  void IndexBackend::ClearDeletedFiles(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "DELETE FROM DeletedFiles");
 
     statement.Execute();
   }
     
 
-  void IndexBackend::ClearDeletedResources()
+  void IndexBackend::ClearDeletedResources(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "DELETE FROM DeletedResources");
 
     statement.Execute();
   }
     
 
-  void IndexBackend::SignalDeletedFiles(IDatabaseBackendOutput& output)
+  void IndexBackend::SignalDeletedFiles(IDatabaseBackendOutput& output,
+                                        DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM DeletedFiles");
 
     statement.SetReadOnly(true);
@@ -287,10 +289,11 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::SignalDeletedResources(IDatabaseBackendOutput& output)
+  void IndexBackend::SignalDeletedResources(IDatabaseBackendOutput& output,
+                                            DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM DeletedResources");
 
     statement.SetReadOnly(true);
@@ -307,10 +310,8 @@ namespace OrthancDatabases
   }
 
 
-  IndexBackend::IndexBackend(OrthancPluginContext* context,
-                             IDatabaseFactory* factory) :
-    context_(context),
-    manager_(factory)
+  IndexBackend::IndexBackend(OrthancPluginContext* context) :
+    context_(context)
   {
   }
 
@@ -345,11 +346,12 @@ namespace OrthancDatabases
   }
 
   
-  void IndexBackend::AddAttachment(int64_t id,
+  void IndexBackend::AddAttachment(DatabaseManager& manager,
+                                   int64_t id,
                                    const OrthancPluginAttachment& attachment)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, "
       "${compressed}, ${uncompressed}, ${compression}, ${hash}, ${hash-compressed})");
 
@@ -376,11 +378,12 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::AttachChild(int64_t parent,
+  void IndexBackend::AttachChild(DatabaseManager& manager,
+                                 int64_t parent,
                                  int64_t child)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "UPDATE Resources SET parentId = ${parent} WHERE internalId = ${child}");
 
     statement.SetParameterType("parent", ValueType_Integer64);
@@ -394,20 +397,20 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::ClearChanges()
+  void IndexBackend::ClearChanges(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "DELETE FROM Changes");
 
     statement.Execute();
   }
 
     
-  void IndexBackend::ClearExportedResources()
+  void IndexBackend::ClearExportedResources(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "DELETE FROM ExportedResources");
 
     statement.Execute();
@@ -415,14 +418,15 @@ namespace OrthancDatabases
 
     
   void IndexBackend::DeleteAttachment(IDatabaseBackendOutput& output,
+                                      DatabaseManager& manager,
                                       int64_t id,
                                       int32_t attachment)
   {
-    ClearDeletedFiles();
+    ClearDeletedFiles(manager);
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
 
       statement.SetParameterType("id", ValueType_Integer64);
@@ -435,15 +439,16 @@ namespace OrthancDatabases
       statement.Execute(args);
     }
 
-    SignalDeletedFiles(output);
+    SignalDeletedFiles(output, manager);
   }
 
     
-  void IndexBackend::DeleteMetadata(int64_t id,
+  void IndexBackend::DeleteMetadata(DatabaseManager& manager,
+                                    int64_t id,
                                     int32_t metadataType)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "DELETE FROM Metadata WHERE id=${id} and type=${type}");
 
     statement.SetParameterType("id", ValueType_Integer64);
@@ -458,16 +463,17 @@ namespace OrthancDatabases
 
     
   void IndexBackend::DeleteResource(IDatabaseBackendOutput& output,
+                                    DatabaseManager& manager,
                                     int64_t id)
   {
-    assert(manager_.GetDialect() != Dialect_MySQL);
+    assert(manager.GetDialect() != Dialect_MySQL);
     
-    ClearDeletedFiles();
-    ClearDeletedResources();
+    ClearDeletedFiles(manager);
+    ClearDeletedResources(manager);
     
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM RemainingAncestor");
 
       statement.Execute();
@@ -475,7 +481,7 @@ namespace OrthancDatabases
       
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM Resources WHERE internalId=${id}");
 
       statement.SetParameterType("id", ValueType_Integer64);
@@ -489,7 +495,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "SELECT * FROM RemainingAncestor");
 
       statement.Execute();
@@ -505,16 +511,17 @@ namespace OrthancDatabases
       }
     }
     
-    SignalDeletedFiles(output);
-    SignalDeletedResources(output);
+    SignalDeletedFiles(output, manager);
+    SignalDeletedResources(output, manager);
   }
 
 
   void IndexBackend::GetAllInternalIds(std::list<int64_t>& target,
+                                       DatabaseManager& manager,
                                        OrthancPluginResourceType resourceType)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT internalId FROM Resources WHERE resourceType=${type}");
       
     statement.SetReadOnly(true);
@@ -528,10 +535,11 @@ namespace OrthancDatabases
 
     
   void IndexBackend::GetAllPublicIds(std::list<std::string>& target,
+                                     DatabaseManager& manager,
                                      OrthancPluginResourceType resourceType)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT publicId FROM Resources WHERE resourceType=${type}");
       
     statement.SetReadOnly(true);
@@ -545,12 +553,13 @@ namespace OrthancDatabases
 
     
   void IndexBackend::GetAllPublicIds(std::list<std::string>& target,
+                                     DatabaseManager& manager,
                                      OrthancPluginResourceType resourceType,
                                      uint64_t since,
                                      uint64_t limit)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT publicId FROM (SELECT publicId FROM Resources "
       "WHERE resourceType=${type}) AS tmp "
       "ORDER BY tmp.publicId LIMIT ${limit} OFFSET ${since}");
@@ -572,11 +581,12 @@ namespace OrthancDatabases
   /* Use GetOutput().AnswerChange() */
   void IndexBackend::GetChanges(IDatabaseBackendOutput& output,
                                 bool& done /*out*/,
+                                DatabaseManager& manager,
                                 int64_t since,
                                 uint32_t maxResults)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM Changes WHERE seq>${since} ORDER BY seq LIMIT ${limit}");
       
     statement.SetReadOnly(true);
@@ -587,15 +597,16 @@ namespace OrthancDatabases
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, statement, args, maxResults);
+    ReadChangesInternal(output, done, manager, statement, args, maxResults);
   }
 
     
   void IndexBackend::GetChildrenInternalId(std::list<int64_t>& target /*out*/,
+                                           DatabaseManager& manager,
                                            int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT a.internalId FROM Resources AS a, Resources AS b  "
       "WHERE a.parentId = b.internalId AND b.internalId = ${id}");
       
@@ -610,10 +621,11 @@ namespace OrthancDatabases
 
     
   void IndexBackend::GetChildrenPublicId(std::list<std::string>& target /*out*/,
+                                         DatabaseManager& manager,
                                          int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT a.publicId FROM Resources AS a, Resources AS b  "
       "WHERE a.parentId = b.internalId AND b.internalId = ${id}");
       
@@ -630,11 +642,12 @@ namespace OrthancDatabases
   /* Use GetOutput().AnswerExportedResource() */
   void IndexBackend::GetExportedResources(IDatabaseBackendOutput& output,
                                           bool& done /*out*/,
+                                          DatabaseManager& manager,
                                           int64_t since,
                                           uint32_t maxResults)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM ExportedResources WHERE seq>${since} ORDER BY seq LIMIT ${limit}");
       
     statement.SetReadOnly(true);
@@ -650,10 +663,11 @@ namespace OrthancDatabases
 
     
   /* Use GetOutput().AnswerChange() */
-  void IndexBackend::GetLastChange(IDatabaseBackendOutput& output)
+  void IndexBackend::GetLastChange(IDatabaseBackendOutput& output,
+                                   DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM Changes ORDER BY seq DESC LIMIT 1");
 
     statement.SetReadOnly(true);
@@ -661,15 +675,16 @@ namespace OrthancDatabases
     Dictionary args;
 
     bool done;  // Ignored
-    ReadChangesInternal(output, done, statement, args, 1);
+    ReadChangesInternal(output, done, manager, statement, args, 1);
   }
 
     
   /* Use GetOutput().AnswerExportedResource() */
-  void IndexBackend::GetLastExportedResource(IDatabaseBackendOutput& output)
+  void IndexBackend::GetLastExportedResource(IDatabaseBackendOutput& output,
+                                             DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM ExportedResources ORDER BY seq DESC LIMIT 1");
 
     statement.SetReadOnly(true);
@@ -683,10 +698,11 @@ namespace OrthancDatabases
     
   /* Use GetOutput().AnswerDicomTag() */
   void IndexBackend::GetMainDicomTags(IDatabaseBackendOutput& output,
+                                      DatabaseManager& manager,
                                       int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM MainDicomTags WHERE id=${id}");
 
     statement.SetReadOnly(true);
@@ -707,10 +723,11 @@ namespace OrthancDatabases
   }
 
     
-  std::string IndexBackend::GetPublicId(int64_t resourceId)
+  std::string IndexBackend::GetPublicId(DatabaseManager& manager,
+                                        int64_t resourceId)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT publicId FROM Resources WHERE internalId=${id}");
 
     statement.SetReadOnly(true);
@@ -732,27 +749,28 @@ namespace OrthancDatabases
   }
 
     
-  uint64_t IndexBackend::GetResourcesCount(OrthancPluginResourceType resourceType)
+  uint64_t IndexBackend::GetResourcesCount(DatabaseManager& manager,
+                                           OrthancPluginResourceType resourceType)
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
-    switch (manager_.GetDialect())
+    switch (manager.GetDialect())
     {
       case Dialect_MySQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COUNT(*) AS UNSIGNED INT) FROM Resources WHERE resourceType=${type}"));
         break;
 
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources WHERE resourceType=${type}"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT COUNT(*) FROM Resources WHERE resourceType=${type}"));
         break;
 
@@ -772,10 +790,11 @@ namespace OrthancDatabases
   }
 
     
-  OrthancPluginResourceType IndexBackend::GetResourceType(int64_t resourceId)
+  OrthancPluginResourceType IndexBackend::GetResourceType(DatabaseManager& manager,
+                                                          int64_t resourceId)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT resourceType FROM Resources WHERE internalId=${id}");
 
     statement.SetReadOnly(true);
@@ -797,29 +816,29 @@ namespace OrthancDatabases
   }
 
     
-  uint64_t IndexBackend::GetTotalCompressedSize()
+  uint64_t IndexBackend::GetTotalCompressedSize(DatabaseManager& manager)
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     // NB: "COALESCE" is used to replace "NULL" by "0" if the number of rows is empty
 
-    switch (manager_.GetDialect())
+    switch (manager.GetDialect())
     {
       case Dialect_MySQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COALESCE(SUM(compressedSize), 0) AS UNSIGNED INTEGER) FROM AttachedFiles"));
         break;
         
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COALESCE(SUM(compressedSize), 0) AS BIGINT) FROM AttachedFiles"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT COALESCE(SUM(compressedSize), 0) FROM AttachedFiles"));
         break;
 
@@ -834,29 +853,29 @@ namespace OrthancDatabases
   }
 
     
-  uint64_t IndexBackend::GetTotalUncompressedSize()
+  uint64_t IndexBackend::GetTotalUncompressedSize(DatabaseManager& manager)
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
     // NB: "COALESCE" is used to replace "NULL" by "0" if the number of rows is empty
 
-    switch (manager_.GetDialect())
+    switch (manager.GetDialect())
     {
       case Dialect_MySQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COALESCE(SUM(uncompressedSize), 0) AS UNSIGNED INTEGER) FROM AttachedFiles"));
         break;
         
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COALESCE(SUM(uncompressedSize), 0) AS BIGINT) FROM AttachedFiles"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT COALESCE(SUM(uncompressedSize), 0) FROM AttachedFiles"));
         break;
 
@@ -871,10 +890,11 @@ namespace OrthancDatabases
   }
 
     
-  bool IndexBackend::IsExistingResource(int64_t internalId)
+  bool IndexBackend::IsExistingResource(DatabaseManager& manager,
+                                        int64_t internalId)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM Resources WHERE internalId=${id}");
 
     statement.SetReadOnly(true);
@@ -889,10 +909,11 @@ namespace OrthancDatabases
   }
 
     
-  bool IndexBackend::IsProtectedPatient(int64_t internalId)
+  bool IndexBackend::IsProtectedPatient(DatabaseManager& manager,
+                                        int64_t internalId)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM PatientRecyclingOrder WHERE patientId = ${id}");
 
     statement.SetReadOnly(true);
@@ -908,10 +929,11 @@ namespace OrthancDatabases
 
     
   void IndexBackend::ListAvailableMetadata(std::list<int32_t>& target /*out*/,
+                                           DatabaseManager& manager,
                                            int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT type FROM Metadata WHERE id=${id}");
       
     statement.SetReadOnly(true);
@@ -925,10 +947,11 @@ namespace OrthancDatabases
 
     
   void IndexBackend::ListAvailableAttachments(std::list<int32_t>& target /*out*/,
+                                              DatabaseManager& manager,
                                               int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT fileType FROM AttachedFiles WHERE id=${id}");
       
     statement.SetReadOnly(true);
@@ -941,13 +964,14 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::LogChange(int32_t changeType,
+  void IndexBackend::LogChange(DatabaseManager& manager,
+                               int32_t changeType,
                                int64_t resourceId,
                                OrthancPluginResourceType resourceType,
                                const char* date)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO Changes VALUES(${}, ${changeType}, ${id}, ${resourceType}, ${date})");
 
     statement.SetParameterType("changeType", ValueType_Integer64);
@@ -965,10 +989,11 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::LogExportedResource(const OrthancPluginExportedResource& resource)
+  void IndexBackend::LogExportedResource(DatabaseManager& manager,
+                                         const OrthancPluginExportedResource& resource)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO ExportedResources VALUES(${}, ${type}, ${publicId}, "
       "${modality}, ${patient}, ${study}, ${series}, ${instance}, ${date})");
 
@@ -997,11 +1022,12 @@ namespace OrthancDatabases
     
   /* Use GetOutput().AnswerAttachment() */
   bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
+                                      DatabaseManager& manager,
                                       int64_t id,
                                       int32_t contentType)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT uuid, uncompressedSize, compressionType, compressedSize, "
       "uncompressedHash, compressedHash FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
 
@@ -1034,15 +1060,17 @@ namespace OrthancDatabases
 
     
   bool IndexBackend::LookupGlobalProperty(std::string& target /*out*/,
+                                          DatabaseManager& manager,
                                           const char* serverIdentifier,
                                           int32_t property)
   {
-    return ::OrthancDatabases::LookupGlobalProperty(target, manager_, serverIdentifier,
+    return ::OrthancDatabases::LookupGlobalProperty(target, manager, serverIdentifier,
                                                     static_cast<Orthanc::GlobalProperty>(property));
   }
 
     
   void IndexBackend::LookupIdentifier(std::list<int64_t>& target /*out*/,
+                                      DatabaseManager& manager,
                                       OrthancPluginResourceType resourceType,
                                       uint16_t group,
                                       uint16_t element,
@@ -1061,25 +1089,25 @@ namespace OrthancDatabases
       case OrthancPluginIdentifierConstraint_Equal:
         header += "d.value = ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager_, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header.c_str()));
         break;
         
       case OrthancPluginIdentifierConstraint_SmallerOrEqual:
         header += "d.value <= ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager_, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header.c_str()));
         break;
         
       case OrthancPluginIdentifierConstraint_GreaterOrEqual:
         header += "d.value >= ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager_, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header.c_str()));
         break;
         
       case OrthancPluginIdentifierConstraint_Wildcard:
         header += "d.value LIKE ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager_, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header.c_str()));
         break;
         
       default:
@@ -1118,6 +1146,7 @@ namespace OrthancDatabases
 
     
   void IndexBackend::LookupIdentifierRange(std::list<int64_t>& target /*out*/,
+                                           DatabaseManager& manager,
                                            OrthancPluginResourceType resourceType,
                                            uint16_t group,
                                            uint16_t element,
@@ -1125,7 +1154,7 @@ namespace OrthancDatabases
                                            const char* end)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT d.id FROM DicomIdentifiers AS d, Resources AS r WHERE "
       "d.id = r.internalId AND r.resourceType=${type} AND d.tagGroup=${group} "
       "AND d.tagElement=${element} AND d.value>=${start} AND d.value<=${end}");
@@ -1156,11 +1185,12 @@ namespace OrthancDatabases
 
     
   bool IndexBackend::LookupMetadata(std::string& target /*out*/,
+                                    DatabaseManager& manager,
                                     int64_t id,
                                     int32_t metadataType)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT value FROM Metadata WHERE id=${id} and type=${type}");
 
     statement.SetReadOnly(true);
@@ -1186,10 +1216,11 @@ namespace OrthancDatabases
 
     
   bool IndexBackend::LookupParent(int64_t& parentId /*out*/,
+                                  DatabaseManager& manager,
                                   int64_t resourceId)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT parentId FROM Resources WHERE internalId=${id}");
 
     statement.SetReadOnly(true);
@@ -1215,10 +1246,11 @@ namespace OrthancDatabases
     
   bool IndexBackend::LookupResource(int64_t& id /*out*/,
                                     OrthancPluginResourceType& type /*out*/,
+                                    DatabaseManager& manager,
                                     const char* publicId)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT internalId, resourceType FROM Resources WHERE publicId=${id}");
 
     statement.SetReadOnly(true);
@@ -1242,10 +1274,11 @@ namespace OrthancDatabases
   }
 
     
-  bool IndexBackend::SelectPatientToRecycle(int64_t& internalId /*out*/)
+  bool IndexBackend::SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                            DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT patientId FROM PatientRecyclingOrder ORDER BY seq ASC LIMIT 1");
 
     statement.SetReadOnly(true);
@@ -1264,10 +1297,11 @@ namespace OrthancDatabases
 
     
   bool IndexBackend::SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                            DatabaseManager& manager,
                                             int64_t patientIdToAvoid)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT patientId FROM PatientRecyclingOrder "
       "WHERE patientId != ${id} ORDER BY seq ASC LIMIT 1");
 
@@ -1291,12 +1325,13 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::SetGlobalProperty(const char* serverIdentifier,
+  void IndexBackend::SetGlobalProperty(DatabaseManager& manager,
+                                       const char* serverIdentifier,
                                        int32_t property,
                                        const char* value)
   {
     return ::OrthancDatabases::SetGlobalProperty(
-      manager_, serverIdentifier, static_cast<Orthanc::GlobalProperty>(property), value);
+      manager, serverIdentifier, static_cast<Orthanc::GlobalProperty>(property), value);
   }
 
 
@@ -1321,40 +1356,43 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::SetMainDicomTag(int64_t id,
+  void IndexBackend::SetMainDicomTag(DatabaseManager& manager,
+                                     int64_t id,
                                      uint16_t group,
                                      uint16_t element,
                                      const char* value)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO MainDicomTags VALUES(${id}, ${group}, ${element}, ${value})");
 
     ExecuteSetTag(statement, id, group, element, value);
   }
 
     
-  void IndexBackend::SetIdentifierTag(int64_t id,
+  void IndexBackend::SetIdentifierTag(DatabaseManager& manager,
+                                      int64_t id,
                                       uint16_t group,
                                       uint16_t element,
                                       const char* value)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO DicomIdentifiers VALUES(${id}, ${group}, ${element}, ${value})");
         
     ExecuteSetTag(statement, id, group, element, value);
   } 
 
     
-  void IndexBackend::SetMetadata(int64_t id,
+  void IndexBackend::SetMetadata(DatabaseManager& manager,
+                                 int64_t id,
                                  int32_t metadataType,
                                  const char* value)
   {
-    if (manager_.GetDialect() == Dialect_SQLite)
+    if (manager.GetDialect() == Dialect_SQLite)
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "INSERT OR REPLACE INTO Metadata VALUES (${id}, ${type}, ${value})");
         
       statement.SetParameterType("id", ValueType_Integer64);
@@ -1372,7 +1410,7 @@ namespace OrthancDatabases
     {
       {
         DatabaseManager::CachedStatement statement(
-          STATEMENT_FROM_HERE, manager_,
+          STATEMENT_FROM_HERE, manager,
           "DELETE FROM Metadata WHERE id=${id} AND type=${type}");
         
         statement.SetParameterType("id", ValueType_Integer64);
@@ -1387,7 +1425,7 @@ namespace OrthancDatabases
 
       {
         DatabaseManager::CachedStatement statement(
-          STATEMENT_FROM_HERE, manager_,
+          STATEMENT_FROM_HERE, manager,
           "INSERT INTO Metadata VALUES (${id}, ${type}, ${value})");
         
         statement.SetParameterType("id", ValueType_Integer64);
@@ -1405,13 +1443,14 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::SetProtectedPatient(int64_t internalId, 
+  void IndexBackend::SetProtectedPatient(DatabaseManager& manager,
+                                         int64_t internalId, 
                                          bool isProtected)
   {
     if (isProtected)
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM PatientRecyclingOrder WHERE patientId=${id}");
         
       statement.SetParameterType("id", ValueType_Integer64);
@@ -1421,10 +1460,10 @@ namespace OrthancDatabases
         
       statement.Execute(args);
     }
-    else if (IsProtectedPatient(internalId))
+    else if (IsProtectedPatient(manager, internalId))
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "INSERT INTO PatientRecyclingOrder VALUES(${}, ${id})");
         
       statement.SetParameterType("id", ValueType_Integer64);
@@ -1441,16 +1480,16 @@ namespace OrthancDatabases
   }
 
     
-  uint32_t IndexBackend::GetDatabaseVersion()
+  uint32_t IndexBackend::GetDatabaseVersion(DatabaseManager& manager)
   {
     // Create a read-only, explicit transaction to read the database
     // version (this was a read-write, implicit transaction in
     // PostgreSQL plugin <= 3.3 and MySQL plugin <= 3.0)
-    DatabaseManager::Transaction transaction(GetManager(), TransactionType_ReadOnly);
+    DatabaseManager::Transaction transaction(manager, TransactionType_ReadOnly);
     
     std::string version = "unknown";
       
-    if (LookupGlobalProperty(version, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
+    if (LookupGlobalProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
     {
       try
       {
@@ -1471,7 +1510,8 @@ namespace OrthancDatabases
    * schema.  The upgrade script is allowed to make calls to
    * OrthancPluginReconstructMainDicomTags().
    **/
-  void IndexBackend::UpgradeDatabase(uint32_t  targetVersion,
+  void IndexBackend::UpgradeDatabase(DatabaseManager& manager,
+                                     uint32_t  targetVersion,
                                      OrthancPluginStorageArea* storageArea)
   {
     LOG(ERROR) << "Upgrading database is not implemented by this plugin";
@@ -1479,11 +1519,12 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::ClearMainDicomTags(int64_t internalId)
+  void IndexBackend::ClearMainDicomTags(DatabaseManager& manager,
+                                        int64_t internalId)
   {
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM MainDicomTags WHERE id=${id}");
         
       statement.SetParameterType("id", ValueType_Integer64);
@@ -1496,7 +1537,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM DicomIdentifiers WHERE id=${id}");
         
       statement.SetParameterType("id", ValueType_Integer64);
@@ -1510,27 +1551,27 @@ namespace OrthancDatabases
 
 
   // For unit testing only!
-  uint64_t IndexBackend::GetAllResourcesCount()
+  uint64_t IndexBackend::GetAllResourcesCount(DatabaseManager& manager)
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
-    switch (manager_.GetDialect())
+    switch (manager.GetDialect())
     {
       case Dialect_MySQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COUNT(*) AS UNSIGNED INT) FROM Resources"));
         break;
         
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT COUNT(*) FROM Resources"));
         break;
 
@@ -1546,27 +1587,27 @@ namespace OrthancDatabases
 
 
   // For unit testing only!
-  uint64_t IndexBackend::GetUnprotectedPatientsCount()
+  uint64_t IndexBackend::GetUnprotectedPatientsCount(DatabaseManager& manager)
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
-    switch (manager_.GetDialect())
+    switch (manager.GetDialect())
     {
       case Dialect_MySQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COUNT(*) AS UNSIGNED INT) FROM PatientRecyclingOrder"));
         break;
         
       case Dialect_PostgreSQL:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT CAST(COUNT(*) AS BIGINT) FROM PatientRecyclingOrder"));
         break;
 
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, GetManager(),
+                          STATEMENT_FROM_HERE, manager,
                           "SELECT COUNT(*) FROM PatientRecyclingOrder"));
         break;
 
@@ -1583,10 +1624,11 @@ namespace OrthancDatabases
 
   // For unit testing only!
   bool IndexBackend::GetParentPublicId(std::string& target,
+                                       DatabaseManager& manager,
                                        int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "SELECT a.publicId FROM Resources AS a, Resources AS b "
       "WHERE a.internalId = b.parentId AND b.internalId = ${id}");
 
@@ -1612,10 +1654,11 @@ namespace OrthancDatabases
 
   // For unit tests only!
   void IndexBackend::GetChildren(std::list<std::string>& childrenPublicIds,
+                                 DatabaseManager& manager,
                                  int64_t id)
   { 
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "SELECT publicId FROM Resources WHERE parentId=${id}");
       
     statement.SetReadOnly(true);
@@ -1700,12 +1743,13 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
+                                     DatabaseManager& manager,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
-    LookupFormatter formatter(manager_.GetDialect());
+    LookupFormatter formatter(manager.GetDialect());
 
     std::string sql;
     Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
@@ -1746,7 +1790,7 @@ namespace OrthancDatabases
       }
     }
 
-    DatabaseManager::StandaloneStatement statement(GetManager(), sql);
+    DatabaseManager::StandaloneStatement statement(manager, sql);
     formatter.PrepareStatement(statement);
 
     statement.Execute(formatter.GetDictionary());
@@ -1884,6 +1928,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   // New primitive since Orthanc 1.5.2
   void IndexBackend::SetResourcesContent(
+    DatabaseManager& manager,
     uint32_t countIdentifierTags,
     const OrthancPluginResourcesContentTags* identifierTags,
     uint32_t countMainDicomTags,
@@ -1898,24 +1943,25 @@ namespace OrthancDatabases
      * same limitation, to check.
      **/
     
-    ExecuteSetResourcesContentTags(GetManager(), "DicomIdentifiers", "i",
+    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", "i",
                                    countIdentifierTags, identifierTags);
 
-    ExecuteSetResourcesContentTags(GetManager(), "MainDicomTags", "t",
+    ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",
                                    countMainDicomTags, mainDicomTags);
 
-    ExecuteSetResourcesContentMetadata(GetManager(), countMetadata, metadata);
+    ExecuteSetResourcesContentMetadata(manager, countMetadata, metadata);
   }
 #endif
 
 
   // New primitive since Orthanc 1.5.2
   void IndexBackend::GetChildrenMetadata(std::list<std::string>& target,
+                                         DatabaseManager& manager,
                                          int64_t resourceId,
                                          int32_t metadata)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT value FROM Metadata WHERE type=${metadata} AND "
       "id IN (SELECT internalId FROM Resources WHERE parentId=${id})");
       
@@ -1932,13 +1978,14 @@ namespace OrthancDatabases
 
 
   // New primitive since Orthanc 1.5.2
-  void IndexBackend::TagMostRecentPatient(int64_t patient)
+  void IndexBackend::TagMostRecentPatient(DatabaseManager& manager,
+                                          int64_t patient)
   {
     int64_t seq;
     
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "SELECT * FROM PatientRecyclingOrder WHERE seq >= "
         "(SELECT seq FROM PatientRecyclingOrder WHERE patientid=${id}) ORDER BY seq LIMIT 2");
 
@@ -1972,7 +2019,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "DELETE FROM PatientRecyclingOrder WHERE seq=${seq}");
         
       statement.SetParameterType("seq", ValueType_Integer64);
@@ -1987,7 +2034,7 @@ namespace OrthancDatabases
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager_,
+        STATEMENT_FROM_HERE, manager,
         "INSERT INTO PatientRecyclingOrder VALUES(${}, ${id})");
         
       statement.SetParameterType("id", ValueType_Integer64);
@@ -2006,10 +2053,11 @@ namespace OrthancDatabases
 bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                            OrthancPluginResourceType& type,
                                            std::string& parentPublicId,
+                                           DatabaseManager& manager,
                                            const char* publicId)
 {
   DatabaseManager::CachedStatement statement(
-    STATEMENT_FROM_HERE, manager_,
+    STATEMENT_FROM_HERE, manager,
     "SELECT resource.internalId, resource.resourceType, parent.publicId "
     "FROM Resources AS resource LEFT JOIN Resources parent ON parent.internalId=resource.parentId "
     "WHERE resource.publicId=${id}");
@@ -2067,10 +2115,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
   // New primitive since Orthanc 1.5.4
   void IndexBackend::GetAllMetadata(std::map<int32_t, std::string>& result,
+                                    DatabaseManager& manager,
                                     int64_t id)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager_,
+      STATEMENT_FROM_HERE, manager,
       "SELECT type, value FROM Metadata WHERE id=${id}");
       
     statement.SetReadOnly(true);
@@ -2105,6 +2154,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
 
   void IndexBackend::CreateInstanceGeneric(OrthancPluginCreateInstanceResult& result,
+                                           DatabaseManager& manager,
                                            const char* hashPatient,
                                            const char* hashStudy,
                                            const char* hashSeries,
@@ -2116,7 +2166,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       OrthancPluginResourceType type;
       int64_t tmp;
         
-      if (LookupResource(tmp, type, hashInstance))
+      if (LookupResource(tmp, type, manager, hashInstance))
       {
         // The instance already exists
         assert(type == OrthancPluginResourceType_Instance);
@@ -2126,7 +2176,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
     }
 
-    result.instanceId = CreateResource(hashInstance, OrthancPluginResourceType_Instance);
+    result.instanceId = CreateResource(manager, hashInstance, OrthancPluginResourceType_Instance);
     result.isNewInstance = true;
 
     result.isNewPatient = false;
@@ -2142,28 +2192,28 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       OrthancPluginResourceType dummy;
 
-      if (LookupResource(result.seriesId, dummy, hashSeries))
+      if (LookupResource(result.seriesId, dummy, manager, hashSeries))
       {
         assert(dummy == OrthancPluginResourceType_Series);
         // The patient, the study and the series already exist
 
-        bool ok = (LookupResource(result.patientId, dummy, hashPatient) &&
-                   LookupResource(result.studyId, dummy, hashStudy));
+        bool ok = (LookupResource(result.patientId, dummy, manager, hashPatient) &&
+                   LookupResource(result.studyId, dummy, manager, hashStudy));
         (void) ok;  // Remove warning about unused variable in release builds
         assert(ok);
       }
-      else if (LookupResource(result.studyId, dummy, hashStudy))
+      else if (LookupResource(result.studyId, dummy, manager, hashStudy))
       {
         assert(dummy == OrthancPluginResourceType_Study);
 
         // New series: The patient and the study already exist
         result.isNewSeries = true;
 
-        bool ok = LookupResource(result.patientId, dummy, hashPatient);
+        bool ok = LookupResource(result.patientId, dummy, manager, hashPatient);
         (void) ok;  // Remove warning about unused variable in release builds
         assert(ok);
       }
-      else if (LookupResource(result.patientId, dummy, hashPatient))
+      else if (LookupResource(result.patientId, dummy, manager, hashPatient))
       {
         assert(dummy == OrthancPluginResourceType_Patient);
 
@@ -2183,35 +2233,35 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // Create the series if needed
     if (result.isNewSeries)
     {
-      result.seriesId = CreateResource(hashSeries, OrthancPluginResourceType_Series);
+      result.seriesId = CreateResource(manager, hashSeries, OrthancPluginResourceType_Series);
     }
 
     // Create the study if needed
     if (result.isNewStudy)
     {
-      result.studyId = CreateResource(hashStudy, OrthancPluginResourceType_Study);
+      result.studyId = CreateResource(manager, hashStudy, OrthancPluginResourceType_Study);
     }
 
     // Create the patient if needed
     if (result.isNewPatient)
     {
-      result.patientId = CreateResource(hashPatient, OrthancPluginResourceType_Patient);
+      result.patientId = CreateResource(manager, hashPatient, OrthancPluginResourceType_Patient);
     }
 
     // Create the parent-to-child links
-    AttachChild(result.seriesId, result.instanceId);
+    AttachChild(manager, result.seriesId, result.instanceId);
 
     if (result.isNewSeries)
     {
-      AttachChild(result.studyId, result.seriesId);
+      AttachChild(manager, result.studyId, result.seriesId);
     }
 
     if (result.isNewStudy)
     {
-      AttachChild(result.patientId, result.studyId);
+      AttachChild(manager, result.patientId, result.studyId);
     }
 
-    TagMostRecentPatient(result.patientId);
+    TagMostRecentPatient(manager, result.patientId);
       
     // Sanity checks
     assert(result.patientId != -1);

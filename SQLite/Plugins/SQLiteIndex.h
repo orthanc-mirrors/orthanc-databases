@@ -79,10 +79,11 @@ namespace OrthancDatabases
       return new Factory(*this);
     }
     
-    virtual int64_t CreateResource(const char* publicId,
+    virtual int64_t CreateResource(DatabaseManager& manager,
+                                   const char* publicId,
                                    OrthancPluginResourceType type);
 
     // New primitive since Orthanc 1.5.2
-    virtual int64_t GetLastChangeIndex();
+    virtual int64_t GetLastChangeIndex(DatabaseManager& manager);
   };
 }

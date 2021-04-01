@@ -56,6 +56,86 @@ namespace OrthancDatabases
 {
   static bool isBackendInUse_ = false;  // Only for sanity checks
   
+
+  // TODO - TURN THIS INTO A CONNECTION POOL
+  class DatabaseBackendAdapterV3::Adapter : public boost::noncopyable
+  {
+  private:
+    std::unique_ptr<IndexBackend>  backend_;
+    boost::mutex                       managerMutex_;
+    std::unique_ptr<DatabaseManager>   manager_;
+
+  public:
+    Adapter(IndexBackend* backend) :
+      backend_(backend)
+    {
+      if (backend == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+      }
+    }
+
+    IndexBackend& GetBackend() const
+    {
+      return *backend_;
+    }
+
+    void OpenConnection()
+    {
+      boost::mutex::scoped_lock  lock(managerMutex_);
+
+      if (manager_.get() == NULL)
+      {
+        manager_.reset(new DatabaseManager(backend_->CreateDatabaseFactory()));
+        manager_->Open();
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+    }
+
+    void CloseConnection()
+    {
+      boost::mutex::scoped_lock  lock(managerMutex_);
+
+      if (manager_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      else
+      {
+        manager_->Close();
+        manager_.reset(NULL);
+      }
+    }
+
+    class DatabaseAccessor : public boost::noncopyable
+    {
+    private:
+      boost::mutex::scoped_lock  lock_;
+      DatabaseManager*           manager_;
+      
+    public:
+      DatabaseAccessor(Adapter& adapter) :
+        lock_(adapter.managerMutex_),
+        manager_(adapter.manager_.get())
+      {
+        if (manager_ == NULL)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+      }
+
+      DatabaseManager& GetManager() const
+      {
+        assert(manager_ != NULL);
+        return *manager_;
+      }
+    };
+  };
+
+
   class DatabaseBackendAdapterV3::Output : public IDatabaseBackendOutput
   {
   private:
@@ -616,20 +696,14 @@ namespace OrthancDatabases
   class DatabaseBackendAdapterV3::Transaction : public boost::noncopyable
   {
   private:
-    boost::mutex::scoped_lock  lock_;    // TODO - REMOVE
-    IndexBackend&          backend_;
+    Adapter&   adapter_;
+    std::unique_ptr<Adapter::DatabaseAccessor>  accessor_;
     std::unique_ptr<Output>    output_;
 
-    static boost::mutex& GetMutex()   // TODO - REMOVE
-    {
-      static boost::mutex mutex_;
-      return mutex_;
-    }
-    
   public:
-    Transaction(IndexBackend& backend) :
-      lock_(GetMutex()),
-      backend_(backend),
+    Transaction(Adapter& adapter) :
+      adapter_(adapter),
+      accessor_(new Adapter::DatabaseAccessor(adapter)),
       output_(new Output)
     {
     }
@@ -640,7 +714,7 @@ namespace OrthancDatabases
 
     IndexBackend& GetBackend() const
     {
-      return backend_;
+      return adapter_.GetBackend();
     }
 
     Output& GetOutput() const
@@ -648,9 +722,9 @@ namespace OrthancDatabases
       return *output_;
     }
 
-    OrthancPluginContext* GetContext() const
+    DatabaseManager& GetManager() const
     {
-      return backend_.GetContext();
+      return accessor_->GetManager();
     }
   };
 
@@ -781,35 +855,35 @@ namespace OrthancDatabases
     
   static OrthancPluginErrorCode Open(void* database)
   {
-    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
 
     try
     {
-      backend->Open();
+      adapter->OpenConnection();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(backend->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
   }
 
   
   static OrthancPluginErrorCode Close(void* database)
   {
-    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
 
     try
     {
-      backend->Close();
+      adapter->CloseConnection();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(backend->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
   }
 
   
   static OrthancPluginErrorCode DestructDatabase(void* database)
   {
-    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
 
-    if (backend == NULL)
+    if (adapter == NULL)
     {
       return OrthancPluginErrorCode_InternalError;
     }
@@ -821,10 +895,10 @@ namespace OrthancDatabases
       }
       else
       {
-        OrthancPluginLogError(backend->GetContext(), "More than one index backend was registered, internal error");
+        OrthancPluginLogError(adapter->GetBackend().GetContext(), "More than one index backend was registered, internal error");
       }
       
-      delete backend;
+      delete adapter;
 
       return OrthancPluginErrorCode_Success;
     }
@@ -834,14 +908,15 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetDatabaseVersion(void* database,
                                                    uint32_t* version)
   {
-    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
       
     try
     {
-      *version = backend->GetDatabaseVersion();
+      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      *version = adapter->GetBackend().GetDatabaseVersion(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(backend->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
   }
 
 
@@ -849,14 +924,15 @@ namespace OrthancDatabases
                                                 OrthancPluginStorageArea* storageArea,
                                                 uint32_t  targetVersion)
   {
-    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
       
     try
     {
-      backend->UpgradeDatabase(targetVersion, storageArea);
+      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      adapter->GetBackend().UpgradeDatabase(accessor.GetManager(), targetVersion, storageArea);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(backend->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
   }
 
 
@@ -864,20 +940,20 @@ namespace OrthancDatabases
                                                  OrthancPluginDatabaseTransaction** target /* out */,
                                                  OrthancPluginDatabaseTransactionType type)
   {
-    IndexBackend* backend = reinterpret_cast<IndexBackend*>(database);
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
       
     try
     {
-      std::unique_ptr<DatabaseBackendAdapterV3::Transaction> transaction(new DatabaseBackendAdapterV3::Transaction(*backend));
+      std::unique_ptr<DatabaseBackendAdapterV3::Transaction> transaction(new DatabaseBackendAdapterV3::Transaction(*adapter));
       
       switch (type)
       {
         case OrthancPluginDatabaseTransactionType_ReadOnly:
-          backend->StartTransaction(TransactionType_ReadOnly);
+          transaction->GetManager().StartTransaction(TransactionType_ReadOnly);
           break;
 
         case OrthancPluginDatabaseTransactionType_ReadWrite:
-          backend->StartTransaction(TransactionType_ReadWrite);
+          transaction->GetManager().StartTransaction(TransactionType_ReadWrite);
           break;
 
         default:
@@ -888,7 +964,7 @@ namespace OrthancDatabases
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(backend->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
   }
 
   
@@ -913,10 +989,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().RollbackTransaction();
+      t->GetManager().RollbackTransaction();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -928,10 +1004,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().CommitTransaction();
+      t->GetManager().CommitTransaction();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -944,10 +1020,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().AddAttachment(id, *attachment);
+      t->GetBackend().AddAttachment(t->GetManager(), id, *attachment);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -958,10 +1034,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().ClearChanges();
+      t->GetBackend().ClearChanges(t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -972,10 +1048,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().ClearExportedResources();
+      t->GetBackend().ClearExportedResources(t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -987,10 +1063,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().ClearMainDicomTags(resourceId);
+      t->GetBackend().ClearMainDicomTags(t->GetManager(), resourceId);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1009,16 +1085,16 @@ namespace OrthancDatabases
 
       if (t->GetBackend().HasCreateInstance())
       {
-        t->GetBackend().CreateInstance(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+        t->GetBackend().CreateInstance(*target, t->GetManager(), hashPatient, hashStudy, hashSeries, hashInstance);
       }
       else
       {
-        t->GetBackend().CreateInstanceGeneric(*target, hashPatient, hashStudy, hashSeries, hashInstance);
+        t->GetBackend().CreateInstanceGeneric(*target, t->GetManager(), hashPatient, hashStudy, hashSeries, hashInstance);
       }
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1031,10 +1107,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().DeleteAttachment(t->GetOutput(), id, contentType);
+      t->GetBackend().DeleteAttachment(t->GetOutput(), t->GetManager(), id, contentType);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1047,10 +1123,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().DeleteMetadata(id, metadataType);
+      t->GetBackend().DeleteMetadata(t->GetManager(), id, metadataType);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1062,10 +1138,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().DeleteResource(t->GetOutput(), id);
+      t->GetBackend().DeleteResource(t->GetOutput(), t->GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1079,7 +1155,7 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::map<int32_t, std::string> values;
-      t->GetBackend().GetAllMetadata(values, id);
+      t->GetBackend().GetAllMetadata(values, t->GetManager(), id);
 
       for (std::map<int32_t, std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
       {
@@ -1088,7 +1164,7 @@ namespace OrthancDatabases
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1102,12 +1178,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::list<std::string> values;
-      t->GetBackend().GetAllPublicIds(values, resourceType);
+      t->GetBackend().GetAllPublicIds(values, t->GetManager(), resourceType);
       t->GetOutput().AnswerStrings(values);
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1123,12 +1199,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::list<std::string> values;
-      t->GetBackend().GetAllPublicIds(values, resourceType, since, limit);
+      t->GetBackend().GetAllPublicIds(values, t->GetManager(), resourceType, since, limit);
       t->GetOutput().AnswerStrings(values);
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1144,12 +1220,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       bool done;
-      t->GetBackend().GetChanges(t->GetOutput(), done, since, maxResults);
+      t->GetBackend().GetChanges(t->GetOutput(), done, t->GetManager(), since, maxResults);
       *targetDone = (done ? 1 : 0);
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1163,12 +1239,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::list<int64_t> values;
-      t->GetBackend().GetChildrenInternalId(values, id);
+      t->GetBackend().GetChildrenInternalId(values, t->GetManager(), id);
       t->GetOutput().AnswerIntegers64(values);
         
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1183,12 +1259,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::list<std::string> values;
-      t->GetBackend().GetChildrenMetadata(values, resourceId, metadata);
+      t->GetBackend().GetChildrenMetadata(values, t->GetManager(), resourceId, metadata);
       t->GetOutput().AnswerStrings(values);
         
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1202,12 +1278,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::list<std::string> values;
-      t->GetBackend().GetChildrenPublicId(values, id);
+      t->GetBackend().GetChildrenPublicId(values, t->GetManager(), id);
       t->GetOutput().AnswerStrings(values);
         
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1223,12 +1299,12 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       bool done;
-      t->GetBackend().GetExportedResources(t->GetOutput(), done, since, maxResults);
+      t->GetBackend().GetExportedResources(t->GetOutput(), done, t->GetManager(), since, maxResults);
       *targetDone = (done ? 1 : 0);
         
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1239,10 +1315,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().GetLastChange(t->GetOutput());
+      t->GetBackend().GetLastChange(t->GetOutput(), t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1254,10 +1330,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      *target = t->GetBackend().GetLastChangeIndex();
+      *target = t->GetBackend().GetLastChangeIndex(t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1268,10 +1344,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().GetLastExportedResource(t->GetOutput());
+      t->GetBackend().GetLastExportedResource(t->GetOutput(), t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1283,10 +1359,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().GetMainDicomTags(t->GetOutput(), id);
+      t->GetBackend().GetMainDicomTags(t->GetOutput(), t->GetManager(), id);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1298,10 +1374,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetOutput().AnswerString(t->GetBackend().GetPublicId(id));
+      t->GetOutput().AnswerString(t->GetBackend().GetPublicId(t->GetManager(), id));
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1314,10 +1390,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      *target = t->GetBackend().GetResourcesCount(resourceType);
+      *target = t->GetBackend().GetResourcesCount(t->GetManager(), resourceType);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1330,10 +1406,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      *target = t->GetBackend().GetResourceType(resourceId);
+      *target = t->GetBackend().GetResourceType(t->GetManager(), resourceId);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1345,10 +1421,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      *target = t->GetBackend().GetTotalCompressedSize();
+      *target = t->GetBackend().GetTotalCompressedSize(t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1360,10 +1436,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      *target = t->GetBackend().GetTotalUncompressedSize();
+      *target = t->GetBackend().GetTotalUncompressedSize(t->GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1376,11 +1452,11 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      bool above = (t->GetBackend().GetTotalCompressedSize() >= threshold);
+      bool above = (t->GetBackend().GetTotalCompressedSize(t->GetManager()) >= threshold);
       *target = (above ? 1 : 0);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1393,11 +1469,11 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      bool exists = t->GetBackend().IsExistingResource(resourceId);
+      bool exists = t->GetBackend().IsExistingResource(t->GetManager(), resourceId);
       *target = (exists ? 1 : 0);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1410,11 +1486,11 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      bool isProtected = t->GetBackend().IsProtectedPatient(resourceId);
+      bool isProtected = t->GetBackend().IsProtectedPatient(t->GetManager(), resourceId);
       *target = (isProtected ? 1 : 0);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1428,11 +1504,11 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::list<int32_t> values;
-      t->GetBackend().ListAvailableAttachments(values, resourceId);
+      t->GetBackend().ListAvailableAttachments(values, t->GetManager(), resourceId);
       t->GetOutput().AnswerIntegers32(values);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1447,10 +1523,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().LogChange(changeType, resourceId, resourceType, date);
+      t->GetBackend().LogChange(t->GetManager(), changeType, resourceId, resourceType, date);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
   
 
@@ -1480,10 +1556,10 @@ namespace OrthancDatabases
       exported.sopInstanceUid = sopInstanceUid;
         
       t->GetOutput().Clear();
-      t->GetBackend().LogExportedResource(exported);
+      t->GetBackend().LogExportedResource(t->GetManager(), exported);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1496,10 +1572,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().LookupAttachment(t->GetOutput(), resourceId, contentType);
+      t->GetBackend().LookupAttachment(t->GetOutput(), t->GetManager(), resourceId, contentType);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1514,14 +1590,14 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::string s;
-      if (t->GetBackend().LookupGlobalProperty(s, serverIdentifier, property))
+      if (t->GetBackend().LookupGlobalProperty(s, t->GetManager(), serverIdentifier, property))
       {
         t->GetOutput().AnswerString(s);
       }
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1536,14 +1612,14 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::string s;
-      if (t->GetBackend().LookupMetadata(s, id, metadata))
+      if (t->GetBackend().LookupMetadata(s, t->GetManager(), id, metadata))
       {
         t->GetOutput().AnswerString(s);
       }
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1557,14 +1633,14 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       int64_t parentId;
-      if (t->GetBackend().LookupParent(parentId, id))
+      if (t->GetBackend().LookupParent(parentId, t->GetManager(), id))
       {
         t->GetOutput().AnswerInteger64(parentId);
       }
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1580,7 +1656,7 @@ namespace OrthancDatabases
     {
       t->GetOutput().Clear();
 
-      if (t->GetBackend().LookupResource(*id, *type, publicId))
+      if (t->GetBackend().LookupResource(*id, *type, t->GetManager(), publicId))
       {
         *isExisting = 1;
       }
@@ -1591,7 +1667,7 @@ namespace OrthancDatabases
         
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1616,10 +1692,10 @@ namespace OrthancDatabases
         lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
       }
         
-      t->GetBackend().LookupResources(t->GetOutput(), lookup, queryLevel, limit, (requestSomeInstanceId != 0));
+      t->GetBackend().LookupResources(t->GetOutput(), t->GetManager(), lookup, queryLevel, limit, (requestSomeInstanceId != 0));
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
 
@@ -1636,7 +1712,7 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::string parent;
-      if (t->GetBackend().LookupResourceAndParent(*id, *type, parent, publicId))
+      if (t->GetBackend().LookupResourceAndParent(*id, *type, parent, t->GetManager(), publicId))
       {
         *isExisting = 1;
 
@@ -1652,7 +1728,7 @@ namespace OrthancDatabases
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
   
@@ -1665,14 +1741,14 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
       
       int64_t id;
-      if (t->GetBackend().SelectPatientToRecycle(id))
+      if (t->GetBackend().SelectPatientToRecycle(id, t->GetManager()))
       {
         t->GetOutput().AnswerInteger64(id);
       }
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
     
@@ -1686,14 +1762,14 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
       
       int64_t id;
-      if (t->GetBackend().SelectPatientToRecycle(id, patientIdToAvoid))
+      if (t->GetBackend().SelectPatientToRecycle(id, t->GetManager(), patientIdToAvoid))
       {
         t->GetOutput().AnswerInteger64(id);
       }
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
     
@@ -1707,10 +1783,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().SetGlobalProperty(serverIdentifier, property, value);
+      t->GetBackend().SetGlobalProperty(t->GetManager(), serverIdentifier, property, value);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
     
@@ -1724,10 +1800,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().SetMetadata(id, metadata, value);
+      t->GetBackend().SetMetadata(t->GetManager(), id, metadata, value);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
     
@@ -1740,10 +1816,10 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().SetProtectedPatient(id, (isProtected != 0));
+      t->GetBackend().SetProtectedPatient(t->GetManager(), id, (isProtected != 0));
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
     
@@ -1760,12 +1836,11 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().SetResourcesContent(countIdentifierTags, identifierTags,
-                                          countMainDicomTags, mainDicomTags,
-                                          countMetadata, metadata);
+      t->GetBackend().SetResourcesContent(t->GetManager(), countIdentifierTags, identifierTags,
+                                          countMainDicomTags, mainDicomTags, countMetadata, metadata);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
   }
 
     
@@ -1855,7 +1930,7 @@ namespace OrthancDatabases
 
     OrthancPluginContext* context = backend->GetContext();
  
-    if (OrthancPluginRegisterDatabaseBackendV3(context, &params, sizeof(params), backend) != OrthancPluginErrorCode_Success)
+    if (OrthancPluginRegisterDatabaseBackendV3(context, &params, sizeof(params), new Adapter(backend)) != OrthancPluginErrorCode_Success)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }

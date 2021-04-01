@@ -76,13 +76,14 @@ namespace OrthancDatabases
       return new Factory(*this);
     }
 
-    virtual int64_t CreateResource(const char* publicId,
+    virtual int64_t CreateResource(DatabaseManager& manager,
+                                   const char* publicId,
                                    OrthancPluginResourceType type)
       ORTHANC_OVERRIDE;
 
-    virtual uint64_t GetTotalCompressedSize() ORTHANC_OVERRIDE;
+    virtual uint64_t GetTotalCompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-    virtual uint64_t GetTotalUncompressedSize() ORTHANC_OVERRIDE;
+    virtual uint64_t GetTotalUncompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
     
     virtual bool HasCreateInstance() const  ORTHANC_OVERRIDE
     {
@@ -91,6 +92,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                DatabaseManager& manager,
                                 const char* hashPatient,
                                 const char* hashStudy,
                                 const char* hashSeries,
@@ -98,10 +100,12 @@ namespace OrthancDatabases
       ORTHANC_OVERRIDE;
 #endif
 
-    virtual uint64_t GetResourcesCount(OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE;
+    virtual uint64_t GetResourcesCount(DatabaseManager& manager,
+                                       OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE;
 
-    virtual int64_t GetLastChangeIndex() ORTHANC_OVERRIDE;
+    virtual int64_t GetLastChangeIndex(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-    virtual void TagMostRecentPatient(int64_t patient) ORTHANC_OVERRIDE;
+    virtual void TagMostRecentPatient(DatabaseManager& manager,
+                                      int64_t patient) ORTHANC_OVERRIDE;
   };
 }

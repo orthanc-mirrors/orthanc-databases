@@ -259,18 +259,19 @@ namespace OrthancDatabases
 
   PostgreSQLIndex::PostgreSQLIndex(OrthancPluginContext* context,
                                    const PostgreSQLParameters& parameters) :
-    IndexBackend(context, new Factory(*this)),
+    IndexBackend(context),
     parameters_(parameters),
     clearAll_(false)
   {
   }
 
   
-  int64_t PostgreSQLIndex::CreateResource(const char* publicId,
+  int64_t PostgreSQLIndex::CreateResource(DatabaseManager& manager,
+                                          const char* publicId,
                                           OrthancPluginResourceType type)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "INSERT INTO Resources VALUES(${}, ${type}, ${id}, NULL) RETURNING internalId");
      
     statement.SetParameterType("id", ValueType_Utf8String);
@@ -286,14 +287,14 @@ namespace OrthancDatabases
   }
 
 
-  uint64_t PostgreSQLIndex::GetTotalCompressedSize()
+  uint64_t PostgreSQLIndex::GetTotalCompressedSize(DatabaseManager& manager)
   {
     // Fast version if extension "./FastTotalSize.sql" is installed
     uint64_t result;
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "SELECT value FROM GlobalIntegers WHERE key = 0");
 
       statement.SetReadOnly(true);
@@ -302,19 +303,19 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(ReadInteger64(statement, 0));
     }
     
-    assert(result == IndexBackend::GetTotalCompressedSize());
+    assert(result == IndexBackend::GetTotalCompressedSize(manager));
     return result;
   }
 
   
-  uint64_t PostgreSQLIndex::GetTotalUncompressedSize()
+  uint64_t PostgreSQLIndex::GetTotalUncompressedSize(DatabaseManager& manager)
   {
     // Fast version if extension "./FastTotalSize.sql" is installed
     uint64_t result;
 
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "SELECT value FROM GlobalIntegers WHERE key = 1");
 
       statement.SetReadOnly(true);
@@ -323,20 +324,21 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(ReadInteger64(statement, 0));
     }
     
-    assert(result == IndexBackend::GetTotalUncompressedSize());
+    assert(result == IndexBackend::GetTotalUncompressedSize(manager));
     return result;
   }
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,
+                                       DatabaseManager& manager,
                                        const char* hashPatient,
                                        const char* hashStudy,
                                        const char* hashSeries,
                                        const char* hashInstance)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "SELECT * FROM CreateInstance(${patient}, ${study}, ${series}, ${instance})");
 
     statement.SetParameterType("patient", ValueType_Utf8String);
@@ -379,7 +381,8 @@ namespace OrthancDatabases
 #endif
 
 
-  uint64_t PostgreSQLIndex::GetResourcesCount(OrthancPluginResourceType resourceType)
+  uint64_t PostgreSQLIndex::GetResourcesCount(DatabaseManager& manager,
+                                              OrthancPluginResourceType resourceType)
   {
     // Optimized version thanks to the "FastCountResources.sql" extension
 
@@ -392,7 +395,7 @@ namespace OrthancDatabases
     
     {
       DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, GetManager(),
+        STATEMENT_FROM_HERE, manager,
         "SELECT value FROM GlobalIntegers WHERE key = ${key}");
 
       statement.SetParameterType("key", ValueType_Integer64);
@@ -408,15 +411,15 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(ReadInteger64(statement, 0));
     }
       
-    assert(result == IndexBackend::GetResourcesCount(resourceType));
+    assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
     return result;
   }
 
 
-  int64_t PostgreSQLIndex::GetLastChangeIndex()
+  int64_t PostgreSQLIndex::GetLastChangeIndex(DatabaseManager& manager)
   {
     DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
+      STATEMENT_FROM_HERE, manager,
       "SELECT value FROM GlobalIntegers WHERE key = 6");
 
     statement.SetReadOnly(true);
@@ -426,7 +429,8 @@ namespace OrthancDatabases
   }
 
 
-  void PostgreSQLIndex::TagMostRecentPatient(int64_t patient)
+  void PostgreSQLIndex::TagMostRecentPatient(DatabaseManager& manager,
+                                             int64_t patient)
   {
     // This behavior is implemented in "CreateInstance()", and no
     // backward compatibility is necessary
