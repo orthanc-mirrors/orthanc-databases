@@ -37,32 +37,25 @@ TEST(SQLiteIndex, Lock)
   {
     // No locking if using memory backend
     OrthancDatabases::SQLiteIndex db1(NULL);
-    OrthancDatabases::DatabaseManager manager1(db1.CreateDatabaseFactory());
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
 
     OrthancDatabases::SQLiteIndex db2(NULL);
-    OrthancDatabases::DatabaseManager manager2(db2.CreateDatabaseFactory());
-    
-    manager1.Open();
-    manager2.Open();
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2));
   }
 
   Orthanc::SystemToolbox::RemoveFile("index.db");
 
   {
     OrthancDatabases::SQLiteIndex db1(NULL, "index.db");
-    OrthancDatabases::DatabaseManager manager1(db1.CreateDatabaseFactory());
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
 
     OrthancDatabases::SQLiteIndex db2(NULL, "index.db");
-    OrthancDatabases::DatabaseManager manager2(db2.CreateDatabaseFactory());
-
-    manager1.Open();
-    ASSERT_THROW(manager2.Open(), Orthanc::OrthancException);
+    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2), Orthanc::OrthancException);
   }
 
   {
     OrthancDatabases::SQLiteIndex db3(NULL, "index.db");
-    OrthancDatabases::DatabaseManager manager3(db3.CreateDatabaseFactory());
-    manager3.Open();
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager3(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3));
   }
 }
 

@@ -57,7 +57,7 @@ extern "C"
     {
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::StorageBackend::Register
-        (context, new OrthancDatabases::PostgreSQLStorageArea(parameters));
+        (context, new OrthancDatabases::PostgreSQLStorageArea(parameters, false /* don't clear database */));
     }
     catch (Orthanc::OrthancException& e)
     {

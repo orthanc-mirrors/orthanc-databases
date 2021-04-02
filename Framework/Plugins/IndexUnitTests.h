@@ -182,128 +182,127 @@ TEST(IndexBackend, Basic)
 
   db.SetOutputFactory(new DatabaseBackendAdapterV2::Factory(&context, NULL));
 
-  DatabaseManager manager(db.CreateDatabaseFactory());
-  manager.Open();
+  std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db));
   
   std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());
 
   std::string s;
-  ASSERT_TRUE(db.LookupGlobalProperty(s, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
+  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
   ASSERT_EQ("6", s);
 
-  ASSERT_FALSE(db.LookupGlobalProperty(s, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
-  db.SetGlobalProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence, "Hello");
-  ASSERT_TRUE(db.LookupGlobalProperty(s, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
+  ASSERT_FALSE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
+  db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence, "Hello");
+  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
   ASSERT_EQ("Hello", s);
-  db.SetGlobalProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence, "HelloWorld");
-  ASSERT_TRUE(db.LookupGlobalProperty(s, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
+  db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence, "HelloWorld");
+  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_AnonymizationSequence));
   ASSERT_EQ("HelloWorld", s);
 
-  int64_t a = db.CreateResource(manager, "study", OrthancPluginResourceType_Study);
-  ASSERT_TRUE(db.IsExistingResource(manager, a));
-  ASSERT_FALSE(db.IsExistingResource(manager, a + 1));
+  int64_t a = db.CreateResource(*manager, "study", OrthancPluginResourceType_Study);
+  ASSERT_TRUE(db.IsExistingResource(*manager, a));
+  ASSERT_FALSE(db.IsExistingResource(*manager, a + 1));
 
   int64_t b;
   OrthancPluginResourceType t;
-  ASSERT_FALSE(db.LookupResource(b, t, manager, "world"));
-  ASSERT_TRUE(db.LookupResource(b, t, manager, "study"));
+  ASSERT_FALSE(db.LookupResource(b, t, *manager, "world"));
+  ASSERT_TRUE(db.LookupResource(b, t, *manager, "study"));
   ASSERT_EQ(a, b);
   ASSERT_EQ(OrthancPluginResourceType_Study, t);
   
-  b = db.CreateResource(manager, "series", OrthancPluginResourceType_Series);
+  b = db.CreateResource(*manager, "series", OrthancPluginResourceType_Series);
   ASSERT_NE(a, b);
 
-  ASSERT_EQ("study", db.GetPublicId(manager, a));
-  ASSERT_EQ("series", db.GetPublicId(manager, b));
-  ASSERT_EQ(OrthancPluginResourceType_Study, db.GetResourceType(manager, a));
-  ASSERT_EQ(OrthancPluginResourceType_Series, db.GetResourceType(manager, b));
+  ASSERT_EQ("study", db.GetPublicId(*manager, a));
+  ASSERT_EQ("series", db.GetPublicId(*manager, b));
+  ASSERT_EQ(OrthancPluginResourceType_Study, db.GetResourceType(*manager, a));
+  ASSERT_EQ(OrthancPluginResourceType_Series, db.GetResourceType(*manager, b));
 
-  db.AttachChild(manager, a, b);
+  db.AttachChild(*manager, a, b);
 
   int64_t c;
-  ASSERT_FALSE(db.LookupParent(c, manager, a));
-  ASSERT_TRUE(db.LookupParent(c, manager, b));
+  ASSERT_FALSE(db.LookupParent(c, *manager, a));
+  ASSERT_TRUE(db.LookupParent(c, *manager, b));
   ASSERT_EQ(a, c);
 
-  c = db.CreateResource(manager, "series2", OrthancPluginResourceType_Series);
-  db.AttachChild(manager, a, c);
+  c = db.CreateResource(*manager, "series2", OrthancPluginResourceType_Series);
+  db.AttachChild(*manager, a, c);
 
-  ASSERT_EQ(3u, db.GetAllResourcesCount(manager));
-  ASSERT_EQ(0u, db.GetResourcesCount(manager, OrthancPluginResourceType_Patient));
-  ASSERT_EQ(1u, db.GetResourcesCount(manager, OrthancPluginResourceType_Study));
-  ASSERT_EQ(2u, db.GetResourcesCount(manager, OrthancPluginResourceType_Series));
+  ASSERT_EQ(3u, db.GetAllResourcesCount(*manager));
+  ASSERT_EQ(0u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Patient));
+  ASSERT_EQ(1u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Study));
+  ASSERT_EQ(2u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Series));
 
-  ASSERT_FALSE(db.GetParentPublicId(s, manager, a));
-  ASSERT_TRUE(db.GetParentPublicId(s, manager, b));  ASSERT_EQ("study", s);
-  ASSERT_TRUE(db.GetParentPublicId(s, manager, c));  ASSERT_EQ("study", s);
+  ASSERT_FALSE(db.GetParentPublicId(s, *manager, a));
+  ASSERT_TRUE(db.GetParentPublicId(s, *manager, b));  ASSERT_EQ("study", s);
+  ASSERT_TRUE(db.GetParentPublicId(s, *manager, c));  ASSERT_EQ("study", s);
 
   std::list<std::string> children;
-  db.GetChildren(children, manager, a);
+  db.GetChildren(children, *manager, a);
   ASSERT_EQ(2u, children.size());
-  db.GetChildren(children, manager, b);
+  db.GetChildren(children, *manager, b);
   ASSERT_EQ(0u, children.size());
-  db.GetChildren(children, manager, c);
+  db.GetChildren(children, *manager, c);
   ASSERT_EQ(0u, children.size());
 
   std::list<std::string> cp;
-  db.GetChildrenPublicId(cp, manager, a);
+  db.GetChildrenPublicId(cp, *manager, a);
   ASSERT_EQ(2u, cp.size());
   ASSERT_TRUE(cp.front() == "series" || cp.front() == "series2");
   ASSERT_TRUE(cp.back() == "series" || cp.back() == "series2");
   ASSERT_NE(cp.front(), cp.back());
 
   std::list<std::string> pub;
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Patient);
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Patient);
   ASSERT_EQ(0u, pub.size());
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Study);
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Study);
   ASSERT_EQ(1u, pub.size());
   ASSERT_EQ("study", pub.front());
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Series);
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Series);
   ASSERT_EQ(2u, pub.size());
   ASSERT_TRUE(pub.front() == "series" || pub.front() == "series2");
   ASSERT_TRUE(pub.back() == "series" || pub.back() == "series2");
   ASSERT_NE(pub.front(), pub.back());
 
   std::list<int64_t> ci;
-  db.GetChildrenInternalId(ci, manager, a);
+  db.GetChildrenInternalId(ci, *manager, a);
   ASSERT_EQ(2u, ci.size());
   ASSERT_TRUE(ci.front() == b || ci.front() == c);
   ASSERT_TRUE(ci.back() == b || ci.back() == c);
   ASSERT_NE(ci.front(), ci.back());
 
-  db.SetMetadata(manager, a, Orthanc::MetadataType_ModifiedFrom, "modified");
-  db.SetMetadata(manager, a, Orthanc::MetadataType_LastUpdate, "update2");
-  ASSERT_FALSE(db.LookupMetadata(s, manager, b, Orthanc::MetadataType_LastUpdate));
-  ASSERT_TRUE(db.LookupMetadata(s, manager, a, Orthanc::MetadataType_LastUpdate));
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_ModifiedFrom, "modified");
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update2");
+  ASSERT_FALSE(db.LookupMetadata(s, *manager, b, Orthanc::MetadataType_LastUpdate));
+  ASSERT_TRUE(db.LookupMetadata(s, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update2", s);
-  db.SetMetadata(manager, a, Orthanc::MetadataType_LastUpdate, "update");
-  ASSERT_TRUE(db.LookupMetadata(s, manager, a, Orthanc::MetadataType_LastUpdate));
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update");
+  ASSERT_TRUE(db.LookupMetadata(s, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update", s);
 
   std::list<int32_t> md;
-  db.ListAvailableMetadata(md, manager, a);
+  db.ListAvailableMetadata(md, *manager, a);
   ASSERT_EQ(2u, md.size());
   ASSERT_TRUE(md.front() == Orthanc::MetadataType_ModifiedFrom || md.back() == Orthanc::MetadataType_ModifiedFrom);
   ASSERT_TRUE(md.front() == Orthanc::MetadataType_LastUpdate || md.back() == Orthanc::MetadataType_LastUpdate);
   std::string mdd;
-  ASSERT_TRUE(db.LookupMetadata(mdd, manager, a, Orthanc::MetadataType_ModifiedFrom));
+  ASSERT_TRUE(db.LookupMetadata(mdd, *manager, a, Orthanc::MetadataType_ModifiedFrom));
   ASSERT_EQ("modified", mdd);
-  ASSERT_TRUE(db.LookupMetadata(mdd, manager, a, Orthanc::MetadataType_LastUpdate));
+  ASSERT_TRUE(db.LookupMetadata(mdd, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update", mdd);
 
-  db.ListAvailableMetadata(md, manager, b);
+  db.ListAvailableMetadata(md, *manager, b);
   ASSERT_EQ(0u, md.size());
 
-  db.DeleteMetadata(manager, a, Orthanc::MetadataType_LastUpdate);
-  db.DeleteMetadata(manager, b, Orthanc::MetadataType_LastUpdate);
-  ASSERT_FALSE(db.LookupMetadata(s, manager, a, Orthanc::MetadataType_LastUpdate));
+  db.DeleteMetadata(*manager, a, Orthanc::MetadataType_LastUpdate);
+  db.DeleteMetadata(*manager, b, Orthanc::MetadataType_LastUpdate);
+  ASSERT_FALSE(db.LookupMetadata(s, *manager, a, Orthanc::MetadataType_LastUpdate));
 
-  db.ListAvailableMetadata(md, manager, a);
+  db.ListAvailableMetadata(md, *manager, a);
   ASSERT_EQ(1u, md.size());
   ASSERT_EQ(Orthanc::MetadataType_ModifiedFrom, md.front());
 
-  ASSERT_EQ(0u, db.GetTotalCompressedSize(manager));
-  ASSERT_EQ(0u, db.GetTotalUncompressedSize(manager));
+  ASSERT_EQ(0u, db.GetTotalCompressedSize(*manager));
+  ASSERT_EQ(0u, db.GetTotalUncompressedSize(*manager));
 
 
   std::list<int32_t> fc;
@@ -326,17 +325,17 @@ TEST(IndexBackend, Basic)
   a2.compressedSize = 4242;
   a2.compressedHash = "md5_2";
     
-  db.AddAttachment(manager, a, a1);
-  db.ListAvailableAttachments(fc, manager, a);
+  db.AddAttachment(*manager, a, a1);
+  db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(1u, fc.size());
   ASSERT_EQ(Orthanc::FileContentType_Dicom, fc.front());
-  db.AddAttachment(manager, a, a2);
-  db.ListAvailableAttachments(fc, manager, a);
+  db.AddAttachment(*manager, a, a2);
+  db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(2u, fc.size());
-  ASSERT_FALSE(db.LookupAttachment(*output, manager, b, Orthanc::FileContentType_Dicom));
+  ASSERT_FALSE(db.LookupAttachment(*output, *manager, b, Orthanc::FileContentType_Dicom));
 
-  ASSERT_EQ(4284u, db.GetTotalCompressedSize(manager));
-  ASSERT_EQ(4284u, db.GetTotalUncompressedSize(manager));
+  ASSERT_EQ(4284u, db.GetTotalCompressedSize(*manager));
+  ASSERT_EQ(4284u, db.GetTotalUncompressedSize(*manager));
 
   expectedAttachment.reset(new OrthancPluginAttachment);
   expectedAttachment->uuid = "uuid1";
@@ -346,7 +345,7 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressionType = Orthanc::CompressionType_None;
   expectedAttachment->compressedSize = 42;
   expectedAttachment->compressedHash = "md5_1";
-  ASSERT_TRUE(db.LookupAttachment(*output, manager, a, Orthanc::FileContentType_Dicom));
+  ASSERT_TRUE(db.LookupAttachment(*output, *manager, a, Orthanc::FileContentType_Dicom));
 
   expectedAttachment.reset(new OrthancPluginAttachment);
   expectedAttachment->uuid = "uuid2";
@@ -356,21 +355,21 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressionType = Orthanc::CompressionType_None;
   expectedAttachment->compressedSize = 4242;
   expectedAttachment->compressedHash = "md5_2";
-  ASSERT_TRUE(db.LookupAttachment(*output, manager, a, Orthanc::FileContentType_DicomAsJson));
+  ASSERT_TRUE(db.LookupAttachment(*output, *manager, a, Orthanc::FileContentType_DicomAsJson));
 
-  db.ListAvailableAttachments(fc, manager, b);
+  db.ListAvailableAttachments(fc, *manager, b);
   ASSERT_EQ(0u, fc.size());
-  db.DeleteAttachment(*output, manager, a, Orthanc::FileContentType_Dicom);
-  db.ListAvailableAttachments(fc, manager, a);
+  db.DeleteAttachment(*output, *manager, a, Orthanc::FileContentType_Dicom);
+  db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(1u, fc.size());
   ASSERT_EQ(Orthanc::FileContentType_DicomAsJson, fc.front());
-  db.DeleteAttachment(*output, manager, a, Orthanc::FileContentType_DicomAsJson);
-  db.ListAvailableAttachments(fc, manager, a);
+  db.DeleteAttachment(*output, *manager, a, Orthanc::FileContentType_DicomAsJson);
+  db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(0u, fc.size());
 
 
-  db.SetIdentifierTag(manager, a, 0x0010, 0x0020, "patient");
-  db.SetIdentifierTag(manager, a, 0x0020, 0x000d, "study");
+  db.SetIdentifierTag(*manager, a, 0x0010, 0x0020, "patient");
+  db.SetIdentifierTag(*manager, a, 0x0020, 0x000d, "study");
 
   expectedDicomTags.clear();
   expectedDicomTags.push_back(OrthancPluginDicomTag());
@@ -381,14 +380,14 @@ TEST(IndexBackend, Basic)
   expectedDicomTags.back().group = 0x0020;
   expectedDicomTags.back().element = 0x000d;
   expectedDicomTags.back().value = "study";
-  db.GetMainDicomTags(*output, manager, a);
+  db.GetMainDicomTags(*output, *manager, a);
 
 
-  db.LookupIdentifier(ci, manager, OrthancPluginResourceType_Study, 0x0010, 0x0020, 
+  db.LookupIdentifier(ci, *manager, OrthancPluginResourceType_Study, 0x0010, 0x0020, 
                       OrthancPluginIdentifierConstraint_Equal, "patient");
   ASSERT_EQ(1u, ci.size());
   ASSERT_EQ(a, ci.front());
-  db.LookupIdentifier(ci, manager, OrthancPluginResourceType_Study, 0x0010, 0x0020, 
+  db.LookupIdentifier(ci, *manager, OrthancPluginResourceType_Study, 0x0010, 0x0020, 
                       OrthancPluginIdentifierConstraint_Equal, "study");
   ASSERT_EQ(0u, ci.size());
 
@@ -403,67 +402,67 @@ TEST(IndexBackend, Basic)
   exp.studyInstanceUid = "study";
   exp.seriesInstanceUid = "series";
   exp.sopInstanceUid = "instance";
-  db.LogExportedResource(manager, exp);
+  db.LogExportedResource(*manager, exp);
 
   expectedExported.reset(new OrthancPluginExportedResource());
   *expectedExported = exp;
   expectedExported->seq = 1;
 
   bool done;
-  db.GetExportedResources(*output, done, manager, 0, 10);
+  db.GetExportedResources(*output, done, *manager, 0, 10);
   
 
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Patient); ASSERT_EQ(0u, pub.size());
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Study); ASSERT_EQ(1u, pub.size());
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Series); ASSERT_EQ(2u, pub.size());
-  db.GetAllPublicIds(pub, manager, OrthancPluginResourceType_Instance); ASSERT_EQ(0u, pub.size());
-  ASSERT_EQ(3u, db.GetAllResourcesCount(manager));
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Patient); ASSERT_EQ(0u, pub.size());
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Study); ASSERT_EQ(1u, pub.size());
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Series); ASSERT_EQ(2u, pub.size());
+  db.GetAllPublicIds(pub, *manager, OrthancPluginResourceType_Instance); ASSERT_EQ(0u, pub.size());
+  ASSERT_EQ(3u, db.GetAllResourcesCount(*manager));
 
-  ASSERT_EQ(0u, db.GetUnprotectedPatientsCount(manager));  // No patient was inserted
-  ASSERT_TRUE(db.IsExistingResource(manager, c));
+  ASSERT_EQ(0u, db.GetUnprotectedPatientsCount(*manager));  // No patient was inserted
+  ASSERT_TRUE(db.IsExistingResource(*manager, c));
 
   {
     // A transaction is needed here for MySQL, as it was not possible
     // to implement recursive deletion of resources using pure SQL
     // statements
-    manager.StartTransaction(TransactionType_ReadWrite);    
-    db.DeleteResource(*output, manager, c);
-    manager.CommitTransaction();
+    manager->StartTransaction(TransactionType_ReadWrite);    
+    db.DeleteResource(*output, *manager, c);
+    manager->CommitTransaction();
   }
   
-  ASSERT_FALSE(db.IsExistingResource(manager, c));
-  ASSERT_TRUE(db.IsExistingResource(manager, a));
-  ASSERT_TRUE(db.IsExistingResource(manager, b));
-  ASSERT_EQ(2u, db.GetAllResourcesCount(manager));
-  db.DeleteResource(*output, manager, a);
-  ASSERT_EQ(0u, db.GetAllResourcesCount(manager));
-  ASSERT_FALSE(db.IsExistingResource(manager, a));
-  ASSERT_FALSE(db.IsExistingResource(manager, b));
-  ASSERT_FALSE(db.IsExistingResource(manager, c));
+  ASSERT_FALSE(db.IsExistingResource(*manager, c));
+  ASSERT_TRUE(db.IsExistingResource(*manager, a));
+  ASSERT_TRUE(db.IsExistingResource(*manager, b));
+  ASSERT_EQ(2u, db.GetAllResourcesCount(*manager));
+  db.DeleteResource(*output, *manager, a);
+  ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
+  ASSERT_FALSE(db.IsExistingResource(*manager, a));
+  ASSERT_FALSE(db.IsExistingResource(*manager, b));
+  ASSERT_FALSE(db.IsExistingResource(*manager, c));
 
-  ASSERT_EQ(0u, db.GetAllResourcesCount(manager));
-  ASSERT_EQ(0u, db.GetUnprotectedPatientsCount(manager));
-  int64_t p1 = db.CreateResource(manager, "patient1", OrthancPluginResourceType_Patient);
-  int64_t p2 = db.CreateResource(manager, "patient2", OrthancPluginResourceType_Patient);
-  int64_t p3 = db.CreateResource(manager, "patient3", OrthancPluginResourceType_Patient);
-  ASSERT_EQ(3u, db.GetUnprotectedPatientsCount(manager));
+  ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
+  ASSERT_EQ(0u, db.GetUnprotectedPatientsCount(*manager));
+  int64_t p1 = db.CreateResource(*manager, "patient1", OrthancPluginResourceType_Patient);
+  int64_t p2 = db.CreateResource(*manager, "patient2", OrthancPluginResourceType_Patient);
+  int64_t p3 = db.CreateResource(*manager, "patient3", OrthancPluginResourceType_Patient);
+  ASSERT_EQ(3u, db.GetUnprotectedPatientsCount(*manager));
   int64_t r;
-  ASSERT_TRUE(db.SelectPatientToRecycle(r, manager));
+  ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager));
   ASSERT_EQ(p1, r);
-  ASSERT_TRUE(db.SelectPatientToRecycle(r, manager, p1));
+  ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager, p1));
   ASSERT_EQ(p2, r);
-  ASSERT_FALSE(db.IsProtectedPatient(manager, p1));
-  db.SetProtectedPatient(manager, p1, true);
-  ASSERT_TRUE(db.IsProtectedPatient(manager, p1));
-  ASSERT_TRUE(db.SelectPatientToRecycle(r, manager));
+  ASSERT_FALSE(db.IsProtectedPatient(*manager, p1));
+  db.SetProtectedPatient(*manager, p1, true);
+  ASSERT_TRUE(db.IsProtectedPatient(*manager, p1));
+  ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager));
   ASSERT_EQ(p2, r);
-  db.SetProtectedPatient(manager, p1, false);
-  ASSERT_FALSE(db.IsProtectedPatient(manager, p1));
-  ASSERT_TRUE(db.SelectPatientToRecycle(r, manager));
+  db.SetProtectedPatient(*manager, p1, false);
+  ASSERT_FALSE(db.IsProtectedPatient(*manager, p1));
+  ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager));
   ASSERT_EQ(p2, r);
-  db.DeleteResource(*output, manager, p2);
-  ASSERT_TRUE(db.SelectPatientToRecycle(r, manager, p3));
+  db.DeleteResource(*output, *manager, p2);
+  ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager, p3));
   ASSERT_EQ(p1, r);
 
-  manager.Close();
+  manager->Close();
 }

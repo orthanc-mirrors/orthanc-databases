@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include "../../Framework/Common/IDatabaseFactory.h"
 #include "../../Framework/Plugins/IndexBackend.h"
 
 namespace OrthancDatabases
@@ -28,40 +29,8 @@ namespace OrthancDatabases
   class SQLiteIndex : public IndexBackend 
   {
   private:
-    class Factory : public IDatabaseFactory
-    {
-    private:
-      SQLiteIndex&  that_;
-
-    public:
-      Factory(SQLiteIndex& that) :
-      that_(that)
-      {
-      }
-
-      virtual Dialect GetDialect() const
-      {
-        return Dialect_SQLite;
-      }
-
-      virtual IDatabase* Open()
-      {
-        return that_.OpenInternal();
-      }
-
-      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries,
-                                                  unsigned int& connectionRetryInterval)
-      {
-        // Dummy parameters
-        maxConnectionRetries = 0;
-        connectionRetryInterval = 1;
-      }
-    };
-
     std::string            path_;
     bool                   fast_;
-
-    IDatabase* OpenInternal();
 
   public:
     SQLiteIndex(OrthancPluginContext* context);  // Opens in memory
@@ -74,10 +43,9 @@ namespace OrthancDatabases
       fast_ = fast;
     }
 
-    virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE
-    {
-      return new Factory(*this);
-    }
+    virtual IDatabase* OpenDatabaseConnection() ORTHANC_OVERRIDE;
+
+    virtual void ConfigureDatabase(IDatabase& database) ORTHANC_OVERRIDE;
     
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,

@@ -32,10 +32,6 @@ namespace OrthancDatabases
     {
     }
 
-    virtual Dialect GetDialect() const = 0;
-
     virtual IDatabase* Open() = 0;
-
-    virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries, unsigned int& connectionRetryInterval) = 0;
   };
 }

@@ -22,53 +22,19 @@
 #pragma once
 
 #include "../../Framework/Plugins/StorageBackend.h"
-#include "../../Framework/PostgreSQL/PostgreSQLParameters.h"
+#include "../../Framework/PostgreSQL/PostgreSQLDatabase.h"
 
 namespace OrthancDatabases
 {
   class PostgreSQLStorageArea : public StorageBackend
   {
   private:
-    class Factory : public IDatabaseFactory
-    {
-    private:
-      PostgreSQLStorageArea&  that_;
-
-    public:
-      explicit Factory(PostgreSQLStorageArea& that) :
-        that_(that)
-      {
-      }
-
-      virtual Dialect GetDialect() const ORTHANC_OVERRIDE
-      {
-        return Dialect_PostgreSQL;
-      }
-
-      virtual IDatabase* Open() ORTHANC_OVERRIDE
-      {
-        return that_.OpenInternal();
-      }
-
-      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries,
-                                                  unsigned int& connectionRetryInterval) ORTHANC_OVERRIDE
-      {
-        maxConnectionRetries = that_.parameters_.GetMaxConnectionRetries();
-        connectionRetryInterval = that_.parameters_.GetConnectionRetryInterval();
-      }
-    };
-
-    PostgreSQLParameters   parameters_;
-    bool                   clearAll_;
-
-    IDatabase* OpenInternal();
+    void ConfigureDatabase(PostgreSQLDatabase& db,
+                           const PostgreSQLParameters& parameters,
+                           bool clearAll);
 
   public:
-    explicit PostgreSQLStorageArea(const PostgreSQLParameters& parameters);
-
-    void SetClearAll(bool clear)
-    {
-      clearAll_ = clear;
-    }
+    PostgreSQLStorageArea(const PostgreSQLParameters& parameters,
+                          bool clearAll);
   };
 }

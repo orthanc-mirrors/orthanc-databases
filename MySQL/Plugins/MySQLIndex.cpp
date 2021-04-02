@@ -36,6 +36,21 @@
 
 namespace OrthancDatabases
 {
+  MySQLIndex::MySQLIndex(OrthancPluginContext* context,
+                         const MySQLParameters& parameters) :
+    IndexBackend(context),
+    parameters_(parameters),
+    clearAll_(false)
+  {
+  }
+
+
+  IDatabase* MySQLIndex::OpenDatabaseConnection()
+  {
+    return MySQLDatabase::OpenDatabaseConnection(parameters_);
+  }
+
+
   static void ThrowCannotCreateTrigger()
   {
     LOG(ERROR) << "The MySQL user is not allowed to create triggers => 2 possible solutions:";
@@ -46,8 +61,11 @@ namespace OrthancDatabases
                                     "Need to fix the MySQL permissions for \"CREATE TRIGGER\"");
   }
   
-  IDatabase* MySQLIndex::OpenInternal()
+
+  void MySQLIndex::ConfigureDatabase(IDatabase& database)
   {
+    MySQLDatabase& db = dynamic_cast<MySQLDatabase&>(database);
+    
     uint32_t expectedVersion = 6;
 
     if (GetContext())   // "GetContext()" can possibly be NULL in the unit tests
@@ -74,13 +92,10 @@ namespace OrthancDatabases
       MySQLDatabase::ClearDatabase(parameters_);
     }
     
-    std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
-
-    db->Open();
-    db->Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
+    db.Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
 
     {
-      MySQLDatabase::TransientAdvisoryLock lock(*db, MYSQL_LOCK_DATABASE_SETUP);
+      MySQLDatabase::TransientAdvisoryLock lock(db, MYSQL_LOCK_DATABASE_SETUP);
 
       /**
        * In a first transaction, we create the tables. Such a
@@ -97,19 +112,19 @@ namespace OrthancDatabases
        * https://groups.google.com/d/msg/orthanc-users/OCFFkm1qm0k/Mbroy8VWAQAJ
        **/      
       {
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
         
-        db->Execute("ALTER DATABASE " + parameters_.GetDatabase() + 
+        db.Execute("ALTER DATABASE " + parameters_.GetDatabase() + 
                     " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", false);
 
         // This is the first table to be created
-        if (!db->DoesTableExist(t, "GlobalProperties"))
+        if (!db.DoesTableExist(t, "GlobalProperties"))
         {
           std::string query;
           
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::MYSQL_PREPARE_INDEX);
-          db->Execute(query, true);
+          db.Execute(query, true);
         }
 
         t.Commit();
@@ -126,25 +141,25 @@ namespace OrthancDatabases
       int version = 0;
 
       {
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
 
         // This is the last table to be created
-        if (!db->DoesTableExist(t, "PatientRecyclingOrder"))
+        if (!db.DoesTableExist(t, "PatientRecyclingOrder"))
         {
           LOG(ERROR) << "Corrupted MySQL database";
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
         }
 
         // This is the last item to be created
-        if (!db->DoesTriggerExist(t, "PatientAdded"))
+        if (!db.DoesTriggerExist(t, "PatientAdded"))
         {
           ThrowCannotCreateTrigger();
         }
 
-        if (!LookupGlobalIntegerProperty(version, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
+        if (!LookupGlobalIntegerProperty(version, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
         {
-          SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-          SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
           version = expectedVersion;
         }
 
@@ -160,12 +175,12 @@ namespace OrthancDatabases
       int revision = 0;
 
       {
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
 
-        if (!LookupGlobalIntegerProperty(revision, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+        if (!LookupGlobalIntegerProperty(revision, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
         {
           revision = 1;
-          SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
         }
 
         t.Commit();
@@ -173,72 +188,72 @@ namespace OrthancDatabases
 
       if (revision == 1)
       {
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
         
         // The serialization of jobs as a global property can lead to
         // very long values => switch to the LONGTEXT type that can
         // store up to 4GB:
         // https://stackoverflow.com/a/13932834/881731
-        db->Execute("ALTER TABLE GlobalProperties MODIFY value LONGTEXT", false);
+        db.Execute("ALTER TABLE GlobalProperties MODIFY value LONGTEXT", false);
         
         revision = 2;
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
 
       if (revision == 2)
       {        
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
 
         // Install the "GetLastChangeIndex" extension
         std::string query;
 
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::MYSQL_GET_LAST_CHANGE_INDEX);
-        db->Execute(query, true);
+        db.Execute(query, true);
 
-        if (!db->DoesTriggerExist(t, "ChangeAdded"))
+        if (!db.DoesTriggerExist(t, "ChangeAdded"))
         {
           ThrowCannotCreateTrigger();
         }
         
         revision = 3;
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
       
       if (revision == 3)
       {
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
 
         // Reconfiguration of "Metadata" from TEXT type (up to 64KB)
         // to the LONGTEXT type (up to 4GB). This might be important
         // for applications such as the Osimis Web viewer that stores
         // large amount of metadata.
         // http://book.orthanc-server.com/faq/features.html#central-registry-of-metadata-and-attachments
-        db->Execute("ALTER TABLE Metadata MODIFY value LONGTEXT", false);
+        db.Execute("ALTER TABLE Metadata MODIFY value LONGTEXT", false);
         
         revision = 4;
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
       
       if (revision == 4)
       {
-        MySQLTransaction t(*db, TransactionType_ReadWrite);
+        MySQLTransaction t(db, TransactionType_ReadWrite);
         
         // Install the "CreateInstance" extension
         std::string query;
         
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::MYSQL_CREATE_INSTANCE);
-        db->Execute(query, true);
+        db.Execute(query, true);
         
         revision = 5;
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
@@ -260,19 +275,8 @@ namespace OrthancDatabases
      **/
     if (parameters_.HasLock())
     {
-      db->AdvisoryLock(MYSQL_LOCK_INDEX);
+      db.AdvisoryLock(MYSQL_LOCK_INDEX);
     }
-          
-    return db.release();
-  }
-
-
-  MySQLIndex::MySQLIndex(OrthancPluginContext* context,
-                         const MySQLParameters& parameters) :
-    IndexBackend(context),
-    parameters_(parameters),
-    clearAll_(false)
-  {
   }
 
 

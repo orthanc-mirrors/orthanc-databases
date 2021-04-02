@@ -21,11 +21,12 @@
 
 #include "MySQLDatabase.h"
 
+#include "../Common/ImplicitTransaction.h"
+#include "../Common/Integer64Value.h"
+#include "../Common/RetryDatabaseFactory.h"
 #include "MySQLResult.h"
 #include "MySQLStatement.h"
 #include "MySQLTransaction.h"
-#include "../Common/ImplicitTransaction.h"
-#include "../Common/Integer64Value.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
@@ -611,5 +612,34 @@ namespace OrthancDatabases
   MySQLDatabase::TransientAdvisoryLock::~TransientAdvisoryLock()
   {
     database_.ReleaseAdvisoryLock(lock_);
+  }
+
+  
+  MySQLDatabase* MySQLDatabase::OpenDatabaseConnection(const MySQLParameters& parameters)
+  {
+    class Factory : public RetryDatabaseFactory
+    {
+    private:
+      const MySQLParameters&  parameters_;
+
+    protected:
+      virtual IDatabase* TryOpen()
+      {
+        std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
+        db->Open();
+        return db.release();
+      }
+      
+    public:
+      Factory(const MySQLParameters& parameters) :
+        RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
+                             parameters.GetConnectionRetryInterval()),
+        parameters_(parameters)
+      {
+      }
+    };
+
+    Factory factory(parameters);
+    return dynamic_cast<MySQLDatabase*>(factory.Open());
   }
 }

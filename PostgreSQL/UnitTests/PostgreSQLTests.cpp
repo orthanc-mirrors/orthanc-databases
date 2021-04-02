@@ -349,8 +349,7 @@ TEST(PostgreSQL, LargeObject)
 
 TEST(PostgreSQL, StorageArea)
 {
-  PostgreSQLStorageArea storageArea(globalParameters_);
-  storageArea.SetClearAll(true);
+  PostgreSQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
   {
     DatabaseManager::Transaction transaction(storageArea.GetManager(), TransactionType_ReadWrite);
@@ -456,33 +455,32 @@ TEST(PostgreSQLIndex, CreateInstance)
   OrthancDatabases::PostgreSQLIndex db(NULL, globalParameters_);
   db.SetClearAll(true);
 
-  OrthancDatabases::DatabaseManager manager(db.CreateDatabaseFactory());
-  manager.Open();
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db));
 
   std::string s;
-  ASSERT_TRUE(db.LookupGlobalProperty(s, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal1));
+  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal1));
   ASSERT_EQ("2", s);
 
   OrthancPluginCreateInstanceResult r1, r2;
   
   memset(&r1, 0, sizeof(r1));
-  db.CreateInstance(r1, manager, "a", "b", "c", "d");
+  db.CreateInstance(r1, *manager, "a", "b", "c", "d");
   ASSERT_TRUE(r1.isNewInstance);
   ASSERT_TRUE(r1.isNewSeries);
   ASSERT_TRUE(r1.isNewStudy);
   ASSERT_TRUE(r1.isNewPatient);
 
   memset(&r2, 0, sizeof(r2));
-  db.CreateInstance(r2, manager, "a", "b", "c", "d");
+  db.CreateInstance(r2, *manager, "a", "b", "c", "d");
   ASSERT_FALSE(r2.isNewInstance);
   ASSERT_EQ(r1.instanceId, r2.instanceId);
 
   // Breaking the hierarchy
   memset(&r2, 0, sizeof(r2));
-  ASSERT_THROW(db.CreateInstance(r2, manager, "a", "e", "c", "f"), Orthanc::OrthancException);
+  ASSERT_THROW(db.CreateInstance(r2, *manager, "a", "e", "c", "f"), Orthanc::OrthancException);
 
   memset(&r2, 0, sizeof(r2));
-  db.CreateInstance(r2, manager, "a", "b", "c", "e");
+  db.CreateInstance(r2, *manager, "a", "b", "c", "e");
   ASSERT_TRUE(r2.isNewInstance);
   ASSERT_FALSE(r2.isNewSeries);
   ASSERT_FALSE(r2.isNewStudy);
@@ -493,7 +491,7 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_NE(r1.instanceId, r2.instanceId);
 
   memset(&r2, 0, sizeof(r2));
-  db.CreateInstance(r2, manager, "a", "b", "f", "g");
+  db.CreateInstance(r2, *manager, "a", "b", "f", "g");
   ASSERT_TRUE(r2.isNewInstance);
   ASSERT_TRUE(r2.isNewSeries);
   ASSERT_FALSE(r2.isNewStudy);
@@ -504,7 +502,7 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_NE(r1.instanceId, r2.instanceId);
 
   memset(&r2, 0, sizeof(r2));
-  db.CreateInstance(r2, manager, "a", "h", "i", "j");
+  db.CreateInstance(r2, *manager, "a", "h", "i", "j");
   ASSERT_TRUE(r2.isNewInstance);
   ASSERT_TRUE(r2.isNewSeries);
   ASSERT_TRUE(r2.isNewStudy);
@@ -515,7 +513,7 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_NE(r1.instanceId, r2.instanceId);
 
   memset(&r2, 0, sizeof(r2));
-  db.CreateInstance(r2, manager, "k", "l", "m", "n");
+  db.CreateInstance(r2, *manager, "k", "l", "m", "n");
   ASSERT_TRUE(r2.isNewInstance);
   ASSERT_TRUE(r2.isNewSeries);
   ASSERT_TRUE(r2.isNewStudy);
@@ -531,7 +529,6 @@ TEST(PostgreSQLIndex, CreateInstance)
 TEST(PostgreSQL, Lock2)
 {
   std::unique_ptr<PostgreSQLDatabase> db1(CreateTestDatabase());
-  db1->Open();
 
   ASSERT_FALSE(db1->ReleaseAdvisoryLock(43)); // lock counter = 0
   ASSERT_TRUE(db1->AcquireAdvisoryLock(43));  // lock counter = 1
@@ -547,7 +544,6 @@ TEST(PostgreSQL, Lock2)
 
   {
     std::unique_ptr<PostgreSQLDatabase> db2(CreateTestDatabase());
-    db2->Open();
 
     // The "db1" is still actively locking
     ASSERT_FALSE(db2->AcquireAdvisoryLock(43));

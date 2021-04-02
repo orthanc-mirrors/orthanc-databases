@@ -86,8 +86,7 @@ namespace OrthancDatabases
 
       if (manager_.get() == NULL)
       {
-        manager_.reset(new DatabaseManager(backend_->CreateDatabaseFactory()));
-        manager_->Open();
+        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_));
       }
       else
       {

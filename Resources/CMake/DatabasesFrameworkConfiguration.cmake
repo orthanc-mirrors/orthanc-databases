@@ -95,6 +95,8 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/NullValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Query.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ResultBase.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/StatementLocation.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Utf8StringValue.cpp
   )

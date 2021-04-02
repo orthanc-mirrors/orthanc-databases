@@ -31,56 +31,6 @@
 
 namespace OrthancDatabases
 {
-  IDatabase& DatabaseManager::GetDatabase()
-  {
-    unsigned int maxConnectionRetries = 10;
-    unsigned int connectionRetryInterval = 5;
-    unsigned int count = 0;
-
-    factory_->GetConnectionRetriesParameters(maxConnectionRetries, connectionRetryInterval);
-      
-    while (database_.get() == NULL)
-    {
-      transaction_.reset(NULL);
-
-      try
-      {
-        database_.reset(factory_->Open());
-      }
-      catch (Orthanc::OrthancException& e)
-      {
-        if (e.GetErrorCode() == Orthanc::ErrorCode_DatabaseUnavailable)
-        {
-          count ++;
-
-          if (count <= maxConnectionRetries)
-          {
-            LOG(WARNING) << "Database is currently unavailable, retrying...";
-            boost::this_thread::sleep(boost::posix_time::seconds(connectionRetryInterval));
-            continue;
-          }
-          else
-          {
-            LOG(ERROR) << "Timeout when connecting to the database, giving up";
-          }
-        }
-
-        throw;
-      }
-    }
-
-    if (database_.get() == NULL ||
-        database_->GetDialect() != dialect_)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-    }
-    else
-    {
-      return *database_;
-    }
-  }
-
-
   void DatabaseManager::Close()
   {
     LOG(TRACE) << "Closing the connection to the database";
@@ -200,15 +150,15 @@ namespace OrthancDatabases
   }
 
     
-  DatabaseManager::DatabaseManager(IDatabaseFactory* factory) :  // Takes ownership
-    factory_(factory)
+  DatabaseManager::DatabaseManager(IDatabase* database) :
+    database_(database)
   {
-    if (factory == NULL)
+    if (database == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
 
-    dialect_ = factory->GetDialect();
+    dialect_ = database->GetDialect();
   }
 
   

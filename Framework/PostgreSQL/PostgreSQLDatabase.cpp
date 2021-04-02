@@ -22,10 +22,11 @@
 #include "PostgreSQLIncludes.h"  // Must be the first
 #include "PostgreSQLDatabase.h"
 
+#include "../Common/ImplicitTransaction.h"
+#include "../Common/RetryDatabaseFactory.h"
 #include "PostgreSQLResult.h"
 #include "PostgreSQLStatement.h"
 #include "PostgreSQLTransaction.h"
-#include "../Common/ImplicitTransaction.h"
 
 #include <Logging.h>
 #include <OrthancException.h>
@@ -297,5 +298,34 @@ namespace OrthancDatabases
   PostgreSQLDatabase::TransientAdvisoryLock::~TransientAdvisoryLock()
   {
     database_.ReleaseAdvisoryLock(lock_);
+  }
+
+
+  PostgreSQLDatabase* PostgreSQLDatabase::OpenDatabaseConnection(const PostgreSQLParameters& parameters)
+  {
+    class Factory : public RetryDatabaseFactory
+    {
+    private:
+      const PostgreSQLParameters&  parameters_;
+
+    protected:
+      virtual IDatabase* TryOpen()
+      {
+        std::unique_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
+        db->Open();
+        return db.release();
+      }
+      
+    public:
+      Factory(const PostgreSQLParameters& parameters) :
+        RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
+                             parameters.GetConnectionRetryInterval()),
+        parameters_(parameters)
+      {
+      }
+    };
+
+    Factory factory(parameters);
+    return dynamic_cast<PostgreSQLDatabase*>(factory.Open());
   }
 }

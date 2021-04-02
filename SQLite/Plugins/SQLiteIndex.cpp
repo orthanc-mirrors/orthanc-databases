@@ -34,8 +34,27 @@
 
 namespace OrthancDatabases
 {
-  IDatabase* SQLiteIndex::OpenInternal()
+  IDatabase* SQLiteIndex::OpenDatabaseConnection()
   {
+    std::unique_ptr<SQLiteDatabase> db(new SQLiteDatabase);
+
+    if (path_.empty())
+    {
+      db->OpenInMemory();
+    }
+    else
+    {
+      db->Open(path_);
+    }
+
+    return db.release();
+  }
+
+
+  void SQLiteIndex::ConfigureDatabase(IDatabase& database)
+  {
+    SQLiteDatabase& db = dynamic_cast<SQLiteDatabase&>(database);
+    
     uint32_t expectedVersion = 6;
 
     if (GetContext())   // "GetContext()" can possibly be NULL in the unit tests
@@ -52,60 +71,48 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
     }
 
-
-    std::unique_ptr<SQLiteDatabase> db(new SQLiteDatabase);
-
-    if (path_.empty())
     {
-      db->OpenInMemory();
-    }
-    else
-    {
-      db->Open(path_);
-    }
+      SQLiteTransaction t(db);
 
-    {
-      SQLiteTransaction t(*db);
-
-      if (!db->DoesTableExist("Resources"))
+      if (!db.DoesTableExist("Resources"))
       {
         std::string query;
 
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::SQLITE_PREPARE_INDEX);
-        db->Execute(query);
+        db.Execute(query);
  
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
      }
           
       t.Commit();
     }
 
-    db->Execute("PRAGMA ENCODING=\"UTF-8\";");
+    db.Execute("PRAGMA ENCODING=\"UTF-8\";");
 
     if (fast_)
     {
       // Performance tuning of SQLite with PRAGMAs
       // http://www.sqlite.org/pragma.html
-      db->Execute("PRAGMA SYNCHRONOUS=NORMAL;");
-      db->Execute("PRAGMA JOURNAL_MODE=WAL;");
-      db->Execute("PRAGMA LOCKING_MODE=EXCLUSIVE;");
-      db->Execute("PRAGMA WAL_AUTOCHECKPOINT=1000;");
-      //db->Execute("PRAGMA TEMP_STORE=memory");
+      db.Execute("PRAGMA SYNCHRONOUS=NORMAL;");
+      db.Execute("PRAGMA JOURNAL_MODE=WAL;");
+      db.Execute("PRAGMA LOCKING_MODE=EXCLUSIVE;");
+      db.Execute("PRAGMA WAL_AUTOCHECKPOINT=1000;");
+      //db.Execute("PRAGMA TEMP_STORE=memory");
     }
 
     {
-      SQLiteTransaction t(*db);
+      SQLiteTransaction t(db);
 
-      if (!db->DoesTableExist("Resources"))
+      if (!db.DoesTableExist("Resources"))
       {
         LOG(ERROR) << "Corrupted SQLite database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
       }
 
       int version = 0;
-      if (!LookupGlobalIntegerProperty(version, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+      if (!LookupGlobalIntegerProperty(version, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
           version != 6)
       {
         LOG(ERROR) << "SQLite plugin is incompatible with database schema version: " << version;
@@ -113,10 +120,10 @@ namespace OrthancDatabases
       }
 
       int revision;
-      if (!LookupGlobalIntegerProperty(revision, *db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+      if (!LookupGlobalIntegerProperty(revision, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
       {
         revision = 1;
-        SetGlobalIntegerProperty(*db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
       if (revision != 1)
@@ -127,8 +134,6 @@ namespace OrthancDatabases
           
       t.Commit();
     }
-
-    return db.release();
   }
 
 

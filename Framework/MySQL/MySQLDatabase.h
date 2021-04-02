@@ -116,5 +116,7 @@ namespace OrthancDatabases
 
       ~TransientAdvisoryLock();
     };
+
+    static MySQLDatabase* OpenDatabaseConnection(const MySQLParameters& parameters);
   };
 }

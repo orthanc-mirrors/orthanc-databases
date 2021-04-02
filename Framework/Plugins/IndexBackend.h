@@ -377,5 +377,7 @@ namespace OrthancDatabases
     static void Register(IndexBackend* backend);
 
     static void Finalize();
+
+    static DatabaseManager* CreateSingleDatabaseManager(IDatabaseBackend& backend);
   };
 }

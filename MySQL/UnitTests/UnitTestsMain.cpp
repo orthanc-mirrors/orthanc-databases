@@ -50,22 +50,19 @@ TEST(MySQLIndex, Lock)
   OrthancDatabases::MySQLIndex db1(NULL, noLock);
   db1.SetClearAll(true);
 
-  OrthancDatabases::DatabaseManager manager1(db1.CreateDatabaseFactory());
-  manager1.Open();
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
 
   {
     OrthancDatabases::MySQLIndex db2(NULL, lock);
-    OrthancDatabases::DatabaseManager manager2(db2.CreateDatabaseFactory());
-    manager2.Open();
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2));
 
     OrthancDatabases::MySQLIndex db3(NULL, lock);
-    OrthancDatabases::DatabaseManager manager3(db3.CreateDatabaseFactory());
-    ASSERT_THROW(manager3.Open(), Orthanc::OrthancException);
+    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3), Orthanc::OrthancException);
+
   }
 
   OrthancDatabases::MySQLIndex db4(NULL, lock);
-  OrthancDatabases::DatabaseManager manager4(db4.CreateDatabaseFactory());
-  manager4.Open();
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager4(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db4));
 }
 
 
@@ -151,8 +148,7 @@ static int64_t CountFiles(OrthancDatabases::MySQLDatabase& db)
 
 TEST(MySQL, StorageArea)
 {
-  OrthancDatabases::MySQLStorageArea storageArea(globalParameters_);
-  storageArea.SetClearAll(true);
+  OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true);
 
   {
     OrthancDatabases::DatabaseManager::Transaction transaction(storageArea.GetManager(), OrthancDatabases::TransactionType_ReadWrite);

@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include "IDatabaseFactory.h"
+#include "IDatabase.h"
 #include "StatementLocation.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -38,14 +38,16 @@ namespace OrthancDatabases
   private:
     typedef std::map<StatementLocation, IPrecompiledStatement*>  CachedStatements;
 
-    boost::recursive_mutex           mutex_;
-    std::unique_ptr<IDatabaseFactory>  factory_;
-    std::unique_ptr<IDatabase>         database_;
-    std::unique_ptr<ITransaction>      transaction_;
-    CachedStatements                 cachedStatements_;
-    Dialect                          dialect_;
+    boost::recursive_mutex         mutex_;
+    std::unique_ptr<IDatabase>     database_;
+    std::unique_ptr<ITransaction>  transaction_;
+    CachedStatements               cachedStatements_;
+    Dialect                        dialect_;
 
-    IDatabase& GetDatabase();
+    IDatabase& GetDatabase()
+    {
+      return *database_;
+    }
 
     void CloseIfUnavailable(Orthanc::ErrorCode e);
 
@@ -59,7 +61,7 @@ namespace OrthancDatabases
     void ReleaseImplicitTransaction();
 
   public:
-    explicit DatabaseManager(IDatabaseFactory* factory);  // Takes ownership
+    explicit DatabaseManager(IDatabase* database);  // Takes ownership
     
     ~DatabaseManager()
     {
@@ -69,11 +71,6 @@ namespace OrthancDatabases
     Dialect GetDialect() const
     {
       return dialect_;
-    }
-
-    void Open()
-    {
-      GetDatabase();
     }
 
     void Close();

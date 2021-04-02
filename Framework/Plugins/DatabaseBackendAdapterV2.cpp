@@ -23,6 +23,8 @@
 #include "DatabaseBackendAdapterV2.h"
 #include "GlobalProperties.h"
 
+#include "IndexBackend.h"
+
 #include <OrthancException.h>
 
 #include <boost/thread/mutex.hpp>
@@ -78,8 +80,7 @@ namespace OrthancDatabases
 
       if (manager_.get() == NULL)
       {
-        manager_.reset(new DatabaseManager(backend_->CreateDatabaseFactory()));
-        manager_->Open();
+        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_));
       }
       else
       {

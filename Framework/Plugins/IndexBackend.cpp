@@ -2308,4 +2308,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  endif
 #endif
   }
+
+
+  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
+  {
+    std::unique_ptr<IDatabase> database(backend.OpenDatabaseConnection());
+    backend.ConfigureDatabase(*database);
+    return new DatabaseManager(database.release());
+  }
 }

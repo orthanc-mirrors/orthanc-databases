@@ -31,7 +31,7 @@ namespace OrthancDatabases
   class StorageBackend : public boost::noncopyable
   {
   private:
-    DatabaseManager   manager_;
+    std::unique_ptr<DatabaseManager>   manager_;
 
   public:
     class IFileContentVisitor : public boost::noncopyable
@@ -44,16 +44,13 @@ namespace OrthancDatabases
       virtual void Assign(const std::string& content) = 0;
     };
     
-    explicit StorageBackend(IDatabaseFactory* factory);
-
     virtual ~StorageBackend()
     {
     }
 
-    DatabaseManager& GetManager() 
-    {
-      return manager_;
-    }
+    void SetDatabase(IDatabase* database);  // Takes ownership
+
+    DatabaseManager& GetManager();
     
     // NB: These methods will always be invoked in mutual exclusion,
     // as having access to some "DatabaseManager::Transaction" implies

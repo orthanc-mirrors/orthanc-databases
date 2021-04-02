@@ -39,7 +39,10 @@ namespace OrthancDatabases
 
     virtual OrthancPluginContext* GetContext() = 0;
 
-    virtual IDatabaseFactory* CreateDatabaseFactory() = 0;
+    virtual IDatabase* OpenDatabaseConnection() = 0;
+
+    // This function is invoked once, even if multiple connections are open
+    virtual void ConfigureDatabase(IDatabase& database) = 0;
 
     virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
                         

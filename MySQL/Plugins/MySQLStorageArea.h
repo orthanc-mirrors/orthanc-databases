@@ -22,7 +22,7 @@
 #pragma once
 
 #include "../../Framework/Plugins/StorageBackend.h"
-#include "../../Framework/MySQL/MySQLParameters.h"
+#include "../../Framework/MySQL/MySQLDatabase.h"
 
 
 namespace OrthancDatabases
@@ -30,46 +30,12 @@ namespace OrthancDatabases
   class MySQLStorageArea : public StorageBackend
   {
   private:
-    class Factory : public IDatabaseFactory
-    {
-    private:
-      MySQLStorageArea&  that_;
-
-    public:
-      explicit Factory(MySQLStorageArea& that) :
-        that_(that)
-      {
-      }
-
-      virtual Dialect GetDialect() const ORTHANC_OVERRIDE
-      {
-        return Dialect_MySQL;
-      }
-
-      virtual IDatabase* Open() ORTHANC_OVERRIDE
-      {
-        return that_.OpenInternal();
-      }
-
-      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries,
-                                                  unsigned int& connectionRetryInterval) ORTHANC_OVERRIDE
-      {
-        maxConnectionRetries = that_.parameters_.GetMaxConnectionRetries();
-        connectionRetryInterval = that_.parameters_.GetConnectionRetryInterval();
-      }
-    };
-
-    MySQLParameters        parameters_;
-    bool                   clearAll_;
-
-    IDatabase* OpenInternal();
-
+    void ConfigureDatabase(MySQLDatabase& db,
+                           const MySQLParameters& parameters,
+                           bool clearAll);
+    
   public:
-    explicit MySQLStorageArea(const MySQLParameters& parameters);
-
-    void SetClearAll(bool clear)
-    {
-      clearAll_ = clear;
-    }
+    MySQLStorageArea(const MySQLParameters& parameters,
+                     bool clearAll);
   };
 }

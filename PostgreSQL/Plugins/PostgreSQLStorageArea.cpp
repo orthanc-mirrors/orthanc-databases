@@ -31,52 +31,55 @@
 
 namespace OrthancDatabases
 {
-  IDatabase* PostgreSQLStorageArea::OpenInternal()
+  void PostgreSQLStorageArea::ConfigureDatabase(PostgreSQLDatabase& db,
+                                                const PostgreSQLParameters& parameters,
+                                                bool clearAll)
   {
-    std::unique_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
-
-    db->Open();
-
-    if (parameters_.HasLock())
+    if (parameters.HasLock())
     {
-      db->AdvisoryLock(POSTGRESQL_LOCK_STORAGE);
+      db.AdvisoryLock(POSTGRESQL_LOCK_STORAGE);
     }
 
     {
-      PostgreSQLDatabase::TransientAdvisoryLock lock(*db, POSTGRESQL_LOCK_DATABASE_SETUP);
+      PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
 
-      if (clearAll_)
+      if (clearAll)
       {
-        db->ClearAll();
+        db.ClearAll();
       }
 
       {
-        PostgreSQLTransaction t(*db, TransactionType_ReadWrite);
+        PostgreSQLTransaction t(db, TransactionType_ReadWrite);
 
-        if (!db->DoesTableExist("StorageArea"))
+        if (!db.DoesTableExist("StorageArea"))
         {
-          db->Execute("CREATE TABLE IF NOT EXISTS StorageArea("
-                      "uuid VARCHAR NOT NULL PRIMARY KEY,"
-                      "content OID NOT NULL,"
-                      "type INTEGER NOT NULL)");
-
+          db.Execute("CREATE TABLE IF NOT EXISTS StorageArea("
+                     "uuid VARCHAR NOT NULL PRIMARY KEY,"
+                     "content OID NOT NULL,"
+                     "type INTEGER NOT NULL)");
+          
           // Automatically remove the large objects associated with the table
-          db->Execute("CREATE OR REPLACE RULE StorageAreaDelete AS ON DELETE "
-                      "TO StorageArea DO SELECT lo_unlink(old.content);");
+          db.Execute("CREATE OR REPLACE RULE StorageAreaDelete AS ON DELETE "
+                     "TO StorageArea DO SELECT lo_unlink(old.content);");
         }
-
+        
         t.Commit();
       }
     }
-
-    return db.release();
   }
 
 
-  PostgreSQLStorageArea::PostgreSQLStorageArea(const PostgreSQLParameters& parameters) :
-    StorageBackend(new Factory(*this)),
-    parameters_(parameters),
-    clearAll_(false)
+  PostgreSQLStorageArea::PostgreSQLStorageArea(const PostgreSQLParameters& parameters,
+                                               bool clearAll)
   {
+    std::unique_ptr<PostgreSQLDatabase> database(PostgreSQLDatabase::OpenDatabaseConnection(parameters));
+    
+    if (database.get() == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+    
+    ConfigureDatabase(*database, parameters, clearAll);
+    SetDatabase(database.release());
   }
 }

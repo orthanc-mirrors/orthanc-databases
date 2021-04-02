@@ -64,7 +64,7 @@ extern "C"
     {
       OrthancDatabases::MySQLParameters parameters(mysql, configuration);
       OrthancDatabases::StorageBackend::Register
-        (context, new OrthancDatabases::MySQLStorageArea(parameters));
+        (context, new OrthancDatabases::MySQLStorageArea(parameters, false /* don't clear database */));
     }
     catch (Orthanc::OrthancException& e)
     {

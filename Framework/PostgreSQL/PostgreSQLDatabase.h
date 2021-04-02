@@ -89,5 +89,7 @@ namespace OrthancDatabases
 
       ~TransientAdvisoryLock();
     };
+
+    static PostgreSQLDatabase* OpenDatabaseConnection(const PostgreSQLParameters& parameters);
   };
 }

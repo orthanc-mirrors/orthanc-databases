@@ -29,38 +29,8 @@ namespace OrthancDatabases
   class PostgreSQLIndex : public IndexBackend 
   {
   private:
-    class Factory : public IDatabaseFactory
-    {
-    private:
-      PostgreSQLIndex&  that_;
-
-    public:
-      Factory(PostgreSQLIndex& that) :
-      that_(that)
-      {
-      }
-
-      virtual Dialect GetDialect() const
-      {
-        return Dialect_PostgreSQL;
-      }
-
-      virtual IDatabase* Open()
-      {
-        return that_.OpenInternal();
-      }
-
-      virtual void GetConnectionRetriesParameters(unsigned int& maxConnectionRetries, unsigned int& connectionRetryInterval)
-      {
-        maxConnectionRetries = that_.parameters_.GetMaxConnectionRetries();
-        connectionRetryInterval = that_.parameters_.GetConnectionRetryInterval();
-      }
-    };
-
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
-
-    IDatabase* OpenInternal();
 
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
@@ -71,10 +41,9 @@ namespace OrthancDatabases
       clearAll_ = clear;
     }
 
-    virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE
-    {
-      return new Factory(*this);
-    }
+    virtual IDatabase* OpenDatabaseConnection() ORTHANC_OVERRIDE;
+
+    virtual void ConfigureDatabase(IDatabase& database) ORTHANC_OVERRIDE;
 
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,

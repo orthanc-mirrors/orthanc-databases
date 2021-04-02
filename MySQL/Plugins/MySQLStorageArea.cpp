@@ -33,18 +33,16 @@
 
 namespace OrthancDatabases
 {
-  IDatabase* MySQLStorageArea::OpenInternal()
+  void MySQLStorageArea::ConfigureDatabase(MySQLDatabase& db,
+                                           const MySQLParameters& parameters,
+                                           bool clearAll)
   {
-    std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
-
-    db->Open();
-
     {
-      MySQLDatabase::TransientAdvisoryLock lock(*db, MYSQL_LOCK_DATABASE_SETUP);    
-      MySQLTransaction t(*db, TransactionType_ReadWrite);
+      MySQLDatabase::TransientAdvisoryLock lock(db, MYSQL_LOCK_DATABASE_SETUP);    
+      MySQLTransaction t(db, TransactionType_ReadWrite);
 
       int64_t size;
-      if (db->LookupGlobalIntegerVariable(size, "max_allowed_packet"))
+      if (db.LookupGlobalIntegerVariable(size, "max_allowed_packet"))
       {
         int mb = boost::math::iround(static_cast<double>(size) /
                                      static_cast<double>(1024 * 1024));
@@ -59,15 +57,15 @@ namespace OrthancDatabases
                      << "files that can be stored in this MySQL server";
       }
                
-      if (clearAll_)
+      if (clearAll)
       {
-        db->Execute("DROP TABLE IF EXISTS StorageArea", false);
+        db.Execute("DROP TABLE IF EXISTS StorageArea", false);
       }
 
-      db->Execute("CREATE TABLE IF NOT EXISTS StorageArea("
-                  "uuid VARCHAR(64) NOT NULL PRIMARY KEY,"
-                  "content LONGBLOB NOT NULL,"
-                  "type INTEGER NOT NULL)", false);
+      db.Execute("CREATE TABLE IF NOT EXISTS StorageArea("
+                 "uuid VARCHAR(64) NOT NULL PRIMARY KEY,"
+                 "content LONGBLOB NOT NULL,"
+                 "type INTEGER NOT NULL)", false);
 
       t.Commit();
     }
@@ -80,19 +78,24 @@ namespace OrthancDatabases
      * previously-acquired locks.
      * https://dev.mysql.com/doc/refman/5.7/en/locking-functions.html
      **/
-    if (parameters_.HasLock())
+    if (parameters.HasLock())
     {
-      db->AdvisoryLock(MYSQL_LOCK_STORAGE);
+      db.AdvisoryLock(MYSQL_LOCK_STORAGE);
     }
-
-    return db.release();
   }
 
 
-  MySQLStorageArea::MySQLStorageArea(const MySQLParameters& parameters) :
-    StorageBackend(new Factory(*this)),
-    parameters_(parameters),
-    clearAll_(false)
+  MySQLStorageArea::MySQLStorageArea(const MySQLParameters& parameters,
+                                     bool clearAll)
   {
+    std::unique_ptr<MySQLDatabase> database(MySQLDatabase::OpenDatabaseConnection(parameters));
+    
+    if (database.get() == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+    
+    ConfigureDatabase(*database, parameters, clearAll);
+    SetDatabase(database.release());
   }
 }
