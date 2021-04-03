@@ -55,6 +55,15 @@ namespace OrthancDatabases
   class DatabaseBackendAdapterV2::Adapter : public boost::noncopyable
   {
   private:
+    /**
+     * The "managerMutex_" should not be necessary, as it is redundant
+     * with with "Orthanc::ServerIndex::mutex_" (the global mutex) in
+     * Orthanc <= 1.9.1, or with
+     * "Orthanc::OrthancPluginDatabase::mutex_" in Orthanc >= 1.9.2
+     * (the global mutex limited to backward compatibility with older
+     * plugins). It is left here for additional safety.
+     **/
+    
     std::unique_ptr<IDatabaseBackend>  backend_;
     boost::mutex                       managerMutex_;
     std::unique_ptr<DatabaseManager>   manager_;
