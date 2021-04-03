@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include "../../Framework/Common/IDatabaseFactory.h"
 #include "../../Framework/Plugins/IndexBackend.h"
 
 namespace OrthancDatabases
@@ -29,8 +28,8 @@ namespace OrthancDatabases
   class SQLiteIndex : public IndexBackend 
   {
   private:
-    std::string            path_;
-    bool                   fast_;
+    std::string  path_;
+    bool         fast_;
 
   public:
     SQLiteIndex(OrthancPluginContext* context);  // Opens in memory
