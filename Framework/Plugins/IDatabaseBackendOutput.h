@@ -28,6 +28,12 @@ namespace OrthancDatabases
   class IDatabaseBackendOutput : public boost::noncopyable
   {
   public:
+    /**
+     * Contrarily to its parent "IDatabaseBackendOutput" class, the
+     * "IFactory" subclass *can* be invoked from multiple threads if
+     * used through "DatabaseBackendAdapterV3". Make sure to implement
+     * proper locking if need be.
+     **/
     class IFactory : public boost::noncopyable
     {
     public:

@@ -25,9 +25,15 @@
 
 #include <OrthancException.h>
 
+#include <boost/thread/shared_mutex.hpp>
+
 
 namespace OrthancDatabases
 {
+  /**
+   * WARNING: This class can be invoked concurrently by several
+   * threads if it is used from "DatabaseBackendAdapterV3".
+   **/
   class IndexBackend : public IDatabaseBackend
   {
   private:
@@ -35,6 +41,7 @@ namespace OrthancDatabases
 
     OrthancPluginContext*  context_;
 
+    boost::shared_mutex                                outputFactoryMutex_;
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:

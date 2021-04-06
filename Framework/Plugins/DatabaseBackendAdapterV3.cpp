@@ -61,9 +61,22 @@ namespace OrthancDatabases
   class DatabaseBackendAdapterV3::Adapter : public boost::noncopyable
   {
   private:
-    std::unique_ptr<IndexBackend>  backend_;
+    std::unique_ptr<IndexBackend>      backend_;
+    OrthancPluginContext*              context_;
     boost::mutex                       managerMutex_;
     std::unique_ptr<DatabaseManager>   manager_;
+
+    DatabaseManager& GetManager() const
+    {
+      if (manager_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      else
+      {
+        return *manager_;
+      }
+    }    
 
   public:
     Adapter(IndexBackend* backend) :
@@ -73,11 +86,28 @@ namespace OrthancDatabases
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
       }
+      else
+      {
+        context_ = backend_->GetContext();
+      }
     }
 
-    IndexBackend& GetBackend() const
+    OrthancPluginContext* GetContext() const
     {
-      return *backend_;
+      return context_;
+    }
+
+    uint32_t GetDatabaseVersion()
+    {
+      boost::mutex::scoped_lock lock(managerMutex_);
+      return backend_->GetDatabaseVersion(GetManager());
+    }
+
+    void UpgradeDatabase(OrthancPluginStorageArea* storageArea,
+                         uint32_t targetVersion)
+    {
+      boost::mutex::scoped_lock lock(managerMutex_);
+      backend_->UpgradeDatabase(GetManager(), targetVersion, storageArea);
     }
 
     void OpenConnection()
@@ -113,23 +143,25 @@ namespace OrthancDatabases
     {
     private:
       boost::mutex::scoped_lock  lock_;
-      DatabaseManager*           manager_;
+      IndexBackend&              backend_;
+      DatabaseManager&           manager_;
       
     public:
       DatabaseAccessor(Adapter& adapter) :
         lock_(adapter.managerMutex_),
-        manager_(adapter.manager_.get())
+        backend_(*adapter.backend_),
+        manager_(adapter.GetManager())
       {
-        if (manager_ == NULL)
-        {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-        }
+      }
+
+      IndexBackend& GetBackend() const
+      {
+        return backend_;
       }
 
       DatabaseManager& GetManager() const
       {
-        assert(manager_ != NULL);
-        return *manager_;
+        return manager_;
       }
     };
   };
@@ -698,7 +730,7 @@ namespace OrthancDatabases
     Adapter&   adapter_;
     std::unique_ptr<Adapter::DatabaseAccessor>  accessor_;
     std::unique_ptr<Output>    output_;
-
+    
   public:
     Transaction(Adapter& adapter) :
       adapter_(adapter),
@@ -713,7 +745,7 @@ namespace OrthancDatabases
 
     IndexBackend& GetBackend() const
     {
-      return adapter_.GetBackend();
+      return accessor_->GetBackend();
     }
 
     Output& GetOutput() const
@@ -861,7 +893,7 @@ namespace OrthancDatabases
       adapter->OpenConnection();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
   }
 
   
@@ -874,7 +906,7 @@ namespace OrthancDatabases
       adapter->CloseConnection();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
   }
 
   
@@ -894,7 +926,7 @@ namespace OrthancDatabases
       }
       else
       {
-        OrthancPluginLogError(adapter->GetBackend().GetContext(), "More than one index backend was registered, internal error");
+        OrthancPluginLogError(adapter->GetContext(), "More than one index backend was registered, internal error");
       }
       
       delete adapter;
@@ -911,11 +943,10 @@ namespace OrthancDatabases
       
     try
     {
-      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
-      *version = adapter->GetBackend().GetDatabaseVersion(accessor.GetManager());
+      *version = adapter->GetDatabaseVersion();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
   }
 
 
@@ -927,11 +958,10 @@ namespace OrthancDatabases
       
     try
     {
-      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
-      adapter->GetBackend().UpgradeDatabase(accessor.GetManager(), targetVersion, storageArea);
+      adapter->UpgradeDatabase(storageArea, targetVersion);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
   }
 
 
@@ -963,7 +993,7 @@ namespace OrthancDatabases
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetBackend().GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
   }
 
   

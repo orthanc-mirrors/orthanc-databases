@@ -318,6 +318,8 @@ namespace OrthancDatabases
 
   void IndexBackend::SetOutputFactory(IDatabaseBackendOutput::IFactory* factory)
   {
+    boost::unique_lock<boost::shared_mutex> lock(outputFactoryMutex_);
+      
     if (factory == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
@@ -335,6 +337,8 @@ namespace OrthancDatabases
 
   IDatabaseBackendOutput* IndexBackend::CreateOutput()
   {
+    boost::shared_lock<boost::shared_mutex> lock(outputFactoryMutex_);
+      
     if (outputFactory_.get() == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
