@@ -84,92 +84,112 @@ namespace OrthancDatabases
   }
     
 
-  void StorageBackend::Create(DatabaseManager::Transaction& transaction,
-                              const std::string& uuid,
-                              const void* content,
-                              size_t size,
-                              OrthancPluginContentType type)
+  void StorageBackend::Accessor::Create(const std::string& uuid,
+                                        const void* content,
+                                        size_t size,
+                                        OrthancPluginContentType type)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
-      "INSERT INTO StorageArea VALUES (${uuid}, ${content}, ${type})");
-     
-    statement.SetParameterType("uuid", ValueType_Utf8String);
-    statement.SetParameterType("content", ValueType_File);
-    statement.SetParameterType("type", ValueType_Integer64);
+    DatabaseManager::Transaction transaction(manager_, TransactionType_ReadWrite);
 
-    Dictionary args;
-    args.SetUtf8Value("uuid", uuid);
-    args.SetFileValue("content", content, size);
-    args.SetIntegerValue("type", type);
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "INSERT INTO StorageArea VALUES (${uuid}, ${content}, ${type})");
      
-    statement.Execute(args);
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      statement.SetParameterType("content", ValueType_File);
+      statement.SetParameterType("type", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetUtf8Value("uuid", uuid);
+      args.SetFileValue("content", content, size);
+      args.SetIntegerValue("type", type);
+     
+      statement.Execute(args);
+    }
+
+    transaction.Commit();
   }
 
 
-  void StorageBackend::Read(StorageBackend::IFileContentVisitor& target,
-                            DatabaseManager::Transaction& transaction, 
-                            const std::string& uuid,
-                            OrthancPluginContentType type) 
+  void StorageBackend::Accessor::Read(StorageBackend::IFileContentVisitor& visitor,
+                                      const std::string& uuid,
+                                      OrthancPluginContentType type) 
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
-      "SELECT content FROM StorageArea WHERE uuid=${uuid} AND type=${type}");
-     
-    statement.SetParameterType("uuid", ValueType_Utf8String);
-    statement.SetParameterType("type", ValueType_Integer64);
+    DatabaseManager::Transaction transaction(manager_, TransactionType_ReadOnly);
 
-    Dictionary args;
-    args.SetUtf8Value("uuid", uuid);
-    args.SetIntegerValue("type", type);
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "SELECT content FROM StorageArea WHERE uuid=${uuid} AND type=${type}");
      
-    statement.Execute(args);
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      statement.SetParameterType("type", ValueType_Integer64);
 
-    if (statement.IsDone())
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
-    }
-    else if (statement.GetResultFieldsCount() != 1)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-    }
-    else
-    {
-      const IValue& value = statement.GetResultField(0);
-      
-      switch (value.GetType())
+      Dictionary args;
+      args.SetUtf8Value("uuid", uuid);
+      args.SetIntegerValue("type", type);
+     
+      statement.Execute(args);
+
+      if (statement.IsDone())
       {
-        case ValueType_File:
-          target.Assign(dynamic_cast<const FileValue&>(value).GetContent());
-          break;
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+      }
+      else if (statement.GetResultFieldsCount() != 1)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+      }
+      else
+      {
+        const IValue& value = statement.GetResultField(0);
+      
+        switch (value.GetType())
+        {
+          case ValueType_File:
+            visitor.Assign(dynamic_cast<const FileValue&>(value).GetContent());
+            break;
 
-        case ValueType_BinaryString:
-          target.Assign(dynamic_cast<const BinaryStringValue&>(value).GetContent());
-          break;
+          case ValueType_BinaryString:
+            visitor.Assign(dynamic_cast<const BinaryStringValue&>(value).GetContent());
+            break;
 
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+        }
       }
     }
+
+    transaction.Commit();
+
+    if (!visitor.IsSuccess())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Could not read attachment from the storage area");
+    }
   }
 
 
-  void StorageBackend::Remove(DatabaseManager::Transaction& transaction,
-                              const std::string& uuid,
-                              OrthancPluginContentType type)
+  void StorageBackend::Accessor::Remove(const std::string& uuid,
+                                        OrthancPluginContentType type)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, GetManager(),
-      "DELETE FROM StorageArea WHERE uuid=${uuid} AND type=${type}");
-     
-    statement.SetParameterType("uuid", ValueType_Utf8String);
-    statement.SetParameterType("type", ValueType_Integer64);
+    DatabaseManager::Transaction transaction(manager_, TransactionType_ReadWrite);
 
-    Dictionary args;
-    args.SetUtf8Value("uuid", uuid);
-    args.SetIntegerValue("type", type);
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "DELETE FROM StorageArea WHERE uuid=${uuid} AND type=${type}");
      
-    statement.Execute(args);
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      statement.SetParameterType("type", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetUtf8Value("uuid", uuid);
+      args.SetIntegerValue("type", type);
+     
+      statement.Execute(args);
+    }
+      
+    transaction.Commit();
   }
 
 
@@ -189,11 +209,12 @@ namespace OrthancDatabases
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
       }
-
-      DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadWrite);
-      backend_->Create(transaction, uuid, content, static_cast<size_t>(size), type);
-      transaction.Commit();
-      return OrthancPluginErrorCode_Success;
+      else
+      {
+        StorageBackend::Accessor accessor(*backend_);
+        accessor.Create(uuid, content, static_cast<size_t>(size), type);
+        return OrthancPluginErrorCode_Success;
+      }
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
@@ -217,7 +238,7 @@ namespace OrthancDatabases
       {
       }
 
-      bool IsSuccess() const
+      virtual bool IsSuccess() const ORTHANC_OVERRIDE
       {
         return success_;
       }
@@ -254,27 +275,21 @@ namespace OrthancDatabases
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
       }
-      
-      if (target == NULL)
+      else if (target == NULL)
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
       }
-      
-      Visitor visitor(target);
-      
+      else
       {
-        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
-        backend_->Read(visitor, transaction, uuid, type);
+        Visitor visitor(target);
 
-        if (!visitor.IsSuccess())
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);          
+          StorageBackend::Accessor accessor(*backend_);
+          accessor.Read(visitor, uuid, type);
         }
-        
-        transaction.Commit();
+
+        return OrthancPluginErrorCode_Success;
       }
-      
-      return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
@@ -302,7 +317,7 @@ namespace OrthancDatabases
       {
       }
 
-      bool IsSuccess() const
+      virtual bool IsSuccess() const ORTHANC_OVERRIDE
       {
         return success_;
       }
@@ -351,28 +366,22 @@ namespace OrthancDatabases
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
       }
-      
-      if (data == NULL ||
-          size == NULL)
+      else if (data == NULL ||
+               size == NULL)
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
       }
-      
-      Visitor visitor(data, size);
-
+      else
       {
-        DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadOnly);
-        backend_->Read(visitor, transaction, uuid, type);
+        Visitor visitor(data, size);
 
-        if (!visitor.IsSuccess())
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);          
-        }        
-        
-        transaction.Commit();
-      }
+          StorageBackend::Accessor accessor(*backend_);
+          accessor.Read(visitor, uuid, type);
+        }
 
-      return OrthancPluginErrorCode_Success;
+        return OrthancPluginErrorCode_Success;
+      }
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
@@ -383,10 +392,16 @@ namespace OrthancDatabases
   {
     try
     {
-      DatabaseManager::Transaction transaction(backend_->GetManager(), TransactionType_ReadWrite);
-      backend_->Remove(transaction, uuid, type);
-      transaction.Commit();
-      return OrthancPluginErrorCode_Success;
+      if (backend_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      else
+      {
+        StorageBackend::Accessor accessor(*backend_);
+        accessor.Remove(uuid, type);
+        return OrthancPluginErrorCode_Success;
+      }
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
@@ -440,10 +455,9 @@ namespace OrthancDatabases
   }
 
 
-  void StorageBackend::ReadToString(std::string& target,
-                                    DatabaseManager::Transaction& transaction, 
-                                    const std::string& uuid,
-                                    OrthancPluginContentType type)
+  void StorageBackend::Accessor::ReadToString(std::string& target,
+                                              const std::string& uuid,
+                                              OrthancPluginContentType type)
   {
     class Visitor : public StorageBackend::IFileContentVisitor
     {
@@ -458,7 +472,7 @@ namespace OrthancDatabases
       {
       }
 
-      bool IsSuccess() const
+      virtual bool IsSuccess() const ORTHANC_OVERRIDE
       {
         return success_;
       }
@@ -479,12 +493,6 @@ namespace OrthancDatabases
     
 
     Visitor visitor(target);
-      
-    Read(visitor, transaction, uuid, type);
-      
-    if (!visitor.IsSuccess())
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);          
-    }
+    Read(visitor, uuid, type);
   }
 }

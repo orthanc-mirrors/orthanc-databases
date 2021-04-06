@@ -33,6 +33,11 @@ namespace OrthancDatabases
   private:
     std::unique_ptr<DatabaseManager>   manager_;
 
+    DatabaseManager& GetManager();
+    
+  protected:
+    void SetDatabase(IDatabase* database);  // Takes ownership
+
   public:
     class IFileContentVisitor : public boost::noncopyable
     {
@@ -42,43 +47,46 @@ namespace OrthancDatabases
       }
 
       virtual void Assign(const std::string& content) = 0;
+
+      virtual bool IsSuccess() const = 0;
+    };
+
+    class Accessor : public boost::noncopyable
+    {
+    private:
+      DatabaseManager&  manager_;
+
+    public:
+      Accessor(StorageBackend& backend) :
+        manager_(backend.GetManager())
+      {
+      }
+        
+      void Create(const std::string& uuid,
+                  const void* content,
+                  size_t size,
+                  OrthancPluginContentType type);
+
+      void Read(IFileContentVisitor& visitor,
+                const std::string& uuid,
+                OrthancPluginContentType type);
+
+      void Remove(const std::string& uuid,
+                  OrthancPluginContentType type);
+
+      // For unit tests
+      void ReadToString(std::string& target,
+                        const std::string& uuid,
+                        OrthancPluginContentType type);
     };
     
     virtual ~StorageBackend()
     {
     }
 
-    void SetDatabase(IDatabase* database);  // Takes ownership
-
-    DatabaseManager& GetManager();
-    
-    // NB: These methods will always be invoked in mutual exclusion,
-    // as having access to some "DatabaseManager::Transaction" implies
-    // that the parent "DatabaseManager" is locked
-    virtual void Create(DatabaseManager::Transaction& transaction,
-                        const std::string& uuid,
-                        const void* content,
-                        size_t size,
-                        OrthancPluginContentType type) ORTHANC_FINAL;
-
-    virtual void Read(IFileContentVisitor& target,
-                      DatabaseManager::Transaction& transaction, 
-                      const std::string& uuid,
-                      OrthancPluginContentType type) ORTHANC_FINAL;
-
-    virtual void Remove(DatabaseManager::Transaction& transaction,
-                        const std::string& uuid,
-                        OrthancPluginContentType type) ORTHANC_FINAL;
-
     static void Register(OrthancPluginContext* context,
                          StorageBackend* backend);   // Takes ownership
 
     static void Finalize();
-
-    // For unit tests
-    void ReadToString(std::string& target,
-                      DatabaseManager::Transaction& transaction, 
-                      const std::string& uuid,
-                      OrthancPluginContentType type);
   };
 }

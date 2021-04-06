@@ -137,41 +137,50 @@ TEST(MySQL, DISABLED_Lock3)
 
 static int64_t CountFiles(OrthancDatabases::MySQLDatabase& db)
 {
-  OrthancDatabases::Query query("SELECT COUNT(*) FROM StorageArea", true);
-  OrthancDatabases::MySQLStatement s(db, query);
-  OrthancDatabases::MySQLTransaction t(db, OrthancDatabases::TransactionType_ReadOnly);
-  OrthancDatabases::Dictionary d;
-  std::unique_ptr<OrthancDatabases::IResult> result(s.Execute(t, d));
-  return dynamic_cast<const OrthancDatabases::Integer64Value&>(result->GetField(0)).GetValue();
+  OrthancDatabases::MySQLTransaction transaction(db, OrthancDatabases::TransactionType_ReadOnly);
+
+  int64_t count;
+  {
+    OrthancDatabases::Query query("SELECT COUNT(*) FROM StorageArea", true);
+    OrthancDatabases::MySQLStatement s(db, query);
+    OrthancDatabases::MySQLTransaction t(db, OrthancDatabases::TransactionType_ReadOnly);
+    OrthancDatabases::Dictionary d;
+    std::unique_ptr<OrthancDatabases::IResult> result(s.Execute(t, d));
+    count = dynamic_cast<const OrthancDatabases::Integer64Value&>(result->GetField(0)).GetValue();
+  }
+
+  transaction.Commit();
+  return count;
 }
 
 
 TEST(MySQL, StorageArea)
 {
-  OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true);
+  std::unique_ptr<OrthancDatabases::MySQLDatabase> database(
+    OrthancDatabases::MySQLDatabase::OpenDatabaseConnection(globalParameters_));
+  
+  OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
   {
-    OrthancDatabases::DatabaseManager::Transaction transaction(storageArea.GetManager(), OrthancDatabases::TransactionType_ReadWrite);
-    OrthancDatabases::MySQLDatabase& db = 
-      dynamic_cast<OrthancDatabases::MySQLDatabase&>(transaction.GetDatabase());
-
-    ASSERT_EQ(0, CountFiles(db));
+    OrthancDatabases::MySQLStorageArea::Accessor accessor(storageArea);
+    
+    ASSERT_EQ(0, CountFiles(*database));
   
     for (int i = 0; i < 10; i++)
     {
       std::string uuid = boost::lexical_cast<std::string>(i);
       std::string value = "Value " + boost::lexical_cast<std::string>(i * 2);
-      storageArea.Create(transaction, uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
+      accessor.Create(uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
     }
 
     std::string buffer;
-    ASSERT_THROW(storageArea.ReadToString(buffer, transaction, "nope", OrthancPluginContentType_Unknown), 
+    ASSERT_THROW(accessor.ReadToString(buffer, "nope", OrthancPluginContentType_Unknown), 
                  Orthanc::OrthancException);
   
-    ASSERT_EQ(10, CountFiles(db));
-    storageArea.Remove(transaction, "5", OrthancPluginContentType_Unknown);
+    ASSERT_EQ(10, CountFiles(*database));
+    accessor.Remove("5", OrthancPluginContentType_Unknown);
 
-    ASSERT_EQ(9, CountFiles(db));
+    ASSERT_EQ(9, CountFiles(*database));
 
     for (int i = 0; i < 10; i++)
     {
@@ -181,25 +190,22 @@ TEST(MySQL, StorageArea)
 
       if (i == 5)
       {
-        ASSERT_THROW(storageArea.ReadToString(buffer, transaction, uuid, OrthancPluginContentType_Unknown), 
+        ASSERT_THROW(accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown), 
                      Orthanc::OrthancException);
       }
       else
       {
-        storageArea.ReadToString(buffer, transaction, uuid, OrthancPluginContentType_Unknown);
+        accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown);
         ASSERT_EQ(expected, buffer);
       }
     }
 
     for (int i = 0; i < 10; i++)
     {
-      storageArea.Remove(transaction, boost::lexical_cast<std::string>(i),
-                         OrthancPluginContentType_Unknown);
+      accessor.Remove(boost::lexical_cast<std::string>(i), OrthancPluginContentType_Unknown);
     }
 
-    ASSERT_EQ(0, CountFiles(db));
-
-    transaction.Commit();
+    ASSERT_EQ(0, CountFiles(*database));
   }
 }
 

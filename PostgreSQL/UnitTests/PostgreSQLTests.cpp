@@ -65,10 +65,19 @@ static PostgreSQLDatabase* CreateTestDatabase()
 
 static int64_t CountLargeObjects(PostgreSQLDatabase& db)
 {
-  // Count the number of large objects in the DB
-  PostgreSQLStatement s(db, "SELECT COUNT(*) FROM pg_catalog.pg_largeobject");
-  PostgreSQLResult r(s);
-  return r.GetInteger64(0);
+  PostgreSQLTransaction transaction(db, TransactionType_ReadOnly);
+
+  int64_t count;
+  
+  {
+    // Count the number of large objects in the DB
+    PostgreSQLStatement s(db, "SELECT COUNT(*) FROM pg_catalog.pg_largeobject");
+    PostgreSQLResult r(s);
+    count = r.GetInteger64(0);
+  }
+
+  transaction.Commit();
+  return count;
 }
 
 
@@ -349,30 +358,30 @@ TEST(PostgreSQL, LargeObject)
 
 TEST(PostgreSQL, StorageArea)
 {
+  std::unique_ptr<PostgreSQLDatabase> database(PostgreSQLDatabase::OpenDatabaseConnection(globalParameters_));
+  
   PostgreSQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
   {
-    DatabaseManager::Transaction transaction(storageArea.GetManager(), TransactionType_ReadWrite);
-    PostgreSQLDatabase& db = 
-      dynamic_cast<PostgreSQLDatabase&>(transaction.GetDatabase());
-
-    ASSERT_EQ(0, CountLargeObjects(db));
+    PostgreSQLStorageArea::Accessor accessor(storageArea);
+    
+    ASSERT_EQ(0, CountLargeObjects(*database));
   
     for (int i = 0; i < 10; i++)
     {
       std::string uuid = boost::lexical_cast<std::string>(i);
       std::string value = "Value " + boost::lexical_cast<std::string>(i * 2);
-      storageArea.Create(transaction, uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
+      accessor.Create(uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
     }
 
     std::string buffer;
-    ASSERT_THROW(storageArea.ReadToString(buffer, transaction, "nope", OrthancPluginContentType_Unknown), 
+    ASSERT_THROW(accessor.ReadToString(buffer, "nope", OrthancPluginContentType_Unknown), 
                  Orthanc::OrthancException);
   
-    ASSERT_EQ(10, CountLargeObjects(db));
-    storageArea.Remove(transaction, "5", OrthancPluginContentType_Unknown);
+    ASSERT_EQ(10, CountLargeObjects(*database));
+    accessor.Remove("5", OrthancPluginContentType_Unknown);
 
-    ASSERT_EQ(9, CountLargeObjects(db));
+    ASSERT_EQ(9, CountLargeObjects(*database));
 
     for (int i = 0; i < 10; i++)
     {
@@ -381,25 +390,22 @@ TEST(PostgreSQL, StorageArea)
 
       if (i == 5)
       {
-        ASSERT_THROW(storageArea.ReadToString(buffer, transaction, uuid, OrthancPluginContentType_Unknown), 
+        ASSERT_THROW(accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown), 
                      Orthanc::OrthancException);
       }
       else
       {
-        storageArea.ReadToString(buffer, transaction, uuid, OrthancPluginContentType_Unknown);
+        accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown);
         ASSERT_EQ(expected, buffer);
       }
     }
 
     for (int i = 0; i < 10; i++)
     {
-      storageArea.Remove(transaction, boost::lexical_cast<std::string>(i),
-                         OrthancPluginContentType_Unknown);
+      accessor.Remove(boost::lexical_cast<std::string>(i), OrthancPluginContentType_Unknown);
     }
 
-    ASSERT_EQ(0, CountLargeObjects(db));
-
-    transaction.Commit();
+    ASSERT_EQ(0, CountLargeObjects(*database));
   }
 }
 
