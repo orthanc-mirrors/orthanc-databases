@@ -25,12 +25,15 @@
 
 #include <orthanc/OrthancCDatabasePlugin.h>
 
+#include <boost/thread/mutex.hpp>
+
 
 namespace OrthancDatabases
 {
   class StorageBackend : public boost::noncopyable
   {
   private:
+    boost::mutex                       mutex_;
     std::unique_ptr<DatabaseManager>   manager_;
 
     DatabaseManager& GetManager();
@@ -54,10 +57,12 @@ namespace OrthancDatabases
     class Accessor : public boost::noncopyable
     {
     private:
-      DatabaseManager&  manager_;
+      boost::mutex::scoped_lock  lock_;
+      DatabaseManager&           manager_;
 
     public:
       Accessor(StorageBackend& backend) :
+        lock_(backend.mutex_),
         manager_(backend.GetManager())
       {
       }

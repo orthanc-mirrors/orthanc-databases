@@ -164,8 +164,6 @@ namespace OrthancDatabases
   
   void DatabaseManager::StartTransaction(TransactionType type)
   {
-    boost::recursive_mutex::scoped_lock lock(mutex_);
-
     try
     {
       if (transaction_.get() != NULL)
@@ -186,8 +184,6 @@ namespace OrthancDatabases
 
   void DatabaseManager::CommitTransaction()
   {
-    boost::recursive_mutex::scoped_lock lock(mutex_);
-
     if (transaction_.get() == NULL)
     {
       LOG(ERROR) << "Cannot commit a non-existing transaction";
@@ -211,8 +207,6 @@ namespace OrthancDatabases
 
   void DatabaseManager::RollbackTransaction()
   {
-    boost::recursive_mutex::scoped_lock lock(mutex_);
-
     if (transaction_.get() == NULL)
     {
       LOG(ERROR) << "Cannot rollback a non-existing transaction";
@@ -236,7 +230,6 @@ namespace OrthancDatabases
 
   DatabaseManager::Transaction::Transaction(DatabaseManager& manager,
                                             TransactionType type) :
-    lock_(manager.mutex_),
     manager_(manager),
     database_(manager.GetDatabase()),
     committed_(false)
@@ -328,7 +321,6 @@ namespace OrthancDatabases
   
   DatabaseManager::StatementBase::StatementBase(DatabaseManager& manager) :
     manager_(manager),
-    lock_(manager_.mutex_),
     transaction_(manager_.GetTransaction())
   {
   }
