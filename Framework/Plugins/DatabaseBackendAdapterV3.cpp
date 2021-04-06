@@ -24,14 +24,14 @@
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
 
+#include <MultiThreading/SharedMessageQueue.h>
+
 #include <OrthancException.h>
 
 #include <stdexcept>
 #include <list>
 #include <string>
 #include <cassert>
-
-#include <boost/thread/mutex.hpp>  // TODO - REMOVE
 
 
 #define ORTHANC_PLUGINS_DATABASE_CATCH(context)                         \
@@ -97,20 +97,7 @@ namespace OrthancDatabases
       return context_;
     }
 
-    uint32_t GetDatabaseVersion()
-    {
-      boost::mutex::scoped_lock lock(managerMutex_);
-      return backend_->GetDatabaseVersion(GetManager());
-    }
-
-    void UpgradeDatabase(OrthancPluginStorageArea* storageArea,
-                         uint32_t targetVersion)
-    {
-      boost::mutex::scoped_lock lock(managerMutex_);
-      backend_->UpgradeDatabase(GetManager(), targetVersion, storageArea);
-    }
-
-    void OpenConnection()
+    void OpenConnections()
     {
       boost::mutex::scoped_lock  lock(managerMutex_);
 
@@ -124,7 +111,7 @@ namespace OrthancDatabases
       }
     }
 
-    void CloseConnection()
+    void CloseConnections()
     {
       boost::mutex::scoped_lock  lock(managerMutex_);
 
@@ -890,7 +877,7 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->OpenConnection();
+      adapter->OpenConnections();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
@@ -903,7 +890,7 @@ namespace OrthancDatabases
 
     try
     {
-      adapter->CloseConnection();
+      adapter->CloseConnections();
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
@@ -943,7 +930,8 @@ namespace OrthancDatabases
       
     try
     {
-      *version = adapter->GetDatabaseVersion();
+      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      *version = accessor.GetBackend().GetDatabaseVersion(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
@@ -958,7 +946,8 @@ namespace OrthancDatabases
       
     try
     {
-      adapter->UpgradeDatabase(storageArea, targetVersion);
+      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      accessor.GetBackend().UpgradeDatabase(accessor.GetManager(), targetVersion, storageArea);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
