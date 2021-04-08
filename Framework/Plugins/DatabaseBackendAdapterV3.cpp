@@ -55,9 +55,32 @@
 namespace OrthancDatabases
 {
   static bool isBackendInUse_ = false;  // Only for sanity checks
-  
 
-  // TODO - TURN THIS INTO A CONNECTION POOL
+  
+  template <typename T>
+  static void CopyListToVector(std::vector<T>& target,
+                               const std::list<T>& source)
+  {
+    /**
+     * This has the the same effect as:
+     *
+     *   target.reserve(source.size());
+     *   std::copy(std::begin(source), std::end(source), std::back_inserter(target));
+     *
+     * However, this implementation is compatible with C++03 (Linux
+     * Standard Base), whereas "std::back_inserter" requires C++11.
+     **/
+
+    target.clear();
+    target.reserve(source.size());
+
+    for (typename std::list<T>::const_iterator it = source.begin(); it != source.end(); ++it)
+    {
+      target.push_back(*it);
+    }
+  }
+    
+    
   class DatabaseBackendAdapterV3::Adapter : public boost::noncopyable
   {
   private:
@@ -704,22 +727,18 @@ namespace OrthancDatabases
       matches_.push_back(match);
     }
 
-    
+
     void AnswerIntegers32(const std::list<int32_t>& values)
     {
       SetupAnswerType(_OrthancPluginDatabaseAnswerType_Int32);
-
-      integers32_.reserve(values.size());
-      std::copy(std::begin(values), std::end(values), std::back_inserter(integers32_));
+      CopyListToVector(integers32_, values);
     }
 
     
     void AnswerIntegers64(const std::list<int64_t>& values)
     {
       SetupAnswerType(_OrthancPluginDatabaseAnswerType_Int64);
-
-      integers64_.reserve(values.size());
-      std::copy(std::begin(values), std::end(values), std::back_inserter(integers64_));
+      CopyListToVector(integers64_, values);
     }
 
 
@@ -748,9 +767,7 @@ namespace OrthancDatabases
     void AnswerStrings(const std::list<std::string>& values)
     {
       SetupAnswerType(_OrthancPluginDatabaseAnswerType_String);
-
-      stringAnswers_.reserve(values.size());
-      std::copy(std::begin(values), std::end(values), std::back_inserter(stringAnswers_));
+      CopyListToVector(stringAnswers_, values);
     }
 
 

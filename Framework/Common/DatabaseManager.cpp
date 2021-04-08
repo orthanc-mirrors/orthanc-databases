@@ -58,8 +58,16 @@ namespace OrthancDatabases
     
   void DatabaseManager::CloseIfUnavailable(Orthanc::ErrorCode e)
   {
-    if (e != Orthanc::ErrorCode_Success &&
-        e != Orthanc::ErrorCode_DatabaseCannotSerialize)
+    bool failure;
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+    failure = (e != Orthanc::ErrorCode_Success &&
+               e != Orthanc::ErrorCode_DatabaseCannotSerialize);
+#else
+    failure = (e != Orthanc::ErrorCode_Success);
+#endif
+
+    if (failure)
     {
       transaction_.reset(NULL);
     }
