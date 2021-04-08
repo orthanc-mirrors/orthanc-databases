@@ -71,7 +71,11 @@ namespace OrthancDatabases
       }
       else if (error == ER_LOCK_DEADLOCK)
       {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
         throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+#else
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
+#endif
       } 
       else
       {
