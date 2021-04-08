@@ -36,6 +36,9 @@ namespace OrthancDatabases
    * WARNING: In PostgreSQL releases <= 3.3 and in MySQL releases <=
    * 3.0, this class was protected by a mutex. It is now assumed that
    * locking must be implemented at a higher level.
+   *
+   * This class maintains a list of precompiled statements. At any
+   * time, this class handles 0 or 1 active transaction.
    **/
   class DatabaseManager : public boost::noncopyable
   {
@@ -46,11 +49,6 @@ namespace OrthancDatabases
     std::unique_ptr<ITransaction>  transaction_;
     CachedStatements               cachedStatements_;
     Dialect                        dialect_;
-
-    IDatabase& GetDatabase()
-    {
-      return *database_;
-    }
 
     void CloseIfUnavailable(Orthanc::ErrorCode e);
 
@@ -69,6 +67,11 @@ namespace OrthancDatabases
     ~DatabaseManager()
     {
       Close();
+    }
+
+    IDatabase& GetDatabase()
+    {
+      return *database_;
     }
 
     Dialect GetDialect() const
@@ -109,6 +112,21 @@ namespace OrthancDatabases
       IDatabase& GetDatabase()
       {
         return database_;
+      }
+
+      bool DoesTableExist(const std::string& name)
+      {
+        return manager_.GetTransaction().DoesTableExist(name);
+      }
+
+      bool DoesTriggerExist(const std::string& name)
+      {
+        return manager_.GetTransaction().DoesTriggerExist(name);
+      }
+
+      void ExecuteMultiLines(const std::string& sql)
+      {
+        manager_.GetTransaction().ExecuteMultiLines(sql);
       }
     };
 

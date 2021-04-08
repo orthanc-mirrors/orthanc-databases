@@ -151,11 +151,12 @@ namespace OrthancDatabases
       if (connections_.size() == 0)
       {
         assert(backend_.get() != NULL);
-        
-        std::unique_ptr<IDatabase> database(backend_->OpenDatabaseConnection());
-        backend_->ConfigureDatabase(*database);
 
-        connections_.push_back(new DatabaseManager(database.release()));
+        {
+          std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend_->OpenDatabaseConnection()));
+          backend_->ConfigureDatabase(*manager);
+          connections_.push_back(manager.release());
+        }
 
         for (size_t i = 1; i < countConnections_; i++)
         {

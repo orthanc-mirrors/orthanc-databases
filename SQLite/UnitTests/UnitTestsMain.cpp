@@ -65,8 +65,8 @@ TEST(SQLite, ImplicitTransaction)
   OrthancDatabases::SQLiteDatabase db;
   db.OpenInMemory();
 
-  ASSERT_FALSE(db.DoesTableExist("test"));
-  ASSERT_FALSE(db.DoesTableExist("test2"));
+  ASSERT_FALSE(db.GetObject().DoesTableExist("test"));
+  ASSERT_FALSE(db.GetObject().DoesTableExist("test2"));
 
   {
     std::unique_ptr<OrthancDatabases::ITransaction> t(db.CreateTransaction(OrthancDatabases::TransactionType_ReadWrite));
@@ -101,8 +101,8 @@ TEST(SQLite, ImplicitTransaction)
     t->ExecuteWithoutResult(*s, args);
   }
 
-  ASSERT_TRUE(db.DoesTableExist("test"));
-  ASSERT_TRUE(db.DoesTableExist("test2"));
+  ASSERT_TRUE(db.GetObject().DoesTableExist("test"));
+  ASSERT_TRUE(db.GetObject().DoesTableExist("test2"));
 }
 
 

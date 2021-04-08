@@ -1068,8 +1068,41 @@ namespace OrthancDatabases
                                           const char* serverIdentifier,
                                           int32_t property)
   {
-    return ::OrthancDatabases::LookupGlobalProperty(target, manager, serverIdentifier,
-                                                    static_cast<Orthanc::GlobalProperty>(property));
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT value FROM GlobalProperties WHERE property=${property}");
+
+    statement.SetReadOnly(true);
+    statement.SetParameterType("property", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("property", property);
+
+    statement.Execute(args);
+    statement.SetResultFieldType(0, ValueType_Utf8String);
+
+    if (statement.IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      ValueType type = statement.GetResultField(0).GetType();
+
+      if (type == ValueType_Null)
+      {
+        return false;
+      }
+      else if (type != ValueType_Utf8String)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+      }
+      else
+      {
+        target = dynamic_cast<const Utf8StringValue&>(statement.GetResultField(0)).GetContent();
+        return true;
+      }
+    }
   }
 
     
@@ -1332,10 +1365,53 @@ namespace OrthancDatabases
   void IndexBackend::SetGlobalProperty(DatabaseManager& manager,
                                        const char* serverIdentifier,
                                        int32_t property,
-                                       const char* value)
+                                       const char* utf8)
   {
-    return ::OrthancDatabases::SetGlobalProperty(
-      manager, serverIdentifier, static_cast<Orthanc::GlobalProperty>(property), value);
+    if (manager.GetDialect() == Dialect_SQLite)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT OR REPLACE INTO GlobalProperties VALUES (${property}, ${value})");
+        
+      statement.SetParameterType("property", ValueType_Integer64);
+      statement.SetParameterType("value", ValueType_Utf8String);
+        
+      Dictionary args;
+      args.SetIntegerValue("property", static_cast<int>(property));
+      args.SetUtf8Value("value", utf8);
+        
+      statement.Execute(args);
+    }
+    else
+    {
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "DELETE FROM GlobalProperties WHERE property=${property}");
+        
+        statement.SetParameterType("property", ValueType_Integer64);
+        
+        Dictionary args;
+        args.SetIntegerValue("property", property);
+        
+        statement.Execute(args);
+      }
+
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT INTO GlobalProperties VALUES (${property}, ${value})");
+        
+        statement.SetParameterType("property", ValueType_Integer64);
+        statement.SetParameterType("value", ValueType_Utf8String);
+        
+        Dictionary args;
+        args.SetIntegerValue("property", static_cast<int>(property));
+        args.SetUtf8Value("value", utf8);
+        
+        statement.Execute(args);
+      }
+    }
   }
 
 
@@ -2304,6 +2380,43 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 
 
+  bool IndexBackend::LookupGlobalIntegerProperty(int& target,
+                                                 DatabaseManager& manager,
+                                                 const char* serverIdentifier,
+                                                 int32_t property)
+  {
+    std::string value;
+
+    if (LookupGlobalProperty(value, manager, serverIdentifier, property))
+    {
+      try
+      {
+        target = boost::lexical_cast<int>(value);
+        return true;
+      }
+      catch (boost::bad_lexical_cast&)
+      {
+        LOG(ERROR) << "Corrupted PostgreSQL database";
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+      }      
+    }
+    else
+    {
+      return false;
+    }    
+  }
+  
+
+  void IndexBackend::SetGlobalIntegerProperty(DatabaseManager& manager,
+                                              const char* serverIdentifier,
+                                              int32_t property,
+                                              int value)
+  {
+    std::string s = boost::lexical_cast<std::string>(value);
+    SetGlobalProperty(manager, serverIdentifier, property, s.c_str());
+  }
+  
+
   void IndexBackend::Finalize()
   {
     OrthancDatabases::DatabaseBackendAdapterV2::Finalize();
@@ -2318,8 +2431,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
   {
-    std::unique_ptr<IDatabase> database(backend.OpenDatabaseConnection());
-    backend.ConfigureDatabase(*database);
-    return new DatabaseManager(database.release());
+    std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.OpenDatabaseConnection()));
+    backend.ConfigureDatabase(*manager);
+    return manager.release();
   }
 }

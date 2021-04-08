@@ -60,7 +60,7 @@ namespace OrthancDatabases
   }
 
   
-  void PostgreSQLIndex::ConfigureDatabase(IDatabase& database)
+  void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager)
   {
     uint32_t expectedVersion = 6;
 
@@ -78,7 +78,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
     }
 
-    PostgreSQLDatabase& db = dynamic_cast<PostgreSQLDatabase&>(database);
+    PostgreSQLDatabase& db = dynamic_cast<PostgreSQLDatabase&>(manager.GetDatabase());
 
     if (parameters_.HasLock())
     {
@@ -94,29 +94,29 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(db, TransactionType_ReadWrite);
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-        if (!db.DoesTableExist("Resources"))
+        if (!t.DoesTableExist("Resources"))
         {
           std::string query;
 
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
-          db.Execute(query);
+          t.ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 0);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 0);
         }
           
-        if (!db.DoesTableExist("Resources"))
+        if (!t.DoesTableExist("Resources"))
         {
           LOG(ERROR) << "Corrupted PostgreSQL database";
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
         }
 
         int version = 0;
-        if (!LookupGlobalIntegerProperty(version, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+        if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
             version != 6)
         {
           LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema version: " << version;
@@ -124,10 +124,10 @@ namespace OrthancDatabases
         }
 
         int revision;
-        if (!LookupGlobalIntegerProperty(revision, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+        if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
         {
           revision = 1;
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
         }
 
         if (revision != 1)
@@ -140,10 +140,10 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(db, TransactionType_ReadWrite);
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
         int hasTrigram = 0;
-        if (!LookupGlobalIntegerProperty(hasTrigram, db, t, MISSING_SERVER_IDENTIFIER,
+        if (!LookupGlobalIntegerProperty(hasTrigram, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_HasTrigramIndex) ||
             hasTrigram != 1)
         {
@@ -163,11 +163,11 @@ namespace OrthancDatabases
             LOG(WARNING) << "Trying to enable trigram matching on the PostgreSQL database "
                          << "to speed up wildcard searches. This may take several minutes";
 
-            db.Execute(
+            t.ExecuteMultiLines(
               "CREATE EXTENSION IF NOT EXISTS pg_trgm; "
               "CREATE INDEX DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);");
 
-            SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 1);
+            SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 1);
             LOG(WARNING) << "Trigram index has been created";
 
             t.Commit();
@@ -187,10 +187,10 @@ namespace OrthancDatabases
       }
 
       {
-        PostgreSQLTransaction t(db, TransactionType_ReadWrite);
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
         int property = 0;
-        if (!LookupGlobalIntegerProperty(property, db, t, MISSING_SERVER_IDENTIFIER,
+        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_HasCreateInstance) ||
             property != 2)
         {
@@ -199,20 +199,20 @@ namespace OrthancDatabases
           if (property == 1)
           {
             // Drop older, experimental versions of this extension
-            db.Execute("DROP FUNCTION CreateInstance("
-                        "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+            t.ExecuteMultiLines("DROP FUNCTION CreateInstance("
+                                "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
           }
         
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
-          db.Execute(query);
+          t.ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 2);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 2);
         }
 
       
-        if (!LookupGlobalIntegerProperty(property, db, t, MISSING_SERVER_IDENTIFIER,
+        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
             property != 1)
         {
@@ -221,16 +221,16 @@ namespace OrthancDatabases
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
-          db.Execute(query);
+          t.ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
         }
 
 
         // Installing this extension requires the "GlobalIntegers" table
         // created by the "FastTotalSize" extension
         property = 0;
-        if (!LookupGlobalIntegerProperty(property, db, t, MISSING_SERVER_IDENTIFIER,
+        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_HasFastCountResources) ||
             property != 1)
         {
@@ -239,16 +239,16 @@ namespace OrthancDatabases
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
-          db.Execute(query);
+          t.ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
         }
 
 
         // Installing this extension requires the "GlobalIntegers" table
         // created by the "GetLastChangeIndex" extension
         property = 0;
-        if (!LookupGlobalIntegerProperty(property, db, t, MISSING_SERVER_IDENTIFIER,
+        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_GetLastChangeIndex) ||
             property != 1)
         {
@@ -257,9 +257,23 @@ namespace OrthancDatabases
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
-          db.Execute(query);
+          t.ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+        }
+
+        t.Commit();
+      }
+ 
+
+      {
+        // New in release 4.0 to deal with multiple writers
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        if (!t.DoesTableExist("ServerProperties"))
+        {
+          t.ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
+                              "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
         }
 
         t.Commit();

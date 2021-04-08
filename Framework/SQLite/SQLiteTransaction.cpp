@@ -30,6 +30,7 @@
 namespace OrthancDatabases
 {
   SQLiteTransaction::SQLiteTransaction(SQLiteDatabase& database) :
+    database_(database),
     transaction_(database.GetObject())
   {
     transaction_.Begin();

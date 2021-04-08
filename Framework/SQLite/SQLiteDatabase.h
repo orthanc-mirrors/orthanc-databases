@@ -53,11 +53,6 @@ namespace OrthancDatabases
     }
 
     void Execute(const std::string& sql);
-
-    bool DoesTableExist(const std::string& table)
-    {
-      return connection_.DoesTableExist(table.c_str());
-    }
     
     int64_t GetLastInsertRowId() const
     {

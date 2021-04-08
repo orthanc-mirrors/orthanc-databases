@@ -53,14 +53,14 @@ namespace OrthancDatabases
 
         if (!db.DoesTableExist("StorageArea"))
         {
-          db.Execute("CREATE TABLE IF NOT EXISTS StorageArea("
-                     "uuid VARCHAR NOT NULL PRIMARY KEY,"
-                     "content OID NOT NULL,"
-                     "type INTEGER NOT NULL)");
+          db.ExecuteMultiLines("CREATE TABLE IF NOT EXISTS StorageArea("
+                               "uuid VARCHAR NOT NULL PRIMARY KEY,"
+                               "content OID NOT NULL,"
+                               "type INTEGER NOT NULL)");
           
           // Automatically remove the large objects associated with the table
-          db.Execute("CREATE OR REPLACE RULE StorageAreaDelete AS ON DELETE "
-                     "TO StorageArea DO SELECT lo_unlink(old.content);");
+          db.ExecuteMultiLines("CREATE OR REPLACE RULE StorageAreaDelete AS ON DELETE "
+                               "TO StorageArea DO SELECT lo_unlink(old.content);");
         }
         
         t.Commit();

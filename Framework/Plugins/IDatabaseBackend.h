@@ -42,7 +42,7 @@ namespace OrthancDatabases
     virtual IDatabase* OpenDatabaseConnection() = 0;
 
     // This function is invoked once, even if multiple connections are open
-    virtual void ConfigureDatabase(IDatabase& database) = 0;
+    virtual void ConfigureDatabase(DatabaseManager& database) = 0;
 
     virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
                         
@@ -213,7 +213,7 @@ namespace OrthancDatabases
     virtual void SetGlobalProperty(DatabaseManager& manager,
                                    const char* serverIdentifier,
                                    int32_t property,
-                                   const char* value) = 0;
+                                   const char* utf8) = 0;
 
     virtual void SetMainDicomTag(DatabaseManager& manager,
                                  int64_t id,

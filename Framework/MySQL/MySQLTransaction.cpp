@@ -39,11 +39,11 @@ namespace OrthancDatabases
     switch (type)
     {
       case TransactionType_ReadWrite:
-        db_.Execute("START TRANSACTION READ WRITE", false);
+        db_.ExecuteMultiLines("START TRANSACTION READ WRITE", false);
         break;
 
       case TransactionType_ReadOnly:
-        db_.Execute("START TRANSACTION READ ONLY", false);
+        db_.ExecuteMultiLines("START TRANSACTION READ ONLY", false);
         break;
 
       default:
@@ -62,7 +62,7 @@ namespace OrthancDatabases
 
       try
       {
-        db_.Execute("ROLLBACK", false);
+        db_.ExecuteMultiLines("ROLLBACK", false);
       }
       catch (Orthanc::OrthancException&)
       {
@@ -76,7 +76,7 @@ namespace OrthancDatabases
   {
     if (active_)
     {
-      db_.Execute("ROLLBACK", false);
+      db_.ExecuteMultiLines("ROLLBACK", false);
       active_ = false;
     }
     else
@@ -91,7 +91,7 @@ namespace OrthancDatabases
   {
     if (active_)
     {
-      db_.Execute("COMMIT", false);
+      db_.ExecuteMultiLines("COMMIT", false);
       active_ = false;
     }
     else

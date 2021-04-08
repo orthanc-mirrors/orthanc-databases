@@ -155,7 +155,7 @@ namespace OrthancDatabases
   }
 
 
-  void PostgreSQLDatabase::Execute(const std::string& sql)
+  void PostgreSQLDatabase::ExecuteMultiLines(const std::string& sql)
   {
     LOG(TRACE) << "PostgreSQL: " << sql;
     Open();
@@ -210,14 +210,14 @@ namespace OrthancDatabases
     PostgreSQLTransaction transaction(*this, TransactionType_ReadWrite);
     
     // Remove all the large objects
-    Execute("SELECT lo_unlink(loid) FROM (SELECT DISTINCT loid FROM pg_catalog.pg_largeobject) as loids;");
+    ExecuteMultiLines("SELECT lo_unlink(loid) FROM (SELECT DISTINCT loid FROM pg_catalog.pg_largeobject) as loids;");
 
     // http://stackoverflow.com/a/21247009/881731
-    Execute("DROP SCHEMA public CASCADE;");
-    Execute("CREATE SCHEMA public;");
-    Execute("GRANT ALL ON SCHEMA public TO postgres;");
-    Execute("GRANT ALL ON SCHEMA public TO public;");
-    Execute("COMMENT ON SCHEMA public IS 'standard public schema';");
+    ExecuteMultiLines("DROP SCHEMA public CASCADE;");
+    ExecuteMultiLines("CREATE SCHEMA public;");
+    ExecuteMultiLines("GRANT ALL ON SCHEMA public TO postgres;");
+    ExecuteMultiLines("GRANT ALL ON SCHEMA public TO public;");
+    ExecuteMultiLines("COMMENT ON SCHEMA public IS 'standard public schema';");
 
     transaction.Commit();
   }
@@ -233,6 +233,9 @@ namespace OrthancDatabases
   {
     class PostgreSQLImplicitTransaction : public ImplicitTransaction
     {
+    private:
+      PostgreSQLDatabase& db_;
+      
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
                                        const Dictionary& parameters)
@@ -245,6 +248,27 @@ namespace OrthancDatabases
       {
         dynamic_cast<PostgreSQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
+
+    public:
+      PostgreSQLImplicitTransaction(PostgreSQLDatabase& db) :
+        db_(db)
+      {
+      }
+
+      virtual bool DoesTableExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return db_.DoesTableExist(name.c_str());
+      }
+
+      virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return false;
+      }
+
+      virtual void ExecuteMultiLines(const std::string& query) ORTHANC_OVERRIDE
+      {
+        db_.ExecuteMultiLines(query);
+      }
     };
   }
   
@@ -254,7 +278,7 @@ namespace OrthancDatabases
     switch (type)
     {
       case TransactionType_Implicit:
-        return new PostgreSQLImplicitTransaction;
+        return new PostgreSQLImplicitTransaction(*this);
 
       case TransactionType_ReadWrite:
       case TransactionType_ReadOnly:

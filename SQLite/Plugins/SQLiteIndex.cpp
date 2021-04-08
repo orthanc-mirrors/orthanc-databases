@@ -47,14 +47,25 @@ namespace OrthancDatabases
       db->Open(path_);
     }
 
+    db->Execute("PRAGMA ENCODING=\"UTF-8\";");
+
+    if (fast_)
+    {
+      // Performance tuning of SQLite with PRAGMAs
+      // http://www.sqlite.org/pragma.html
+      db->Execute("PRAGMA SYNCHRONOUS=NORMAL;");
+      db->Execute("PRAGMA JOURNAL_MODE=WAL;");
+      db->Execute("PRAGMA LOCKING_MODE=EXCLUSIVE;");
+      db->Execute("PRAGMA WAL_AUTOCHECKPOINT=1000;");
+      //db->Execute("PRAGMA TEMP_STORE=memory");
+    }
+
     return db.release();
   }
 
 
-  void SQLiteIndex::ConfigureDatabase(IDatabase& database)
+  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager)
   {
-    SQLiteDatabase& db = dynamic_cast<SQLiteDatabase&>(database);
-    
     uint32_t expectedVersion = 6;
 
     if (GetContext())   // "GetContext()" can possibly be NULL in the unit tests
@@ -72,47 +83,35 @@ namespace OrthancDatabases
     }
 
     {
-      SQLiteTransaction t(db);
+      DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-      if (!db.DoesTableExist("Resources"))
+      if (!t.DoesTableExist("Resources"))
       {
         std::string query;
 
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::SQLITE_PREPARE_INDEX);
-        db.Execute(query);
- 
-        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
-     }
+
+        t.ExecuteMultiLines(query);
+
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+      }
           
       t.Commit();
     }
 
-    db.Execute("PRAGMA ENCODING=\"UTF-8\";");
-
-    if (fast_)
     {
-      // Performance tuning of SQLite with PRAGMAs
-      // http://www.sqlite.org/pragma.html
-      db.Execute("PRAGMA SYNCHRONOUS=NORMAL;");
-      db.Execute("PRAGMA JOURNAL_MODE=WAL;");
-      db.Execute("PRAGMA LOCKING_MODE=EXCLUSIVE;");
-      db.Execute("PRAGMA WAL_AUTOCHECKPOINT=1000;");
-      //db.Execute("PRAGMA TEMP_STORE=memory");
-    }
+      DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-    {
-      SQLiteTransaction t(db);
-
-      if (!db.DoesTableExist("Resources"))
+      if (!t.DoesTableExist("Resources"))
       {
         LOG(ERROR) << "Corrupted SQLite database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
       }
 
       int version = 0;
-      if (!LookupGlobalIntegerProperty(version, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+      if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
           version != 6)
       {
         LOG(ERROR) << "SQLite plugin is incompatible with database schema version: " << version;
@@ -120,10 +119,10 @@ namespace OrthancDatabases
       }
 
       int revision;
-      if (!LookupGlobalIntegerProperty(revision, db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+      if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
       {
         revision = 1;
-        SetGlobalIntegerProperty(db, t, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
       if (revision != 1)

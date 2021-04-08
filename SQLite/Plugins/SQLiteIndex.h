@@ -44,7 +44,7 @@ namespace OrthancDatabases
 
     virtual IDatabase* OpenDatabaseConnection() ORTHANC_OVERRIDE;
 
-    virtual void ConfigureDatabase(IDatabase& database) ORTHANC_OVERRIDE;
+    virtual void ConfigureDatabase(DatabaseManager& manager) ORTHANC_OVERRIDE;
     
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,

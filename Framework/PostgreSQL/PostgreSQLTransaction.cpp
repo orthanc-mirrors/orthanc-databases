@@ -46,7 +46,7 @@ namespace OrthancDatabases
 
       try
       {
-        database_.Execute("ABORT");
+        database_.ExecuteMultiLines("ABORT");
       }
       catch (Orthanc::OrthancException&)
       {
@@ -64,16 +64,16 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    database_.Execute("BEGIN");
+    database_.ExecuteMultiLines("BEGIN");
 
     switch (type)
     {
       case TransactionType_ReadWrite:
-        database_.Execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
+        database_.ExecuteMultiLines("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
         break;
 
       case TransactionType_ReadOnly:
-        database_.Execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY");
+        database_.ExecuteMultiLines("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY");
         break;
 
       default:
@@ -93,7 +93,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    database_.Execute("ABORT");
+    database_.ExecuteMultiLines("ABORT");
     isOpen_ = false;
   }
 
@@ -107,7 +107,7 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    database_.Execute("COMMIT");
+    database_.ExecuteMultiLines("COMMIT");
     isOpen_ = false;
   }
 

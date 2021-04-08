@@ -88,7 +88,7 @@ namespace OrthancDatabases
                                        uint32_t maxResults);
 
   public:
-    IndexBackend(OrthancPluginContext* context);
+    explicit IndexBackend(OrthancPluginContext* context);
 
     virtual OrthancPluginContext* GetContext() ORTHANC_OVERRIDE
     {
@@ -254,7 +254,7 @@ namespace OrthancDatabases
     virtual void SetGlobalProperty(DatabaseManager& manager,
                                    const char* serverIdentifier,
                                    int32_t property,
-                                   const char* value) ORTHANC_OVERRIDE;
+                                   const char* utf8) ORTHANC_OVERRIDE;
 
     virtual void SetMainDicomTag(DatabaseManager& manager,
                                  int64_t id,
@@ -380,6 +380,16 @@ namespace OrthancDatabases
                                const char* hashStudy,
                                const char* hashSeries,
                                const char* hashInstance);
+
+    bool LookupGlobalIntegerProperty(int& target /*out*/,
+                                     DatabaseManager& manager,
+                                     const char* serverIdentifier,
+                                     int32_t property);
+    
+    void SetGlobalIntegerProperty(DatabaseManager& manager,
+                                  const char* serverIdentifier,
+                                  int32_t property,
+                                  int value);
 
     /**
      * "maxDatabaseRetries" is to handle

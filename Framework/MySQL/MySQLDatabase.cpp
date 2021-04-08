@@ -224,8 +224,8 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
       }
       
-      db.Execute("DROP DATABASE " + database, false);
-      db.Execute("CREATE DATABASE " + database, false);
+      db.ExecuteMultiLines("DROP DATABASE " + database, false);
+      db.ExecuteMultiLines("CREATE DATABASE " + database, false);
       t.Commit();
     }
   }
@@ -478,8 +478,8 @@ namespace OrthancDatabases
   }
 
 
-  void MySQLDatabase::Execute(const std::string& sql,
-                              bool arobaseSeparator)
+  void MySQLDatabase::ExecuteMultiLines(const std::string& sql,
+                                        bool arobaseSeparator)
   {
     if (mysql_ == NULL)
     {
@@ -527,6 +527,9 @@ namespace OrthancDatabases
   {
     class MySQLImplicitTransaction : public ImplicitTransaction
     {
+    private:
+      MySQLDatabase& db_;
+      
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
                                        const Dictionary& parameters)
@@ -538,6 +541,27 @@ namespace OrthancDatabases
                                                 const Dictionary& parameters)
       {
         dynamic_cast<MySQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
+      }
+
+    public:
+      MySQLImplicitTransaction(MySQLDatabase& db) :
+        db_(db)
+      {
+      }
+      
+      virtual bool DoesTableExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "An explicit transaction is needed");
+      }
+
+      virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "An explicit transaction is needed");
+      }
+
+      virtual void ExecuteMultiLines(const std::string& query) ORTHANC_OVERRIDE
+      {
+        db_.ExecuteMultiLines(query, false /* don't deal with arobases */);
       }
     };
   }
@@ -553,7 +577,7 @@ namespace OrthancDatabases
     switch (type)
     {
       case TransactionType_Implicit:
-        return new MySQLImplicitTransaction;
+        return new MySQLImplicitTransaction(*this);
 
       case TransactionType_ReadOnly:
       case TransactionType_ReadWrite:
@@ -635,7 +659,7 @@ namespace OrthancDatabases
       {
         std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
         db->Open();
-        db->Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
+        db->ExecuteMultiLines("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
         return db.release();
       }
       

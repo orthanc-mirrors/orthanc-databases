@@ -86,7 +86,7 @@ TEST(PostgreSQL, Basic)
   std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
   ASSERT_FALSE(pg->DoesTableExist("Test"));
-  pg->Execute("CREATE TABLE Test(name INTEGER, value BIGINT)");
+  pg->ExecuteMultiLines("CREATE TABLE Test(name INTEGER, value BIGINT)");
   ASSERT_TRUE(pg->DoesTableExist("Test"));
 
   PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
@@ -158,7 +158,7 @@ TEST(PostgreSQL, String)
 {
   std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
-  pg->Execute("CREATE TABLE Test(name INTEGER, value VARCHAR(40))");
+  pg->ExecuteMultiLines("CREATE TABLE Test(name INTEGER, value VARCHAR(40))");
 
   PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
   s.DeclareInputInteger(0);
@@ -204,7 +204,7 @@ TEST(PostgreSQL, Transaction)
 {
   std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
-  pg->Execute("CREATE TABLE Test(name INTEGER, value INTEGER)");
+  pg->ExecuteMultiLines("CREATE TABLE Test(name INTEGER, value INTEGER)");
 
   {
     PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
@@ -283,10 +283,10 @@ TEST(PostgreSQL, LargeObject)
   std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
   ASSERT_EQ(0, CountLargeObjects(*pg));
 
-  pg->Execute("CREATE TABLE Test(name VARCHAR, value OID)");
+  pg->ExecuteMultiLines("CREATE TABLE Test(name VARCHAR, value OID)");
 
   // Automatically remove the large objects associated with the table
-  pg->Execute("CREATE RULE TestDelete AS ON DELETE TO Test DO SELECT lo_unlink(old.value);");
+  pg->ExecuteMultiLines("CREATE RULE TestDelete AS ON DELETE TO Test DO SELECT lo_unlink(old.value);");
 
   {
     PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");

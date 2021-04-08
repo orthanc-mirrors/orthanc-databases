@@ -35,6 +35,7 @@ namespace OrthancDatabases
   class SQLiteTransaction : public ITransaction
   {
   private:
+    SQLiteDatabase&               database_;
     Orthanc::SQLite::Transaction  transaction_;
     
   public:
@@ -60,5 +61,20 @@ namespace OrthancDatabases
 
     virtual void ExecuteWithoutResult(IPrecompiledStatement& statement,
                                       const Dictionary& parameters) ORTHANC_OVERRIDE;
+
+    virtual bool DoesTableExist(const std::string& name) ORTHANC_OVERRIDE
+    {
+      return database_.GetObject().DoesTableExist(name.c_str());
+    }
+
+    virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
+    virtual void ExecuteMultiLines(const std::string& query) ORTHANC_OVERRIDE
+    {
+      database_.GetObject().Execute(query);
+    }
   };
 }

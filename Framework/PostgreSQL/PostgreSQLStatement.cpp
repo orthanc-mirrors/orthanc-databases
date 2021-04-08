@@ -201,7 +201,7 @@ namespace OrthancDatabases
       // "Although there is no libpq function for deleting a
       // prepared statement, the SQL DEALLOCATE statement can be
       // used for that purpose."
-      database_.Execute("DEALLOCATE \"" + id_ + "\"");
+      database_.ExecuteMultiLines("DEALLOCATE \"" + id_ + "\"");
     }
 
     id_.clear();

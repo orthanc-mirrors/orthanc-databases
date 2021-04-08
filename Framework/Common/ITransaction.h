@@ -45,5 +45,11 @@ namespace OrthancDatabases
 
     virtual void ExecuteWithoutResult(IPrecompiledStatement& statement,
                                       const Dictionary& parameters) = 0;
+
+    virtual bool DoesTableExist(const std::string& name) = 0;
+
+    virtual bool DoesTriggerExist(const std::string& name) = 0;  // Only for MySQL
+
+    virtual void ExecuteMultiLines(const std::string& query) = 0;
   };
 }

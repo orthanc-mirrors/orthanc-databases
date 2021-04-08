@@ -56,5 +56,20 @@ namespace OrthancDatabases
 
     virtual void ExecuteWithoutResult(IPrecompiledStatement& transaction,
                                       const Dictionary& parameters) ORTHANC_OVERRIDE;
+
+    virtual bool DoesTableExist(const std::string& name)
+    {
+      return db_.DoesTableExist(*this, name);
+    }
+
+    virtual bool DoesTriggerExist(const std::string& name)
+    {
+      return db_.DoesTriggerExist(*this, name);
+    }
+
+    virtual void ExecuteMultiLines(const std::string& query)
+    {
+      db_.ExecuteMultiLines(query, false /* don't deal with arobases */);
+    }
   };
 }

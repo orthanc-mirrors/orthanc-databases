@@ -59,13 +59,13 @@ namespace OrthancDatabases
                
       if (clearAll)
       {
-        db.Execute("DROP TABLE IF EXISTS StorageArea", false);
+        db.ExecuteMultiLines("DROP TABLE IF EXISTS StorageArea", false);
       }
 
-      db.Execute("CREATE TABLE IF NOT EXISTS StorageArea("
-                 "uuid VARCHAR(64) NOT NULL PRIMARY KEY,"
-                 "content LONGBLOB NOT NULL,"
-                 "type INTEGER NOT NULL)", false);
+      db.ExecuteMultiLines("CREATE TABLE IF NOT EXISTS StorageArea("
+                           "uuid VARCHAR(64) NOT NULL PRIMARY KEY,"
+                           "content LONGBLOB NOT NULL,"
+                           "type INTEGER NOT NULL)", false);
 
       t.Commit();
     }

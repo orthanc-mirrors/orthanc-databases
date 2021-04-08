@@ -48,6 +48,9 @@ namespace OrthancDatabases
   {
     class SQLiteImplicitTransaction : public ImplicitTransaction
     {
+    private:
+      SQLiteDatabase&  db_;
+      
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
                                        const Dictionary& parameters) ORTHANC_OVERRIDE
@@ -60,6 +63,27 @@ namespace OrthancDatabases
       {
         dynamic_cast<SQLiteStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
+
+    public:
+      SQLiteImplicitTransaction(SQLiteDatabase& db) :
+        db_(db)
+      {
+      }
+
+      virtual bool DoesTableExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return db_.GetObject().DoesTableExist(name.c_str());
+      }
+
+      virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return false;
+      }
+
+      virtual void ExecuteMultiLines(const std::string& query) ORTHANC_OVERRIDE
+      {
+        db_.GetObject().Execute(query);
+      }
     };
   }
   
@@ -68,7 +92,7 @@ namespace OrthancDatabases
     switch (type)
     {
       case TransactionType_Implicit:
-        return new SQLiteImplicitTransaction;
+        return new SQLiteImplicitTransaction(*this);
 
       case TransactionType_ReadOnly:
       case TransactionType_ReadWrite:

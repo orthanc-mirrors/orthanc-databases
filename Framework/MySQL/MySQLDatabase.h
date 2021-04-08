@@ -79,8 +79,8 @@ namespace OrthancDatabases
 
     void AdvisoryLock(const std::string& lock);
 
-    void Execute(const std::string& sql,
-                 bool arobaseSeparator);
+    void ExecuteMultiLines(const std::string& sql,
+                           bool arobaseSeparator);
 
     bool DoesTableExist(MySQLTransaction& transaction,
                         const std::string& name);
