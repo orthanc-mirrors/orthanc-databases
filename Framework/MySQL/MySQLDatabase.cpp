@@ -69,6 +69,10 @@ namespace OrthancDatabases
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
       }
+      else if (error == ER_LOCK_DEADLOCK)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+      } 
       else
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
@@ -627,6 +631,7 @@ namespace OrthancDatabases
       {
         std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
         db->Open();
+        db->Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
         return db.release();
       }
       

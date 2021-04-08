@@ -42,7 +42,7 @@ namespace OrthancDatabases
   {
     if (isOpen_)
     {
-      LOG(WARNING) << "PostgreSQL: An active PostgreSQL transaction was dismissed";
+      LOG(INFO) << "PostgreSQL: An active PostgreSQL transaction was dismissed";
 
       try
       {

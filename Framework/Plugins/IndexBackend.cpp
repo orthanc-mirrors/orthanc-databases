@@ -2275,7 +2275,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 
 
-  void IndexBackend::Register(IndexBackend* backend)
+  void IndexBackend::Register(IndexBackend* backend,
+                              size_t countConnections,
+                              unsigned int maxDatabaseRetries)
   {
     if (backend == NULL)
     {
@@ -2288,7 +2290,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend);
+      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
       hasLoadedV3 = true;
     }
 #  endif

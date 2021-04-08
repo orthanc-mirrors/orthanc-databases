@@ -91,8 +91,6 @@ namespace OrthancDatabases
     {
       MySQLDatabase::ClearDatabase(parameters_);
     }
-    
-    db.Execute("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
 
     {
       MySQLDatabase::TransientAdvisoryLock lock(db, MYSQL_LOCK_DATABASE_SETUP);

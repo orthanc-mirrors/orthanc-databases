@@ -62,8 +62,12 @@ extern "C"
 
     try
     {
+      const size_t countConnections = 5;  // TODO - PARAMETER
+      const unsigned int maxDatabaseRetries = 10;  // TODO - PARAMETER
+      
       OrthancDatabases::MySQLParameters parameters(mysql, configuration);
-      OrthancDatabases::IndexBackend::Register(new OrthancDatabases::MySQLIndex(context, parameters));
+      OrthancDatabases::IndexBackend::Register(
+        new OrthancDatabases::MySQLIndex(context, parameters), countConnections, maxDatabaseRetries);
     }
     catch (Orthanc::OrthancException& e)
     {

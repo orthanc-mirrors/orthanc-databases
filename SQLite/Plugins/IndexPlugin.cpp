@@ -60,7 +60,9 @@ extern "C"
     {
       /* Register the SQLite index into Orthanc */
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::SQLiteIndex(context, "index.db"));  // TODO parameter
+        new OrthancDatabases::SQLiteIndex(context, "index.db"),   // TODO parameter
+        1 /* only 1 connection is possible with SQLite */,
+        0 /* no collision is possible, as SQLite has a global lock */);
     }
     catch (Orthanc::OrthancException& e)
     {

@@ -381,7 +381,15 @@ namespace OrthancDatabases
                                const char* hashSeries,
                                const char* hashInstance);
 
-    static void Register(IndexBackend* backend);
+    /**
+     * "maxDatabaseRetries" is to handle
+     * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a
+     * collision multiple writers. "countConnections" and
+     * "maxDatabaseRetries" are only used if Orthanc >= 1.9.2.
+     **/
+    static void Register(IndexBackend* backend,
+                         size_t countConnections,
+                         unsigned int maxDatabaseRetries);
 
     static void Finalize();
 

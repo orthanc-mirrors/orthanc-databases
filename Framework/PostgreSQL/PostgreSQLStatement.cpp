@@ -278,7 +278,16 @@ namespace OrthancDatabases
                               1);
     }
 
-    if (result == NULL)
+    if (PQtransactionStatus(reinterpret_cast<PGconn*>(database_.pg_)) == PQTRANS_INERROR)
+    {
+      if (result != NULL)
+      {
+        PQclear(result);
+      }
+      
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+    }
+    else if (result == NULL)
     {
       database_.ThrowException(true);
     }

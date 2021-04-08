@@ -58,7 +58,8 @@ namespace OrthancDatabases
     
   void DatabaseManager::CloseIfUnavailable(Orthanc::ErrorCode e)
   {
-    if (e != Orthanc::ErrorCode_Success)
+    if (e != Orthanc::ErrorCode_Success &&
+        e != Orthanc::ErrorCode_DatabaseCannotSerialize)
     {
       transaction_.reset(NULL);
     }
@@ -209,7 +210,7 @@ namespace OrthancDatabases
   {
     if (transaction_.get() == NULL)
     {
-      LOG(ERROR) << "Cannot rollback a non-existing transaction";
+      LOG(INFO) << "Cannot rollback a non-existing transaction";
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
     else

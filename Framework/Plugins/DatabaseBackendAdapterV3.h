@@ -57,7 +57,9 @@ namespace OrthancDatabases
       virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE;
     };
 
-    static void Register(IndexBackend* backend);
+    static void Register(IndexBackend* backend,
+                         size_t countConnections,
+                         unsigned int maxDatabaseRetries);
 
     static void Finalize();
   };

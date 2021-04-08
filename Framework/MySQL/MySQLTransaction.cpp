@@ -58,7 +58,7 @@ namespace OrthancDatabases
   {
     if (active_)
     {
-      LOG(WARNING) << "An active MySQL transaction was dismissed";
+      LOG(INFO) << "An active MySQL transaction was dismissed";
 
       try
       {
