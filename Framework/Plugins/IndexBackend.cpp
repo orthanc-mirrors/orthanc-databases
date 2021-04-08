@@ -1062,22 +1062,11 @@ namespace OrthancDatabases
     }
   }
 
-    
-  bool IndexBackend::LookupGlobalProperty(std::string& target /*out*/,
-                                          DatabaseManager& manager,
-                                          const char* serverIdentifier,
-                                          int32_t property)
+
+  static bool ReadGlobalProperty(std::string& target,
+                                 DatabaseManager::CachedStatement& statement,
+                                 const Dictionary& args)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT value FROM GlobalProperties WHERE property=${property}");
-
-    statement.SetReadOnly(true);
-    statement.SetParameterType("property", ValueType_Integer64);
-
-    Dictionary args;
-    args.SetIntegerValue("property", property);
-
     statement.Execute(args);
     statement.SetResultFieldType(0, ValueType_Utf8String);
 
@@ -1101,6 +1090,51 @@ namespace OrthancDatabases
       {
         target = dynamic_cast<const Utf8StringValue&>(statement.GetResultField(0)).GetContent();
         return true;
+      }
+    }
+  }
+  
+    
+  bool IndexBackend::LookupGlobalProperty(std::string& target /*out*/,
+                                          DatabaseManager& manager,
+                                          const char* serverIdentifier,
+                                          int32_t property)
+  {
+    if (serverIdentifier == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    else
+    {
+      if (strlen(serverIdentifier) == 0)
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT value FROM GlobalProperties WHERE property=${property}");
+
+        statement.SetReadOnly(true);
+        statement.SetParameterType("property", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetIntegerValue("property", property);
+
+        return ReadGlobalProperty(target, statement, args);
+      }
+      else
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT value FROM ServerProperties WHERE server=${server} AND property=${property}");
+
+        statement.SetReadOnly(true);
+        statement.SetParameterType("server", ValueType_Utf8String);
+        statement.SetParameterType("property", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetUtf8Value("server", serverIdentifier);
+        args.SetIntegerValue("property", property);
+
+        return ReadGlobalProperty(target, statement, args);
       }
     }
   }
@@ -1367,49 +1401,106 @@ namespace OrthancDatabases
                                        int32_t property,
                                        const char* utf8)
   {
-    if (manager.GetDialect() == Dialect_SQLite)
+    if (serverIdentifier == NULL)
     {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "INSERT OR REPLACE INTO GlobalProperties VALUES (${property}, ${value})");
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    else if (manager.GetDialect() == Dialect_SQLite)
+    {
+      bool hasServer = (strlen(serverIdentifier) != 0);
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+      if (hasServer)
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT OR REPLACE INTO ServerProperties VALUES (${server}, ${property}, ${value})"));
+      }
+      else
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT OR REPLACE INTO GlobalProperties VALUES (${property}, ${value})"));
+      }
         
-      statement.SetParameterType("property", ValueType_Integer64);
-      statement.SetParameterType("value", ValueType_Utf8String);
+      statement->SetParameterType("property", ValueType_Integer64);
+      statement->SetParameterType("value", ValueType_Utf8String);
         
       Dictionary args;
       args.SetIntegerValue("property", static_cast<int>(property));
       args.SetUtf8Value("value", utf8);
-        
-      statement.Execute(args);
+
+      if (hasServer)
+      {
+        statement->SetParameterType("server", ValueType_Utf8String);
+        args.SetUtf8Value("server", serverIdentifier);
+      }
+      
+      statement->Execute(args);
     }
     else
     {
+      bool hasServer = (strlen(serverIdentifier) != 0);
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
       {
-        DatabaseManager::CachedStatement statement(
-          STATEMENT_FROM_HERE, manager,
-          "DELETE FROM GlobalProperties WHERE property=${property}");
+        if (hasServer)
+        {
+          statement.reset(new DatabaseManager::CachedStatement(
+                            STATEMENT_FROM_HERE, manager,
+                            "DELETE FROM ServerProperties WHERE server=${server} AND property=${property}"));
+        }
+        else
+        {
+          statement.reset(new DatabaseManager::CachedStatement(
+                            STATEMENT_FROM_HERE, manager,
+                            "DELETE FROM GlobalProperties WHERE property=${property}"));
+        }
         
-        statement.SetParameterType("property", ValueType_Integer64);
+        statement->SetParameterType("property", ValueType_Integer64);
         
         Dictionary args;
         args.SetIntegerValue("property", property);
+
+        if (hasServer)
+        {
+          statement->SetParameterType("server", ValueType_Utf8String);
+          args.SetUtf8Value("server", serverIdentifier);
+        }
         
-        statement.Execute(args);
+        statement->Execute(args);
       }
 
       {
-        DatabaseManager::CachedStatement statement(
-          STATEMENT_FROM_HERE, manager,
-          "INSERT INTO GlobalProperties VALUES (${property}, ${value})");
+        if (hasServer)
+        {
+          statement.reset(new DatabaseManager::CachedStatement(
+                            STATEMENT_FROM_HERE, manager,
+                            "INSERT INTO ServerProperties VALUES (${server}, ${property}, ${value})"));
+        }
+        else
+        {
+          statement.reset(new DatabaseManager::CachedStatement(
+                            STATEMENT_FROM_HERE, manager,
+                            "INSERT INTO GlobalProperties VALUES (${property}, ${value})"));
+        }
         
-        statement.SetParameterType("property", ValueType_Integer64);
-        statement.SetParameterType("value", ValueType_Utf8String);
+        statement->SetParameterType("property", ValueType_Integer64);
+        statement->SetParameterType("value", ValueType_Utf8String);
         
         Dictionary args;
         args.SetIntegerValue("property", static_cast<int>(property));
         args.SetUtf8Value("value", utf8);
         
-        statement.Execute(args);
+        if (hasServer)
+        {
+          statement->SetParameterType("server", ValueType_Utf8String);
+          args.SetUtf8Value("server", serverIdentifier);
+        }
+
+        statement->Execute(args);
       }
     }
   }

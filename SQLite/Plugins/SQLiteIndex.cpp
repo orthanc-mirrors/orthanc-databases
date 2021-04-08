@@ -133,6 +133,18 @@ namespace OrthancDatabases
           
       t.Commit();
     }
+
+    {
+      DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+      if (!t.DoesTableExist("ServerProperties"))
+      {
+        t.ExecuteMultiLines("CREATE TABLE ServerProperties(server TEXT, "
+                            "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
+      }
+
+      t.Commit();
+    }    
   }
 
 

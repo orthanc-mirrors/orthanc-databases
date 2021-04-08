@@ -267,8 +267,23 @@ namespace OrthancDatabases
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
       }
+
+
+      {
+        // New in release 4.0 to deal with multiple writers
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        if (!t.DoesTableExist("ServerProperties"))
+        {
+          t.ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
+                              "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
+        }
+
+        t.Commit();
+      }
     }
 
+    
     /**
      * WARNING: This lock must be acquired after
      * "MYSQL_LOCK_DATABASE_SETUP" is released. Indeed, in MySQL <
