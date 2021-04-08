@@ -1395,6 +1395,44 @@ namespace OrthancDatabases
     }
   }
 
+
+  static void RunSetGlobalPropertyStatement(DatabaseManager::CachedStatement& statement,
+                                            bool hasServer,
+                                            bool hasValue,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            const char* utf8)
+  {
+    Dictionary args;
+
+    statement.SetParameterType("property", ValueType_Integer64);
+    args.SetIntegerValue("property", static_cast<int>(property));
+
+    if (hasValue)
+    {
+      assert(utf8 != NULL);
+      statement.SetParameterType("value", ValueType_Utf8String);
+      args.SetUtf8Value("value", utf8);
+    }
+    else
+    {
+      assert(utf8 == NULL);
+    }        
+
+    if (hasServer)
+    {
+      assert(serverIdentifier != NULL && strlen(serverIdentifier) > 0);
+      statement.SetParameterType("server", ValueType_Utf8String);
+      args.SetUtf8Value("server", serverIdentifier);
+    }
+    else
+    {
+      assert(serverIdentifier == NULL);
+    }
+      
+    statement.Execute(args);
+  }
+
     
   void IndexBackend::SetGlobalProperty(DatabaseManager& manager,
                                        const char* serverIdentifier,
@@ -1409,98 +1447,62 @@ namespace OrthancDatabases
     {
       bool hasServer = (strlen(serverIdentifier) != 0);
 
-      std::unique_ptr<DatabaseManager::CachedStatement> statement;
-
       if (hasServer)
       {
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "INSERT OR REPLACE INTO ServerProperties VALUES (${server}, ${property}, ${value})"));
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT OR REPLACE INTO ServerProperties VALUES (${server}, ${property}, ${value})");
+
+        RunSetGlobalPropertyStatement(statement, true, true, serverIdentifier, property, utf8);
       }
       else
       {
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "INSERT OR REPLACE INTO GlobalProperties VALUES (${property}, ${value})"));
-      }
-        
-      statement->SetParameterType("property", ValueType_Integer64);
-      statement->SetParameterType("value", ValueType_Utf8String);
-        
-      Dictionary args;
-      args.SetIntegerValue("property", static_cast<int>(property));
-      args.SetUtf8Value("value", utf8);
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT OR REPLACE INTO GlobalProperties VALUES (${property}, ${value})");
 
-      if (hasServer)
-      {
-        statement->SetParameterType("server", ValueType_Utf8String);
-        args.SetUtf8Value("server", serverIdentifier);
+        RunSetGlobalPropertyStatement(statement, false, true, NULL, property, utf8);
       }
-      
-      statement->Execute(args);
     }
     else
     {
       bool hasServer = (strlen(serverIdentifier) != 0);
 
-      std::unique_ptr<DatabaseManager::CachedStatement> statement;
-
+      if (hasServer)
       {
-        if (hasServer)
         {
-          statement.reset(new DatabaseManager::CachedStatement(
-                            STATEMENT_FROM_HERE, manager,
-                            "DELETE FROM ServerProperties WHERE server=${server} AND property=${property}"));
-        }
-        else
-        {
-          statement.reset(new DatabaseManager::CachedStatement(
-                            STATEMENT_FROM_HERE, manager,
-                            "DELETE FROM GlobalProperties WHERE property=${property}"));
-        }
-        
-        statement->SetParameterType("property", ValueType_Integer64);
-        
-        Dictionary args;
-        args.SetIntegerValue("property", property);
+          DatabaseManager::CachedStatement statement(
+            STATEMENT_FROM_HERE, manager,
+            "DELETE FROM ServerProperties WHERE server=${server} AND property=${property}");
 
-        if (hasServer)
-        {
-          statement->SetParameterType("server", ValueType_Utf8String);
-          args.SetUtf8Value("server", serverIdentifier);
+          RunSetGlobalPropertyStatement(statement, true, false, serverIdentifier, property, NULL);
         }
-        
-        statement->Execute(args);
+
+        {
+          DatabaseManager::CachedStatement statement(
+            STATEMENT_FROM_HERE, manager,
+            "INSERT INTO ServerProperties VALUES (${server}, ${property}, ${value})");
+
+          RunSetGlobalPropertyStatement(statement, true, true, serverIdentifier, property, utf8);
+        }
       }
-
+      else
       {
-        if (hasServer)
         {
-          statement.reset(new DatabaseManager::CachedStatement(
-                            STATEMENT_FROM_HERE, manager,
-                            "INSERT INTO ServerProperties VALUES (${server}, ${property}, ${value})"));
-        }
-        else
-        {
-          statement.reset(new DatabaseManager::CachedStatement(
-                            STATEMENT_FROM_HERE, manager,
-                            "INSERT INTO GlobalProperties VALUES (${property}, ${value})"));
-        }
-        
-        statement->SetParameterType("property", ValueType_Integer64);
-        statement->SetParameterType("value", ValueType_Utf8String);
-        
-        Dictionary args;
-        args.SetIntegerValue("property", static_cast<int>(property));
-        args.SetUtf8Value("value", utf8);
-        
-        if (hasServer)
-        {
-          statement->SetParameterType("server", ValueType_Utf8String);
-          args.SetUtf8Value("server", serverIdentifier);
+          DatabaseManager::CachedStatement statement(
+            STATEMENT_FROM_HERE, manager,
+            "DELETE FROM GlobalProperties WHERE property=${property}");
+      
+          RunSetGlobalPropertyStatement(statement, false, false, NULL, property, NULL);
         }
 
-        statement->Execute(args);
+        {
+          DatabaseManager::CachedStatement statement(
+            STATEMENT_FROM_HERE, manager,
+            "INSERT INTO GlobalProperties VALUES (${property}, ${value})");
+      
+          RunSetGlobalPropertyStatement(statement, false, true, NULL, property, utf8);
+        }
       }
     }
   }
