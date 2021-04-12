@@ -43,17 +43,9 @@ namespace OrthancDatabases
         // SQL request is not a SELECT)
         done_ = true;
       }
-      else if (error == CR_SERVER_GONE_ERROR ||
-               error == CR_SERVER_LOST ||
-               error == ER_QUERY_INTERRUPTED)
-      {
-        database_.LogError();
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
-      }
       else
       {
-        database_.LogError();
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+        database_.ThrowException();
       }
     }
     else
@@ -82,7 +74,7 @@ namespace OrthancDatabases
     // https://github.com/hholzgra/connector-c-examples/blob/master/mysql_stmt_bind_result.c
 
     SetFieldsCount(statement_.GetResultFieldsCount());
-
+    
     Step();
   }
     

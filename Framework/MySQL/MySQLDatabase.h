@@ -56,6 +56,8 @@ namespace OrthancDatabases
 
     void CheckErrorCode(int code);
 
+    void ThrowException();
+
     MYSQL* GetObject();
 
     void Open();

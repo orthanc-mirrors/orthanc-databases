@@ -52,6 +52,40 @@ namespace OrthancDatabases
   }
 
 
+  void MySQLDatabase::ThrowException()
+  {
+    LogError();
+
+    unsigned int error = mysql_errno(mysql_);
+    if (error == CR_SERVER_GONE_ERROR ||
+        error == CR_SERVER_LOST ||
+        error == ER_QUERY_INTERRUPTED)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
+    }
+    else if (error == CR_COMMANDS_OUT_OF_SYNC)
+    {
+#if !defined(MARIADB_VERSION_ID)
+      LOG(ERROR) << "TODO - This error seems to be related to the use of libmysqlclient: Try to switch to mariadb-connector";
+#endif
+      
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
+    }
+    else if (error == ER_LOCK_DEADLOCK)
+    {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+#else
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
+#endif
+    } 
+    else
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+  }
+
+
   void MySQLDatabase::CheckErrorCode(int code)
   {
     if (code == 0)
@@ -60,27 +94,7 @@ namespace OrthancDatabases
     }
     else
     {
-      LogError();
-      
-      unsigned int error = mysql_errno(mysql_);
-      if (error == CR_SERVER_GONE_ERROR ||
-          error == CR_SERVER_LOST ||
-          error == ER_QUERY_INTERRUPTED)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
-      }
-      else if (error == ER_LOCK_DEADLOCK)
-      {
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
-#else
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
-#endif
-      } 
-      else
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-      }
+      ThrowException();
     }
   }
 
