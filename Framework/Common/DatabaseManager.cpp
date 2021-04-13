@@ -241,7 +241,7 @@ namespace OrthancDatabases
                                             TransactionType type) :
     manager_(manager),
     database_(manager.GetDatabase()),
-    committed_(false)
+    active_(true)
   {
     manager_.StartTransaction(type);
   }
@@ -249,7 +249,7 @@ namespace OrthancDatabases
 
   DatabaseManager::Transaction::~Transaction()
   {
-    if (!committed_)
+    if (active_)
     {
       try
       {
@@ -266,14 +266,28 @@ namespace OrthancDatabases
   
   void DatabaseManager::Transaction::Commit()
   {
-    if (committed_)
+    if (active_)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      manager_.CommitTransaction();
+      active_ = true;
     }
     else
     {
-      manager_.CommitTransaction();
-      committed_ = true;
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+  }
+
+
+  void DatabaseManager::Transaction::Rollback()
+  {
+    if (active_)
+    {
+      manager_.RollbackTransaction();
+      active_ = true;
+    }
+    else
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
   }
 

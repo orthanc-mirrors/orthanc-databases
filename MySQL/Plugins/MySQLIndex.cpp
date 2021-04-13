@@ -112,18 +112,18 @@ namespace OrthancDatabases
       {
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
         
-        t.ExecuteMultiLines("ALTER DATABASE " + parameters_.GetDatabase() + 
-                            " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        t.GetDatabaseTransaction().ExecuteMultiLines("ALTER DATABASE " + parameters_.GetDatabase() + 
+                                                     " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
         // This is the first table to be created
-        if (!t.DoesTableExist("GlobalProperties"))
+        if (!t.GetDatabaseTransaction().DoesTableExist("GlobalProperties"))
         {
           std::string query;
           
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::MYSQL_PREPARE_INDEX);
 
-          // Need to escape arobases: Don't use "t.ExecuteMultiLines()" here
+          // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
           db.ExecuteMultiLines(query, true);
         }
 
@@ -144,14 +144,14 @@ namespace OrthancDatabases
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
         // This is the last table to be created
-        if (!t.DoesTableExist("PatientRecyclingOrder"))
+        if (!t.GetDatabaseTransaction().DoesTableExist("PatientRecyclingOrder"))
         {
           LOG(ERROR) << "Corrupted MySQL database";
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
         }
 
         // This is the last item to be created
-        if (!t.DoesTriggerExist("PatientAdded"))
+        if (!t.GetDatabaseTransaction().DoesTriggerExist("PatientAdded"))
         {
           ThrowCannotCreateTrigger();
         }
@@ -194,7 +194,7 @@ namespace OrthancDatabases
         // very long values => switch to the LONGTEXT type that can
         // store up to 4GB:
         // https://stackoverflow.com/a/13932834/881731
-        t.ExecuteMultiLines("ALTER TABLE GlobalProperties MODIFY value LONGTEXT");
+        t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE GlobalProperties MODIFY value LONGTEXT");
         
         revision = 2;
         SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
@@ -212,10 +212,10 @@ namespace OrthancDatabases
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::MYSQL_GET_LAST_CHANGE_INDEX);
 
-        // Need to escape arobases: Don't use "t.ExecuteMultiLines()" here
+        // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
         db.ExecuteMultiLines(query, true);
 
-        if (!t.DoesTriggerExist("ChangeAdded"))
+        if (!t.GetDatabaseTransaction().DoesTriggerExist("ChangeAdded"))
         {
           ThrowCannotCreateTrigger();
         }
@@ -235,7 +235,7 @@ namespace OrthancDatabases
         // for applications such as the Osimis Web viewer that stores
         // large amount of metadata.
         // http://book.orthanc-server.com/faq/features.html#central-registry-of-metadata-and-attachments
-        t.ExecuteMultiLines("ALTER TABLE Metadata MODIFY value LONGTEXT");
+        t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Metadata MODIFY value LONGTEXT");
         
         revision = 4;
         SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
@@ -253,7 +253,7 @@ namespace OrthancDatabases
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::MYSQL_CREATE_INSTANCE);
 
-        // Need to escape arobases: Don't use "t.ExecuteMultiLines()" here
+        // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
         db.ExecuteMultiLines(query, true);
         
         revision = 5;
@@ -273,10 +273,10 @@ namespace OrthancDatabases
         // New in release 4.0 to deal with multiple writers
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-        if (!t.DoesTableExist("ServerProperties"))
+        if (!t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
         {
-          t.ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
-                              "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
+          t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
+                                                       "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
         }
 
         t.Commit();

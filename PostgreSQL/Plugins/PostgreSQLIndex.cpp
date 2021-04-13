@@ -96,20 +96,20 @@ namespace OrthancDatabases
       {
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-        if (!t.DoesTableExist("Resources"))
+        if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
           std::string query;
 
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
-          t.ExecuteMultiLines(query);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 0);
         }
           
-        if (!t.DoesTableExist("Resources"))
+        if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
           LOG(ERROR) << "Corrupted PostgreSQL database";
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
@@ -163,7 +163,7 @@ namespace OrthancDatabases
             LOG(WARNING) << "Trying to enable trigram matching on the PostgreSQL database "
                          << "to speed up wildcard searches. This may take several minutes";
 
-            t.ExecuteMultiLines(
+            t.GetDatabaseTransaction().ExecuteMultiLines(
               "CREATE EXTENSION IF NOT EXISTS pg_trgm; "
               "CREATE INDEX DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);");
 
@@ -199,14 +199,14 @@ namespace OrthancDatabases
           if (property == 1)
           {
             // Drop older, experimental versions of this extension
-            t.ExecuteMultiLines("DROP FUNCTION CreateInstance("
-                                "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+            t.GetDatabaseTransaction().ExecuteMultiLines("DROP FUNCTION CreateInstance("
+                                                         "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
           }
         
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
-          t.ExecuteMultiLines(query);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 2);
         }
@@ -221,7 +221,7 @@ namespace OrthancDatabases
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
-          t.ExecuteMultiLines(query);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
         }
@@ -239,7 +239,7 @@ namespace OrthancDatabases
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
-          t.ExecuteMultiLines(query);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
         }
@@ -257,7 +257,7 @@ namespace OrthancDatabases
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
-          t.ExecuteMultiLines(query);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
         }
@@ -270,10 +270,10 @@ namespace OrthancDatabases
         // New in release 4.0 to deal with multiple writers
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-        if (!t.DoesTableExist("ServerProperties"))
+        if (!t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
         {
-          t.ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
-                              "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
+          t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
+                                                       "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
         }
 
         t.Commit();

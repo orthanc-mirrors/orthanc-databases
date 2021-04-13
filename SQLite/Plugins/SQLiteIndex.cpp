@@ -85,14 +85,14 @@ namespace OrthancDatabases
     {
       DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-      if (!t.DoesTableExist("Resources"))
+      if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
       {
         std::string query;
 
         Orthanc::EmbeddedResources::GetFileResource
           (query, Orthanc::EmbeddedResources::SQLITE_PREPARE_INDEX);
 
-        t.ExecuteMultiLines(query);
+        t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
         SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
         SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
@@ -104,7 +104,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-      if (!t.DoesTableExist("Resources"))
+      if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
       {
         LOG(ERROR) << "Corrupted SQLite database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
@@ -137,10 +137,10 @@ namespace OrthancDatabases
     {
       DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
-      if (!t.DoesTableExist("ServerProperties"))
+      if (!t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
       {
-        t.ExecuteMultiLines("CREATE TABLE ServerProperties(server TEXT, "
-                            "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
+        t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server TEXT, "
+                                                     "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
       }
 
       t.Commit();

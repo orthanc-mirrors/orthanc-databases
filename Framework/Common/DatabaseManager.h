@@ -88,13 +88,14 @@ namespace OrthancDatabases
     void RollbackTransaction();
 
 
-    // This class is only used in the "StorageBackend"
+    // This class is only used in the "StorageBackend" and in
+    // "IDatabaseBackend::ConfigureDatabase()"
     class Transaction : public boost::noncopyable
     {
     private:
       DatabaseManager&  manager_;
       IDatabase&        database_;
-      bool              committed_;
+      bool              active_;
 
     public:
       explicit Transaction(DatabaseManager& manager,
@@ -104,29 +105,16 @@ namespace OrthancDatabases
 
       void Commit();
 
-      DatabaseManager& GetManager()
-      {
-        return manager_;
-      }
+      void Rollback();
 
-      IDatabase& GetDatabase()
+      /**
+       * WARNING: Don't call "GetDatabaseTransaction().Commit()" and
+       * "GetDatabaseTransaction().Rollback()", but use the "Commit()"
+       * and "Rollback()" methods above.
+       **/
+      ITransaction& GetDatabaseTransaction()
       {
-        return database_;
-      }
-
-      bool DoesTableExist(const std::string& name)
-      {
-        return manager_.GetTransaction().DoesTableExist(name);
-      }
-
-      bool DoesTriggerExist(const std::string& name)
-      {
-        return manager_.GetTransaction().DoesTriggerExist(name);
-      }
-
-      void ExecuteMultiLines(const std::string& sql)
-      {
-        manager_.GetTransaction().ExecuteMultiLines(sql);
+        return manager_.GetTransaction();
       }
     };
 
