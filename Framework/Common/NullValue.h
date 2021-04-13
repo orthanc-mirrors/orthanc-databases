@@ -36,10 +36,5 @@ namespace OrthancDatabases
     }
 
     virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
-
-    virtual std::string Format() const ORTHANC_OVERRIDE
-    {
-      return "(null)";
-    }
   };
 }

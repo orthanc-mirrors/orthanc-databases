@@ -54,9 +54,4 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
-
-  std::string Integer64Value::Format() const
-  {
-    return boost::lexical_cast<std::string>(value_);
-  }
 }

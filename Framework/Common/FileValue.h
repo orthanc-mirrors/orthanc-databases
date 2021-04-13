@@ -48,16 +48,6 @@ namespace OrthancDatabases
       content_.assign(reinterpret_cast<const char*>(buffer), size);
     }
     
-    void SwapContent(std::string& content)
-    {
-      content_.swap(content);
-    }
-
-    void SetContent(const std::string& content)
-    {
-      content_ = content;
-    }
-
     std::string& GetContent()
     {
       return content_;
@@ -84,7 +74,5 @@ namespace OrthancDatabases
     }
     
     virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
-
-    virtual std::string Format() const ORTHANC_OVERRIDE;
   };
 }

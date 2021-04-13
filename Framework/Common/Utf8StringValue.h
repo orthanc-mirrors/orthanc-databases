@@ -34,16 +34,7 @@ namespace OrthancDatabases
     std::string  utf8_;
 
   public:
-    explicit Utf8StringValue()
-    {
-    }
-
     explicit Utf8StringValue(const std::string& utf8) :
-      utf8_(utf8)
-    {
-    }
-
-    explicit Utf8StringValue(const char* utf8) :
       utf8_(utf8)
     {
     }
@@ -59,10 +50,5 @@ namespace OrthancDatabases
     }
     
     virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
-
-    virtual std::string Format() const ORTHANC_OVERRIDE
-    {
-      return "[" + utf8_ + "]";
-    }
   };
 }

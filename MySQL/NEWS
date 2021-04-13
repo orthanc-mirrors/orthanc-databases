@@ -1,7 +1,7 @@
 Pending changes in the mainline
 ===============================
 
-* Support of retries for collisions between multiple writers, from Orthanc SDK 1.9.2
+* Support of multiple readers/writers, by handling retries in Orthanc SDK 1.9.2
 * Support of range reads for the storage area, from Orthanc SDK 1.9.0
 
 

@@ -33,24 +33,9 @@ namespace OrthancDatabases
     std::string  content_;
 
   public:
-    explicit BinaryStringValue()
-    {
-    }
-
     explicit BinaryStringValue(const std::string& content) :
       content_(content)
     {
-    }
-
-    BinaryStringValue(const void* content,
-                      size_t size)
-    {
-      content_.assign(reinterpret_cast<const char*>(content), size);
-    }
-
-    std::string& GetContent()
-    {
-      return content_;
     }
 
     const std::string& GetContent() const
@@ -74,7 +59,5 @@ namespace OrthancDatabases
     }
     
     virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
-
-    virtual std::string Format() const ORTHANC_OVERRIDE;
   };
 }

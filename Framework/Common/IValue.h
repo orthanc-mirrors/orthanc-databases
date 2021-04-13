@@ -38,7 +38,5 @@ namespace OrthancDatabases
     virtual ValueType GetType() const = 0;
 
     virtual IValue* Convert(ValueType target) const = 0;
-
-    virtual std::string Format() const = 0;
   };
 }

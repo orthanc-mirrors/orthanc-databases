@@ -44,10 +44,4 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
     }
   }
-
-
-  std::string BinaryStringValue::Format() const
-  {
-    return "(binary - " + boost::lexical_cast<std::string>(content_.size()) + " bytes)";
-  }
 }
