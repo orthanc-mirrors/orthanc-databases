@@ -363,7 +363,7 @@ TEST(PostgreSQL, StorageArea)
   PostgreSQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
   {
-    PostgreSQLStorageArea::Accessor accessor(storageArea);
+    std::unique_ptr<OrthancDatabases::StorageBackend::IAccessor> accessor(storageArea.CreateAccessor());
     
     ASSERT_EQ(0, CountLargeObjects(*database));
   
@@ -371,15 +371,15 @@ TEST(PostgreSQL, StorageArea)
     {
       std::string uuid = boost::lexical_cast<std::string>(i);
       std::string value = "Value " + boost::lexical_cast<std::string>(i * 2);
-      accessor.Create(uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
+      accessor->Create(uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
     }
 
     std::string buffer;
-    ASSERT_THROW(accessor.ReadToString(buffer, "nope", OrthancPluginContentType_Unknown), 
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadWholeToString(buffer, *accessor, "nope", OrthancPluginContentType_Unknown), 
                  Orthanc::OrthancException);
   
     ASSERT_EQ(10, CountLargeObjects(*database));
-    accessor.Remove("5", OrthancPluginContentType_Unknown);
+    accessor->Remove("5", OrthancPluginContentType_Unknown);
 
     ASSERT_EQ(9, CountLargeObjects(*database));
 
@@ -390,19 +390,19 @@ TEST(PostgreSQL, StorageArea)
 
       if (i == 5)
       {
-        ASSERT_THROW(accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown), 
+        ASSERT_THROW(OrthancDatabases::StorageBackend::ReadWholeToString(buffer, *accessor, uuid, OrthancPluginContentType_Unknown), 
                      Orthanc::OrthancException);
       }
       else
       {
-        accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown);
+        OrthancDatabases::StorageBackend::ReadWholeToString(buffer, *accessor, uuid, OrthancPluginContentType_Unknown);
         ASSERT_EQ(expected, buffer);
       }
     }
 
     for (int i = 0; i < 10; i++)
     {
-      accessor.Remove(boost::lexical_cast<std::string>(i), OrthancPluginContentType_Unknown);
+      accessor->Remove(boost::lexical_cast<std::string>(i), OrthancPluginContentType_Unknown);
     }
 
     ASSERT_EQ(0, CountLargeObjects(*database));

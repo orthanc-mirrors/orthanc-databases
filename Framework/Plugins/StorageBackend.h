@@ -32,15 +32,6 @@ namespace OrthancDatabases
 {
   class StorageBackend : public boost::noncopyable
   {
-  private:
-    boost::mutex                       mutex_;
-    std::unique_ptr<DatabaseManager>   manager_;
-
-    DatabaseManager& GetManager();
-    
-  protected:
-    void SetDatabase(IDatabase* database);  // Takes ownership
-
   public:
     class IFileContentVisitor : public boost::noncopyable
     {
@@ -54,44 +45,109 @@ namespace OrthancDatabases
       virtual bool IsSuccess() const = 0;
     };
 
-    class Accessor : public boost::noncopyable
+    class IAccessor : public boost::noncopyable
+    {
+    public:
+      virtual ~IAccessor()
+      {
+      }
+
+      virtual void Create(const std::string& uuid,
+                          const void* content,
+                          size_t size,
+                          OrthancPluginContentType type) = 0;
+
+      virtual void ReadWhole(IFileContentVisitor& visitor,
+                             const std::string& uuid,
+                             OrthancPluginContentType type) = 0;
+
+      virtual void ReadRange(IFileContentVisitor& visitor,
+                             const std::string& uuid,
+                             OrthancPluginContentType type,
+                             uint64_t start,
+                             uint64_t length) = 0;
+      
+      virtual void Remove(const std::string& uuid,
+                          OrthancPluginContentType type) = 0;
+    };
+    
+  private:
+    class StringVisitor;
+    
+    boost::mutex                       mutex_;
+    std::unique_ptr<DatabaseManager>   manager_;
+
+    DatabaseManager& GetManager();
+    
+  protected:
+    class AccessorBase : public IAccessor
     {
     private:
       boost::mutex::scoped_lock  lock_;
       DatabaseManager&           manager_;
 
     public:
-      Accessor(StorageBackend& backend) :
+      AccessorBase(StorageBackend& backend) :
         lock_(backend.mutex_),
         manager_(backend.GetManager())
       {
       }
-        
-      void Create(const std::string& uuid,
-                  const void* content,
-                  size_t size,
-                  OrthancPluginContentType type);
 
-      void Read(IFileContentVisitor& visitor,
-                const std::string& uuid,
-                OrthancPluginContentType type);
+      DatabaseManager& GetManager() const
+      {
+        return manager_;
+      }
 
-      void Remove(const std::string& uuid,
-                  OrthancPluginContentType type);
+      virtual void Create(const std::string& uuid,
+                          const void* content,
+                          size_t size,
+                          OrthancPluginContentType type);
 
-      // For unit tests
-      void ReadToString(std::string& target,
-                        const std::string& uuid,
-                        OrthancPluginContentType type);
+      virtual void ReadWhole(IFileContentVisitor& visitor,
+                             const std::string& uuid,
+                             OrthancPluginContentType type);
+
+      virtual void ReadRange(IFileContentVisitor& visitor,
+                             const std::string& uuid,
+                             OrthancPluginContentType type,
+                             uint64_t start,
+                             uint64_t length);
+      
+      virtual void Remove(const std::string& uuid,
+                          OrthancPluginContentType type);
     };
     
+    void SetDatabase(IDatabase* database);  // Takes ownership
+
+    virtual bool HasReadRange() const = 0;
+
+  public:
     virtual ~StorageBackend()
     {
+    }
+
+    virtual IAccessor* CreateAccessor()
+    {
+      return new AccessorBase(*this);
     }
 
     static void Register(OrthancPluginContext* context,
                          StorageBackend* backend);   // Takes ownership
 
     static void Finalize();
+
+    // For unit tests
+    static void ReadWholeToString(std::string& target,
+                                  IAccessor& accessor,
+                                  const std::string& uuid,
+                                  OrthancPluginContentType type);
+
+    // For unit tests
+    static void ReadRangeToString(std::string& target,
+                                  IAccessor& accessor,
+                                  const std::string& uuid,
+                                  OrthancPluginContentType type,
+                                  uint64_t start,
+                                  uint64_t length);
   };
 }

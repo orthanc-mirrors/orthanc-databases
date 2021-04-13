@@ -153,6 +153,7 @@ namespace OrthancDatabases
         case MYSQL_TYPE_STRING:
         case MYSQL_TYPE_VAR_STRING:
         case MYSQL_TYPE_BLOB:
+        case MYSQL_TYPE_LONG_BLOB:
           // https://medium.com/@adamhooper/in-mysql-never-use-utf8-use-utf8mb4-11761243e434
           switch (field.charsetnr)
           {

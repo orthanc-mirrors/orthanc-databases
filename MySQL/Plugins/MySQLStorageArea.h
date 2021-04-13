@@ -30,12 +30,22 @@ namespace OrthancDatabases
   class MySQLStorageArea : public StorageBackend
   {
   private:
+    class Accessor;
+    
     void ConfigureDatabase(MySQLDatabase& db,
                            const MySQLParameters& parameters,
                            bool clearAll);
-    
+
+  protected:
+    virtual bool HasReadRange() const
+    {
+      return true;
+    }
+
   public:
     MySQLStorageArea(const MySQLParameters& parameters,
                      bool clearAll);
+
+    virtual IAccessor* CreateAccessor();
   };
 }

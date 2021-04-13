@@ -162,7 +162,7 @@ TEST(MySQL, StorageArea)
   OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
   {
-    OrthancDatabases::MySQLStorageArea::Accessor accessor(storageArea);
+    std::unique_ptr<OrthancDatabases::StorageBackend::IAccessor> accessor(storageArea.CreateAccessor());
     
     ASSERT_EQ(0, CountFiles(*database));
   
@@ -170,15 +170,16 @@ TEST(MySQL, StorageArea)
     {
       std::string uuid = boost::lexical_cast<std::string>(i);
       std::string value = "Value " + boost::lexical_cast<std::string>(i * 2);
-      accessor.Create(uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
+      accessor->Create(uuid, value.c_str(), value.size(), OrthancPluginContentType_Unknown);
     }
 
     std::string buffer;
-    ASSERT_THROW(accessor.ReadToString(buffer, "nope", OrthancPluginContentType_Unknown), 
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadWholeToString(
+                   buffer, *accessor, "nope", OrthancPluginContentType_Unknown), 
                  Orthanc::OrthancException);
   
     ASSERT_EQ(10, CountFiles(*database));
-    accessor.Remove("5", OrthancPluginContentType_Unknown);
+    accessor->Remove("5", OrthancPluginContentType_Unknown);
 
     ASSERT_EQ(9, CountFiles(*database));
 
@@ -190,22 +191,93 @@ TEST(MySQL, StorageArea)
 
       if (i == 5)
       {
-        ASSERT_THROW(accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown), 
+        ASSERT_THROW(OrthancDatabases::StorageBackend::ReadWholeToString(
+                       buffer, *accessor, uuid, OrthancPluginContentType_Unknown), 
                      Orthanc::OrthancException);
       }
       else
       {
-        accessor.ReadToString(buffer, uuid, OrthancPluginContentType_Unknown);
+        OrthancDatabases::StorageBackend::ReadWholeToString(buffer, *accessor, uuid, OrthancPluginContentType_Unknown);
         ASSERT_EQ(expected, buffer);
       }
     }
 
     for (int i = 0; i < 10; i++)
     {
-      accessor.Remove(boost::lexical_cast<std::string>(i), OrthancPluginContentType_Unknown);
+      accessor->Remove(boost::lexical_cast<std::string>(i), OrthancPluginContentType_Unknown);
     }
 
     ASSERT_EQ(0, CountFiles(*database));
+  }
+}
+
+
+TEST(MySQL, StorageReadRange)
+{
+  std::unique_ptr<OrthancDatabases::MySQLDatabase> database(
+    OrthancDatabases::MySQLDatabase::OpenDatabaseConnection(globalParameters_));
+  
+  OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true /* clear database */);
+
+  {
+    std::unique_ptr<OrthancDatabases::StorageBackend::IAccessor> accessor(storageArea.CreateAccessor());
+    ASSERT_EQ(0, CountFiles(*database));  
+    accessor->Create("uuid", "abcd\0\1\2\3\4\5", 10, OrthancPluginContentType_Unknown);
+    ASSERT_EQ(1u, CountFiles(*database));  
+  }
+
+  {
+    std::unique_ptr<OrthancDatabases::StorageBackend::IAccessor> accessor(storageArea.CreateAccessor());
+    ASSERT_EQ(1u, CountFiles(*database));
+
+    std::string s;
+    OrthancDatabases::StorageBackend::ReadWholeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown);
+    ASSERT_EQ(10u, s.size());
+    ASSERT_EQ('a', s[0]);
+    ASSERT_EQ('d', s[3]);
+    ASSERT_EQ('\0', s[4]);
+    ASSERT_EQ('\5', s[9]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 0, 0);
+    ASSERT_TRUE(s.empty());
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 0, 1);
+    ASSERT_EQ(1u, s.size());
+    ASSERT_EQ('a', s[0]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 4, 1);
+    ASSERT_EQ(1u, s.size());
+    ASSERT_EQ('\0', s[0]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 9, 1);
+    ASSERT_EQ(1u, s.size());
+    ASSERT_EQ('\5', s[0]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 10, 0);
+    ASSERT_TRUE(s.empty());
+
+    // Cannot read non-empty range after the end of the string
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadRangeToString(
+                   s, *accessor, "uuid", OrthancPluginContentType_Unknown, 10, 1), Orthanc::OrthancException);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 0, 4);
+    ASSERT_EQ(4u, s.size());
+    ASSERT_EQ('a', s[0]);
+    ASSERT_EQ('b', s[1]);
+    ASSERT_EQ('c', s[2]);
+    ASSERT_EQ('d', s[3]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 4, 6);
+    ASSERT_EQ(6u, s.size());
+    ASSERT_EQ('\0', s[0]);
+    ASSERT_EQ('\1', s[1]);
+    ASSERT_EQ('\2', s[2]);
+    ASSERT_EQ('\3', s[3]);
+    ASSERT_EQ('\4', s[4]);
+    ASSERT_EQ('\5', s[5]);
+
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadRangeToString(
+                   s, *accessor, "uuid", OrthancPluginContentType_Unknown, 4, 7), Orthanc::OrthancException);
   }
 }
 

@@ -175,6 +175,10 @@ namespace OrthancDatabases
   {
     CheckColumn(column, OIDOID);
 
+    /**
+     * In PostgreSQL, the type "Oid" corresponds to "unsigned int", cf.
+     * /usr/include/postgresql/10/server/postgres_ext.h
+     **/
     Oid oid;
     assert(PQfsize(reinterpret_cast<PGresult*>(result_), column) == sizeof(oid));
 

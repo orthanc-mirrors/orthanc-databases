@@ -21,6 +21,7 @@
 
 #include "MySQLStorageArea.h"
 
+#include "../../Framework/Common/BinaryStringValue.h"
 #include "../../Framework/MySQL/MySQLDatabase.h"
 #include "../../Framework/MySQL/MySQLTransaction.h"
 #include "MySQLDefinitions.h"
@@ -97,5 +98,95 @@ namespace OrthancDatabases
     
     ConfigureDatabase(*database, parameters, clearAll);
     SetDatabase(database.release());
+  }
+
+
+  class MySQLStorageArea::Accessor : public StorageBackend::AccessorBase
+  {
+  public:
+    Accessor(MySQLStorageArea& backend) :
+      AccessorBase(backend)
+    {
+    }
+
+    virtual void ReadRange(IFileContentVisitor& visitor,
+                           const std::string& uuid,
+                           OrthancPluginContentType type,
+                           uint64_t start,
+                           uint64_t length) ORTHANC_OVERRIDE
+    {
+      DatabaseManager::Transaction transaction(GetManager(), TransactionType_ReadOnly);
+
+      {
+        // https://stackoverflow.com/a/6545557/881731
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, GetManager(),
+          "SELECT SUBSTRING(content, ${start}, ${length}) FROM StorageArea WHERE uuid=${uuid} AND type=${type}");
+     
+        statement.SetParameterType("uuid", ValueType_Utf8String);
+        statement.SetParameterType("type", ValueType_Integer64);
+        statement.SetParameterType("start", ValueType_Integer64);
+        statement.SetParameterType("length", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetUtf8Value("uuid", uuid);
+        args.SetIntegerValue("type", type);
+        args.SetIntegerValue("length", length);
+
+        /**
+         * "For all forms of SUBSTRING(), the position of the first
+         * character in the string from which the substring is to be
+         * extracted is reckoned as 1." => hence the "+ 1"
+         * https://dev.mysql.com/doc/refman/8.0/en/string-functions.html#function_substring
+         **/
+        args.SetIntegerValue("start", start + 1);
+     
+        statement.Execute(args);
+
+        if (statement.IsDone())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+        }
+        else if (statement.GetResultFieldsCount() != 1)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+        }
+        else
+        {
+          const IValue& value = statement.GetResultField(0);
+      
+          if (value.GetType() == ValueType_BinaryString)
+          {
+            const std::string& content = dynamic_cast<const BinaryStringValue&>(value).GetContent();
+
+            if (static_cast<uint64_t>(content.size()) == length)
+            {
+              visitor.Assign(content);
+            }
+            else
+            {
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_BadRange);
+            }
+          }
+          else
+          {
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+          }
+        }
+      }
+
+      transaction.Commit();
+
+      if (!visitor.IsSuccess())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Could not read range from the storage area");
+      }
+    }
+  };
+  
+
+  StorageBackend::IAccessor* MySQLStorageArea::CreateAccessor()
+  {
+    return new Accessor(*this);
   }
 }

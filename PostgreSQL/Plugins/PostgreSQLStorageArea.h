@@ -33,6 +33,12 @@ namespace OrthancDatabases
                            const PostgreSQLParameters& parameters,
                            bool clearAll);
 
+  protected:
+    virtual bool HasReadRange() const
+    {
+      return false;  // TODO
+    }
+
   public:
     PostgreSQLStorageArea(const PostgreSQLParameters& parameters,
                           bool clearAll);

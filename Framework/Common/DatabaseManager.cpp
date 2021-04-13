@@ -269,7 +269,7 @@ namespace OrthancDatabases
     if (active_)
     {
       manager_.CommitTransaction();
-      active_ = true;
+      active_ = false;
     }
     else
     {
@@ -283,7 +283,7 @@ namespace OrthancDatabases
     if (active_)
     {
       manager_.RollbackTransaction();
-      active_ = true;
+      active_ = false;
     }
     else
     {
