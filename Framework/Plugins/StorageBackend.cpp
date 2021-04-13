@@ -98,7 +98,7 @@ namespace OrthancDatabases
         "INSERT INTO StorageArea VALUES (${uuid}, ${content}, ${type})");
      
       statement.SetParameterType("uuid", ValueType_Utf8String);
-      statement.SetParameterType("content", ValueType_File);
+      statement.SetParameterType("content", ValueType_InputFile);
       statement.SetParameterType("type", ValueType_Integer64);
 
       Dictionary args;

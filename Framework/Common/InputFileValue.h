@@ -27,21 +27,23 @@
 
 namespace OrthancDatabases
 {
-  class FileValue : public IValue
+  class InputFileValue : public IValue
   {
   private:
     std::string  content_;
 
   public:
-    FileValue()
+    explicit InputFileValue(const std::string& content) :
+      content_(content)
     {
     }
 
-    std::string& GetContent()
+    InputFileValue(const void* buffer,
+                   size_t size)
     {
-      return content_;
+      content_.assign(reinterpret_cast<const char*>(buffer), size);
     }
-
+    
     const std::string& GetContent() const
     {
       return content_;
@@ -59,7 +61,7 @@ namespace OrthancDatabases
 
     virtual ValueType GetType() const ORTHANC_OVERRIDE
     {
-      return ValueType_File;
+      return ValueType_InputFile;
     }
     
     virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;

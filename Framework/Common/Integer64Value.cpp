@@ -44,9 +44,6 @@ namespace OrthancDatabases
       case ValueType_BinaryString:
         return new BinaryStringValue(s);
 
-      case ValueType_File:
-        return new FileValue(s);
-
       case ValueType_Utf8String:
         return new Utf8StringValue(s);
 

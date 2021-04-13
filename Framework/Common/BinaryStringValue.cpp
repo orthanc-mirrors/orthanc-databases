@@ -34,9 +34,6 @@ namespace OrthancDatabases
   {
     switch (target)
     {
-      case ValueType_File:
-        return new FileValue(content_);
-
       case ValueType_Null:
         return new NullValue;
 

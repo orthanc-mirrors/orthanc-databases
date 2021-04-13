@@ -23,7 +23,7 @@
 #include "PostgreSQLStatement.h"
 
 #include "../Common/BinaryStringValue.h"
-#include "../Common/FileValue.h"
+#include "../Common/InputFileValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/NullValue.h"
 #include "../Common/ResultBase.h"
@@ -336,7 +336,7 @@ namespace OrthancDatabases
           DeclareInputBinary(i);
           break;
 
-        case ValueType_File:
+        case ValueType_InputFile:
           DeclareInputLargeObject(i);
           break;
 
@@ -533,10 +533,10 @@ namespace OrthancDatabases
                      (parameters.GetValue(name)).GetContent());
           break;
 
-        case ValueType_File:
+        case ValueType_InputFile:
         {
-          const FileValue& blob =
-            dynamic_cast<const FileValue&>(parameters.GetValue(name));
+          const InputFileValue& blob =
+            dynamic_cast<const InputFileValue&>(parameters.GetValue(name));
 
           PostgreSQLLargeObject largeObject(database_, blob.GetContent());
           BindLargeObject(i, largeObject);

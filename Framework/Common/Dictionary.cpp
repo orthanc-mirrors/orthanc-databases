@@ -22,7 +22,7 @@
 #include "Dictionary.h"
 
 #include "BinaryStringValue.h"
-#include "FileValue.h"
+#include "InputFileValue.h"
 #include "Integer64Value.h"
 #include "NullValue.h"
 #include "Utf8StringValue.h"
@@ -104,7 +104,7 @@ namespace OrthancDatabases
   void Dictionary::SetFileValue(const std::string& key,
                                 const std::string& file)
   {
-    SetValue(key, new FileValue(file));
+    SetValue(key, new InputFileValue(file));
   }
 
   
@@ -112,7 +112,7 @@ namespace OrthancDatabases
                                 const void* content,
                                 size_t size)
   {
-    SetValue(key, new FileValue(content, size));
+    SetValue(key, new InputFileValue(content, size));
   }
 
   

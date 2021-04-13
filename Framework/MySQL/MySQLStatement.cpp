@@ -22,7 +22,7 @@
 #include "MySQLStatement.h"
 
 #include "../Common/BinaryStringValue.h"
-#include "../Common/FileValue.h"
+#include "../Common/InputFileValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
@@ -500,9 +500,9 @@ namespace OrthancDatabases
           break;
         }
 
-        case ValueType_File:
+        case ValueType_InputFile:
         {
-          const std::string& content = dynamic_cast<const FileValue&>(value).GetContent();
+          const std::string& content = dynamic_cast<const InputFileValue&>(value).GetContent();
           inputs[i].buffer = const_cast<char*>(content.c_str());
           inputs[i].buffer_length = content.size();
           inputs[i].buffer_type = MYSQL_TYPE_BLOB;

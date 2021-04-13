@@ -28,6 +28,7 @@ namespace OrthancDatabases
   {
     ValueType_BinaryString,
     ValueType_File,
+    ValueType_InputFile,
     ValueType_Integer64,
     ValueType_Null,
     ValueType_Utf8String
