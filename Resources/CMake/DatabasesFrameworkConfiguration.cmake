@@ -88,7 +88,6 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/BinaryStringValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/DatabaseManager.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Dictionary.cpp
-  ${ORTHANC_DATABASES_ROOT}/Framework/Common/FileValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/GenericFormatter.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ImplicitTransaction.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/InputFileValue.cpp
@@ -96,6 +95,7 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/NullValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Query.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ResultBase.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/ResultFileValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/StatementLocation.cpp

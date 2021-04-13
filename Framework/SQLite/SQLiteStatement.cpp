@@ -22,7 +22,7 @@
 #include "SQLiteStatement.h"
 
 #include "../Common/BinaryStringValue.h"
-#include "../Common/FileValue.h"
+#include "../Common/InputFileValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Query.h"
 #include "../Common/Utf8StringValue.h"
@@ -74,10 +74,10 @@ namespace OrthancDatabases
           break;
         }
 
-        case ValueType_File:
+        case ValueType_InputFile:
         {
-          const FileValue& blob =
-            dynamic_cast<const FileValue&>(parameters.GetValue(name));
+          const InputFileValue& blob =
+            dynamic_cast<const InputFileValue&>(parameters.GetValue(name));
           statement_->BindBlob(i, blob.GetBuffer(), blob.GetSize());
           break;
         }

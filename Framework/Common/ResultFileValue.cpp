@@ -19,49 +19,26 @@
  **/
 
 
-#pragma once
+#include "ResultFileValue.h"
 
-#include "IValue.h"
+#include "BinaryStringValue.h"
+#include "NullValue.h"
 
-#include <Compatibility.h>
+#include <OrthancException.h>
+
+#include <boost/lexical_cast.hpp>
 
 namespace OrthancDatabases
 {
-  class FileValue : public IValue
+  IValue* ResultFileValue::Convert(ValueType target) const
   {
-  private:
-    std::string  content_;
-
-  public:
-    FileValue()
+    switch (target)
     {
-    }
+      case ValueType_BinaryString:
+        return new BinaryStringValue(content_);
 
-    std::string& GetContent()
-    {
-      return content_;
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
     }
-
-    const std::string& GetContent() const
-    {
-      return content_;
-    }
-
-    const void* GetBuffer() const
-    {
-      return (content_.empty() ? NULL : content_.c_str());
-    }
-
-    size_t GetSize() const
-    {
-      return content_.size();
-    }
-
-    virtual ValueType GetType() const ORTHANC_OVERRIDE
-    {
-      return ValueType_File;
-    }
-    
-    virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
-  };
+  }
 }

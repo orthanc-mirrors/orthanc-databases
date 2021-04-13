@@ -26,7 +26,7 @@
 #endif
 
 #include "../../Framework/Common/BinaryStringValue.h"
-#include "../../Framework/Common/FileValue.h"
+#include "../../Framework/Common/ResultFileValue.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <OrthancException.h>
@@ -147,8 +147,8 @@ namespace OrthancDatabases
       
         switch (value.GetType())
         {
-          case ValueType_File:
-            visitor.Assign(dynamic_cast<const FileValue&>(value).GetContent());
+          case ValueType_ResultFile:
+            visitor.Assign(dynamic_cast<const ResultFileValue&>(value).GetContent());
             break;
 
           case ValueType_BinaryString:

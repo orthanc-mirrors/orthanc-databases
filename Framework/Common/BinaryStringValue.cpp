@@ -21,7 +21,6 @@
 
 #include "BinaryStringValue.h"
 
-#include "FileValue.h"
 #include "NullValue.h"
 
 #include <OrthancException.h>

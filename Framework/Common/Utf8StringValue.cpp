@@ -22,7 +22,6 @@
 #include "Utf8StringValue.h"
 
 #include "BinaryStringValue.h"
-#include "FileValue.h"
 #include "NullValue.h"
 #include "Integer64Value.h"
 

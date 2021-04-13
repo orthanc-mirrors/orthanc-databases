@@ -23,7 +23,7 @@
 #include "PostgreSQLResult.h"
 
 #include "../Common/BinaryStringValue.h"
-#include "../Common/FileValue.h"
+#include "../Common/ResultFileValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
@@ -235,7 +235,7 @@ namespace OrthancDatabases
 
       case OIDOID:
       {
-        std::unique_ptr<FileValue> value(new FileValue);
+        std::unique_ptr<ResultFileValue> value(new ResultFileValue);
         GetLargeObject(value->GetContent(), column);
         return value.release();
       }
