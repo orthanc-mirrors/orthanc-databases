@@ -25,6 +25,8 @@
 
 #include <Compatibility.h>
 
+#include <stdint.h>
+
 namespace OrthancDatabases
 {
   /**
