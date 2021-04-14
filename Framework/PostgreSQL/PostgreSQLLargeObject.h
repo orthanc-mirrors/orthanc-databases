@@ -45,23 +45,21 @@ namespace OrthancDatabases
                size_t size);
 
   public:
-    PostgreSQLLargeObject(PostgreSQLDatabase& database,
-                          const void* data,
-                          size_t size);
-
+    // This constructor is used to deal with "InputFileValue"
     PostgreSQLLargeObject(PostgreSQLDatabase& database,
                           const std::string& s);
 
     std::string GetOid() const;
 
-    static void Read(std::string& target,
-                     PostgreSQLDatabase& database,
-                     const std::string& oid);
+    static void ReadWhole(std::string& target,
+                          PostgreSQLDatabase& database,
+                          const std::string& oid);
 
-    static void Read(void*& target,
-                     size_t& size,
-                     PostgreSQLDatabase& database,
-                     const std::string& oid);
+    static void ReadRange(std::string& target,
+                          PostgreSQLDatabase& database,
+                          const std::string& oid,
+                          uint64_t start,
+                          size_t size);
 
     static void Delete(PostgreSQLDatabase& database,
                        const std::string& oid);

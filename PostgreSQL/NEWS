@@ -1,8 +1,8 @@
 Pending changes in the mainline
 ===============================
 
-* Support of multiple readers/writers, by handling retries in Orthanc SDK 1.9.2
-* Support of "OrthancPluginRegisterStorageArea2()" from Orthanc SDK 1.9.0
+* Support of multiple readers/writers, by handling retries from Orthanc SDK 1.9.2
+* Support of range reads for the storage area, from Orthanc SDK 1.9.0
 
 
 Release 3.3 (2020-12-14)

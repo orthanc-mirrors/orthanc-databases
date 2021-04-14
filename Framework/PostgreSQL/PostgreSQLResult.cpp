@@ -191,7 +191,7 @@ namespace OrthancDatabases
   void PostgreSQLResult::GetLargeObjectContent(std::string& content,
                                                unsigned int column) const
   {
-    PostgreSQLLargeObject::Read(content, database_, GetLargeObjectOid(column));
+    PostgreSQLLargeObject::ReadWhole(content, database_, GetLargeObjectOid(column));
   }
 
 
@@ -211,15 +211,14 @@ namespace OrthancDatabases
 
     virtual void ReadWhole(std::string& target) const ORTHANC_OVERRIDE
     {
-      PostgreSQLLargeObject::Read(target, database_, oid_);
-
+      PostgreSQLLargeObject::ReadWhole(target, database_, oid_);
     }
     
     virtual void ReadRange(std::string& target,
                            uint64_t start,
                            size_t length) const ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      PostgreSQLLargeObject::ReadRange(target, database_, oid_, start, length);
     }
   };
 

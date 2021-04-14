@@ -305,7 +305,7 @@ TEST(PostgreSQL, LargeObject)
       s.Run();
 
       std::string tmp;
-      PostgreSQLLargeObject::Read(tmp, *pg, obj.GetOid());
+      PostgreSQLLargeObject::ReadWhole(tmp, *pg, obj.GetOid());
       ASSERT_EQ(value, tmp);
 
       t.Commit();
@@ -406,6 +406,77 @@ TEST(PostgreSQL, StorageArea)
     }
 
     ASSERT_EQ(0, CountLargeObjects(*database));
+  }
+}
+
+
+TEST(PostgreSQL, StorageReadRange)
+{
+  std::unique_ptr<OrthancDatabases::PostgreSQLDatabase> database(
+    OrthancDatabases::PostgreSQLDatabase::OpenDatabaseConnection(globalParameters_));
+  
+  OrthancDatabases::PostgreSQLStorageArea storageArea(globalParameters_, true /* clear database */);
+
+  {
+    std::unique_ptr<OrthancDatabases::StorageBackend::IAccessor> accessor(storageArea.CreateAccessor());
+    ASSERT_EQ(0, CountLargeObjects(*database));
+    accessor->Create("uuid", "abcd\0\1\2\3\4\5", 10, OrthancPluginContentType_Unknown);
+    ASSERT_EQ(1u, CountLargeObjects(*database));
+  }
+
+  {
+    std::unique_ptr<OrthancDatabases::StorageBackend::IAccessor> accessor(storageArea.CreateAccessor());
+    ASSERT_EQ(1u, CountLargeObjects(*database));
+
+    std::string s;
+    OrthancDatabases::StorageBackend::ReadWholeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown);
+    ASSERT_EQ(10u, s.size());
+    ASSERT_EQ('a', s[0]);
+    ASSERT_EQ('d', s[3]);
+    ASSERT_EQ('\0', s[4]);
+    ASSERT_EQ('\5', s[9]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 0, 0);
+    ASSERT_TRUE(s.empty());
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 0, 1);
+    ASSERT_EQ(1u, s.size());
+    ASSERT_EQ('a', s[0]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 4, 1);
+    ASSERT_EQ(1u, s.size());
+    ASSERT_EQ('\0', s[0]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 9, 1);
+    ASSERT_EQ(1u, s.size());
+    ASSERT_EQ('\5', s[0]);
+
+    // Cannot read non-empty range after the end of the string. NB:
+    // The behavior on range (10, 0) is different than in MySQL!
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadRangeToString(
+                   s, *accessor, "uuid", OrthancPluginContentType_Unknown, 10, 0), Orthanc::OrthancException);
+
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadRangeToString(
+                   s, *accessor, "uuid", OrthancPluginContentType_Unknown, 10, 1), Orthanc::OrthancException);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 0, 4);
+    ASSERT_EQ(4u, s.size());
+    ASSERT_EQ('a', s[0]);
+    ASSERT_EQ('b', s[1]);
+    ASSERT_EQ('c', s[2]);
+    ASSERT_EQ('d', s[3]);
+
+    OrthancDatabases::StorageBackend::ReadRangeToString(s, *accessor, "uuid", OrthancPluginContentType_Unknown, 4, 6);
+    ASSERT_EQ(6u, s.size());
+    ASSERT_EQ('\0', s[0]);
+    ASSERT_EQ('\1', s[1]);
+    ASSERT_EQ('\2', s[2]);
+    ASSERT_EQ('\3', s[3]);
+    ASSERT_EQ('\4', s[4]);
+    ASSERT_EQ('\5', s[5]);
+
+    ASSERT_THROW(OrthancDatabases::StorageBackend::ReadRangeToString(
+                   s, *accessor, "uuid", OrthancPluginContentType_Unknown, 4, 7), Orthanc::OrthancException);
   }
 }
 

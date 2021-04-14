@@ -36,7 +36,7 @@ namespace OrthancDatabases
   protected:
     virtual bool HasReadRange() const
     {
-      return false;  // TODO
+      return true;
     }
 
   public:

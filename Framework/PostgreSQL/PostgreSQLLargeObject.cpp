@@ -80,16 +80,6 @@ namespace OrthancDatabases
 
 
   PostgreSQLLargeObject::PostgreSQLLargeObject(PostgreSQLDatabase& database,
-                                               const void* data,
-                                               size_t size) : 
-    database_(database)
-  {
-    Create();
-    Write(data, size);
-  }
-
-
-  PostgreSQLLargeObject::PostgreSQLLargeObject(PostgreSQLDatabase& database,
                                                const std::string& s) : 
     database_(database)
   {
@@ -113,6 +103,24 @@ namespace OrthancDatabases
     int fd_;
     size_t size_;
 
+    void ReadInternal(PGconn* pg,
+                      std::string& target)
+    {
+      for (size_t position = 0; position < target.size(); )
+      {
+        size_t remaining = target.size() - position;
+
+        int nbytes = lo_read(pg, fd_, &target[position], remaining);
+        if (nbytes < 0)
+        {
+          LOG(ERROR) << "PostgreSQL: Unable to read the large object in the database";
+          database_.ThrowException(false);
+        }
+
+        position += static_cast<size_t>(nbytes);
+      }
+    }
+    
   public:
     Reader(PostgreSQLDatabase& database,
            const std::string& oid) : 
@@ -138,9 +146,6 @@ namespace OrthancDatabases
         database.ThrowException(true);
       }
       size_ = static_cast<size_t>(size);
-
-      // Go to the first byte of the object
-      lo_lseek(pg, fd_, 0, SEEK_SET);
     }
 
     ~Reader()
@@ -153,60 +158,67 @@ namespace OrthancDatabases
       return size_;
     }
 
-    void Read(char* target)
+    void ReadWhole(std::string& target)
     {
-      for (size_t position = 0; position < size_; )
+      if (target.size() != size_)
       {
-        size_t remaining = size_ - position;
-
-        int nbytes = lo_read(reinterpret_cast<PGconn*>(database_.pg_), fd_, target + position, remaining);
-        if (nbytes < 0)
-        {
-          LOG(ERROR) << "PostgreSQL: Unable to read the large object in the database";
-          database_.ThrowException(false);
-        }
-
-        position += static_cast<size_t>(nbytes);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
+      
+      PGconn* pg = reinterpret_cast<PGconn*>(database_.pg_);
+
+      // Go to the first byte of the object
+      lo_lseek(pg, fd_, 0, SEEK_SET);
+
+      ReadInternal(pg, target);
+    }
+
+    void ReadRange(std::string& target,
+                   uint64_t start)
+    {
+      PGconn* pg = reinterpret_cast<PGconn*>(database_.pg_);
+
+      // Go to the first byte of the object
+      lo_lseek(pg, fd_, start, SEEK_SET);
+
+      ReadInternal(pg, target);
     }
   };
   
 
-  void PostgreSQLLargeObject::Read(std::string& target,
-                                   PostgreSQLDatabase& database,
-                                   const std::string& oid)
+  void PostgreSQLLargeObject::ReadWhole(std::string& target,
+                                        PostgreSQLDatabase& database,
+                                        const std::string& oid)
   {
     Reader reader(database, oid);
     target.resize(reader.GetSize());    
 
     if (target.size() > 0)
     {
-      reader.Read(&target[0]);
+      reader.ReadWhole(target);
     }
   }
 
 
-  void PostgreSQLLargeObject::Read(void*& target,
-                                   size_t& size,
-                                   PostgreSQLDatabase& database,
-                                   const std::string& oid)
+  void PostgreSQLLargeObject::ReadRange(std::string& target,
+                                        PostgreSQLDatabase& database,
+                                        const std::string& oid,
+                                        uint64_t start,
+                                        size_t length)
   {
     Reader reader(database, oid);
-    size = reader.GetSize();
 
-    if (size == 0)
+    if (start >= reader.GetSize() ||
+        start + length > reader.GetSize())
     {
-      target = NULL;
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadRange);
     }
-    else
+    
+    target.resize(length);
+
+    if (target.size() > 0)
     {
-      target = malloc(size);
-      if (target == NULL)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory);
-      }
-      
-      reader.Read(reinterpret_cast<char*>(target));
+      reader.ReadRange(target, start);
     }
   }
 
