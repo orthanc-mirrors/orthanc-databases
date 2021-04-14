@@ -2459,6 +2459,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
+      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
+                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
+      
       OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
       hasLoadedV3 = true;
     }

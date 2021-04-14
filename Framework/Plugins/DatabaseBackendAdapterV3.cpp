@@ -117,7 +117,8 @@ namespace OrthancDatabases
     {
       if (countConnections == 0)
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange,
+                                        "There must be a non-zero number of connections to the database");
       }
       else if (backend == NULL)
       {

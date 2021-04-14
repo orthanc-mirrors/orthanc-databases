@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* New option "IndexConnectionsCount" to control how many simultaneous
+  connections to the MySQL database are used by the index plugin
 * Support of multiple readers/writers, by handling retries from Orthanc SDK 1.9.2
 * Support of range reads for the storage area, from Orthanc SDK 1.9.0
 

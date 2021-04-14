@@ -56,12 +56,12 @@ extern "C"
 
     try
     {
-      const size_t countConnections = 5;  // TODO - PARAMETER
-      const unsigned int maxDatabaseRetries = 10;  // TODO - PARAMETER
-      
+      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
+
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::PostgreSQLIndex(context, parameters), countConnections, maxDatabaseRetries);
+        new OrthancDatabases::PostgreSQLIndex(context, parameters), countConnections,
+        parameters.GetMaxConnectionRetries());
     }
     catch (Orthanc::OrthancException& e)
     {
