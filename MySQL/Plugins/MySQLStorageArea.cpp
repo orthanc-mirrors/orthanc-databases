@@ -113,7 +113,7 @@ namespace OrthancDatabases
                            const std::string& uuid,
                            OrthancPluginContentType type,
                            uint64_t start,
-                           uint64_t length) ORTHANC_OVERRIDE
+                           size_t length) ORTHANC_OVERRIDE
     {
       DatabaseManager::Transaction transaction(GetManager(), TransactionType_ReadOnly);
 
