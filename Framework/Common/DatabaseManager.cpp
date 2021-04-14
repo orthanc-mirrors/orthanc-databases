@@ -171,6 +171,19 @@ namespace OrthancDatabases
   }
 
   
+  IDatabase& DatabaseManager::GetDatabase()
+  {
+    if (database_.get() == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
+    }
+    else
+    {
+      return *database_;
+    }
+  }
+
+
   void DatabaseManager::StartTransaction(TransactionType type)
   {
     try

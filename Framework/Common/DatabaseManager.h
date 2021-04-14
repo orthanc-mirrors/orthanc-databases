@@ -69,10 +69,7 @@ namespace OrthancDatabases
       Close();
     }
 
-    IDatabase& GetDatabase()
-    {
-      return *database_;
-    }
+    IDatabase& GetDatabase();
 
     Dialect GetDialect() const
     {
