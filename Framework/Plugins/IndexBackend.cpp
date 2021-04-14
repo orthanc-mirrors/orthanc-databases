@@ -2527,7 +2527,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
   {
-    std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.OpenDatabaseConnection()));
+    std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.CreateDatabaseFactory()));
     backend.ConfigureDatabase(*manager);
     return manager.release();
   }

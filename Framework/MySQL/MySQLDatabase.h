@@ -25,7 +25,7 @@
 #  error MySQL support must be enabled to use this file
 #endif
 
-#include "../Common/IDatabase.h"
+#include "../Common/IDatabaseFactory.h"
 #include "MySQLParameters.h"
 
 #include <mysql.h>
@@ -37,6 +37,8 @@ namespace OrthancDatabases
   class MySQLDatabase : public IDatabase
   {
   private:
+    class Factory;
+    
     MySQLParameters  parameters_;
     MYSQL           *mysql_;
 
@@ -119,6 +121,8 @@ namespace OrthancDatabases
       ~TransientAdvisoryLock();
     };
 
-    static MySQLDatabase* OpenDatabaseConnection(const MySQLParameters& parameters);
+    static IDatabaseFactory* CreateDatabaseFactory(const MySQLParameters& parameters);
+
+    static MySQLDatabase* CreateDatabaseConnection(const MySQLParameters& parameters);
   };
 }

@@ -325,30 +325,37 @@ namespace OrthancDatabases
   }
 
 
-  PostgreSQLDatabase* PostgreSQLDatabase::OpenDatabaseConnection(const PostgreSQLParameters& parameters)
+  class PostgreSQLDatabase::Factory : public RetryDatabaseFactory
   {
-    class Factory : public RetryDatabaseFactory
+  private:
+    PostgreSQLParameters  parameters_;
+    
+  protected:
+    virtual IDatabase* TryOpen()
     {
-    private:
-      const PostgreSQLParameters&  parameters_;
+      std::unique_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
+      db->Open();
+      return db.release();
+    }
+    
+  public:
+    explicit Factory(const PostgreSQLParameters& parameters) :
+      RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
+                           parameters.GetConnectionRetryInterval()),
+      parameters_(parameters)
+    {
+    }
+  };
 
-    protected:
-      virtual IDatabase* TryOpen()
-      {
-        std::unique_ptr<PostgreSQLDatabase> db(new PostgreSQLDatabase(parameters_));
-        db->Open();
-        return db.release();
-      }
-      
-    public:
-      explicit Factory(const PostgreSQLParameters& parameters) :
-        RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
-                             parameters.GetConnectionRetryInterval()),
-        parameters_(parameters)
-      {
-      }
-    };
 
+  IDatabaseFactory* PostgreSQLDatabase::CreateDatabaseFactory(const PostgreSQLParameters& parameters)
+  {
+    return new Factory(parameters);
+  }
+
+
+  PostgreSQLDatabase* PostgreSQLDatabase::CreateDatabaseConnection(const PostgreSQLParameters& parameters)
+  {
     Factory factory(parameters);
     return dynamic_cast<PostgreSQLDatabase*>(factory.Open());
   }

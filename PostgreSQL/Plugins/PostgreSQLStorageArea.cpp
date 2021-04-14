@@ -70,16 +70,13 @@ namespace OrthancDatabases
 
 
   PostgreSQLStorageArea::PostgreSQLStorageArea(const PostgreSQLParameters& parameters,
-                                               bool clearAll)
+                                               bool clearAll) :
+    StorageBackend(PostgreSQLDatabase::CreateDatabaseFactory(parameters))
   {
-    std::unique_ptr<PostgreSQLDatabase> database(PostgreSQLDatabase::OpenDatabaseConnection(parameters));
-    
-    if (database.get() == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      AccessorBase accessor(*this);
+      PostgreSQLDatabase& database = dynamic_cast<PostgreSQLDatabase&>(accessor.GetManager().GetDatabase());
+      ConfigureDatabase(database, parameters, clearAll);
     }
-    
-    ConfigureDatabase(*database, parameters, clearAll);
-    SetDatabase(database.release());
   }
 }

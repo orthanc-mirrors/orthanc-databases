@@ -56,36 +56,11 @@
 
 namespace OrthancDatabases
 {
-  void StorageBackend::SetDatabase(IDatabase* database)
+  StorageBackend::StorageBackend(IDatabaseFactory* factory) :
+    manager_(factory)
   {
-    if (database == NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-    }
-    else if (manager_.get() != NULL)
-    {
-      delete database;
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
-    else
-    {
-      manager_.reset(new DatabaseManager(database));
-    }
   }
   
-  DatabaseManager& StorageBackend::GetManager()
-  {
-    if (manager_.get() == NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
-    else
-    {
-      return *manager_;
-    }
-  }
-    
-
   void StorageBackend::AccessorBase::Create(const std::string& uuid,
                                             const void* content,
                                             size_t size,

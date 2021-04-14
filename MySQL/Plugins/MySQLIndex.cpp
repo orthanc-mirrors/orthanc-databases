@@ -45,9 +45,9 @@ namespace OrthancDatabases
   }
 
 
-  IDatabase* MySQLIndex::OpenDatabaseConnection()
+  IDatabaseFactory* MySQLIndex::CreateDatabaseFactory() 
   {
-    return MySQLDatabase::OpenDatabaseConnection(parameters_);
+    return MySQLDatabase::CreateDatabaseFactory(parameters_);
   }
 
 

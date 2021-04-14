@@ -38,7 +38,8 @@ namespace OrthancDatabases
   {
     Dialect_MySQL,
     Dialect_PostgreSQL,
-    Dialect_SQLite
+    Dialect_SQLite,
+    Dialect_Unknown
   };
 
   enum TransactionType

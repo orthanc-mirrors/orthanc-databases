@@ -358,7 +358,7 @@ TEST(PostgreSQL, LargeObject)
 
 TEST(PostgreSQL, StorageArea)
 {
-  std::unique_ptr<PostgreSQLDatabase> database(PostgreSQLDatabase::OpenDatabaseConnection(globalParameters_));
+  std::unique_ptr<PostgreSQLDatabase> database(PostgreSQLDatabase::CreateDatabaseConnection(globalParameters_));
   
   PostgreSQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
@@ -413,7 +413,7 @@ TEST(PostgreSQL, StorageArea)
 TEST(PostgreSQL, StorageReadRange)
 {
   std::unique_ptr<OrthancDatabases::PostgreSQLDatabase> database(
-    OrthancDatabases::PostgreSQLDatabase::OpenDatabaseConnection(globalParameters_));
+    OrthancDatabases::PostgreSQLDatabase::CreateDatabaseConnection(globalParameters_));
   
   OrthancDatabases::PostgreSQLStorageArea storageArea(globalParameters_, true /* clear database */);
 

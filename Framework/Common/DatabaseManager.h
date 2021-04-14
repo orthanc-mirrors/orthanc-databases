@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include "IDatabase.h"
+#include "IDatabaseFactory.h"
 #include "StatementLocation.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -39,12 +39,17 @@ namespace OrthancDatabases
    *
    * This class maintains a list of precompiled statements. At any
    * time, this class handles 0 or 1 active transaction.
+   *
+   * "DatabaseManager" takes a "IDatabaseFactory" as input, in order
+   * to be able to automatically re-open the database connection if
+   * the latter gets lost.
    **/
   class DatabaseManager : public boost::noncopyable
   {
   private:
     typedef std::map<StatementLocation, IPrecompiledStatement*>  CachedStatements;
 
+    std::unique_ptr<IDatabaseFactory>  factory_;
     std::unique_ptr<IDatabase>     database_;
     std::unique_ptr<ITransaction>  transaction_;
     CachedStatements               cachedStatements_;
@@ -62,7 +67,7 @@ namespace OrthancDatabases
     void ReleaseImplicitTransaction();
 
   public:
-    explicit DatabaseManager(IDatabase* database);  // Takes ownership
+    explicit DatabaseManager(IDatabaseFactory* factory);  // Takes ownership
     
     ~DatabaseManager()
     {
@@ -71,10 +76,7 @@ namespace OrthancDatabases
 
     IDatabase& GetDatabase();
 
-    Dialect GetDialect() const
-    {
-      return dialect_;
-    }
+    Dialect GetDialect() const;
 
     void Close();
     

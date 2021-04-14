@@ -157,7 +157,7 @@ static int64_t CountFiles(OrthancDatabases::MySQLDatabase& db)
 TEST(MySQL, StorageArea)
 {
   std::unique_ptr<OrthancDatabases::MySQLDatabase> database(
-    OrthancDatabases::MySQLDatabase::OpenDatabaseConnection(globalParameters_));
+    OrthancDatabases::MySQLDatabase::CreateDatabaseConnection(globalParameters_));
   
   OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true /* clear database */);
 
@@ -214,7 +214,7 @@ TEST(MySQL, StorageArea)
 TEST(MySQL, StorageReadRange)
 {
   std::unique_ptr<OrthancDatabases::MySQLDatabase> database(
-    OrthancDatabases::MySQLDatabase::OpenDatabaseConnection(globalParameters_));
+    OrthancDatabases::MySQLDatabase::CreateDatabaseConnection(globalParameters_));
   
   OrthancDatabases::MySQLStorageArea storageArea(globalParameters_, true /* clear database */);
 

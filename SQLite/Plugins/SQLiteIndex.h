@@ -42,7 +42,7 @@ namespace OrthancDatabases
       fast_ = fast;
     }
 
-    virtual IDatabase* OpenDatabaseConnection() ORTHANC_OVERRIDE;
+    virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE;
 
     virtual void ConfigureDatabase(DatabaseManager& manager) ORTHANC_OVERRIDE;
     

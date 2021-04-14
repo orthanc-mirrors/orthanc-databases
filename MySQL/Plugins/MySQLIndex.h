@@ -41,7 +41,7 @@ namespace OrthancDatabases
       clearAll_ = clear;
     }
 
-    virtual IDatabase* OpenDatabaseConnection() ORTHANC_OVERRIDE;
+    virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE;
 
     virtual void ConfigureDatabase(DatabaseManager& database) ORTHANC_OVERRIDE;
  

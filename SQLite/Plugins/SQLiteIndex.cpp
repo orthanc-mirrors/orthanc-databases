@@ -34,33 +34,53 @@
 
 namespace OrthancDatabases
 {
-  IDatabase* SQLiteIndex::OpenDatabaseConnection()
+  IDatabaseFactory* SQLiteIndex::CreateDatabaseFactory()
   {
-    std::unique_ptr<SQLiteDatabase> db(new SQLiteDatabase);
-
-    if (path_.empty())
+    class Factory : public IDatabaseFactory
     {
-      db->OpenInMemory();
-    }
-    else
-    {
-      db->Open(path_);
-    }
+    private:
+      std::string  path_;
+      bool         fast_;
+      
+    public:
+      Factory(const std::string& path,
+              bool fast) :
+        path_(path),
+        fast_(fast)
+      {
+      }
+      
+      virtual IDatabase* Open() ORTHANC_OVERRIDE
+      {
+        std::unique_ptr<SQLiteDatabase> db(new SQLiteDatabase);
 
-    db->Execute("PRAGMA ENCODING=\"UTF-8\";");
+        if (path_.empty())
+        {
+          db->OpenInMemory();
+        }
+        else
+        {
+          db->Open(path_);
+        }
 
-    if (fast_)
-    {
-      // Performance tuning of SQLite with PRAGMAs
-      // http://www.sqlite.org/pragma.html
-      db->Execute("PRAGMA SYNCHRONOUS=NORMAL;");
-      db->Execute("PRAGMA JOURNAL_MODE=WAL;");
-      db->Execute("PRAGMA LOCKING_MODE=EXCLUSIVE;");
-      db->Execute("PRAGMA WAL_AUTOCHECKPOINT=1000;");
-      //db->Execute("PRAGMA TEMP_STORE=memory");
-    }
+        db->Execute("PRAGMA ENCODING=\"UTF-8\";");
 
-    return db.release();
+        if (fast_)
+        {
+          // Performance tuning of SQLite with PRAGMAs
+          // http://www.sqlite.org/pragma.html
+          db->Execute("PRAGMA SYNCHRONOUS=NORMAL;");
+          db->Execute("PRAGMA JOURNAL_MODE=WAL;");
+          db->Execute("PRAGMA LOCKING_MODE=EXCLUSIVE;");
+          db->Execute("PRAGMA WAL_AUTOCHECKPOINT=1000;");
+          //db->Execute("PRAGMA TEMP_STORE=memory");
+        }
+
+        return db.release();
+      }
+    };
+
+    return new Factory(path_, fast_);
   }
 
 

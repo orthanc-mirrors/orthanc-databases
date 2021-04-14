@@ -26,7 +26,7 @@
 #endif
 
 #include "PostgreSQLParameters.h"
-#include "../Common/IDatabase.h"
+#include "../Common/IDatabaseFactory.h"
 
 namespace OrthancDatabases
 {
@@ -35,6 +35,8 @@ namespace OrthancDatabases
   private:
     friend class PostgreSQLStatement;
     friend class PostgreSQLLargeObject;
+
+    class Factory;
 
     PostgreSQLParameters  parameters_;
     void*                 pg_;   /* Object of type "PGconn*" */
@@ -90,6 +92,8 @@ namespace OrthancDatabases
       ~TransientAdvisoryLock();
     };
 
-    static PostgreSQLDatabase* OpenDatabaseConnection(const PostgreSQLParameters& parameters);
+    static IDatabaseFactory* CreateDatabaseFactory(const PostgreSQLParameters& parameters);
+
+    static PostgreSQLDatabase* CreateDatabaseConnection(const PostgreSQLParameters& parameters);
   };
 }

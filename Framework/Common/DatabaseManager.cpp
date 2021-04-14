@@ -159,30 +159,54 @@ namespace OrthancDatabases
   }
 
     
-  DatabaseManager::DatabaseManager(IDatabase* database) :
-    database_(database)
+  DatabaseManager::DatabaseManager(IDatabaseFactory* factory) :
+    factory_(factory),
+    dialect_(Dialect_Unknown)
   {
-    if (database == NULL)
+    if (factory == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
-
-    dialect_ = database->GetDialect();
   }
 
   
   IDatabase& DatabaseManager::GetDatabase()
   {
+    assert(factory_.get() != NULL);
+    
     if (database_.get() == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
+      database_.reset(factory_->Open());
+
+      if (database_.get() == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+
+      dialect_ = database_->GetDialect();
+      if (dialect_ == Dialect_Unknown)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+    }
+
+    return *database_;
+  }
+
+
+  Dialect DatabaseManager::GetDialect() const
+  {
+    if (database_.get() == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
     else
     {
-      return *database_;
+      assert(dialect_ != Dialect_Unknown);
+      return dialect_;
     }
   }
-
+  
 
   void DatabaseManager::StartTransaction(TransactionType type)
   {

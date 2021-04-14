@@ -661,31 +661,38 @@ namespace OrthancDatabases
   }
 
   
-  MySQLDatabase* MySQLDatabase::OpenDatabaseConnection(const MySQLParameters& parameters)
+  class MySQLDatabase::Factory : public RetryDatabaseFactory
   {
-    class Factory : public RetryDatabaseFactory
+  private:
+    MySQLParameters  parameters_;
+
+  protected:
+    virtual IDatabase* TryOpen()
     {
-    private:
-      const MySQLParameters&  parameters_;
-
-    protected:
-      virtual IDatabase* TryOpen()
-      {
-        std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
-        db->Open();
-        db->ExecuteMultiLines("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
-        return db.release();
-      }
+      std::unique_ptr<MySQLDatabase> db(new MySQLDatabase(parameters_));
+      db->Open();
+      db->ExecuteMultiLines("SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE", false);
+      return db.release();
+    }
       
-    public:
-      explicit Factory(const MySQLParameters& parameters) :
-        RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
-                             parameters.GetConnectionRetryInterval()),
-        parameters_(parameters)
-      {
-      }
-    };
+  public:
+    explicit Factory(const MySQLParameters& parameters) :
+      RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
+                           parameters.GetConnectionRetryInterval()),
+      parameters_(parameters)
+    {
+    }
+  };
 
+
+  IDatabaseFactory* MySQLDatabase::CreateDatabaseFactory(const MySQLParameters& parameters)
+  {
+    return new Factory(parameters);
+  }
+
+
+  MySQLDatabase* MySQLDatabase::CreateDatabaseConnection(const MySQLParameters& parameters)
+  {
     Factory factory(parameters);
     return dynamic_cast<MySQLDatabase*>(factory.Open());
   }

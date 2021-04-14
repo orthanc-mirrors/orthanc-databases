@@ -54,9 +54,9 @@ namespace OrthancDatabases
   }
 
   
-  IDatabase* PostgreSQLIndex::OpenDatabaseConnection()
+  IDatabaseFactory* PostgreSQLIndex::CreateDatabaseFactory()
   {
-    return PostgreSQLDatabase::OpenDatabaseConnection(parameters_);
+    return PostgreSQLDatabase::CreateDatabaseFactory(parameters_);
   }
 
   

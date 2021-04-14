@@ -74,11 +74,9 @@ namespace OrthancDatabases
   private:
     class StringVisitor;
     
-    boost::mutex                       mutex_;
-    std::unique_ptr<DatabaseManager>   manager_;
+    boost::mutex      mutex_;
+    DatabaseManager   manager_;
 
-    DatabaseManager& GetManager();
-    
   protected:
     class AccessorBase : public IAccessor
     {
@@ -89,7 +87,7 @@ namespace OrthancDatabases
     public:
       explicit AccessorBase(StorageBackend& backend) :
         lock_(backend.mutex_),
-        manager_(backend.GetManager())
+        manager_(backend.manager_)
       {
       }
 
@@ -117,11 +115,11 @@ namespace OrthancDatabases
                           OrthancPluginContentType type) ORTHANC_OVERRIDE;
     };
     
-    void SetDatabase(IDatabase* database);  // Takes ownership
-
     virtual bool HasReadRange() const = 0;
 
   public:
+    StorageBackend(IDatabaseFactory* factory);  // Takes ownership
+
     virtual ~StorageBackend()
     {
     }

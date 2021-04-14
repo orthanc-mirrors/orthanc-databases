@@ -87,17 +87,14 @@ namespace OrthancDatabases
 
 
   MySQLStorageArea::MySQLStorageArea(const MySQLParameters& parameters,
-                                     bool clearAll)
+                                     bool clearAll) :
+    StorageBackend(MySQLDatabase::CreateDatabaseFactory(parameters))
   {
-    std::unique_ptr<MySQLDatabase> database(MySQLDatabase::OpenDatabaseConnection(parameters));
-    
-    if (database.get() == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      AccessorBase accessor(*this);
+      MySQLDatabase& database = dynamic_cast<MySQLDatabase&>(accessor.GetManager().GetDatabase());
+      ConfigureDatabase(database, parameters, clearAll);
     }
-    
-    ConfigureDatabase(*database, parameters, clearAll);
-    SetDatabase(database.release());
   }
 
 
