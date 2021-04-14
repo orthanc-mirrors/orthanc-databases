@@ -187,7 +187,6 @@ TEST(MySQL, StorageArea)
     {
       std::string uuid = boost::lexical_cast<std::string>(i);
       std::string expected = "Value " + boost::lexical_cast<std::string>(i * 2);
-      std::string content;
 
       if (i == 5)
       {

@@ -458,6 +458,20 @@ namespace OrthancDatabases
       {
       }
 
+      ~Visitor()
+      {
+        if (data_ != NULL /* this condition is invalidated by "Release()" */ &&
+            *data_ != NULL)
+        {
+          free(*data_);
+        }
+      }
+
+      void Release()
+      {
+        data_ = NULL;
+      }      
+
       virtual bool IsSuccess() const ORTHANC_OVERRIDE
       {
         return success_;
@@ -468,6 +482,11 @@ namespace OrthancDatabases
         if (success_)
         {
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        else if (data_ == NULL)
+        {
+          // "Release()" has been called
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
         }
         else
         {
@@ -520,6 +539,8 @@ namespace OrthancDatabases
           std::unique_ptr<StorageBackend::IAccessor> accessor(backend_->CreateAccessor());
           accessor->ReadWhole(visitor, uuid, type);
         }
+
+        visitor.Release();
 
         return OrthancPluginErrorCode_Success;
       }
@@ -609,7 +630,7 @@ namespace OrthancDatabases
     bool          success_;
       
   public:
-    StringVisitor(std::string& target) :
+    explicit StringVisitor(std::string& target) :
       target_(target),
       success_(false)
     {

@@ -69,7 +69,7 @@ namespace OrthancDatabases
     std::unique_ptr<DatabaseManager>   manager_;
 
   public:
-    Adapter(IDatabaseBackend* backend) :
+    explicit Adapter(IDatabaseBackend* backend) :
       backend_(backend)
     {
       if (backend == NULL)
@@ -119,7 +119,7 @@ namespace OrthancDatabases
       DatabaseManager*           manager_;
       
     public:
-      DatabaseAccessor(Adapter& adapter) :
+      explicit DatabaseAccessor(Adapter& adapter) :
         lock_(adapter.managerMutex_),
         manager_(adapter.manager_.get())
       {

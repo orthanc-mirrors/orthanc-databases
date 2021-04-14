@@ -558,7 +558,7 @@ namespace OrthancDatabases
       }
 
     public:
-      MySQLImplicitTransaction(MySQLDatabase& db) :
+      explicit MySQLImplicitTransaction(MySQLDatabase& db) :
         db_(db)
       {
       }
@@ -678,7 +678,7 @@ namespace OrthancDatabases
       }
       
     public:
-      Factory(const MySQLParameters& parameters) :
+      explicit Factory(const MySQLParameters& parameters) :
         RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
                              parameters.GetConnectionRetryInterval()),
         parameters_(parameters)

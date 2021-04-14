@@ -32,7 +32,7 @@ namespace OrthancDatabases
     bool         fast_;
 
   public:
-    SQLiteIndex(OrthancPluginContext* context);  // Opens in memory
+    explicit SQLiteIndex(OrthancPluginContext* context);  // Opens in memory
 
     SQLiteIndex(OrthancPluginContext* context,
                 const std::string& path);
@@ -48,9 +48,9 @@ namespace OrthancDatabases
     
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
-                                   OrthancPluginResourceType type);
+                                   OrthancPluginResourceType type) ORTHANC_OVERRIDE;
 
     // New primitive since Orthanc 1.5.2
-    virtual int64_t GetLastChangeIndex(DatabaseManager& manager);
+    virtual int64_t GetLastChangeIndex(DatabaseManager& manager) ORTHANC_OVERRIDE;
   };
 }

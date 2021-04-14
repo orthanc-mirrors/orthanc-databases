@@ -34,7 +34,7 @@ namespace OrthancDatabases
                            bool clearAll);
 
   protected:
-    virtual bool HasReadRange() const
+    virtual bool HasReadRange() const ORTHANC_OVERRIDE
     {
       return true;
     }

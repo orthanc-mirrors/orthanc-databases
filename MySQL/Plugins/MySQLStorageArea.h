@@ -37,7 +37,7 @@ namespace OrthancDatabases
                            bool clearAll);
 
   protected:
-    virtual bool HasReadRange() const
+    virtual bool HasReadRange() const ORTHANC_OVERRIDE
     {
       return true;
     }
@@ -46,6 +46,6 @@ namespace OrthancDatabases
     MySQLStorageArea(const MySQLParameters& parameters,
                      bool clearAll);
 
-    virtual IAccessor* CreateAccessor();
+    virtual IAccessor* CreateAccessor() ORTHANC_OVERRIDE;
   };
 }

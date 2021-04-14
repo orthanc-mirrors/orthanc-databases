@@ -343,8 +343,6 @@ namespace OrthancDatabases
 
     while (!done)
     {
-      int64_t parentId;
-      
       {
         DatabaseManager::CachedStatement lookupSiblings(
           STATEMENT_FROM_HERE, manager,
@@ -365,7 +363,7 @@ namespace OrthancDatabases
         }
         else
         {
-          parentId = ReadInteger64(lookupSiblings, 0);
+          int64_t parentId = ReadInteger64(lookupSiblings, 0);
           lookupSiblings.Next();
 
           if (lookupSiblings.IsDone())
@@ -385,10 +383,10 @@ namespace OrthancDatabases
             
             parent.SetParameterType("id", ValueType_Integer64);
 
-            Dictionary args;
-            args.SetIntegerValue("id", parentId);
+            Dictionary args2;
+            args2.SetIntegerValue("id", parentId);
     
-            parent.Execute(args);
+            parent.Execute(args2);
 
             output.SignalRemainingAncestor(
               ReadString(parent, 0),

@@ -87,7 +87,7 @@ namespace OrthancDatabases
       DatabaseManager&           manager_;
 
     public:
-      AccessorBase(StorageBackend& backend) :
+      explicit AccessorBase(StorageBackend& backend) :
         lock_(backend.mutex_),
         manager_(backend.GetManager())
       {
@@ -101,20 +101,20 @@ namespace OrthancDatabases
       virtual void Create(const std::string& uuid,
                           const void* content,
                           size_t size,
-                          OrthancPluginContentType type);
+                          OrthancPluginContentType type) ORTHANC_OVERRIDE;
 
       virtual void ReadWhole(IFileContentVisitor& visitor,
                              const std::string& uuid,
-                             OrthancPluginContentType type);
+                             OrthancPluginContentType type) ORTHANC_OVERRIDE;
 
       virtual void ReadRange(IFileContentVisitor& visitor,
                              const std::string& uuid,
                              OrthancPluginContentType type,
                              uint64_t start,
-                             size_t length);
+                             size_t length) ORTHANC_OVERRIDE;
       
       virtual void Remove(const std::string& uuid,
-                          OrthancPluginContentType type);
+                          OrthancPluginContentType type) ORTHANC_OVERRIDE;
     };
     
     void SetDatabase(IDatabase* database);  // Takes ownership

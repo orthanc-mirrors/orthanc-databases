@@ -250,7 +250,7 @@ namespace OrthancDatabases
       }
 
     public:
-      PostgreSQLImplicitTransaction(PostgreSQLDatabase& db) :
+      explicit PostgreSQLImplicitTransaction(PostgreSQLDatabase& db) :
         db_(db)
       {
       }
@@ -341,7 +341,7 @@ namespace OrthancDatabases
       }
       
     public:
-      Factory(const PostgreSQLParameters& parameters) :
+      explicit Factory(const PostgreSQLParameters& parameters) :
         RetryDatabaseFactory(parameters.GetMaxConnectionRetries(),
                              parameters.GetConnectionRetryInterval()),
         parameters_(parameters)

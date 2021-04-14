@@ -65,7 +65,7 @@ namespace OrthancDatabases
       }
 
     public:
-      SQLiteImplicitTransaction(SQLiteDatabase& db) :
+      explicit SQLiteImplicitTransaction(SQLiteDatabase& db) :
         db_(db)
       {
       }

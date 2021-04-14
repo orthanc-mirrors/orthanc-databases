@@ -150,7 +150,7 @@ namespace OrthancDatabases
 
   void PostgreSQLParameters::SetPortNumber(unsigned int port)
   {
-    if (port <= 0 ||
+    if (port == 0 ||
         port >= 65535)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

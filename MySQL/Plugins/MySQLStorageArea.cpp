@@ -104,7 +104,7 @@ namespace OrthancDatabases
   class MySQLStorageArea::Accessor : public StorageBackend::AccessorBase
   {
   public:
-    Accessor(MySQLStorageArea& backend) :
+    explicit Accessor(MySQLStorageArea& backend) :
       AccessorBase(backend)
     {
     }
