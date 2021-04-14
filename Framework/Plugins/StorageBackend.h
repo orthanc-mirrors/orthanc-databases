@@ -65,7 +65,7 @@ namespace OrthancDatabases
                              const std::string& uuid,
                              OrthancPluginContentType type,
                              uint64_t start,
-                             uint64_t length) = 0;
+                             size_t length) = 0;
       
       virtual void Remove(const std::string& uuid,
                           OrthancPluginContentType type) = 0;
@@ -111,7 +111,7 @@ namespace OrthancDatabases
                              const std::string& uuid,
                              OrthancPluginContentType type,
                              uint64_t start,
-                             uint64_t length);
+                             size_t length);
       
       virtual void Remove(const std::string& uuid,
                           OrthancPluginContentType type);
@@ -148,6 +148,6 @@ namespace OrthancDatabases
                                   const std::string& uuid,
                                   OrthancPluginContentType type,
                                   uint64_t start,
-                                  uint64_t length);
+                                  size_t length);
   };
 }

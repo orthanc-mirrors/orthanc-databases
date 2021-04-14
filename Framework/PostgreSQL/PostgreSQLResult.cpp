@@ -170,8 +170,7 @@ namespace OrthancDatabases
   }
 
 
-  void PostgreSQLResult::GetLargeObject(std::string& result,
-                                        unsigned int column) const
+  std::string PostgreSQLResult::GetLargeObjectOid(unsigned int column) const
   {
     CheckColumn(column, OIDOID);
 
@@ -185,24 +184,44 @@ namespace OrthancDatabases
     oid = *(const Oid*) PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column);
     oid = ntohl(oid);
 
-    PostgreSQLLargeObject::Read(result, database_, boost::lexical_cast<std::string>(oid));
+    return boost::lexical_cast<std::string>(oid);
   }
 
 
-  void PostgreSQLResult::GetLargeObject(void*& result,
-                                           size_t& size,
-                                           unsigned int column) const
+  void PostgreSQLResult::GetLargeObjectContent(std::string& content,
+                                               unsigned int column) const
   {
-    CheckColumn(column, OIDOID);
-
-    Oid oid;
-    assert(PQfsize(reinterpret_cast<PGresult*>(result_), column) == sizeof(oid));
-
-    oid = *(const Oid*) PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column);
-    oid = ntohl(oid);
-
-    PostgreSQLLargeObject::Read(result, size, database_, boost::lexical_cast<std::string>(oid));
+    PostgreSQLLargeObject::Read(content, database_, GetLargeObjectOid(column));
   }
+
+
+  class PostgreSQLResult::LargeObjectResult : public ResultFileValue
+  {
+  private:
+    PostgreSQLDatabase&  database_;
+    std::string          oid_;
+
+  public:
+    LargeObjectResult(PostgreSQLDatabase& database,
+                      const std::string& oid) :
+      database_(database),
+      oid_(oid)
+    {
+    }
+
+    virtual void ReadWhole(std::string& target) const ORTHANC_OVERRIDE
+    {
+      PostgreSQLLargeObject::Read(target, database_, oid_);
+
+    }
+    
+    virtual void ReadRange(std::string& target,
+                           uint64_t start,
+                           size_t length) const ORTHANC_OVERRIDE
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+  };
 
 
   IValue* PostgreSQLResult::GetValue(unsigned int column) const
@@ -234,11 +253,7 @@ namespace OrthancDatabases
         return new BinaryStringValue(GetString(column));
 
       case OIDOID:
-      {
-        std::unique_ptr<ResultFileValue> value(new ResultFileValue);
-        GetLargeObject(value->GetContent(), column);
-        return value.release();
-      }
+        return new LargeObjectResult(database_, GetLargeObjectOid(column));
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);

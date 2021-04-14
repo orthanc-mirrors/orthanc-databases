@@ -27,36 +27,19 @@
 
 namespace OrthancDatabases
 {
+  /**
+   * This class is not used for MySQL, as MySQL uses BLOB columns to
+   * store files.
+   **/
   class ResultFileValue : public IValue
   {
-  private:
-    std::string  content_;
-
   public:
-    ResultFileValue()
-    {
-    }
-
-    std::string& GetContent()
-    {
-      return content_;
-    }
-
-    const std::string& GetContent() const
-    {
-      return content_;
-    }
-
-    const void* GetBuffer() const
-    {
-      return (content_.empty() ? NULL : content_.c_str());
-    }
-
-    size_t GetSize() const
-    {
-      return content_.size();
-    }
-
+    virtual void ReadWhole(std::string& target) const = 0;
+    
+    virtual void ReadRange(std::string& target,
+                           uint64_t start,
+                           size_t length) const = 0;
+    
     virtual ValueType GetType() const ORTHANC_OVERRIDE
     {
       return ValueType_ResultFile;

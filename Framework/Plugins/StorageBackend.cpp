@@ -148,8 +148,12 @@ namespace OrthancDatabases
         switch (value.GetType())
         {
           case ValueType_ResultFile:
-            visitor.Assign(dynamic_cast<const ResultFileValue&>(value).GetContent());
+          {
+            std::string content;
+            dynamic_cast<const ResultFileValue&>(value).ReadWhole(content);
+            visitor.Assign(content);
             break;
+          }
 
           case ValueType_BinaryString:
             visitor.Assign(dynamic_cast<const BinaryStringValue&>(value).GetContent());
@@ -174,9 +178,60 @@ namespace OrthancDatabases
                                                const std::string& uuid,
                                                OrthancPluginContentType type,
                                                uint64_t start,
-                                               uint64_t length)
+                                               size_t length)
   {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    /**
+     * This is a generic implementation, that will only work if
+     * "ResultFileValue" is implemented by the database backend. For
+     * instance, this will *not* work with MySQL, as the latter uses
+     * BLOB columns to store files.
+     **/
+    DatabaseManager::Transaction transaction(manager_, TransactionType_ReadOnly);
+
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager_,
+        "SELECT content FROM StorageArea WHERE uuid=${uuid} AND type=${type}");
+     
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      statement.SetParameterType("type", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetUtf8Value("uuid", uuid);
+      args.SetIntegerValue("type", type);
+     
+      statement.Execute(args);
+
+      if (statement.IsDone())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+      }
+      else if (statement.GetResultFieldsCount() != 1)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+      }
+      else
+      {
+        const IValue& value = statement.GetResultField(0);
+        if (value.GetType() == ValueType_ResultFile)
+        {
+          std::string content;
+          dynamic_cast<const ResultFileValue&>(value).ReadRange(content, start, length);
+          visitor.Assign(content);
+        }
+        else
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
+        }
+      }
+    }
+
+    transaction.Commit();
+
+    if (!visitor.IsSuccess())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Could not read attachment from the storage area");
+    }
   }
 
 
@@ -598,7 +653,7 @@ namespace OrthancDatabases
                                          const std::string& uuid,
                                          OrthancPluginContentType type,
                                          uint64_t start,
-                                         uint64_t length)
+                                         size_t length)
   {
     StringVisitor visitor(target);
     accessor.ReadRange(visitor, uuid, type, start, length);

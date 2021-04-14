@@ -326,7 +326,7 @@ TEST(PostgreSQL, LargeObject)
     ASSERT_EQ("Index 9", r.GetString(0));
 
     std::string data;
-    r.GetLargeObject(data, 1);
+    r.GetLargeObjectContent(data, 1);
     ASSERT_EQ("Value 18", data);    
 
     r.Next();

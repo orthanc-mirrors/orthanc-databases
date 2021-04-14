@@ -35,7 +35,11 @@ namespace OrthancDatabases
     switch (target)
     {
       case ValueType_BinaryString:
-        return new BinaryStringValue(content_);
+      {
+        std::string content;
+        ReadWhole(content);
+        return new BinaryStringValue(content);
+      }
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);

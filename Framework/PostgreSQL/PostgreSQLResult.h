@@ -32,6 +32,8 @@ namespace OrthancDatabases
   class PostgreSQLResult : public boost::noncopyable
   {
   private:
+    class LargeObjectResult;
+    
     void                *result_;  /* Object of type "PGresult*" */
     int                  position_;
     PostgreSQLDatabase&  database_;
@@ -70,12 +72,10 @@ namespace OrthancDatabases
 
     std::string GetString(unsigned int column) const;
 
-    void GetLargeObject(std::string& result,
-                        unsigned int column) const;
+    std::string GetLargeObjectOid(unsigned int column) const;
 
-    void GetLargeObject(void*& result,
-                        size_t& size,
-                        unsigned int column) const;
+    void GetLargeObjectContent(std::string& content,
+                               unsigned int column) const;
 
     IValue* GetValue(unsigned int column) const;
   };
