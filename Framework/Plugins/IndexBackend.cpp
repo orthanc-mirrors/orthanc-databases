@@ -2467,7 +2467,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     if (!hasLoadedV3)
     {
-      LOG(WARNING) << "Performance warning: Your version of Orthanc doesn't support multiple readers/writers";
+      LOG(WARNING) << "Performance warning: Your version of the Orthanc SDK doesn't support multiple readers/writers";
       OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
     }
   }
