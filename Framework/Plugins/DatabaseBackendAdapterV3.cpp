@@ -1725,6 +1725,8 @@ namespace OrthancDatabases
 
 
   static OrthancPluginErrorCode LookupParent(OrthancPluginDatabaseTransaction* transaction,
+                                             uint8_t* existing /* out */,
+                                             int64_t* parentId /* out */,
                                              int64_t id)
   {
     DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
@@ -1733,10 +1735,13 @@ namespace OrthancDatabases
     {
       t->GetOutput().Clear();
 
-      int64_t parentId;
-      if (t->GetBackend().LookupParent(parentId, t->GetManager(), id))
+      if (t->GetBackend().LookupParent(*parentId, t->GetManager(), id))
       {
-        t->GetOutput().AnswerInteger64(parentId);
+        *existing = 1;
+      }
+      else
+      {
+        *existing = 0;
       }
       
       return OrthancPluginErrorCode_Success;
@@ -1833,7 +1838,9 @@ namespace OrthancDatabases
   }
 
   
-  static OrthancPluginErrorCode SelectPatientToRecycle(OrthancPluginDatabaseTransaction* transaction)
+  static OrthancPluginErrorCode SelectPatientToRecycle(OrthancPluginDatabaseTransaction* transaction,
+                                                       uint8_t* patientAvailable,
+                                                       int64_t* patientId)
   {
     DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
@@ -1841,10 +1848,13 @@ namespace OrthancDatabases
     {
       t->GetOutput().Clear();
       
-      int64_t id;
-      if (t->GetBackend().SelectPatientToRecycle(id, t->GetManager()))
+      if (t->GetBackend().SelectPatientToRecycle(*patientId, t->GetManager()))
       {
-        t->GetOutput().AnswerInteger64(id);
+        *patientAvailable = 1;
+      }
+      else
+      {
+        *patientAvailable = 0;
       }
       
       return OrthancPluginErrorCode_Success;
@@ -1854,6 +1864,8 @@ namespace OrthancDatabases
 
     
   static OrthancPluginErrorCode SelectPatientToRecycle2(OrthancPluginDatabaseTransaction* transaction,
+                                                        uint8_t* patientAvailable,
+                                                        int64_t* patientId,
                                                         int64_t patientIdToAvoid)
   {
     DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
@@ -1862,10 +1874,13 @@ namespace OrthancDatabases
     {
       t->GetOutput().Clear();
       
-      int64_t id;
-      if (t->GetBackend().SelectPatientToRecycle(id, t->GetManager(), patientIdToAvoid))
+      if (t->GetBackend().SelectPatientToRecycle(*patientId, t->GetManager(), patientIdToAvoid))
       {
-        t->GetOutput().AnswerInteger64(id);
+        *patientAvailable = 1;
+      }
+      else
+      {
+        *patientAvailable = 0;
       }
       
       return OrthancPluginErrorCode_Success;
