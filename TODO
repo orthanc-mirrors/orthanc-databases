@@ -9,6 +9,10 @@ Common - Database index
 
 * Store revisions for metadata and attachments in PostgreSQL and MySQL
 
+* Performance of joins in LookupResources: Create cached statement for
+  LookupResources, that are grouped to search up to, say, 10 tags,
+  instead of recompiling for each request
+
 
 ---------------------
 Common - Storage area
@@ -25,3 +29,10 @@ MySQL
 
 * MySQL performance => implement GlobalProperty_GetTotalSizeIsFast:
   https://groups.google.com/d/msg/orthanc-users/kSR4a110zDo/D7e4ITR8BwAJ
+
+* Add index to speed up wildcard search, as already done in PostgreSQL:
+
+  - https://dev.mysql.com/doc/refman/5.5/en/fulltext-search.html +
+    ALTER TABLE table ADD FULLTEXT index_name(column1);
+
+  - https://dev.mysql.com/doc/refman/8.0/en/index-btree-hash.html
