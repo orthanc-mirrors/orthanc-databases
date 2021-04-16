@@ -7,13 +7,12 @@
 Common - Database index
 -----------------------
 
+* Store revisions for metadata and attachments in PostgreSQL and MySQL
+
 
 ---------------------
 Common - Storage area
 ---------------------
-
-* Implement range requests in the MySQL/PostgreSQL storage areas (new
-  in Orthanc 1.9.0)
 
 * Implement the "StoreDicom" option from the default filesystem
   storage area to run MySQL/PostgreSQL storage in index-only mode:
