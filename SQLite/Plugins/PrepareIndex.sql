@@ -30,6 +30,7 @@ CREATE TABLE Metadata(
        id INTEGER REFERENCES Resources(internalId) ON DELETE CASCADE,
        type INTEGER,
        value TEXT,
+       revision INTEGER,
        PRIMARY KEY(id, type)
        );
 

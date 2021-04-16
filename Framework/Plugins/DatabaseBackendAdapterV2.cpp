@@ -1073,7 +1073,8 @@ namespace OrthancDatabases
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
 
       std::string s;
-      if (adapter->GetBackend().LookupMetadata(s, accessor.GetManager(), id, metadata))
+      int64_t revision;  // not handled in this API
+      if (adapter->GetBackend().LookupMetadata(s, revision, accessor.GetManager(), id, metadata))
       {
         OrthancPluginDatabaseAnswerString(adapter->GetBackend().GetContext(),
                                           output->GetDatabase(), s.c_str());
@@ -1244,7 +1245,8 @@ namespace OrthancDatabases
     try
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
-      adapter->GetBackend().SetMetadata(accessor.GetManager(), id, metadata, value);
+      adapter->GetBackend().SetMetadata(accessor.GetManager(), id, metadata, value,
+                                        0 /* revision number, unused in old API */);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

@@ -190,6 +190,7 @@ namespace OrthancDatabases
                                        const char* end) = 0;
 
     virtual bool LookupMetadata(std::string& target /*out*/,
+                                int64_t& revision /*out*/,
                                 DatabaseManager& manager,
                                 int64_t id,
                                 int32_t metadataType) = 0;
@@ -230,7 +231,8 @@ namespace OrthancDatabases
     virtual void SetMetadata(DatabaseManager& manager,
                              int64_t id,
                              int32_t metadataType,
-                             const char* value) = 0;
+                             const char* value,
+                             int64_t revision) = 0;
 
     virtual void SetProtectedPatient(DatabaseManager& manager,
                                      int64_t internalId, 

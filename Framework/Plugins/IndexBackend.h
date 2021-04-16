@@ -231,6 +231,7 @@ namespace OrthancDatabases
                                        const char* end) ORTHANC_OVERRIDE;
 
     virtual bool LookupMetadata(std::string& target /*out*/,
+                                int64_t& revision /*out*/,
                                 DatabaseManager& manager,
                                 int64_t id,
                                 int32_t metadataType) ORTHANC_OVERRIDE;
@@ -271,7 +272,8 @@ namespace OrthancDatabases
     virtual void SetMetadata(DatabaseManager& manager,
                              int64_t id,
                              int32_t metadataType,
-                             const char* value) ORTHANC_OVERRIDE;
+                             const char* value,
+                             int64_t revision) ORTHANC_OVERRIDE;
     
     virtual void SetProtectedPatient(DatabaseManager& manager,
                                      int64_t internalId, 

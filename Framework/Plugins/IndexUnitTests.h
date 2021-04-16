@@ -270,14 +270,28 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(ci.back() == b || ci.back() == c);
   ASSERT_NE(ci.front(), ci.back());
 
-  db.SetMetadata(*manager, a, Orthanc::MetadataType_ModifiedFrom, "modified");
-  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update2");
-  ASSERT_FALSE(db.LookupMetadata(s, *manager, b, Orthanc::MetadataType_LastUpdate));
-  ASSERT_TRUE(db.LookupMetadata(s, *manager, a, Orthanc::MetadataType_LastUpdate));
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_ModifiedFrom, "modified", 42);
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update2", 43);
+  int64_t revision = -1;
+  ASSERT_FALSE(db.LookupMetadata(s, revision, *manager, b, Orthanc::MetadataType_LastUpdate));
+  ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update2", s);
-  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update");
-  ASSERT_TRUE(db.LookupMetadata(s, *manager, a, Orthanc::MetadataType_LastUpdate));
+
+#if ORTHANC_ENABLE_SQLITE == 1
+  ASSERT_EQ(43, revision);  // Only SQLite implements revisions so far
+#else
+  ASSERT_EQ(0, revision);
+#endif
+
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update", 44);
+  ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update", s);
+
+#if ORTHANC_ENABLE_SQLITE == 1
+  ASSERT_EQ(44, revision);  // Only SQLite implements revisions so far
+#else
+  ASSERT_EQ(0, revision);
+#endif
 
   std::list<int32_t> md;
   db.ListAvailableMetadata(md, *manager, a);
@@ -285,17 +299,32 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(md.front() == Orthanc::MetadataType_ModifiedFrom || md.back() == Orthanc::MetadataType_ModifiedFrom);
   ASSERT_TRUE(md.front() == Orthanc::MetadataType_LastUpdate || md.back() == Orthanc::MetadataType_LastUpdate);
   std::string mdd;
-  ASSERT_TRUE(db.LookupMetadata(mdd, *manager, a, Orthanc::MetadataType_ModifiedFrom));
+  ASSERT_TRUE(db.LookupMetadata(mdd, revision, *manager, a, Orthanc::MetadataType_ModifiedFrom));
   ASSERT_EQ("modified", mdd);
-  ASSERT_TRUE(db.LookupMetadata(mdd, *manager, a, Orthanc::MetadataType_LastUpdate));
+
+#if ORTHANC_ENABLE_SQLITE == 1
+  ASSERT_EQ(42, revision);  // Only SQLite implements revisions so far
+#else
+  ASSERT_EQ(0, revision);
+#endif
+
+  ASSERT_TRUE(db.LookupMetadata(mdd, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update", mdd);
+
+#if ORTHANC_ENABLE_SQLITE == 1
+  ASSERT_EQ(44, revision);  // Only SQLite implements revisions so far
+#else
+  ASSERT_EQ(0, revision);
+#endif
 
   db.ListAvailableMetadata(md, *manager, b);
   ASSERT_EQ(0u, md.size());
 
+  ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   db.DeleteMetadata(*manager, a, Orthanc::MetadataType_LastUpdate);
+  ASSERT_FALSE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   db.DeleteMetadata(*manager, b, Orthanc::MetadataType_LastUpdate);
-  ASSERT_FALSE(db.LookupMetadata(s, *manager, a, Orthanc::MetadataType_LastUpdate));
+  ASSERT_FALSE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
 
   db.ListAvailableMetadata(md, *manager, a);
   ASSERT_EQ(1u, md.size());

@@ -1707,6 +1707,7 @@ namespace OrthancDatabases
 
 
   static OrthancPluginErrorCode LookupMetadata(OrthancPluginDatabaseTransaction* transaction,
+                                               int64_t* revision /* out */,
                                                int64_t id,
                                                int32_t metadata)
   {
@@ -1717,7 +1718,7 @@ namespace OrthancDatabases
       t->GetOutput().Clear();
 
       std::string s;
-      if (t->GetBackend().LookupMetadata(s, t->GetManager(), id, metadata))
+      if (t->GetBackend().LookupMetadata(s, *revision, t->GetManager(), id, metadata))
       {
         t->GetOutput().AnswerString(s);
       }
@@ -1913,14 +1914,15 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode SetMetadata(OrthancPluginDatabaseTransaction* transaction,
                                             int64_t id,
                                             int32_t metadata,
-                                            const char* value)
+                                            const char* value,
+                                            int64_t revision)
   {
     DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().SetMetadata(t->GetManager(), id, metadata, value);
+      t->GetBackend().SetMetadata(t->GetManager(), id, metadata, value, revision);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());

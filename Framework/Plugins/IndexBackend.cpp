@@ -446,7 +446,7 @@ namespace OrthancDatabases
     SignalDeletedFiles(output, manager);
   }
 
-    
+
   void IndexBackend::DeleteMetadata(DatabaseManager& manager,
                                     int64_t id,
                                     int32_t metadataType)
@@ -465,7 +465,7 @@ namespace OrthancDatabases
     statement.Execute(args);
   }
 
-    
+
   void IndexBackend::DeleteResource(IDatabaseBackendOutput& output,
                                     DatabaseManager& manager,
                                     int64_t id)
@@ -1256,31 +1256,60 @@ namespace OrthancDatabases
 
     
   bool IndexBackend::LookupMetadata(std::string& target /*out*/,
+                                    int64_t& revision /*out*/,
                                     DatabaseManager& manager,
                                     int64_t id,
                                     int32_t metadataType)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT value FROM Metadata WHERE id=${id} and type=${type}");
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
-    statement.SetReadOnly(true);
-    statement.SetParameterType("id", ValueType_Integer64);
-    statement.SetParameterType("type", ValueType_Integer64);
+    switch (manager.GetDialect())
+    {
+      case Dialect_MySQL:
+      case Dialect_PostgreSQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "SELECT value FROM Metadata WHERE id=${id} and type=${type}"));
+        break;
+
+      case Dialect_SQLite:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "SELECT value, revision FROM Metadata WHERE id=${id} and type=${type}"));
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    
+    
+    statement->SetReadOnly(true);
+    statement->SetParameterType("id", ValueType_Integer64);
+    statement->SetParameterType("type", ValueType_Integer64);
 
     Dictionary args;
     args.SetIntegerValue("id", id);
     args.SetIntegerValue("type", metadataType);
 
-    statement.Execute(args);
+    statement->Execute(args);
 
-    if (statement.IsDone())
+    if (statement->IsDone())
     {
       return false;
     }
     else
     {
-      target = ReadString(statement, 0);
+      target = ReadString(*statement, 0);
+
+      if (manager.GetDialect() == Dialect_SQLite)
+      {
+        revision = ReadInteger64(*statement, 1);
+      }
+      else
+      {
+        revision = 0;  // TODO - REVISIONS
+      }
+      
       return true;
     }
   } 
@@ -1560,27 +1589,31 @@ namespace OrthancDatabases
   void IndexBackend::SetMetadata(DatabaseManager& manager,
                                  int64_t id,
                                  int32_t metadataType,
-                                 const char* value)
+                                 const char* value,
+                                 int64_t revision)
   {
     if (manager.GetDialect() == Dialect_SQLite)
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT OR REPLACE INTO Metadata VALUES (${id}, ${type}, ${value})");
+        "INSERT OR REPLACE INTO Metadata VALUES (${id}, ${type}, ${value}, ${revision})");
         
       statement.SetParameterType("id", ValueType_Integer64);
       statement.SetParameterType("type", ValueType_Integer64);
       statement.SetParameterType("value", ValueType_Utf8String);
+      statement.SetParameterType("revision", ValueType_Integer64);
         
       Dictionary args;
       args.SetIntegerValue("id", id);
       args.SetIntegerValue("type", metadataType);
       args.SetUtf8Value("value", value);
+      args.SetIntegerValue("revision", revision);
         
       statement.Execute(args);
     }
     else
     {
+      // TODO - REVISIONS
       {
         DatabaseManager::CachedStatement statement(
           STATEMENT_FROM_HERE, manager,
@@ -2048,10 +2081,16 @@ namespace OrthancDatabases
       std::string name = "m" + boost::lexical_cast<std::string>(i);
 
       args.SetUtf8Value(name, metadata[i].value);
+
+      std::string revisionSuffix;
+      if (manager.GetDialect() == Dialect_SQLite)
+      {
+        revisionSuffix = ", 0";  // TODO - REVISIONS
+      }
       
       std::string insert = ("(" + boost::lexical_cast<std::string>(metadata[i].resource) + ", " +
                             boost::lexical_cast<std::string>(metadata[i].metadata) + ", " +
-                            "${" + name + "})");
+                            "${" + name + "}" + revisionSuffix + ")");
 
       std::string remove = ("(id=" + boost::lexical_cast<std::string>(metadata[i].resource) +
                             " AND type=" + boost::lexical_cast<std::string>(metadata[i].metadata)
@@ -2121,7 +2160,7 @@ namespace OrthancDatabases
 
     ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",
                                    countMainDicomTags, mainDicomTags);
-
+    
     ExecuteSetResourcesContentMetadata(manager, countMetadata, metadata);
   }
 #endif
