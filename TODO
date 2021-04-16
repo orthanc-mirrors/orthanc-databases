@@ -22,6 +22,9 @@ Common - Storage area
   storage area to run MySQL/PostgreSQL storage in index-only mode:
   https://book.orthanc-server.com/contributing.html
 
+* Performance: Add a pool of connections to PostgreSQL/MySQL, as
+  already done in the database index plugins
+
 
 -----
 MySQL
