@@ -50,7 +50,8 @@ namespace OrthancDatabases
 #else
     Orthanc::Logging::Initialize(context);
 #endif
-    
+
+    Orthanc::Logging::EnableInfoLevel(true);
     OrthancPlugins::SetGlobalContext(context);
     ImplicitTransaction::SetErrorOnDoubleExecution(false);
 

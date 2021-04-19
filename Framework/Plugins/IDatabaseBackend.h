@@ -48,6 +48,8 @@ namespace OrthancDatabases
                         
     virtual IDatabaseBackendOutput* CreateOutput() = 0;
 
+    virtual bool HasRevisionsSupport() const = 0;
+
     virtual void AddAttachment(DatabaseManager& manager,
                                int64_t id,
                                const OrthancPluginAttachment& attachment) = 0;

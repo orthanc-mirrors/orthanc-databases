@@ -46,6 +46,11 @@ namespace OrthancDatabases
 
     virtual void ConfigureDatabase(DatabaseManager& manager) ORTHANC_OVERRIDE;
     
+    virtual bool HasRevisionsSupport() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+    
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
                                    OrthancPluginResourceType type) ORTHANC_OVERRIDE;

@@ -24,8 +24,8 @@
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
 
+#include <Logging.h>
 #include <MultiThreading/SharedMessageQueue.h>
-
 #include <OrthancException.h>
 
 #include <stdexcept>
@@ -2059,6 +2059,15 @@ namespace OrthancDatabases
           new Adapter(backend, countConnections)) != OrthancPluginErrorCode_Success)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
+    }
+
+    if (backend->HasRevisionsSupport())
+    {
+      LOG(INFO) << "The database backend *has* support for revisions of metadata and attachments";
+    }
+    else
+    {
+      LOG(WARNING) << "The database backend has *no* support for revisions of metadata and attachments";
     }
 
     backend->SetOutputFactory(new Factory);
