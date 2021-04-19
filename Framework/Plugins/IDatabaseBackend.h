@@ -52,7 +52,8 @@ namespace OrthancDatabases
 
     virtual void AddAttachment(DatabaseManager& manager,
                                int64_t id,
-                               const OrthancPluginAttachment& attachment) = 0;
+                               const OrthancPluginAttachment& attachment,
+                               int64_t revision) = 0;
 
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,
@@ -166,6 +167,7 @@ namespace OrthancDatabases
     
     /* Use GetOutput().AnswerAttachment() */
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
+                                  int64_t& revision /*out*/,
                                   DatabaseManager& manager,
                                   int64_t id,
                                   int32_t contentType) = 0;

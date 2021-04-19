@@ -362,7 +362,8 @@ namespace OrthancDatabases
     try
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
-      adapter->GetBackend().AddAttachment(accessor.GetManager(), id, *attachment);
+      adapter->GetBackend().AddAttachment(accessor.GetManager(), id, *attachment,
+                                          0 /* revision number, unused in old API */);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -962,8 +963,9 @@ namespace OrthancDatabases
 
     try
     {
-      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
-      adapter->GetBackend().LookupAttachment(*output, accessor.GetManager(), id, contentType);
+      DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
+      int64_t revision;  // not handled in this API   
+      adapter->GetBackend().LookupAttachment(*output, revision, accessor.GetManager(), id, contentType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

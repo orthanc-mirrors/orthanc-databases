@@ -352,8 +352,11 @@ namespace OrthancDatabases
   
   void IndexBackend::AddAttachment(DatabaseManager& manager,
                                    int64_t id,
-                                   const OrthancPluginAttachment& attachment)
+                                   const OrthancPluginAttachment& attachment,
+                                   int64_t revision)
   {
+    // TODO - REVISIONS
+    
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, "
@@ -1026,6 +1029,7 @@ namespace OrthancDatabases
     
   /* Use GetOutput().AnswerAttachment() */
   bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
+                                      int64_t& revision /*out*/,
                                       DatabaseManager& manager,
                                       int64_t id,
                                       int32_t contentType)
@@ -1058,6 +1062,9 @@ namespace OrthancDatabases
                               ReadInteger32(statement, 2),
                               ReadInteger64(statement, 3),
                               ReadString(statement, 5));
+
+      revision = 0;  // TODO - REVISIONS
+
       return true;
     }
   }

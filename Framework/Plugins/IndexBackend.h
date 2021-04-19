@@ -101,7 +101,8 @@ namespace OrthancDatabases
     
     virtual void AddAttachment(DatabaseManager& manager,
                                int64_t id,
-                               const OrthancPluginAttachment& attachment) ORTHANC_OVERRIDE;
+                               const OrthancPluginAttachment& attachment,
+                               int64_t revision) ORTHANC_OVERRIDE;
     
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,
@@ -205,6 +206,7 @@ namespace OrthancDatabases
                                      const OrthancPluginExportedResource& resource) ORTHANC_OVERRIDE;
     
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
+                                  int64_t& revision /*out*/,
                                   DatabaseManager& manager,
                                   int64_t id,
                                   int32_t contentType) ORTHANC_OVERRIDE;

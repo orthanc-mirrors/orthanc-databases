@@ -1118,14 +1118,15 @@ namespace OrthancDatabases
 
   static OrthancPluginErrorCode AddAttachment(OrthancPluginDatabaseTransaction* transaction,
                                               int64_t id,
-                                              const OrthancPluginAttachment* attachment)
+                                              const OrthancPluginAttachment* attachment,
+                                              int64_t revision)
   {
     DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().AddAttachment(t->GetManager(), id, *attachment);
+      t->GetBackend().AddAttachment(t->GetManager(), id, *attachment, revision);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
@@ -1669,6 +1670,7 @@ namespace OrthancDatabases
 
 
   static OrthancPluginErrorCode LookupAttachment(OrthancPluginDatabaseTransaction* transaction,
+                                                 int64_t* revision /* out */,
                                                  int64_t resourceId,
                                                  int32_t contentType)
   {
@@ -1677,7 +1679,7 @@ namespace OrthancDatabases
     try
     {
       t->GetOutput().Clear();
-      t->GetBackend().LookupAttachment(t->GetOutput(), t->GetManager(), resourceId, contentType);
+      t->GetBackend().LookupAttachment(t->GetOutput(), *revision, t->GetManager(), resourceId, contentType);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
@@ -2007,7 +2009,6 @@ namespace OrthancDatabases
     params.rollback = Rollback;
     params.commit = Commit;
 
-    params.addAttachment = AddAttachment;
     params.clearChanges = ClearChanges;
     params.clearExportedResources = ClearExportedResources;
     params.clearMainDicomTags = ClearMainDicomTags;
@@ -2028,8 +2029,8 @@ namespace OrthancDatabases
     params.getLastExportedResource = GetLastExportedResource;
     params.getMainDicomTags = GetMainDicomTags;
     params.getPublicId = GetPublicId;
-    params.getResourcesCount = GetResourcesCount;
     params.getResourceType = GetResourceType;
+    params.getResourcesCount = GetResourcesCount;
     params.getTotalCompressedSize = GetTotalCompressedSize;
     params.getTotalUncompressedSize = GetTotalUncompressedSize;
     params.isDiskSizeAbove = IsDiskSizeAbove;
@@ -2043,10 +2044,11 @@ namespace OrthancDatabases
     params.lookupMetadata = LookupMetadata;
     params.lookupParent = LookupParent;
     params.lookupResource = LookupResource;
-    params.lookupResources = LookupResources;
     params.lookupResourceAndParent = LookupResourceAndParent;
+    params.lookupResources = LookupResources;
     params.selectPatientToRecycle = SelectPatientToRecycle;
     params.selectPatientToRecycle2 = SelectPatientToRecycle2;
+    params.setAttachment = AddAttachment;
     params.setGlobalProperty = SetGlobalProperty;
     params.setMetadata = SetMetadata;
     params.setProtectedPatient = SetProtectedPatient;

@@ -354,14 +354,14 @@ TEST(IndexBackend, Basic)
   a2.compressedSize = 4242;
   a2.compressedHash = "md5_2";
     
-  db.AddAttachment(*manager, a, a1);
+  db.AddAttachment(*manager, a, a1, 42);
   db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(1u, fc.size());
   ASSERT_EQ(Orthanc::FileContentType_Dicom, fc.front());
-  db.AddAttachment(*manager, a, a2);
+  db.AddAttachment(*manager, a, a2, 43);
   db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(2u, fc.size());
-  ASSERT_FALSE(db.LookupAttachment(*output, *manager, b, Orthanc::FileContentType_Dicom));
+  ASSERT_FALSE(db.LookupAttachment(*output, revision, *manager, b, Orthanc::FileContentType_Dicom));
 
   ASSERT_EQ(4284u, db.GetTotalCompressedSize(*manager));
   ASSERT_EQ(4284u, db.GetTotalUncompressedSize(*manager));
@@ -374,7 +374,8 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressionType = Orthanc::CompressionType_None;
   expectedAttachment->compressedSize = 42;
   expectedAttachment->compressedHash = "md5_1";
-  ASSERT_TRUE(db.LookupAttachment(*output, *manager, a, Orthanc::FileContentType_Dicom));
+  ASSERT_TRUE(db.LookupAttachment(*output, revision, *manager, a, Orthanc::FileContentType_Dicom));
+  ASSERT_EQ(0, revision);  // TODO - REVISIONS
 
   expectedAttachment.reset(new OrthancPluginAttachment);
   expectedAttachment->uuid = "uuid2";
@@ -384,7 +385,9 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressionType = Orthanc::CompressionType_None;
   expectedAttachment->compressedSize = 4242;
   expectedAttachment->compressedHash = "md5_2";
-  ASSERT_TRUE(db.LookupAttachment(*output, *manager, a, Orthanc::FileContentType_DicomAsJson));
+  revision = -1;
+  ASSERT_TRUE(db.LookupAttachment(*output, revision, *manager, a, Orthanc::FileContentType_DicomAsJson));
+  ASSERT_EQ(0, revision);  // TODO - REVISIONS
 
   db.ListAvailableAttachments(fc, *manager, b);
   ASSERT_EQ(0u, fc.size());
