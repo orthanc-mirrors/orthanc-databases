@@ -1037,7 +1037,17 @@ namespace OrthancDatabases
       
       if (ExecuteLookupAttachment(statement, output, id, contentType))
       {
-        revision = statement.ReadInteger64(6);
+        if (statement.GetResultField(6).GetType() == ValueType_Null)
+        {
+          // "NULL" can happen with a database created by PostgreSQL
+          // plugin <= 3.3 (because of "ALTER TABLE AttachedFiles")
+          revision = 0;
+        }
+        else
+        {
+          revision = statement.ReadInteger64(6);
+        }
+        
         return true;
       }
       else
@@ -1259,25 +1269,18 @@ namespace OrthancDatabases
   {
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
-    switch (manager.GetDialect())
+    if (HasRevisionsSupport())
     {
-      case Dialect_MySQL:
-      case Dialect_PostgreSQL:
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "SELECT value FROM Metadata WHERE id=${id} and type=${type}"));
-        break;
-
-      case Dialect_SQLite:
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "SELECT value, revision FROM Metadata WHERE id=${id} and type=${type}"));
-        break;
-
-      default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT value, revision FROM Metadata WHERE id=${id} and type=${type}"));
     }
-    
+    else
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT value FROM Metadata WHERE id=${id} and type=${type}"));
+    }    
     
     statement->SetReadOnly(true);
     statement->SetParameterType("id", ValueType_Integer64);
@@ -1297,13 +1300,22 @@ namespace OrthancDatabases
     {
       target = statement->ReadString(0);
 
-      if (manager.GetDialect() == Dialect_SQLite)
+      if (HasRevisionsSupport())
       {
-        revision = statement->ReadInteger64(1);
+        if (statement->GetResultField(1).GetType() == ValueType_Null)
+        {
+          // "NULL" can happen with a database created by PostgreSQL
+          // plugin <= 3.3 (because of "ALTER TABLE AttachedFiles")
+          revision = 0;
+        }
+        else
+        {
+          revision = statement->ReadInteger64(1);
+        }
       }
       else
       {
-        revision = 0;  // TODO - REVISIONS
+        revision = 0;  // No support for revisions
       }
       
       return true;
@@ -1581,6 +1593,23 @@ namespace OrthancDatabases
     ExecuteSetTag(statement, id, group, element, value);
   } 
 
+
+  static void ExecuteSetMetadata(DatabaseManager::CachedStatement& statement,
+                                 Dictionary& args,
+                                 int64_t id,
+                                 int32_t metadataType,
+                                 const char* value)
+  {
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("type", ValueType_Integer64);
+    statement.SetParameterType("value", ValueType_Utf8String);
+
+    args.SetIntegerValue("id", id);
+    args.SetIntegerValue("type", metadataType);
+    args.SetUtf8Value("value", value);
+
+    statement.Execute(args);
+  }
     
   void IndexBackend::SetMetadata(DatabaseManager& manager,
                                  int64_t id,
@@ -1590,26 +1619,19 @@ namespace OrthancDatabases
   {
     if (manager.GetDialect() == Dialect_SQLite)
     {
+      assert(HasRevisionsSupport());
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "INSERT OR REPLACE INTO Metadata VALUES (${id}, ${type}, ${value}, ${revision})");
         
-      statement.SetParameterType("id", ValueType_Integer64);
-      statement.SetParameterType("type", ValueType_Integer64);
-      statement.SetParameterType("value", ValueType_Utf8String);
-      statement.SetParameterType("revision", ValueType_Integer64);
-        
       Dictionary args;
-      args.SetIntegerValue("id", id);
-      args.SetIntegerValue("type", metadataType);
-      args.SetUtf8Value("value", value);
+      statement.SetParameterType("revision", ValueType_Integer64);
       args.SetIntegerValue("revision", revision);
-        
-      statement.Execute(args);
+
+      ExecuteSetMetadata(statement, args, id, metadataType, value);
     }
     else
     {
-      // TODO - REVISIONS
       {
         DatabaseManager::CachedStatement statement(
           STATEMENT_FROM_HERE, manager,
@@ -1625,21 +1647,26 @@ namespace OrthancDatabases
         statement.Execute(args);
       }
 
+      if (HasRevisionsSupport())
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT INTO Metadata VALUES (${id}, ${type}, ${value}, ${revision})");
+        
+        Dictionary args;
+        statement.SetParameterType("revision", ValueType_Integer64);
+        args.SetIntegerValue("revision", revision);
+        
+        ExecuteSetMetadata(statement, args, id, metadataType, value);
+      }
+      else
       {
         DatabaseManager::CachedStatement statement(
           STATEMENT_FROM_HERE, manager,
           "INSERT INTO Metadata VALUES (${id}, ${type}, ${value})");
         
-        statement.SetParameterType("id", ValueType_Integer64);
-        statement.SetParameterType("type", ValueType_Integer64);
-        statement.SetParameterType("value", ValueType_Utf8String);
-        
         Dictionary args;
-        args.SetIntegerValue("id", id);
-        args.SetIntegerValue("type", metadataType);
-        args.SetUtf8Value("value", value);
-        
-        statement.Execute(args);
+        ExecuteSetMetadata(statement, args, id, metadataType, value);
       }
     }
   }
@@ -2065,6 +2092,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   static void ExecuteSetResourcesContentMetadata(
     DatabaseManager& manager,
+    bool hasRevisionsSupport,
     uint32_t count,
     const OrthancPluginResourcesContentMetadata* metadata)
   {
@@ -2079,9 +2107,9 @@ namespace OrthancDatabases
       args.SetUtf8Value(name, metadata[i].value);
 
       std::string revisionSuffix;
-      if (manager.GetDialect() == Dialect_SQLite)
+      if (hasRevisionsSupport)
       {
-        revisionSuffix = ", 0";  // TODO - REVISIONS
+        revisionSuffix = ", 0";
       }
       
       std::string insert = ("(" + boost::lexical_cast<std::string>(metadata[i].resource) + ", " +
@@ -2157,7 +2185,7 @@ namespace OrthancDatabases
     ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",
                                    countMainDicomTags, mainDicomTags);
     
-    ExecuteSetResourcesContentMetadata(manager, countMetadata, metadata);
+    ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);
   }
 #endif
 

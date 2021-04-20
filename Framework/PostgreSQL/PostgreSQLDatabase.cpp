@@ -30,6 +30,7 @@
 
 #include <Logging.h>
 #include <OrthancException.h>
+#include <Toolbox.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
@@ -184,10 +185,10 @@ namespace OrthancDatabases
   }
 
 
-  bool PostgreSQLDatabase::DoesTableExist(const char* name)
+  bool PostgreSQLDatabase::DoesTableExist(const std::string& name)
   {
-    std::string lower(name);
-    std::transform(lower.begin(), lower.end(), lower.begin(), tolower);
+    std::string lower;
+    Orthanc::Toolbox::ToLowerCase(lower, name);
 
     // http://stackoverflow.com/a/24089729/881731
 
@@ -200,6 +201,30 @@ namespace OrthancDatabases
     statement.DeclareInputString(0);
     statement.BindString(0, lower);
 
+    PostgreSQLResult result(statement);
+    return !result.IsDone();
+  }
+
+
+  bool PostgreSQLDatabase::DoesColumnExist(const std::string& tableName,
+                                           const std::string& columnName)
+  {
+    std::string lowerTable, lowerColumn;
+    Orthanc::Toolbox::ToLowerCase(lowerTable, tableName);
+    Orthanc::Toolbox::ToLowerCase(lowerColumn, columnName);
+
+    PostgreSQLStatement statement(*this,
+                                  "SELECT 1 FROM information_schema.columns "
+                                  "WHERE table_schema=$1 AND table_name=$2 AND column_name=$3");
+ 
+    statement.DeclareInputString(0);
+    statement.DeclareInputString(1);
+    statement.DeclareInputString(2);
+    
+    statement.BindString(0, "public" /* schema */);
+    statement.BindString(1, lowerTable);
+    statement.BindString(2, lowerColumn);
+    
     PostgreSQLResult result(statement);
     return !result.IsDone();
   }

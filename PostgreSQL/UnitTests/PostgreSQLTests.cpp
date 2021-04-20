@@ -86,9 +86,18 @@ TEST(PostgreSQL, Basic)
   std::unique_ptr<PostgreSQLDatabase> pg(CreateTestDatabase());
 
   ASSERT_FALSE(pg->DoesTableExist("Test"));
+  ASSERT_FALSE(pg->DoesColumnExist("Test", "value"));
+  ASSERT_FALSE(pg->DoesTableExist("TEST"));
+  ASSERT_FALSE(pg->DoesTableExist("test"));
   pg->ExecuteMultiLines("CREATE TABLE Test(name INTEGER, value BIGINT)");
   ASSERT_TRUE(pg->DoesTableExist("Test"));
+  ASSERT_TRUE(pg->DoesTableExist("TEST"));
+  ASSERT_TRUE(pg->DoesTableExist("test"));
 
+  ASSERT_TRUE(pg->DoesColumnExist("Test", "Value"));
+  ASSERT_TRUE(pg->DoesColumnExist("TEST", "VALUE"));
+  ASSERT_TRUE(pg->DoesColumnExist("test", "value"));
+  
   PostgreSQLStatement s(*pg, "INSERT INTO Test VALUES ($1,$2)");
   s.DeclareInputInteger(0);
   s.DeclareInputInteger64(1);

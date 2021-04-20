@@ -33,6 +33,17 @@
 #include <list>
 
 
+#if ORTHANC_ENABLE_POSTGRESQL == 1
+#  define HAS_REVISIONS 1
+#elif ORTHANC_ENABLE_MYSQL == 1
+#  define HAS_REVISIONS 0
+#elif ORTHANC_ENABLE_SQLITE == 1
+#  define HAS_REVISIONS 1
+#else
+#  error Unknown database backend
+#endif
+
+
 namespace Orthanc
 {
   /**
@@ -277,8 +288,8 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update2", s);
 
-#if ORTHANC_ENABLE_SQLITE == 1
-  ASSERT_EQ(43, revision);  // Only SQLite implements revisions so far
+#if HAS_REVISIONS == 1
+  ASSERT_EQ(43, revision);
 #else
   ASSERT_EQ(0, revision);
 #endif
@@ -287,8 +298,8 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update", s);
 
-#if ORTHANC_ENABLE_SQLITE == 1
-  ASSERT_EQ(44, revision);  // Only SQLite implements revisions so far
+#if HAS_REVISIONS == 1
+  ASSERT_EQ(44, revision);
 #else
   ASSERT_EQ(0, revision);
 #endif
@@ -302,8 +313,8 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.LookupMetadata(mdd, revision, *manager, a, Orthanc::MetadataType_ModifiedFrom));
   ASSERT_EQ("modified", mdd);
 
-#if ORTHANC_ENABLE_SQLITE == 1
-  ASSERT_EQ(42, revision);  // Only SQLite implements revisions so far
+#if HAS_REVISIONS == 1
+  ASSERT_EQ(42, revision);
 #else
   ASSERT_EQ(0, revision);
 #endif
@@ -311,8 +322,8 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.LookupMetadata(mdd, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
   ASSERT_EQ("update", mdd);
 
-#if ORTHANC_ENABLE_SQLITE == 1
-  ASSERT_EQ(44, revision);  // Only SQLite implements revisions so far
+#if HAS_REVISIONS == 1
+  ASSERT_EQ(44, revision);
 #else
   ASSERT_EQ(0, revision);
 #endif
@@ -376,8 +387,8 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressedHash = "md5_1";
   ASSERT_TRUE(db.LookupAttachment(*output, revision, *manager, a, Orthanc::FileContentType_Dicom));
 
-#if ORTHANC_ENABLE_SQLITE == 1
-  ASSERT_EQ(42, revision);  // Only SQLite implements revisions so far
+#if HAS_REVISIONS == 1
+  ASSERT_EQ(42, revision);
 #else
   ASSERT_EQ(0, revision);
 #endif
@@ -393,8 +404,8 @@ TEST(IndexBackend, Basic)
   revision = -1;
   ASSERT_TRUE(db.LookupAttachment(*output, revision, *manager, a, Orthanc::FileContentType_DicomAsJson));
 
-#if ORTHANC_ENABLE_SQLITE == 1
-  ASSERT_EQ(43, revision);  // Only SQLite implements revisions so far
+#if HAS_REVISIONS == 1
+  ASSERT_EQ(43, revision);
 #else
   ASSERT_EQ(0, revision);
 #endif

@@ -276,6 +276,24 @@ namespace OrthancDatabases
                                                        "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
         }
 
+        /**
+         * PostgreSQL 9.5: "Adding a column with a default requires
+         * updating each row of the table (to store the new column
+         * value). However, if no default is specified, PostgreSQL is
+         * able to avoid the physical update." => We set no default
+         * for performance (older entries will be NULL)
+         * https://www.postgresql.org/docs/9.5/ddl-alter.html
+         **/
+        if (!db.DoesColumnExist("Metadata", "revision"))
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Metadata ADD COLUMN revision INTEGER");
+        }
+
+        if (!db.DoesColumnExist("AttachedFiles", "revision"))
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN revision INTEGER");
+        }
+
         t.Commit();
       }
     }

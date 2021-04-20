@@ -66,7 +66,10 @@ namespace OrthancDatabases
 
     void ExecuteMultiLines(const std::string& sql);
 
-    bool DoesTableExist(const char* name);
+    bool DoesTableExist(const std::string& name);
+
+    bool DoesColumnExist(const std::string& tableName,
+                         const std::string& columnName);
 
     void ClearAll();   // Only for unit tests!
 
