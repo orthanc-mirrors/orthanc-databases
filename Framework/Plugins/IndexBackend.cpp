@@ -58,8 +58,8 @@ namespace OrthancDatabases
   }
 
   
-  int64_t IndexBackend::ReadInteger64(const DatabaseManager::StatementBase& statement,
-                                      size_t field)
+  static int64_t ReadInteger64(const DatabaseManager::StatementBase& statement,
+                               size_t field)
   {
     if (statement.IsDone())
     {
@@ -80,8 +80,8 @@ namespace OrthancDatabases
   }
 
 
-  int32_t IndexBackend::ReadInteger32(const DatabaseManager::StatementBase& statement,
-                                      size_t field)
+  static int32_t ReadInteger32(const DatabaseManager::StatementBase& statement,
+                               size_t field)
   {
     if (statement.IsDone())
     {
@@ -102,8 +102,8 @@ namespace OrthancDatabases
   }
 
     
-  std::string IndexBackend::ReadString(const DatabaseManager::StatementBase& statement,
-                                       size_t field)
+  static std::string ReadString(const DatabaseManager::StatementBase& statement,
+                                size_t field)
   {
     const IValue& value = statement.GetResultField(field);
 
@@ -123,9 +123,9 @@ namespace OrthancDatabases
 
     
   template <typename T>
-  void IndexBackend::ReadListOfIntegers(std::list<T>& target,
-                                        DatabaseManager::CachedStatement& statement,
-                                        const Dictionary& args)
+  static void ReadListOfIntegers(std::list<T>& target,
+                                 DatabaseManager::CachedStatement& statement,
+                                 const Dictionary& args)
   {
     statement.Execute(args);
       
@@ -149,9 +149,9 @@ namespace OrthancDatabases
   }
 
     
-  void IndexBackend::ReadListOfStrings(std::list<std::string>& target,
-                                       DatabaseManager::CachedStatement& statement,
-                                       const Dictionary& args)
+  static void ReadListOfStrings(std::list<std::string>& target,
+                                DatabaseManager::CachedStatement& statement,
+                                const Dictionary& args)
   {
     statement.Execute(args);
 
@@ -349,19 +349,12 @@ namespace OrthancDatabases
     }
   }
 
-  
-  void IndexBackend::AddAttachment(DatabaseManager& manager,
-                                   int64_t id,
-                                   const OrthancPluginAttachment& attachment,
-                                   int64_t revision)
-  {
-    // TODO - REVISIONS
-    
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, "
-      "${compressed}, ${uncompressed}, ${compression}, ${hash}, ${hash-compressed})");
 
+  static void ExecuteAddAttachment(DatabaseManager::CachedStatement& statement,
+                                   Dictionary& args,
+                                   int64_t id,
+                                   const OrthancPluginAttachment& attachment)
+  {
     statement.SetParameterType("id", ValueType_Integer64);
     statement.SetParameterType("type", ValueType_Integer64);
     statement.SetParameterType("uuid", ValueType_Utf8String);
@@ -371,7 +364,6 @@ namespace OrthancDatabases
     statement.SetParameterType("hash", ValueType_Utf8String);
     statement.SetParameterType("hash-compressed", ValueType_Utf8String);
 
-    Dictionary args;
     args.SetIntegerValue("id", id);
     args.SetIntegerValue("type", attachment.contentType);
     args.SetUtf8Value("uuid", attachment.uuid);
@@ -380,8 +372,40 @@ namespace OrthancDatabases
     args.SetIntegerValue("compression", attachment.compressionType);
     args.SetUtf8Value("hash", attachment.uncompressedHash);
     args.SetUtf8Value("hash-compressed", attachment.compressedHash);
-    
+
     statement.Execute(args);
+  }
+
+  
+  void IndexBackend::AddAttachment(DatabaseManager& manager,
+                                   int64_t id,
+                                   const OrthancPluginAttachment& attachment,
+                                   int64_t revision)
+  {
+    if (HasRevisionsSupport())
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
+        "${uncompressed}, ${compression}, ${hash}, ${hash-compressed}, ${revision})");
+
+      Dictionary args;
+
+      statement.SetParameterType("revision", ValueType_Integer64);
+      args.SetIntegerValue("revision", revision);
+      
+      ExecuteAddAttachment(statement, args, id, attachment);
+    }
+    else
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
+        "${uncompressed}, ${compression}, ${hash}, ${hash-compressed})");
+
+      Dictionary args;
+      ExecuteAddAttachment(statement, args, id, attachment);
+    }
   }
 
     
@@ -1026,19 +1050,12 @@ namespace OrthancDatabases
     statement.Execute(args);
   }
 
-    
-  /* Use GetOutput().AnswerAttachment() */
-  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
-                                      int64_t& revision /*out*/,
-                                      DatabaseManager& manager,
+
+  static bool ExecuteLookupAttachment(DatabaseManager::CachedStatement& statement,
+                                      IDatabaseBackendOutput& output,
                                       int64_t id,
                                       int32_t contentType)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT uuid, uncompressedSize, compressionType, compressedSize, "
-      "uncompressedHash, compressedHash FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
-
     statement.SetReadOnly(true);
     statement.SetParameterType("id", ValueType_Integer64);
     statement.SetParameterType("type", ValueType_Integer64);
@@ -1062,10 +1079,46 @@ namespace OrthancDatabases
                               ReadInteger32(statement, 2),
                               ReadInteger64(statement, 3),
                               ReadString(statement, 5));
-
-      revision = 0;  // TODO - REVISIONS
-
       return true;
+    }
+  }
+                                      
+  
+    
+  /* Use GetOutput().AnswerAttachment() */
+  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
+                                      int64_t& revision /*out*/,
+                                      DatabaseManager& manager,
+                                      int64_t id,
+                                      int32_t contentType)
+  {
+    if (HasRevisionsSupport())
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
+        "compressedHash, revision FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
+      
+      if (ExecuteLookupAttachment(statement, output, id, contentType))
+      {
+        revision = ReadInteger64(statement, 6);
+        return true;
+      }
+      else
+      {
+        return false;
+      }
+    }
+    else
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
+        "compressedHash FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
+      
+      revision = 0;
+
+      return ExecuteLookupAttachment(statement, output, id, contentType);
     }
   }
 

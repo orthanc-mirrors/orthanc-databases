@@ -43,6 +43,7 @@ CREATE TABLE AttachedFiles(
        compressionType INTEGER,
        uncompressedHash TEXT,
        compressedHash TEXT,
+       revision INTEGER,
        PRIMARY KEY(id, fileType)
        );              
 

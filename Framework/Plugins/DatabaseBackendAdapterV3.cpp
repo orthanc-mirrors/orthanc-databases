@@ -2009,6 +2009,7 @@ namespace OrthancDatabases
     params.rollback = Rollback;
     params.commit = Commit;
 
+    params.addAttachment = AddAttachment;
     params.clearChanges = ClearChanges;
     params.clearExportedResources = ClearExportedResources;
     params.clearMainDicomTags = ClearMainDicomTags;
@@ -2048,7 +2049,6 @@ namespace OrthancDatabases
     params.lookupResources = LookupResources;
     params.selectPatientToRecycle = SelectPatientToRecycle;
     params.selectPatientToRecycle2 = SelectPatientToRecycle2;
-    params.setAttachment = AddAttachment;
     params.setGlobalProperty = SetGlobalProperty;
     params.setMetadata = SetMetadata;
     params.setProtectedPatient = SetProtectedPatient;

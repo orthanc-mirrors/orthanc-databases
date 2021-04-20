@@ -45,24 +45,6 @@ namespace OrthancDatabases
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
-    static int64_t ReadInteger64(const DatabaseManager::StatementBase& statement,
-                                 size_t field);
-
-    static int32_t ReadInteger32(const DatabaseManager::StatementBase& statement,
-                                 size_t field);
-    
-    static std::string ReadString(const DatabaseManager::StatementBase& statement,
-                                  size_t field);
-    
-    template <typename T>
-    static void ReadListOfIntegers(std::list<T>& target,
-                                   DatabaseManager::CachedStatement& statement,
-                                   const Dictionary& args);
-    
-    static void ReadListOfStrings(std::list<std::string>& target,
-                                  DatabaseManager::CachedStatement& statement,
-                                  const Dictionary& args);
-
     void ClearDeletedFiles(DatabaseManager& manager);
 
     void ClearDeletedResources(DatabaseManager& manager);

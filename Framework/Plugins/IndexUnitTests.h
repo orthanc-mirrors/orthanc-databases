@@ -375,7 +375,12 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressedSize = 42;
   expectedAttachment->compressedHash = "md5_1";
   ASSERT_TRUE(db.LookupAttachment(*output, revision, *manager, a, Orthanc::FileContentType_Dicom));
-  ASSERT_EQ(0, revision);  // TODO - REVISIONS
+
+#if ORTHANC_ENABLE_SQLITE == 1
+  ASSERT_EQ(42, revision);  // Only SQLite implements revisions so far
+#else
+  ASSERT_EQ(0, revision);
+#endif
 
   expectedAttachment.reset(new OrthancPluginAttachment);
   expectedAttachment->uuid = "uuid2";
@@ -387,7 +392,12 @@ TEST(IndexBackend, Basic)
   expectedAttachment->compressedHash = "md5_2";
   revision = -1;
   ASSERT_TRUE(db.LookupAttachment(*output, revision, *manager, a, Orthanc::FileContentType_DicomAsJson));
-  ASSERT_EQ(0, revision);  // TODO - REVISIONS
+
+#if ORTHANC_ENABLE_SQLITE == 1
+  ASSERT_EQ(43, revision);  // Only SQLite implements revisions so far
+#else
+  ASSERT_EQ(0, revision);
+#endif
 
   db.ListAvailableAttachments(fc, *manager, b);
   ASSERT_EQ(0u, fc.size());
