@@ -1041,6 +1041,21 @@ namespace OrthancDatabases
   }
 
 
+  static OrthancPluginErrorCode HasRevisionsSupport(void* database,
+                                                    uint8_t* target)
+  {
+    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+      
+    try
+    {
+      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      *target = (accessor.GetBackend().HasRevisionsSupport() ? 1 : 0);
+      return OrthancPluginErrorCode_Success;
+    }
+    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+  }
+
+
   static OrthancPluginErrorCode StartTransaction(void* database,
                                                  OrthancPluginDatabaseTransaction** target /* out */,
                                                  OrthancPluginDatabaseTransactionType type)
@@ -2004,6 +2019,7 @@ namespace OrthancDatabases
     params.destructDatabase = DestructDatabase;
     params.getDatabaseVersion = GetDatabaseVersion;
     params.upgradeDatabase = UpgradeDatabase;
+    params.hasRevisionsSupport = HasRevisionsSupport;
     params.startTransaction = StartTransaction;
     params.destructTransaction = DestructTransaction;
     params.rollback = Rollback;
@@ -2061,15 +2077,6 @@ namespace OrthancDatabases
           new Adapter(backend, countConnections)) != OrthancPluginErrorCode_Success)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
-    }
-
-    if (backend->HasRevisionsSupport())
-    {
-      LOG(INFO) << "The database backend *has* support for revisions of metadata and attachments";
-    }
-    else
-    {
-      LOG(WARNING) << "The database backend has *no* support for revisions of metadata and attachments";
     }
 
     backend->SetOutputFactory(new Factory);
