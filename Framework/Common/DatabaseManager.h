@@ -179,6 +179,12 @@ namespace OrthancDatabases
                               ValueType type);
       
       const IValue& GetResultField(size_t index) const;
+
+      int32_t ReadInteger32(size_t field) const;
+
+      int64_t ReadInteger64(size_t field) const;
+
+      std::string ReadString(size_t field) const;
     };
 
 

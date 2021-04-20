@@ -58,70 +58,6 @@ namespace OrthancDatabases
   }
 
   
-  static int64_t ReadInteger64(const DatabaseManager::StatementBase& statement,
-                               size_t field)
-  {
-    if (statement.IsDone())
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-    }
-
-    const IValue& value = statement.GetResultField(field);
-      
-    switch (value.GetType())
-    {
-      case ValueType_Integer64:
-        return dynamic_cast<const Integer64Value&>(value).GetValue();
-
-      default:
-        //LOG(ERROR) << value.Format();
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-    }
-  }
-
-
-  static int32_t ReadInteger32(const DatabaseManager::StatementBase& statement,
-                               size_t field)
-  {
-    if (statement.IsDone())
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-    }
-
-    int64_t value = ReadInteger64(statement, field);
-
-    if (value != static_cast<int64_t>(static_cast<int32_t>(value)))
-    {
-      LOG(ERROR) << "Integer overflow";
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-    }
-    else
-    {
-      return static_cast<int32_t>(value);
-    }
-  }
-
-    
-  static std::string ReadString(const DatabaseManager::StatementBase& statement,
-                                size_t field)
-  {
-    const IValue& value = statement.GetResultField(field);
-
-    switch (value.GetType())
-    {
-      case ValueType_BinaryString:
-        return dynamic_cast<const BinaryStringValue&>(value).GetContent();
-
-      case ValueType_Utf8String:
-        return dynamic_cast<const Utf8StringValue&>(value).GetContent();
-
-      default:
-        //LOG(ERROR) << value.Format();
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-    }
-  }
-
-    
   template <typename T>
   static void ReadListOfIntegers(std::list<T>& target,
                                  DatabaseManager::CachedStatement& statement,
@@ -142,7 +78,7 @@ namespace OrthancDatabases
 
       while (!statement.IsDone())
       {
-        target.push_back(static_cast<T>(ReadInteger64(statement, 0)));
+        target.push_back(static_cast<T>(statement.ReadInteger64(0)));
         statement.Next();
       }
     }
@@ -166,7 +102,7 @@ namespace OrthancDatabases
       
       while (!statement.IsDone())
       {
-        target.push_back(ReadString(statement, 0));
+        target.push_back(statement.ReadString(0));
         statement.Next();
       }
     }
@@ -188,11 +124,11 @@ namespace OrthancDatabases
            !statement.IsDone())
     {
       output.AnswerChange(
-        ReadInteger64(statement, 0),
-        ReadInteger32(statement, 1),
-        static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 3)),
-        GetPublicId(manager, ReadInteger64(statement, 2)),
-        ReadString(statement, 4));
+        statement.ReadInteger64(0),
+        statement.ReadInteger32(1),
+        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(3)),
+        GetPublicId(manager, statement.ReadInteger64(2)),
+        statement.ReadString(4));
 
       statement.Next();
       count++;
@@ -216,20 +152,20 @@ namespace OrthancDatabases
     while (count < maxResults &&
            !statement.IsDone())
     {
-      int64_t seq = ReadInteger64(statement, 0);
+      int64_t seq = statement.ReadInteger64(0);
       OrthancPluginResourceType resourceType =
-        static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
-      std::string publicId = ReadString(statement, 2);
+        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(1));
+      std::string publicId = statement.ReadString(2);
 
       output.AnswerExportedResource(seq, 
                                     resourceType,
                                     publicId,
-                                    ReadString(statement, 3),  // modality
-                                    ReadString(statement, 8),  // date
-                                    ReadString(statement, 4),  // patient ID
-                                    ReadString(statement, 5),  // study instance UID
-                                    ReadString(statement, 6),  // series instance UID
-                                    ReadString(statement, 7)); // sop instance UID
+                                    statement.ReadString(3),  // modality
+                                    statement.ReadString(8),  // date
+                                    statement.ReadString(4),  // patient ID
+                                    statement.ReadString(5),  // study instance UID
+                                    statement.ReadString(6),  // series instance UID
+                                    statement.ReadString(7)); // sop instance UID
       
       statement.Next();
       count++;
@@ -272,16 +208,16 @@ namespace OrthancDatabases
 
     while (!statement.IsDone())
     {
-      std::string a = ReadString(statement, 0);
-      std::string b = ReadString(statement, 5);
-      std::string c = ReadString(statement, 6);
+      std::string a = statement.ReadString(0);
+      std::string b = statement.ReadString(5);
+      std::string c = statement.ReadString(6);
 
       output.SignalDeletedAttachment(a.c_str(),
-                                     ReadInteger32(statement, 1),
-                                     ReadInteger64(statement, 3),
+                                     statement.ReadInteger32(1),
+                                     statement.ReadInteger64(3),
                                      b.c_str(),
-                                     ReadInteger32(statement, 4),
-                                     ReadInteger64(statement, 2),
+                                     statement.ReadInteger32(4),
+                                     statement.ReadInteger64(2),
                                      c.c_str());
       
       statement.Next();
@@ -302,8 +238,8 @@ namespace OrthancDatabases
     while (!statement.IsDone())
     {
       output.SignalDeletedResource(
-        ReadString(statement, 1),
-        static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 0)));
+        statement.ReadString(1),
+        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0)));
 
       statement.Next();
     }
@@ -534,8 +470,8 @@ namespace OrthancDatabases
       if (!statement.IsDone())
       {
         output.SignalRemainingAncestor(
-          ReadString(statement, 1),
-          static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 0)));
+          statement.ReadString(1),
+          static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0)));
           
         // There is at most 1 remaining ancestor
         assert((statement.Next(), statement.IsDone()));
@@ -746,9 +682,9 @@ namespace OrthancDatabases
 
     while (!statement.IsDone())
     {
-      output.AnswerDicomTag(static_cast<uint16_t>(ReadInteger64(statement, 1)),
-                            static_cast<uint16_t>(ReadInteger64(statement, 2)),
-                            ReadString(statement, 3));
+      output.AnswerDicomTag(static_cast<uint16_t>(statement.ReadInteger64(1)),
+                            static_cast<uint16_t>(statement.ReadInteger64(2)),
+                            statement.ReadString(3));
       statement.Next();
     }
   }
@@ -775,7 +711,7 @@ namespace OrthancDatabases
     }
     else
     {
-      return ReadString(statement, 0);
+      return statement.ReadString(0);
     }
   }
 
@@ -817,7 +753,7 @@ namespace OrthancDatabases
 
     statement->Execute(args);
 
-    return static_cast<uint64_t>(ReadInteger64(*statement, 0));
+    return static_cast<uint64_t>(statement->ReadInteger64(0));
   }
 
     
@@ -842,7 +778,7 @@ namespace OrthancDatabases
     }
     else
     {
-      return static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 0));
+      return static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0));
     }
   }
 
@@ -880,7 +816,7 @@ namespace OrthancDatabases
     statement->SetReadOnly(true);
     statement->Execute();
 
-    return static_cast<uint64_t>(ReadInteger64(*statement, 0));
+    return static_cast<uint64_t>(statement->ReadInteger64(0));
   }
 
     
@@ -917,7 +853,7 @@ namespace OrthancDatabases
     statement->SetReadOnly(true);
     statement->Execute();
 
-    return static_cast<uint64_t>(ReadInteger64(*statement, 0));
+    return static_cast<uint64_t>(statement->ReadInteger64(0));
   }
 
     
@@ -1072,13 +1008,13 @@ namespace OrthancDatabases
     }
     else
     {
-      output.AnswerAttachment(ReadString(statement, 0),
+      output.AnswerAttachment(statement.ReadString(0),
                               contentType,
-                              ReadInteger64(statement, 1),
-                              ReadString(statement, 4),
-                              ReadInteger32(statement, 2),
-                              ReadInteger64(statement, 3),
-                              ReadString(statement, 5));
+                              statement.ReadInteger64(1),
+                              statement.ReadString(4),
+                              statement.ReadInteger32(2),
+                              statement.ReadInteger64(3),
+                              statement.ReadString(5));
       return true;
     }
   }
@@ -1101,7 +1037,7 @@ namespace OrthancDatabases
       
       if (ExecuteLookupAttachment(statement, output, id, contentType))
       {
-        revision = ReadInteger64(statement, 6);
+        revision = statement.ReadInteger64(6);
         return true;
       }
       else
@@ -1270,7 +1206,7 @@ namespace OrthancDatabases
     target.clear();
     while (!statement->IsDone())
     {
-      target.push_back(ReadInteger64(*statement, 0));
+      target.push_back(statement->ReadInteger64(0));
       statement->Next();
     }
   }
@@ -1309,7 +1245,7 @@ namespace OrthancDatabases
     target.clear();
     while (!statement.IsDone())
     {
-      target.push_back(ReadInteger64(statement, 0));
+      target.push_back(statement.ReadInteger64(0));
       statement.Next();
     }
   }
@@ -1359,11 +1295,11 @@ namespace OrthancDatabases
     }
     else
     {
-      target = ReadString(*statement, 0);
+      target = statement->ReadString(0);
 
       if (manager.GetDialect() == Dialect_SQLite)
       {
-        revision = ReadInteger64(*statement, 1);
+        revision = statement->ReadInteger64(1);
       }
       else
       {
@@ -1398,7 +1334,7 @@ namespace OrthancDatabases
     }
     else
     {
-      parentId = ReadInteger64(statement, 0);
+      parentId = statement.ReadInteger64(0);
       return true;
     }
   }
@@ -1427,8 +1363,8 @@ namespace OrthancDatabases
     }
     else
     {
-      id = ReadInteger64(statement, 0);
-      type = static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
+      id = statement.ReadInteger64(0);
+      type = static_cast<OrthancPluginResourceType>(statement.ReadInteger32(1));
       return true;
     }
   }
@@ -1450,7 +1386,7 @@ namespace OrthancDatabases
     }
     else
     {
-      internalId = ReadInteger64(statement, 0);
+      internalId = statement.ReadInteger64(0);
       return true;
     }
   }
@@ -1479,7 +1415,7 @@ namespace OrthancDatabases
     }
     else
     {
-      internalId = ReadInteger64(statement, 0);
+      internalId = statement.ReadInteger64(0);
       return true;
     }
   }
@@ -1848,7 +1784,7 @@ namespace OrthancDatabases
     statement->SetReadOnly(true);
     statement->Execute();
 
-    return static_cast<uint64_t>(ReadInteger64(*statement, 0));
+    return static_cast<uint64_t>(statement->ReadInteger64(0));
   }    
 
 
@@ -1884,7 +1820,7 @@ namespace OrthancDatabases
     statement->SetReadOnly(true);
     statement->Execute();
 
-    return static_cast<uint64_t>(ReadInteger64(*statement, 0));
+    return static_cast<uint64_t>(statement->ReadInteger64(0));
   }    
 
 
@@ -1912,7 +1848,7 @@ namespace OrthancDatabases
     }
     else
     {
-      target = ReadString(statement, 0);
+      target = statement.ReadString(0);
       return true;
     }
   }
@@ -2065,11 +2001,11 @@ namespace OrthancDatabases
     {
       if (requestSomeInstance)
       {
-        output.AnswerMatchingResource(ReadString(statement, 0), ReadString(statement, 1));
+        output.AnswerMatchingResource(statement.ReadString(0), statement.ReadString(1));
       }
       else
       {
-        output.AnswerMatchingResource(ReadString(statement, 0));
+        output.AnswerMatchingResource(statement.ReadString(0));
       }
 
       statement.Next();
@@ -2275,7 +2211,7 @@ namespace OrthancDatabases
         return;
       }
 
-      seq = ReadInteger64(statement, 0);
+      seq = statement.ReadInteger64(0);
 
       statement.Next();
 
@@ -2356,8 +2292,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     statement.SetResultFieldType(1, ValueType_Integer64);      
     statement.SetResultFieldType(2, ValueType_Utf8String);
 
-    id = ReadInteger64(statement, 0);
-    type = static_cast<OrthancPluginResourceType>(ReadInteger32(statement, 1));
+    id = statement.ReadInteger64(0);
+    type = static_cast<OrthancPluginResourceType>(statement.ReadInteger32(1));
 
     const IValue& value = statement.GetResultField(2);
       
@@ -2416,7 +2352,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       while (!statement.IsDone())
       {
-        result[ReadInteger32(statement, 0)] = ReadString(statement, 1);
+        result[statement.ReadInteger32(0)] = statement.ReadString(1);
         statement.Next();
       }
     }

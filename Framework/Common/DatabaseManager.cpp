@@ -21,6 +21,9 @@
 
 #include "DatabaseManager.h"
 
+#include "Integer64Value.h"
+#include "BinaryStringValue.h"
+#include "Utf8StringValue.h"
 #include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -481,7 +484,72 @@ namespace OrthancDatabases
       manager_.CloseIfUnavailable(e.GetErrorCode());
       throw;
     }
-  }  
+  }
+
+
+  int64_t DatabaseManager::StatementBase::ReadInteger64(size_t field) const
+  {
+    if (IsDone())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+    else
+    {
+      const IValue& value = GetResultField(field);
+      
+      switch (value.GetType())
+      {
+        case ValueType_Integer64:
+          return dynamic_cast<const Integer64Value&>(value).GetValue();
+
+        default:
+          //LOG(ERROR) << value.Format();
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+    }
+  }
+
+
+  int32_t DatabaseManager::StatementBase::ReadInteger32(size_t field) const
+  {
+    if (IsDone())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+    else
+    {
+      int64_t value = ReadInteger64(field);
+
+      if (value != static_cast<int64_t>(static_cast<int32_t>(value)))
+      {
+        LOG(ERROR) << "Integer overflow";
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+      else
+      {
+        return static_cast<int32_t>(value);
+      }
+    }
+  }
+
+    
+  std::string DatabaseManager::StatementBase::ReadString(size_t field) const
+  {
+    const IValue& value = GetResultField(field);
+
+    switch (value.GetType())
+    {
+      case ValueType_BinaryString:
+        return dynamic_cast<const BinaryStringValue&>(value).GetContent();
+
+      case ValueType_Utf8String:
+        return dynamic_cast<const Utf8StringValue&>(value).GetContent();
+
+      default:
+        //LOG(ERROR) << value.Format();
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+  }
   
   
   DatabaseManager::CachedStatement::CachedStatement(const StatementLocation& location,

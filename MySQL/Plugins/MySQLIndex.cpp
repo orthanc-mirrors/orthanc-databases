@@ -325,7 +325,7 @@ namespace OrthancDatabases
 
       statement.Execute();
       
-      return ReadInteger64(statement, 0);
+      return statement.ReadInteger64(0);
     }
   }
 
@@ -363,7 +363,7 @@ namespace OrthancDatabases
         }
         else
         {
-          int64_t parentId = ReadInteger64(lookupSiblings, 0);
+          int64_t parentId = lookupSiblings.ReadInteger64(0);
           lookupSiblings.Next();
 
           if (lookupSiblings.IsDone())
@@ -389,8 +389,8 @@ namespace OrthancDatabases
             parent.Execute(args2);
 
             output.SignalRemainingAncestor(
-              ReadString(parent, 0),
-              static_cast<OrthancPluginResourceType>(ReadInteger32(parent, 1)));
+              parent.ReadString(0),
+              static_cast<OrthancPluginResourceType>(parent.ReadInteger32(1)));
           }
         }
       }
@@ -422,7 +422,7 @@ namespace OrthancDatabases
     statement.SetReadOnly(true);
     statement.Execute();
 
-    return ReadInteger64(statement, 0);
+    return statement.ReadInteger64(0);
   }
 
 
@@ -473,17 +473,17 @@ namespace OrthancDatabases
         statement.SetResultFieldType(i, ValueType_Integer64);
       }
 
-      result.isNewInstance = (ReadInteger64(statement, 3) == 1);
-      result.instanceId = ReadInteger64(statement, 7);
+      result.isNewInstance = (statement.ReadInteger64(3) == 1);
+      result.instanceId = statement.ReadInteger64(7);
 
       if (result.isNewInstance)
       {
-        result.isNewPatient = (ReadInteger64(statement, 0) == 1);
-        result.isNewStudy = (ReadInteger64(statement, 1) == 1);
-        result.isNewSeries = (ReadInteger64(statement, 2) == 1);
-        result.patientId = ReadInteger64(statement, 4);
-        result.studyId = ReadInteger64(statement, 5);
-        result.seriesId = ReadInteger64(statement, 6);
+        result.isNewPatient = (statement.ReadInteger64(0) == 1);
+        result.isNewStudy = (statement.ReadInteger64(1) == 1);
+        result.isNewSeries = (statement.ReadInteger64(2) == 1);
+        result.patientId = statement.ReadInteger64(4);
+        result.studyId = statement.ReadInteger64(5);
+        result.seriesId = statement.ReadInteger64(6);
       }
     }   
   }
