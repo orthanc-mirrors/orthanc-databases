@@ -71,7 +71,8 @@ namespace OrthancDatabases
 
   PostgreSQLStorageArea::PostgreSQLStorageArea(const PostgreSQLParameters& parameters,
                                                bool clearAll) :
-    StorageBackend(PostgreSQLDatabase::CreateDatabaseFactory(parameters))
+    StorageBackend(PostgreSQLDatabase::CreateDatabaseFactory(parameters),
+                   parameters.GetMaxConnectionRetries())
   {
     {
       AccessorBase accessor(*this);

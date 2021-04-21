@@ -71,11 +71,30 @@ namespace OrthancDatabases
                           OrthancPluginContentType type) = 0;
     };
     
+    /**
+     * This class is similar to
+     * "Orthanc::StatelessDatabaseOperations": It handles retries of
+     * transactions in the case of collision between multiple
+     * readers/writers.
+     **/
+    class IDatabaseOperation : public boost::noncopyable
+    {
+    public:
+      virtual ~IDatabaseOperation()
+      {
+      }
+
+      virtual void Execute(IAccessor& accessor) = 0;
+    };
+
+    class ReadWholeOperation;
+
   private:
     class StringVisitor;
     
     boost::mutex      mutex_;
     DatabaseManager   manager_;
+    unsigned int      maxRetries_;
 
   protected:
     class AccessorBase : public IAccessor
@@ -118,7 +137,8 @@ namespace OrthancDatabases
     virtual bool HasReadRange() const = 0;
 
   public:
-    StorageBackend(IDatabaseFactory* factory);  // Takes ownership
+    StorageBackend(IDatabaseFactory* factory /* takes ownership */,
+                   unsigned int maxRetries);
 
     virtual ~StorageBackend()
     {
@@ -147,5 +167,12 @@ namespace OrthancDatabases
                                   OrthancPluginContentType type,
                                   uint64_t start,
                                   size_t length);
+
+    unsigned int GetMaxRetries() const
+    {
+      return maxRetries_;
+    }
+
+    void Execute(IDatabaseOperation& operation);
   };
 }

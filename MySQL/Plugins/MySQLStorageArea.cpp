@@ -88,7 +88,8 @@ namespace OrthancDatabases
 
   MySQLStorageArea::MySQLStorageArea(const MySQLParameters& parameters,
                                      bool clearAll) :
-    StorageBackend(MySQLDatabase::CreateDatabaseFactory(parameters))
+    StorageBackend(MySQLDatabase::CreateDatabaseFactory(parameters),
+                   parameters.GetMaxConnectionRetries())
   {
     {
       AccessorBase accessor(*this);

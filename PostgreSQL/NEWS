@@ -8,6 +8,7 @@ Pending changes in the mainline
 * Support of range reads for the storage area, from Orthanc SDK 1.9.0
 * Fix issue #193 (LSB binaries crash with PostgreSQL + SSL) by changeset
   in OrthancFramework: https://hg.orthanc-server.com/orthanc/rev/9a9118406484
+* Fix issue #151 (Storage failures when running with two instances and PG_LOCK=false)
 
 
 Release 3.3 (2020-12-14)
