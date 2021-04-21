@@ -23,6 +23,7 @@
 #include "../../Framework/Plugins/PluginInitialization.h"
 
 #include <Logging.h>
+#include <Toolbox.h>
 
 extern "C"
 {
@@ -32,6 +33,8 @@ extern "C"
     {
       return -1;
     }
+
+    Orthanc::Toolbox::InitializeOpenSsl();
 
     OrthancPlugins::OrthancConfiguration configuration;
 
@@ -78,6 +81,7 @@ extern "C"
   {
     LOG(WARNING) << "PostgreSQL storage area is finalizing";
     OrthancDatabases::StorageBackend::Finalize();
+    Orthanc::Toolbox::FinalizeOpenSsl();
   }
 
 

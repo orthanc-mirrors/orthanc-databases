@@ -22,6 +22,7 @@
 #include "../Plugins/PostgreSQLIndex.h"
 
 #include <Logging.h>
+#include <Toolbox.h>
 #include <gtest/gtest.h>
 
 OrthancDatabases::PostgreSQLParameters  globalParameters_;
@@ -126,6 +127,7 @@ int main(int argc, char **argv)
   globalParameters_.SetDatabase(argv[5]);
 
   ::testing::InitGoogleTest(&argc, argv);
+  Orthanc::Toolbox::InitializeOpenSsl();
   Orthanc::Logging::Initialize();
   Orthanc::Logging::EnableInfoLevel(true);
   Orthanc::Logging::EnableTraceLevel(true);
@@ -133,6 +135,7 @@ int main(int argc, char **argv)
   int result = RUN_ALL_TESTS();
 
   Orthanc::Logging::Finalize();
+  Orthanc::Toolbox::FinalizeOpenSsl();
 
   return result;
 }

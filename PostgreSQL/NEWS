@@ -6,6 +6,8 @@ Pending changes in the mainline
 * Support of revisions for metadata and attachments
 * Support of multiple readers/writers, by handling retries from Orthanc SDK 1.9.2
 * Support of range reads for the storage area, from Orthanc SDK 1.9.0
+* Fix issue #193 (LSB binaries crash with PostgreSQL + SSL) by changeset
+  in OrthancFramework: https://hg.orthanc-server.com/orthanc/rev/9a9118406484
 
 
 Release 3.3 (2020-12-14)
