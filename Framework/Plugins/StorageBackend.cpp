@@ -673,9 +673,6 @@ namespace OrthancDatabases
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
       if (OrthancPluginCheckVersionAdvanced(context, 1, 9, 0) == 1)
       {
-        LOG(WARNING) << "The storage area plugin will retry up to " << backend_->GetMaxRetries()
-                     << " time(s) in the case of a collision";
-
         OrthancPluginStorageReadRange readRange = NULL;
         if (backend_->HasReadRange())
         {
@@ -693,6 +690,9 @@ namespace OrthancDatabases
         LOG(WARNING) << "Performance warning: Your version of the Orthanc core doesn't support reading of file ranges";
         OrthancPluginRegisterStorageArea(context_, StorageCreate, StorageRead, StorageRemove);
       }
+
+      LOG(WARNING) << "The storage area plugin will retry up to " << backend_->GetMaxRetries()
+                   << " time(s) in the case of a collision";
     }
   }
 
