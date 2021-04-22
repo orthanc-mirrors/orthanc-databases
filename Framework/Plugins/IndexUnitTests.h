@@ -32,6 +32,11 @@
 #include <gtest/gtest.h>
 #include <list>
 
+#if !defined(ORTHANC_DATABASE_VERSION)
+// This happens if using the Orthanc framework system-wide library
+#  define ORTHANC_DATABASE_VERSION 6
+#endif
+
 
 #if ORTHANC_ENABLE_POSTGRESQL == 1
 #  define HAS_REVISIONS 1
