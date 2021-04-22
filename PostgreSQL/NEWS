@@ -1,6 +1,10 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 4.0 (2021-04-22)
+========================
+
 * New option "IndexConnectionsCount" to control how many simultaneous
   connections to the PostgreSQL database are used by the index plugin
 * Support of revisions for metadata and attachments
