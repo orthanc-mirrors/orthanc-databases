@@ -689,7 +689,7 @@ namespace OrthancDatabases
 
       if (!hasLoadedV2)
       {
-        LOG(WARNING) << "Performance warning: Your version of the Orthanc core doesn't support reading of file ranges";
+        LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support reading of file ranges";
         OrthancPluginRegisterStorageArea(context_, StorageCreate, StorageRead, StorageRemove);
       }
 
