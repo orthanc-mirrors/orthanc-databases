@@ -11,7 +11,8 @@ import stat
 import urllib2
 
 TARGET = os.path.join(os.path.dirname(__file__), 'Orthanc')
-PLUGIN_SDK_VERSION = [ '0.9.5', '1.4.0', '1.5.2', '1.5.4' ]
+PLUGIN_SDK_VERSION_OLD = [ '0.9.5', '1.4.0', '1.5.2', '1.5.4' ]
+PLUGIN_SDK_VERSION_NEW = [ '1.9.2' ]
 REPOSITORY = 'https://hg.orthanc-server.com/orthanc/raw-file'
 
 FILES = [
@@ -56,10 +57,13 @@ def Download(x):
 
     url = '%s/%s/%s' % (REPOSITORY, branch, source)
 
-    with open(target, 'w') as f:
-        f.write(urllib2.urlopen(url).read())
+    try:
+        with open(target, 'w') as f:
+            f.write(urllib2.urlopen(url).read())
+    except Exception as e:
+        raise Exception('Cannot download: %s' % url)    
 
-
+    
 commands = []
 
 for f in FILES:
@@ -67,11 +71,19 @@ for f in FILES:
                       f[0],
                       os.path.join(f[1], os.path.basename(f[0])) ])
 
-for version in PLUGIN_SDK_VERSION:
+for version in PLUGIN_SDK_VERSION_OLD:
     for f in SDK:
         commands.append([
             'Orthanc-%s' % version, 
             'Plugins/Include/%s' % f,
+            'Sdk-%s/%s' % (version, f) 
+        ])
+
+for version in PLUGIN_SDK_VERSION_NEW:
+    for f in SDK:
+        commands.append([
+            'Orthanc-%s' % version, 
+            'OrthancServer/Plugins/Include/%s' % f,
             'Sdk-%s/%s' % (version, f) 
         ])
 
