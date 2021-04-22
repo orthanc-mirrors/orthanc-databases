@@ -790,6 +790,7 @@ namespace OrthancDatabases
       }
       catch (Orthanc::OrthancException& e)
       {
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 9, 2)
         if (e.GetErrorCode() == Orthanc::ErrorCode_DatabaseCannotSerialize)
         {
           if (attempt >= maxRetries_)
@@ -808,6 +809,9 @@ namespace OrthancDatabases
         {
           throw;
         }
+#else
+        throw;
+#endif
       }
     }
   }
