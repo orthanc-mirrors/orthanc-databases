@@ -358,6 +358,7 @@ namespace OrthancDatabases
     }
 #endif
 
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     // This function corresponds to
     // "Orthanc::Compatibility::ICreateInstance::Apply()"
     void CreateInstanceGeneric(OrthancPluginCreateInstanceResult& result,
@@ -366,6 +367,7 @@ namespace OrthancDatabases
                                const char* hashStudy,
                                const char* hashSeries,
                                const char* hashInstance);
+#endif
 
     bool LookupGlobalIntegerProperty(int& target /*out*/,
                                      DatabaseManager& manager,

@@ -1029,6 +1029,8 @@ namespace OrthancDatabases
   }
 
 
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 4, 0)
   static OrthancPluginErrorCode  LookupIdentifierRange(OrthancPluginDatabaseContext* context,
                                                        void* payload,
                                                        OrthancPluginResourceType resourceType,
@@ -1059,6 +1061,8 @@ namespace OrthancDatabases
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
+#  endif
+#endif
 
 
   static OrthancPluginErrorCode  LookupMetadata(OrthancPluginDatabaseContext* context,
@@ -1465,6 +1469,8 @@ namespace OrthancDatabases
 #endif    
 
     
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
   // New primitive since Orthanc 1.5.2
   static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseContext* context,
                                                     void* payload,
@@ -1494,8 +1500,12 @@ namespace OrthancDatabases
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
   }
+#  endif
+#endif
 
 
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
   // New primitive since Orthanc 1.5.2
   static OrthancPluginErrorCode GetLastChangeIndex(int64_t* result,
                                                    void* payload)
@@ -1510,8 +1520,12 @@ namespace OrthancDatabases
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
   }
+#  endif
+#endif
 
 
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
   // New primitive since Orthanc 1.5.2
   static OrthancPluginErrorCode TagMostRecentPatient(void* payload,
                                                      int64_t patientId)
@@ -1526,6 +1540,8 @@ namespace OrthancDatabases
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;      
   }
+#  endif
+#endif
    
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1

@@ -2389,6 +2389,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #endif
 
 
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   void IndexBackend::CreateInstanceGeneric(OrthancPluginCreateInstanceResult& result,
                                            DatabaseManager& manager,
                                            const char* hashPatient,
@@ -2505,6 +2506,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     assert(result.seriesId != -1);
     assert(result.instanceId != -1);
   }
+#endif
 
 
   void IndexBackend::Register(IndexBackend* backend,

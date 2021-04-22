@@ -315,7 +315,8 @@ namespace OrthancDatabases
   }
 
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 0)
   static OrthancPluginErrorCode StorageReadWhole(OrthancPluginMemoryBuffer64* target,
                                                  const char* uuid,
                                                  OrthancPluginContentType type)
@@ -492,6 +493,7 @@ namespace OrthancDatabases
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
   }
+#  endif
 #endif
 
   
