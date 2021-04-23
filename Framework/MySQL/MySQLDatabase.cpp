@@ -546,13 +546,13 @@ namespace OrthancDatabases
       
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
-                                       const Dictionary& parameters)
+                                       const Dictionary& parameters) ORTHANC_OVERRIDE
       {
         return dynamic_cast<MySQLStatement&>(statement).Execute(*this, parameters);
       }
 
       virtual void ExecuteWithoutResultInternal(IPrecompiledStatement& statement,
-                                                const Dictionary& parameters)
+                                                const Dictionary& parameters) ORTHANC_OVERRIDE
       {
         dynamic_cast<MySQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }

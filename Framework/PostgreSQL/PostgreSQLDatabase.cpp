@@ -263,13 +263,13 @@ namespace OrthancDatabases
       
     protected:
       virtual IResult* ExecuteInternal(IPrecompiledStatement& statement,
-                                       const Dictionary& parameters)
+                                       const Dictionary& parameters) ORTHANC_OVERRIDE
       {
         return dynamic_cast<PostgreSQLStatement&>(statement).Execute(*this, parameters);
       }
 
       virtual void ExecuteWithoutResultInternal(IPrecompiledStatement& statement,
-                                                const Dictionary& parameters)
+                                                const Dictionary& parameters) ORTHANC_OVERRIDE
       {
         dynamic_cast<PostgreSQLStatement&>(statement).ExecuteWithoutResult(*this, parameters);
       }
