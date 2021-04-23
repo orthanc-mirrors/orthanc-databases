@@ -1,6 +1,10 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 4.0 (2021-04-23)
+========================
+
 * New option "IndexConnectionsCount" to control how many simultaneous
   connections to the MySQL database are used by the index plugin
 * Support of multiple readers/writers, by handling retries from Orthanc SDK 1.9.2
