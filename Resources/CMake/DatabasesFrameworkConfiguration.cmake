@@ -52,8 +52,6 @@ endif()
 ## Configure the Orthanc Framework
 #####################################################################
 
-include_directories(${ORTHANC_FRAMEWORK_ROOT})
-
 if (ORTHANC_FRAMEWORK_SOURCE STREQUAL "system")
   if (ORTHANC_FRAMEWORK_USE_SHARED)
     include(FindBoost)
@@ -85,6 +83,7 @@ else()
   set(ENABLE_MODULE_DICOM OFF)
   
   include(${ORTHANC_FRAMEWORK_ROOT}/../Resources/CMake/OrthancFrameworkConfiguration.cmake)
+  include_directories(${ORTHANC_FRAMEWORK_ROOT})
 endif()
 
 
