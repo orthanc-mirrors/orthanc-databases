@@ -522,5 +522,22 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager, p3));
   ASSERT_EQ(p1, r);
 
+  {
+    // Test creating a large property of 16MB
+    // https://groups.google.com/g/orthanc-users/c/1Y3nTBdr0uE/m/K7PA5pboAgAJ
+    std::string longProperty;
+    longProperty.resize(16 * 1024 * 1024);
+    for (size_t i = 0; i < longProperty.size(); i++)
+    {
+      longProperty[i] = 'A' + (i % 26);
+    }
+
+    db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8, longProperty.c_str());
+
+    std::string tmp;
+    ASSERT_TRUE(db.LookupGlobalProperty(tmp, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8));
+    ASSERT_EQ(longProperty, tmp);
+  }
+
   manager->Close();
 }
