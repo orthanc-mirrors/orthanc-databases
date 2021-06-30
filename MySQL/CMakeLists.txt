@@ -132,3 +132,13 @@ target_link_libraries(UnitTests ${GOOGLE_TEST_LIBRARIES})
 set_target_properties(UnitTests PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=0
   )
+
+if ("${CMAKE_SYSTEM_VERSION}" STREQUAL "LinuxStandardBase")
+  # Explicitly adding "-lstdc++" during linking for LSB had to be
+  # introduced on the BuildBot server for LSB Release builds between
+  # "OrthancMySQL-4.0" and "OrthancMySQL-4.1", for unclear
+  # reasons. Without this option, many symbols are left undefined
+  # while linking "UnitTests" in release mode. Similar to:
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=14001
+  target_link_libraries(UnitTests stdc++)
+endif()
