@@ -138,8 +138,6 @@ namespace OrthancDatabases
        * transaction).
        **/
 
-      int version = 0;
-
       {
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
 
@@ -155,6 +153,8 @@ namespace OrthancDatabases
         {
           ThrowCannotCreateTrigger();
         }
+
+        int version = 0;
 
         if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion))
         {
