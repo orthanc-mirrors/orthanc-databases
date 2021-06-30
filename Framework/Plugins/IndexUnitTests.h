@@ -523,7 +523,8 @@ TEST(IndexBackend, Basic)
   ASSERT_EQ(p1, r);
 
   {
-    // Test creating a large property of 16MB
+    // Test creating a large property of 16MB (large properties are
+    // notably necessary to serialize jobs)
     // https://groups.google.com/g/orthanc-users/c/1Y3nTBdr0uE/m/K7PA5pboAgAJ
     std::string longProperty;
     longProperty.resize(16 * 1024 * 1024);
@@ -534,8 +535,16 @@ TEST(IndexBackend, Basic)
 
     db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8, longProperty.c_str());
 
+    // The following line fails on MySQL 4.0 because the "value"
+    // column in "ServerProperties" is "TEXT" instead of "LONGTEXT"
+    db.SetGlobalProperty(*manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8, longProperty.c_str());
+
     std::string tmp;
     ASSERT_TRUE(db.LookupGlobalProperty(tmp, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8));
+    ASSERT_EQ(longProperty, tmp);
+
+    tmp.clear();
+    ASSERT_TRUE(db.LookupGlobalProperty(tmp, *manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8));
     ASSERT_EQ(longProperty, tmp);
   }
 

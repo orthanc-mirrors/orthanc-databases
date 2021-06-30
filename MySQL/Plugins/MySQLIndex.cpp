@@ -261,25 +261,43 @@ namespace OrthancDatabases
 
         t.Commit();
       }
-      
-      if (revision != 5)
+
+      if (revision == 5)      
+      {
+        // Added new table "ServerProperties" since release 4.0 to deal with multiple writers
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        if (t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
+        {
+          /**
+           * Patch for MySQL plugin 4.0, where the column "value" was
+           * "TEXT" instead of "LONGTEXT", which prevented
+           * serialization of large jobs. This was giving error "MySQL
+           * error (1406,22001): Data too long for column 'value' at
+           * row 1" after log message "Serializing the content of the
+           * jobs engine" (in --trace mode).
+           * https://groups.google.com/g/orthanc-users/c/1Y3nTBdr0uE/m/K7PA5pboAgAJ
+           **/
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE ServerProperties MODIFY value LONGTEXT");          
+        }
+        else
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
+                                                       "property INTEGER, value LONGTEXT, PRIMARY KEY(server, property))");
+        }
+
+        // Revision 6 indicates that "value" of "ServerProperties" is
+        // "LONGTEXT", whereas revision 5 corresponds to "TEXT"
+        revision = 6;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        
+        t.Commit();
+      }
+
+      if (revision != 6)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-      }
-
-
-      {
-        // New in release 4.0 to deal with multiple writers
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        if (!t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
-                                                       "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
-        }
-
-        t.Commit();
       }
     }
 
