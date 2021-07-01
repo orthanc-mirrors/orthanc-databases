@@ -99,6 +99,7 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/DatabaseManager.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Dictionary.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/GenericFormatter.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/IResult.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ImplicitTransaction.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/InputFileValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Integer64Value.cpp

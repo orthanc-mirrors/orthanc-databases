@@ -54,6 +54,9 @@ namespace OrthancDatabases
 
         break;
 
+      case ValueType_Utf8String:
+        return new Utf8StringValue(utf8_);
+
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }

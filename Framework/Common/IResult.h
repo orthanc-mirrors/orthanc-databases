@@ -42,5 +42,8 @@ namespace OrthancDatabases
     virtual size_t GetFieldsCount() const = 0;
 
     virtual const IValue& GetField(size_t index) const = 0;
+
+    static void Print(std::ostream& stream,
+                      IResult& result);
   };
 }
