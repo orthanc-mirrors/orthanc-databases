@@ -51,6 +51,14 @@ namespace OrthancDatabases
     }
     else
     {
+      if (allNames_.find(source) != allNames_.end())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls,
+                                        "Parameter ${" + source + "} registered twice");
+      }
+
+      allNames_.insert(source);
+      
       switch (dialect_)
       {
         case Dialect_PostgreSQL:

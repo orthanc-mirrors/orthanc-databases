@@ -1,4 +1,4 @@
- /**
+/**
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
@@ -19,41 +19,36 @@
  **/
 
 
-#pragma once
+#include "DatabasesEnumerations.h"
 
-#include "Query.h"
-
-#include <Compatibility.h>
-
-#include <set>
+#include <OrthancException.h>
 
 namespace OrthancDatabases
 {
-  class GenericFormatter : public Query::IParameterFormatter
+  const char* EnumerationToString(ValueType type)
   {
-  private:
-    Dialect                   dialect_;
-    std::vector<std::string>  parametersName_;
-    std::vector<ValueType>    parametersType_;
-    std::set<std::string>     allNames_;
-      
-  public:
-    explicit GenericFormatter(Dialect dialect) :
-      dialect_(dialect)
+    switch (type)
     {
+      case ValueType_BinaryString:
+        return "BinaryString";
+        
+      case ValueType_InputFile:
+        return "InputFile";
+        
+      case ValueType_Integer64:
+        return "Integer64";
+        
+      case ValueType_Null:
+        return "Null";
+        
+      case ValueType_ResultFile:
+        return "ResultFile";
+        
+      case ValueType_Utf8String:
+        return "Utf8String";
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
-    
-    virtual void Format(std::string& target,
-                        const std::string& source,
-                        ValueType type) ORTHANC_OVERRIDE;
-
-    size_t GetParametersCount() const
-    {
-      return parametersName_.size();
-    }
-
-    const std::string& GetParameterName(size_t index) const;
-
-    ValueType GetParameterType(size_t index) const;
-  };
+  }   
 }

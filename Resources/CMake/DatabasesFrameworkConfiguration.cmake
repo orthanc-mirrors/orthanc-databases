@@ -97,6 +97,7 @@ set(ORTHANC_DATABASES_ROOT ${CMAKE_CURRENT_LIST_DIR}/../..)
 set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/BinaryStringValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/DatabaseManager.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/DatabasesEnumerations.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Dictionary.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/GenericFormatter.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/IResult.cpp

@@ -49,4 +49,6 @@ namespace OrthancDatabases
     TransactionType_ReadOnly,  // Should only arise with Orthanc SDK >= 1.9.2 in the index plugin
     TransactionType_Implicit   // Should only arise with Orthanc SDK <= 1.9.1
   };
+
+  const char* EnumerationToString(ValueType type);
 }
