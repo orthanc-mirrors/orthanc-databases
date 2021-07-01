@@ -24,7 +24,6 @@
 #include "Integer64Value.h"
 #include "BinaryStringValue.h"
 #include "Utf8StringValue.h"
-#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
@@ -61,16 +60,8 @@ namespace OrthancDatabases
     
   void DatabaseManager::CloseIfUnavailable(Orthanc::ErrorCode e)
   {
-    bool failure;
-
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    failure = (e != Orthanc::ErrorCode_Success &&
-               e != Orthanc::ErrorCode_DatabaseCannotSerialize);
-#else
-    failure = (e != Orthanc::ErrorCode_Success);
-#endif
-
-    if (failure)
+    if (e != Orthanc::ErrorCode_Success &&
+        e != Orthanc::ErrorCode_DatabaseCannotSerialize)
     {
       transaction_.reset(NULL);
     }

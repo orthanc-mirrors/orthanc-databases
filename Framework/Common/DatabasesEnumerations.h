@@ -39,6 +39,7 @@ namespace OrthancDatabases
     Dialect_MySQL,
     Dialect_PostgreSQL,
     Dialect_SQLite,
+    Dialect_MSSQL,
     Dialect_Unknown
   };
 

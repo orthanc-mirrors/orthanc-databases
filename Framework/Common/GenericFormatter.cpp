@@ -59,6 +59,7 @@ namespace OrthancDatabases
 
         case Dialect_MySQL:
         case Dialect_SQLite:
+        case Dialect_MSSQL:
           target = "?";
           break;
 
