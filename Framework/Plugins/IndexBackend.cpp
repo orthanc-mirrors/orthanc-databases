@@ -735,6 +735,7 @@ namespace OrthancDatabases
                           "SELECT CAST(COUNT(*) AS BIGINT) FROM Resources WHERE resourceType=${type}"));
         break;
 
+      case Dialect_MSSQL:
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
                           STATEMENT_FROM_HERE, manager,
@@ -803,6 +804,7 @@ namespace OrthancDatabases
                           "SELECT CAST(COALESCE(SUM(compressedSize), 0) AS BIGINT) FROM AttachedFiles"));
         break;
 
+      case Dialect_MSSQL:
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
                           STATEMENT_FROM_HERE, manager,
@@ -840,6 +842,7 @@ namespace OrthancDatabases
                           "SELECT CAST(COALESCE(SUM(uncompressedSize), 0) AS BIGINT) FROM AttachedFiles"));
         break;
 
+      case Dialect_MSSQL:
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
                           STATEMENT_FROM_HERE, manager,
@@ -1799,6 +1802,7 @@ namespace OrthancDatabases
         break;
 
       case Dialect_SQLite:
+      case Dialect_MSSQL:
         statement.reset(new DatabaseManager::CachedStatement(
                           STATEMENT_FROM_HERE, manager,
                           "SELECT COUNT(*) FROM Resources"));

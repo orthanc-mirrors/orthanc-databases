@@ -140,5 +140,7 @@ if ("${CMAKE_SYSTEM_VERSION}" STREQUAL "LinuxStandardBase")
   # reasons. Without this option, many symbols are left undefined
   # while linking "UnitTests" in release mode. Similar to:
   # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=14001
+  #
+  # NB: This will be automatically added in Orthanc Framework > 1.9.5
   target_link_libraries(UnitTests stdc++ m)
 endif()

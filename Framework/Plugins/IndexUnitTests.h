@@ -214,6 +214,11 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
   ASSERT_EQ("HelloWorld", s);
 
+  ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
+  ASSERT_EQ(0u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Patient));
+  ASSERT_EQ(0u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Study));
+  ASSERT_EQ(0u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Series));
+
   int64_t a = db.CreateResource(*manager, "study", OrthancPluginResourceType_Study);
   ASSERT_TRUE(db.IsExistingResource(*manager, a));
   ASSERT_FALSE(db.IsExistingResource(*manager, a + 1));
