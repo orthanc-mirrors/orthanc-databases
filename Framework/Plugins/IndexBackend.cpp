@@ -942,7 +942,7 @@ namespace OrthancDatabases
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "INSERT INTO Changes VALUES(${}, ${changeType}, ${id}, ${resourceType}, ${date})");
+      "INSERT INTO Changes VALUES(${AUTOINCREMENT} ${changeType}, ${id}, ${resourceType}, ${date})");
 
     statement.SetParameterType("changeType", ValueType_Integer64);
     statement.SetParameterType("id", ValueType_Integer64);
@@ -964,7 +964,7 @@ namespace OrthancDatabases
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "INSERT INTO ExportedResources VALUES(${}, ${type}, ${publicId}, "
+      "INSERT INTO ExportedResources VALUES(${AUTOINCREMENT} ${type}, ${publicId}, "
       "${modality}, ${patient}, ${study}, ${series}, ${instance}, ${date})");
 
     statement.SetParameterType("type", ValueType_Integer64);
@@ -1696,7 +1696,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO PatientRecyclingOrder VALUES(${}, ${id})");
+        "INSERT INTO PatientRecyclingOrder VALUES(${AUTOINCREMENT} ${id})");
         
       statement.SetParameterType("id", ValueType_Integer64);
         
@@ -2275,7 +2275,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO PatientRecyclingOrder VALUES(${}, ${id})");
+        "INSERT INTO PatientRecyclingOrder VALUES({AUTOINCREMENT} ${id})");
         
       statement.SetParameterType("id", ValueType_Integer64);
         

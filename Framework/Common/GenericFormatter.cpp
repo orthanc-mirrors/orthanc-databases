@@ -33,16 +33,29 @@ namespace OrthancDatabases
   {
     if (source.empty())
     {
-      // This is the default parameter for INSERT
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+    else if (source == "AUTOINCREMENT")
+    {
+      if (GetParametersCount() != 0)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls,
+                                        "The AUTOINCREMENT argument must always be the first");
+      }
+      
       switch (dialect_)
       {
         case Dialect_PostgreSQL:
-          target = "DEFAULT";
+          target = "DEFAULT, ";
           break;
 
         case Dialect_MySQL:
         case Dialect_SQLite:
-          target = "NULL";
+          target = "NULL, ";
+          break;
+
+        case Dialect_MSSQL:
+          target.clear();  // The IDENTITY field must not be filled in MSSQL
           break;
 
         default:
@@ -51,14 +64,6 @@ namespace OrthancDatabases
     }
     else
     {
-      if (allNames_.find(source) != allNames_.end())
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls,
-                                        "Parameter ${" + source + "} registered twice");
-      }
-
-      allNames_.insert(source);
-      
       switch (dialect_)
       {
         case Dialect_PostgreSQL:

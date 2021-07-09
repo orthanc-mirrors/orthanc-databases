@@ -324,7 +324,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO Resources VALUES(${}, ${type}, ${id}, NULL)");
+        "INSERT INTO Resources VALUES(NULL, ${type}, ${id}, NULL)");
     
       statement.SetParameterType("id", ValueType_Utf8String);
       statement.SetParameterType("type", ValueType_Integer64);
