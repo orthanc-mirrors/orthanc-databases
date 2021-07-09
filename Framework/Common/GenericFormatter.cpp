@@ -43,7 +43,7 @@ namespace OrthancDatabases
                                         "The AUTOINCREMENT argument must always be the first");
       }
       
-      switch (dialect_)
+      switch (autoincrementDialect_)
       {
         case Dialect_PostgreSQL:
           target = "DEFAULT, ";
@@ -64,7 +64,7 @@ namespace OrthancDatabases
     }
     else
     {
-      switch (dialect_)
+      switch (namedDialect_)
       {
         case Dialect_PostgreSQL:
           target = "$" + boost::lexical_cast<std::string>(parametersName_.size() + 1);

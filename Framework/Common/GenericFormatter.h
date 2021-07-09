@@ -32,14 +32,26 @@ namespace OrthancDatabases
   class GenericFormatter : public Query::IParameterFormatter
   {
   private:
-    Dialect                   dialect_;
+    Dialect                   autoincrementDialect_;
+    Dialect                   namedDialect_;
     std::vector<std::string>  parametersName_;
     std::vector<ValueType>    parametersType_;
       
   public:
     explicit GenericFormatter(Dialect dialect) :
-      dialect_(dialect)
+      autoincrementDialect_(dialect),
+      namedDialect_(dialect)
     {
+    }
+
+    void SetAutoincrementDialect(Dialect dialect)
+    {
+      autoincrementDialect_ = dialect;
+    }
+    
+    void SetNamedDialect(Dialect dialect)
+    {
+      namedDialect_ = dialect;
     }
     
     virtual void Format(std::string& target,
