@@ -44,11 +44,23 @@ namespace OrthancDatabases
     {
     }
 
+    Dialect GetDialect() const;
+
+    Dialect GetAutoincrementDialect() const
+    {
+      return autoincrementDialect_;
+    }
+
     void SetAutoincrementDialect(Dialect dialect)
     {
       autoincrementDialect_ = dialect;
     }
     
+    Dialect GetNamedDialect() const
+    {
+      return namedDialect_;
+    }
+
     void SetNamedDialect(Dialect dialect)
     {
       namedDialect_ = dialect;

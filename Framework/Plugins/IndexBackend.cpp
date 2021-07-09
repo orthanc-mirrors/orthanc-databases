@@ -433,8 +433,6 @@ namespace OrthancDatabases
                                     DatabaseManager& manager,
                                     int64_t id)
   {
-    assert(manager.GetDialect() != Dialect_MySQL);
-    
     ClearDeletedFiles(manager);
     ClearDeletedResources(manager);
     
@@ -552,19 +550,32 @@ namespace OrthancDatabases
                                 int64_t since,
                                 uint32_t maxResults)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM Changes WHERE seq>${since} ORDER BY seq LIMIT ${limit}");
-      
-    statement.SetReadOnly(true);
-    statement.SetParameterType("limit", ValueType_Integer64);
-    statement.SetParameterType("since", ValueType_Integer64);
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+   
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      statement.reset(
+        new DatabaseManager::CachedStatement(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT TOP(${limit}) * FROM Changes WHERE seq>${since} ORDER BY seq"));
+    }
+    else
+    {
+      statement.reset(
+        new DatabaseManager::CachedStatement(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT * FROM Changes WHERE seq>${since} ORDER BY seq LIMIT ${limit}"));
+    }
+
+    statement->SetReadOnly(true);
+    statement->SetParameterType("limit", ValueType_Integer64);
+    statement->SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, statement, args, maxResults);
+    ReadChangesInternal(output, done, manager, *statement, args, maxResults);
   }
 
     
@@ -613,19 +624,32 @@ namespace OrthancDatabases
                                           int64_t since,
                                           uint32_t maxResults)
   {
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM ExportedResources WHERE seq>${since} ORDER BY seq LIMIT ${limit}");
-      
-    statement.SetReadOnly(true);
-    statement.SetParameterType("limit", ValueType_Integer64);
-    statement.SetParameterType("since", ValueType_Integer64);
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+   
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      statement.reset(
+        new DatabaseManager::CachedStatement(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT TOP(${limit}) * FROM ExportedResources WHERE seq>${since} ORDER BY seq"));
+    }
+    else
+    {
+      statement.reset(
+        new DatabaseManager::CachedStatement(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT * FROM ExportedResources WHERE seq>${since} ORDER BY seq LIMIT ${limit}"));
+    }
+    
+    statement->SetReadOnly(true);
+    statement->SetParameterType("limit", ValueType_Integer64);
+    statement->SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, *statement, args, maxResults);
   }
 
     
@@ -1838,6 +1862,7 @@ namespace OrthancDatabases
                           "SELECT CAST(COUNT(*) AS BIGINT) FROM PatientRecyclingOrder"));
         break;
 
+      case Dialect_MSSQL:
       case Dialect_SQLite:
         statement.reset(new DatabaseManager::CachedStatement(
                           STATEMENT_FROM_HERE, manager,

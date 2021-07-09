@@ -27,6 +27,21 @@
 
 namespace OrthancDatabases
 {
+  Dialect GenericFormatter::GetDialect() const
+  {
+    if (autoincrementDialect_ != namedDialect_)
+    {
+      // The two dialects do not match because of a previous call to
+      // SetAutoincrementDialect() or SetNamedDialect()
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+    else
+    {
+      return namedDialect_;
+    }
+  }
+  
+
   void GenericFormatter::Format(std::string& target,
                                 const std::string& source,
                                 ValueType type)
