@@ -193,6 +193,13 @@ namespace OrthancDatabases
     };
 
 
+    /**
+     * WARNING: At any given time, there must be at most 1 object of
+     * the "CachedStatement" class in the scope, otherwise error
+     * "Cannot execute more than one statement in an implicit
+     * transaction" is generated if no explicit transaction is
+     * present.
+     **/
     class CachedStatement : public StatementBase
     {
     private:
