@@ -22,7 +22,7 @@
 #include "../Plugins/MySQLIndex.h"
 #include "../Plugins/MySQLStorageArea.h"
 
-OrthancDatabases::MySQLParameters globalParameters_;
+static OrthancDatabases::MySQLParameters globalParameters_;
 
 #include "../../Framework/Common/Integer64Value.h"
 #include "../../Framework/MySQL/MySQLDatabase.h"

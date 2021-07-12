@@ -44,6 +44,8 @@
 #  define HAS_REVISIONS 0
 #elif ORTHANC_ENABLE_SQLITE == 1
 #  define HAS_REVISIONS 1
+#elif ORTHANC_ENABLE_ODBC == 1
+#  define HAS_REVISIONS 1
 #else
 #  error Unknown database backend
 #endif
@@ -210,6 +212,8 @@ TEST(IndexBackend, Basic)
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_SQLITE == 1
   SQLiteIndex db(&context);  // Open in memory
+#elif ORTHANC_ENABLE_ODBC == 1
+  OdbcIndex db(&context, connectionString_);
 #else
 #  error Unsupported database backend
 #endif
