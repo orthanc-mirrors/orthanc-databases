@@ -367,6 +367,9 @@ namespace OrthancDatabases
 
     while (!done)
     {
+      bool hasSibling = false;
+      int64_t parentId;
+      
       {
         DatabaseManager::CachedStatement lookupSiblings(
           STATEMENT_FROM_HERE, manager,
@@ -387,7 +390,7 @@ namespace OrthancDatabases
         }
         else
         {
-          int64_t parentId = lookupSiblings.ReadInteger64(0);
+          parentId = lookupSiblings.ReadInteger64(0);
           lookupSiblings.Next();
 
           if (lookupSiblings.IsDone())
@@ -400,39 +403,59 @@ namespace OrthancDatabases
           {
             // "id" has at least one sibling node: the parent node is the remaining ancestor
             done = true;
-
-            DatabaseManager::CachedStatement parent(
-              STATEMENT_FROM_HERE, manager,
-              "SELECT publicId, resourceType FROM Resources WHERE internalId=${id};");
-            
-            parent.SetParameterType("id", ValueType_Integer64);
-
-            Dictionary args2;
-            args2.SetIntegerValue("id", parentId);
-    
-            parent.Execute(args2);
-
-            output.SignalRemainingAncestor(
-              parent.ReadString(0),
-              static_cast<OrthancPluginResourceType>(parent.ReadInteger32(1)));
+            hasSibling = true;
           }
         }
       }
+
+      if (hasSibling)
+      {
+        // This cannot be executed in the same scope as another
+        // DatabaseManager::CachedStatement
+        
+        DatabaseManager::CachedStatement parent(
+          STATEMENT_FROM_HERE, manager,
+          "SELECT publicId, resourceType FROM Resources WHERE internalId=${id};");
+        
+        parent.SetParameterType("id", ValueType_Integer64);
+        
+        Dictionary args2;
+        args2.SetIntegerValue("id", parentId);
+        
+        parent.Execute(args2);
+        
+        output.SignalRemainingAncestor(
+          parent.ReadString(0),
+          static_cast<OrthancPluginResourceType>(parent.ReadInteger32(1)));
+      }
+    }
+
+    {
+      DatabaseManager::CachedStatement dropTemporaryTable(
+        STATEMENT_FROM_HERE, manager,
+        "DROP TEMPORARY TABLE IF EXISTS DeletedResources");
+      dropTemporaryTable.Execute();
+    }
+
+    {
+      DatabaseManager::CachedStatement lookupResourcesToDelete(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE DeletedResources SELECT * FROM (SELECT internalId, resourceType, publicId FROM Resources WHERE internalId=${id} OR parentId=${id} OR parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}) OR parentId IN (SELECT internalId FROM Resources WHERE parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}))) AS t");
+      lookupResourcesToDelete.SetParameterType("id", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetIntegerValue("id", id);
+      lookupResourcesToDelete.Execute(args);
     }
 
     {
       DatabaseManager::CachedStatement deleteHierarchy(
         STATEMENT_FROM_HERE, manager,
-        "DELETE FROM Resources WHERE internalId IN (SELECT * FROM (SELECT internalId FROM Resources WHERE internalId=${id} OR parentId=${id} OR parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}) OR parentId IN (SELECT internalId FROM Resources WHERE parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}))) as t);");
-      
-      deleteHierarchy.SetParameterType("id", ValueType_Integer64);
-      
-      Dictionary args;
-      args.SetIntegerValue("id", id);
-    
-      deleteHierarchy.Execute(args);
+        "DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM DeletedResources)");
+      deleteHierarchy.Execute();
     }
 
+    SignalDeletedResources(output, manager);
     SignalDeletedFiles(output, manager);
   }
 

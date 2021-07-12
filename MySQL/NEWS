@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* Added missing calls to OrthancPluginDatabaseSignalDeletedResource()
+
 
 Release 4.1 (2021-06-30)
 ========================

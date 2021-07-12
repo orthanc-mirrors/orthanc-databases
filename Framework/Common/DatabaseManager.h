@@ -185,6 +185,11 @@ namespace OrthancDatabases
       int64_t ReadInteger64(size_t field) const;
 
       std::string ReadString(size_t field) const;
+
+      void PrintResult(std::ostream& stream)
+      {
+        IResult::Print(stream, GetResult());
+      }
     };
 
 

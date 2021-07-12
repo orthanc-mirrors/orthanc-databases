@@ -230,7 +230,7 @@ namespace OrthancDatabases
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM DeletedResources");
+      "SELECT resourceType, publicId FROM DeletedResources");
 
     statement.SetReadOnly(true);
     statement.Execute();
