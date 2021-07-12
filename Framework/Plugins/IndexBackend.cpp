@@ -523,11 +523,20 @@ namespace OrthancDatabases
                                      uint64_t since,
                                      uint64_t limit)
   {
+    std::string suffix;
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      suffix = "OFFSET ${since} ROWS FETCH FIRST ${limit} ROWS ONLY";
+    }
+    else
+    {
+      suffix = "LIMIT ${limit} OFFSET ${since}";
+    }
+    
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "SELECT publicId FROM (SELECT publicId FROM Resources "
-      "WHERE resourceType=${type}) AS tmp "
-      "ORDER BY tmp.publicId LIMIT ${limit} OFFSET ${since}");
+      "WHERE resourceType=${type}) AS tmp ORDER BY tmp.publicId " + suffix);
       
     statement.SetReadOnly(true);
     statement.SetParameterType("type", ValueType_Integer64);
@@ -550,32 +559,29 @@ namespace OrthancDatabases
                                 int64_t since,
                                 uint32_t maxResults)
   {
-    std::unique_ptr<DatabaseManager::CachedStatement> statement;
-   
+    std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
     {
-      statement.reset(
-        new DatabaseManager::CachedStatement(
-          STATEMENT_FROM_HERE, manager,
-          "SELECT TOP(${limit}) * FROM Changes WHERE seq>${since} ORDER BY seq"));
+      suffix = "OFFSET 0 ROWS FETCH FIRST ${limit} ROWS ONLY";
     }
     else
     {
-      statement.reset(
-        new DatabaseManager::CachedStatement(
-          STATEMENT_FROM_HERE, manager,
-          "SELECT * FROM Changes WHERE seq>${since} ORDER BY seq LIMIT ${limit}"));
+      suffix = "LIMIT ${limit}";
     }
+    
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT * FROM Changes WHERE seq>${since} ORDER BY seq " + suffix);
 
-    statement->SetReadOnly(true);
-    statement->SetParameterType("limit", ValueType_Integer64);
-    statement->SetParameterType("since", ValueType_Integer64);
+    statement.SetReadOnly(true);
+    statement.SetParameterType("limit", ValueType_Integer64);
+    statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, *statement, args, maxResults);
+    ReadChangesInternal(output, done, manager, statement, args, maxResults);
   }
 
     
@@ -624,32 +630,29 @@ namespace OrthancDatabases
                                           int64_t since,
                                           uint32_t maxResults)
   {
-    std::unique_ptr<DatabaseManager::CachedStatement> statement;
-   
+    std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
     {
-      statement.reset(
-        new DatabaseManager::CachedStatement(
-          STATEMENT_FROM_HERE, manager,
-          "SELECT TOP(${limit}) * FROM ExportedResources WHERE seq>${since} ORDER BY seq"));
+      suffix = "OFFSET 0 ROWS FETCH FIRST ${limit} ROWS ONLY";
     }
     else
     {
-      statement.reset(
-        new DatabaseManager::CachedStatement(
-          STATEMENT_FROM_HERE, manager,
-          "SELECT * FROM ExportedResources WHERE seq>${since} ORDER BY seq LIMIT ${limit}"));
+      suffix = "LIMIT ${limit}";
     }
     
-    statement->SetReadOnly(true);
-    statement->SetParameterType("limit", ValueType_Integer64);
-    statement->SetParameterType("since", ValueType_Integer64);
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT * FROM ExportedResources WHERE seq>${since} ORDER BY seq " + suffix);
+    
+    statement.SetReadOnly(true);
+    statement.SetParameterType("limit", ValueType_Integer64);
+    statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
     args.SetIntegerValue("limit", maxResults + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(output, done, *statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
   }
 
     
@@ -657,9 +660,19 @@ namespace OrthancDatabases
   void IndexBackend::GetLastChange(IDatabaseBackendOutput& output,
                                    DatabaseManager& manager)
   {
+    std::string suffix;
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      suffix = "OFFSET 0 ROWS FETCH FIRST 1 ROWS ONLY";
+    }
+    else
+    {
+      suffix = "LIMIT 1";
+    }
+
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM Changes ORDER BY seq DESC LIMIT 1");
+      "SELECT * FROM Changes ORDER BY seq DESC " + suffix);
 
     statement.SetReadOnly(true);
       
@@ -674,9 +687,19 @@ namespace OrthancDatabases
   void IndexBackend::GetLastExportedResource(IDatabaseBackendOutput& output,
                                              DatabaseManager& manager)
   {
+    std::string suffix;
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      suffix = "OFFSET 0 ROWS FETCH FIRST 1 ROWS ONLY";
+    }
+    else
+    {
+      suffix = "LIMIT 1";
+    }
+
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM ExportedResources ORDER BY seq DESC LIMIT 1");
+      "SELECT * FROM ExportedResources ORDER BY seq DESC " + suffix);
 
     statement.SetReadOnly(true);
       
@@ -1412,10 +1435,20 @@ namespace OrthancDatabases
   bool IndexBackend::SelectPatientToRecycle(int64_t& internalId /*out*/,
                                             DatabaseManager& manager)
   {
+    std::string suffix;
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      suffix = "OFFSET 0 ROWS FETCH FIRST 1 ROWS ONLY";
+    }
+    else
+    {
+      suffix = "LIMIT 1";
+    }
+    
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT patientId FROM PatientRecyclingOrder ORDER BY seq ASC LIMIT 1");
-
+      "SELECT patientId FROM PatientRecyclingOrder ORDER BY seq ASC " + suffix);
+    
     statement.SetReadOnly(true);
     statement.Execute();
 
@@ -1435,10 +1468,20 @@ namespace OrthancDatabases
                                             DatabaseManager& manager,
                                             int64_t patientIdToAvoid)
   {
+    std::string suffix;
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      suffix = "OFFSET 0 ROWS FETCH FIRST 1 ROWS ONLY";
+    }
+    else
+    {
+      suffix = "LIMIT 1";
+    }
+    
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "SELECT patientId FROM PatientRecyclingOrder "
-      "WHERE patientId != ${id} ORDER BY seq ASC LIMIT 1");
+      "WHERE patientId != ${id} ORDER BY seq ASC " + suffix);
 
     statement.SetReadOnly(true);
     statement.SetParameterType("id", ValueType_Integer64);
@@ -2246,13 +2289,23 @@ namespace OrthancDatabases
   void IndexBackend::TagMostRecentPatient(DatabaseManager& manager,
                                           int64_t patient)
   {
+    std::string suffix;
+    if (manager.GetDialect() == Dialect_MSSQL)
+    {
+      suffix = "OFFSET 0 ROWS FETCH FIRST 2 ROWS ONLY";
+    }
+    else
+    {
+      suffix = "LIMIT 2";
+    }
+
     int64_t seq;
     
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "SELECT * FROM PatientRecyclingOrder WHERE seq >= "
-        "(SELECT seq FROM PatientRecyclingOrder WHERE patientid=${id}) ORDER BY seq LIMIT 2");
+        "(SELECT seq FROM PatientRecyclingOrder WHERE patientid=${id}) ORDER BY seq " + suffix);
 
       statement.SetReadOnly(true);
       statement.SetParameterType("id", ValueType_Integer64);
@@ -2300,7 +2353,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO PatientRecyclingOrder VALUES({AUTOINCREMENT} ${id})");
+        "INSERT INTO PatientRecyclingOrder VALUES(${AUTOINCREMENT} ${id})");
         
       statement.SetParameterType("id", ValueType_Integer64);
         
