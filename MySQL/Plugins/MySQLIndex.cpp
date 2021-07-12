@@ -352,6 +352,12 @@ namespace OrthancDatabases
                                   DatabaseManager& manager,
                                   int64_t id)
   {
+    /**
+     * Contrarily to PostgreSQL and SQLite, the MySQL dialect doesn't
+     * support cascaded delete inside the same table. This has to be
+     * manually reimplemented.
+     **/
+    
     ClearDeletedFiles(manager);
 
     // Recursive exploration of resources to be deleted, from the "id"

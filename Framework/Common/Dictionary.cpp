@@ -34,7 +34,7 @@
 
 namespace OrthancDatabases
 {
-  Dictionary::~Dictionary()
+  void Dictionary::Clear()
   {
     for (Values::iterator it = values_.begin(); 
          it != values_.end(); ++it)
@@ -42,8 +42,10 @@ namespace OrthancDatabases
       assert(it->second != NULL);
       delete it->second;
     }
-  }
 
+    values_.clear();
+  }
+  
 
   bool Dictionary::HasKey(const std::string& key) const
   {

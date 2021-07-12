@@ -356,20 +356,14 @@ namespace OrthancDatabases
   
   void DatabaseManager::StatementBase::SetResult(IResult* result)
   {
-    std::unique_ptr<IResult> protection(result);
-    
-    if (result_.get() != NULL)
-    {
-      LOG(ERROR) << "Cannot execute twice a statement";
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
-
     if (result == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
-
-    result_.reset(protection.release());
+    else
+    {
+      result_.reset(result);
+    }
   }
 
   

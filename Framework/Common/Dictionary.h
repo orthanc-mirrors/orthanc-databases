@@ -36,7 +36,12 @@ namespace OrthancDatabases
     Values  values_;
 
   public:
-    ~Dictionary();
+    ~Dictionary()
+    {
+      Clear();
+    }
+
+    void Clear();
 
     bool HasKey(const std::string& key) const;
 
