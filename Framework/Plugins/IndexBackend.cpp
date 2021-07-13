@@ -126,8 +126,8 @@ namespace OrthancDatabases
       output.AnswerChange(
         statement.ReadInteger64(0),
         statement.ReadInteger32(1),
-        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(3)),
-        GetPublicId(manager, statement.ReadInteger64(2)),
+        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(2)),
+        statement.ReadString(3),
         statement.ReadString(4));
 
       statement.Next();
@@ -571,7 +571,9 @@ namespace OrthancDatabases
     
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM Changes WHERE seq>${since} ORDER BY seq " + suffix);
+      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Changes.date, "
+      "Resources.publicId FROM Changes INNER JOIN Resources "
+      "ON Changes.internalId = Resources.internalId WHERE seq>${since} ORDER BY seq " + suffix);
 
     statement.SetReadOnly(true);
     statement.SetParameterType("limit", ValueType_Integer64);
@@ -672,7 +674,9 @@ namespace OrthancDatabases
 
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM Changes ORDER BY seq DESC " + suffix);
+      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Changes.date, "
+      "Resources.publicId FROM Changes INNER JOIN Resources "
+      "ON Changes.internalId = Resources.internalId ORDER BY seq DESC " + suffix);
 
     statement.SetReadOnly(true);
       
@@ -2011,6 +2015,7 @@ namespace OrthancDatabases
     {
       switch (dialect_)
       {
+        case Dialect_MSSQL:
         case Dialect_SQLite:
         case Dialect_PostgreSQL:
           return "ESCAPE '\\'";
