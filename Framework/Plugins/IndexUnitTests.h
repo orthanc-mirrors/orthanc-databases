@@ -601,106 +601,131 @@ TEST(IndexBackend, Basic)
 
   for (size_t level = 0; level < 4; level++)
   {
-    // Test cascade up to the "patient" level
-    ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
+    for (size_t attachmentLevel = 0; attachmentLevel < 4; attachmentLevel++)
+    {
+      // Test cascade up to the "patient" level
+      ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
 
-    std::vector<int64_t> resources;
-    resources.push_back(db.CreateResource(*manager, "patient", OrthancPluginResourceType_Patient));
-    resources.push_back(db.CreateResource(*manager, "study", OrthancPluginResourceType_Study));
-    resources.push_back(db.CreateResource(*manager, "series", OrthancPluginResourceType_Series));
-    resources.push_back(db.CreateResource(*manager, "instance", OrthancPluginResourceType_Instance));
+      std::vector<int64_t> resources;
+      resources.push_back(db.CreateResource(*manager, "patient", OrthancPluginResourceType_Patient));
+      resources.push_back(db.CreateResource(*manager, "study", OrthancPluginResourceType_Study));
+      resources.push_back(db.CreateResource(*manager, "series", OrthancPluginResourceType_Series));
+      resources.push_back(db.CreateResource(*manager, "instance", OrthancPluginResourceType_Instance));
 
-    OrthancPluginAttachment a;
-    a.uuid = "attachment";
-    a.contentType = Orthanc::FileContentType_DicomAsJson;
-    a.uncompressedSize = 4242;
-    a.uncompressedHash = "md5";
-    a.compressionType = Orthanc::CompressionType_None;
-    a.compressedSize = 4242;
-    a.compressedHash = "md5";
-    db.AddAttachment(*manager, resources[2], a, 42);
+      OrthancPluginAttachment a;
+      a.uuid = "attachment";
+      a.contentType = Orthanc::FileContentType_DicomAsJson;
+      a.uncompressedSize = 4242;
+      a.uncompressedHash = "md5";
+      a.compressionType = Orthanc::CompressionType_None;
+      a.compressedSize = 4242;
+      a.compressedHash = "md5";
+      db.AddAttachment(*manager, resources[attachmentLevel], a, 42);
     
-    db.AttachChild(*manager, resources[0], resources[1]);
-    db.AttachChild(*manager, resources[1], resources[2]);
-    db.AttachChild(*manager, resources[2], resources[3]);
-    ASSERT_EQ(4u, db.GetAllResourcesCount(*manager));
+      db.AttachChild(*manager, resources[0], resources[1]);
+      db.AttachChild(*manager, resources[1], resources[2]);
+      db.AttachChild(*manager, resources[2], resources[3]);
+      ASSERT_EQ(4u, db.GetAllResourcesCount(*manager));
 
-    deletedAttachments.clear();
-    deletedResources.clear();
-    remainingAncestor.reset();
+      deletedAttachments.clear();
+      deletedResources.clear();
+      remainingAncestor.reset();
     
-    db.DeleteResource(*output, *manager, resources[level]);
+      db.DeleteResource(*output, *manager, resources[level]);
     
-    ASSERT_EQ(1u, deletedAttachments.size());
-    ASSERT_EQ("attachment", *deletedAttachments.begin());
-    ASSERT_EQ(4u, deletedResources.size());
-    ASSERT_EQ(OrthancPluginResourceType_Patient, deletedResources["patient"]);
-    ASSERT_EQ(OrthancPluginResourceType_Study, deletedResources["study"]);
-    ASSERT_EQ(OrthancPluginResourceType_Series, deletedResources["series"]);
-    ASSERT_EQ(OrthancPluginResourceType_Instance, deletedResources["instance"]);
-    ASSERT_TRUE(remainingAncestor.get() == NULL);
+      ASSERT_EQ(1u, deletedAttachments.size());
+      ASSERT_EQ("attachment", *deletedAttachments.begin());
+      ASSERT_EQ(4u, deletedResources.size());
+      ASSERT_EQ(OrthancPluginResourceType_Patient, deletedResources["patient"]);
+      ASSERT_EQ(OrthancPluginResourceType_Study, deletedResources["study"]);
+      ASSERT_EQ(OrthancPluginResourceType_Series, deletedResources["series"]);
+      ASSERT_EQ(OrthancPluginResourceType_Instance, deletedResources["instance"]);
+      ASSERT_TRUE(remainingAncestor.get() == NULL);
+    }
   }
 
   for (size_t level = 1; level < 4; level++)
   {
-    // Test remaining ancestor
-    ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
-
-    std::vector<int64_t> resources;
-    resources.push_back(db.CreateResource(*manager, "patient", OrthancPluginResourceType_Patient));
-    resources.push_back(db.CreateResource(*manager, "study", OrthancPluginResourceType_Study));
-    resources.push_back(db.CreateResource(*manager, "series", OrthancPluginResourceType_Series));
-    resources.push_back(db.CreateResource(*manager, "instance", OrthancPluginResourceType_Instance));
-
-    int64_t unrelated = db.CreateResource(*manager, "unrelated", OrthancPluginResourceType_Patient);
-    int64_t remaining = db.CreateResource(*manager, "remaining", static_cast<OrthancPluginResourceType>(level));
-
-    db.AttachChild(*manager, resources[0], resources[1]);
-    db.AttachChild(*manager, resources[1], resources[2]);
-    db.AttachChild(*manager, resources[2], resources[3]);
-    db.AttachChild(*manager, resources[level - 1], remaining);
-    ASSERT_EQ(6u, db.GetAllResourcesCount(*manager));
-    
-    deletedAttachments.clear();
-    deletedResources.clear();
-    remainingAncestor.reset();
-    
-    db.DeleteResource(*output, *manager, resources[3]);  // delete instance
-    
-    ASSERT_EQ(0u, deletedAttachments.size());
-    ASSERT_EQ(OrthancPluginResourceType_Instance, deletedResources["instance"]);
-    
-    ASSERT_TRUE(remainingAncestor.get() != NULL);
-    
-    switch (level)
+    for (size_t attachmentLevel = 0; attachmentLevel < 4; attachmentLevel++)
     {
-      case 1:
-        ASSERT_EQ(3u, deletedResources.size());
-        ASSERT_EQ(OrthancPluginResourceType_Study, deletedResources["study"]);
-        ASSERT_EQ(OrthancPluginResourceType_Series, deletedResources["series"]);
-        ASSERT_EQ("patient", remainingAncestor->first);
-        ASSERT_EQ(OrthancPluginResourceType_Patient, remainingAncestor->second);
-        break;
+      // Test remaining ancestor
+      ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
 
-      case 2:
-        ASSERT_EQ(2u, deletedResources.size());
-        ASSERT_EQ(OrthancPluginResourceType_Series, deletedResources["series"]);
-        ASSERT_EQ("study", remainingAncestor->first);
-        ASSERT_EQ(OrthancPluginResourceType_Study, remainingAncestor->second);
-        break;
+      std::vector<int64_t> resources;
+      resources.push_back(db.CreateResource(*manager, "patient", OrthancPluginResourceType_Patient));
+      resources.push_back(db.CreateResource(*manager, "study", OrthancPluginResourceType_Study));
+      resources.push_back(db.CreateResource(*manager, "series", OrthancPluginResourceType_Series));
+      resources.push_back(db.CreateResource(*manager, "instance", OrthancPluginResourceType_Instance));
 
-      case 3:
-        ASSERT_EQ(1u, deletedResources.size());
-        ASSERT_EQ("series", remainingAncestor->first);
-        ASSERT_EQ(OrthancPluginResourceType_Series, remainingAncestor->second);
-        break;
+      int64_t unrelated = db.CreateResource(*manager, "unrelated", OrthancPluginResourceType_Patient);
+      int64_t remaining = db.CreateResource(*manager, "remaining", static_cast<OrthancPluginResourceType>(level));
 
-      default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-    }
+      db.AttachChild(*manager, resources[0], resources[1]);
+      db.AttachChild(*manager, resources[1], resources[2]);
+      db.AttachChild(*manager, resources[2], resources[3]);
+      db.AttachChild(*manager, resources[level - 1], remaining);
+      ASSERT_EQ(6u, db.GetAllResourcesCount(*manager));
+
+      OrthancPluginAttachment a;
+      a.uuid = "attachment";
+      a.contentType = Orthanc::FileContentType_DicomAsJson;
+      a.uncompressedSize = 4242;
+      a.uncompressedHash = "md5";
+      a.compressionType = Orthanc::CompressionType_None;
+      a.compressedSize = 4242;
+      a.compressedHash = "md5";
+      db.AddAttachment(*manager, resources[attachmentLevel], a, 42);
+        
+      deletedAttachments.clear();
+      deletedResources.clear();
+      remainingAncestor.reset();
     
-    db.DeleteResource(*output, *manager, resources[0]);
-    db.DeleteResource(*output, *manager, unrelated);
+      db.DeleteResource(*output, *manager, resources[3]);  // delete instance
+
+      if (attachmentLevel < level)
+      {
+        ASSERT_EQ(0u, deletedAttachments.size());
+      }
+      else
+      {
+        ASSERT_EQ(1u, deletedAttachments.size());
+        ASSERT_EQ("attachment", *deletedAttachments.begin());
+      }
+      
+      ASSERT_EQ(OrthancPluginResourceType_Instance, deletedResources["instance"]);
+    
+      ASSERT_TRUE(remainingAncestor.get() != NULL);
+    
+      switch (level)
+      {
+        case 1:
+          ASSERT_EQ(3u, deletedResources.size());
+          ASSERT_EQ(OrthancPluginResourceType_Study, deletedResources["study"]);
+          ASSERT_EQ(OrthancPluginResourceType_Series, deletedResources["series"]);
+          ASSERT_EQ("patient", remainingAncestor->first);
+          ASSERT_EQ(OrthancPluginResourceType_Patient, remainingAncestor->second);
+          break;
+
+        case 2:
+          ASSERT_EQ(2u, deletedResources.size());
+          ASSERT_EQ(OrthancPluginResourceType_Series, deletedResources["series"]);
+          ASSERT_EQ("study", remainingAncestor->first);
+          ASSERT_EQ(OrthancPluginResourceType_Study, remainingAncestor->second);
+          break;
+
+        case 3:
+          ASSERT_EQ(1u, deletedResources.size());
+          ASSERT_EQ("series", remainingAncestor->first);
+          ASSERT_EQ(OrthancPluginResourceType_Series, remainingAncestor->second);
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+    
+      db.DeleteResource(*output, *manager, resources[0]);
+      db.DeleteResource(*output, *manager, unrelated);
+    }
   }
 
   manager->Close();
