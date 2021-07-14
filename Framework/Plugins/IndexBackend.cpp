@@ -201,24 +201,21 @@ namespace OrthancDatabases
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT * FROM DeletedFiles");
+      "SELECT uuid, fileType, uncompressedSize, uncompressedHash, compressionType, "
+      "compressedSize, compressedHash FROM DeletedFiles");
 
     statement.SetReadOnly(true);
     statement.Execute();
 
     while (!statement.IsDone())
     {
-      std::string a = statement.ReadString(0);
-      std::string b = statement.ReadString(5);
-      std::string c = statement.ReadString(6);
-
-      output.SignalDeletedAttachment(a.c_str(),
+      output.SignalDeletedAttachment(statement.ReadString(0),
                                      statement.ReadInteger32(1),
-                                     statement.ReadInteger64(3),
-                                     b.c_str(),
-                                     statement.ReadInteger32(4),
                                      statement.ReadInteger64(2),
-                                     c.c_str());
+                                     statement.ReadString(3),
+                                     statement.ReadInteger32(4),
+                                     statement.ReadInteger64(5),
+                                     statement.ReadString(6));
       
       statement.Next();
     }

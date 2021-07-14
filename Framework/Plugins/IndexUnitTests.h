@@ -675,6 +675,8 @@ TEST(IndexBackend, Basic)
       a.compressedSize = 4242;
       a.compressedHash = "md5";
       db.AddAttachment(*manager, resources[attachmentLevel], a, 42);
+
+      ASSERT_THROW(db.AddAttachment(*manager, resources[attachmentLevel], a, 43), Orthanc::OrthancException);
       
       deletedAttachments.clear();
       a.uuid = "attachment2";
