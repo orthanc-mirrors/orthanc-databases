@@ -675,7 +675,15 @@ TEST(IndexBackend, Basic)
       a.compressedSize = 4242;
       a.compressedHash = "md5";
       db.AddAttachment(*manager, resources[attachmentLevel], a, 42);
-        
+      
+      deletedAttachments.clear();
+      a.uuid = "attachment2";
+      db.DeleteAttachment(*output, *manager, resources[attachmentLevel], Orthanc::FileContentType_DicomAsJson);
+      ASSERT_EQ(1u, deletedAttachments.size());
+      ASSERT_EQ("attachment", *deletedAttachments.begin());
+      
+      db.AddAttachment(*manager, resources[attachmentLevel], a, 43);
+      
       deletedAttachments.clear();
       deletedResources.clear();
       remainingAncestor.reset();
@@ -689,7 +697,7 @@ TEST(IndexBackend, Basic)
       else
       {
         ASSERT_EQ(1u, deletedAttachments.size());
-        ASSERT_EQ("attachment", *deletedAttachments.begin());
+        ASSERT_EQ("attachment2", *deletedAttachments.begin());
       }
       
       ASSERT_EQ(OrthancPluginResourceType_Instance, deletedResources["instance"]);
