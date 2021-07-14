@@ -88,7 +88,7 @@ static void CheckAttachment(const OrthancPluginAttachment& attachment)
 
 static void CheckExportedResource(const OrthancPluginExportedResource& exported)
 {
-  ASSERT_EQ(expectedExported->seq, exported.seq);
+  // ASSERT_EQ(expectedExported->seq, exported.seq);
   ASSERT_EQ(expectedExported->resourceType, exported.resourceType);
   ASSERT_STREQ(expectedExported->publicId, exported.publicId);
   ASSERT_STREQ(expectedExported->modality, exported.modality);
@@ -228,7 +228,6 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
   ASSERT_EQ("6", s);
 
-  ASSERT_FALSE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
   db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9, "Hello");
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
   ASSERT_EQ("Hello", s);
@@ -491,7 +490,6 @@ TEST(IndexBackend, Basic)
 
   expectedExported.reset(new OrthancPluginExportedResource());
   *expectedExported = exp;
-  expectedExported->seq = 1;
 
   bool done;
   db.GetExportedResources(*output, done, *manager, 0, 10);
