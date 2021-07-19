@@ -75,8 +75,9 @@ add_library(FrameworkForPlugins STATIC
   Plugins/MySQLStorageArea.cpp
   )
 
-set_property(TARGET FrameworkForPlugins
-  PROPERTY POSITION_INDEPENDENT_CODE ON
+set_target_properties(FrameworkForPlugins PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=1
   )
 
 add_library(OrthancMySQLIndex SHARED
