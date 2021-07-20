@@ -210,10 +210,10 @@ TEST(IndexBackend, Basic)
 #elif ORTHANC_ENABLE_MYSQL == 1
   MySQLIndex db(&context, globalParameters_);
   db.SetClearAll(true);
-#elif ORTHANC_ENABLE_SQLITE == 1
-  SQLiteIndex db(&context);  // Open in memory
 #elif ORTHANC_ENABLE_ODBC == 1
   OdbcIndex db(&context, connectionString_);
+#elif ORTHANC_ENABLE_SQLITE == 1  // Must be the last one
+  SQLiteIndex db(&context);  // Open in memory
 #else
 #  error Unsupported database backend
 #endif
