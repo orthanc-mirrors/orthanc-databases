@@ -779,7 +779,9 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
     
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 9, 2)
     unsigned int attempt = 0;
+#endif
     
     for (;;)
     {
