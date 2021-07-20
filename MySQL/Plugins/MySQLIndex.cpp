@@ -368,7 +368,7 @@ namespace OrthancDatabases
     while (!done)
     {
       bool hasSibling = false;
-      int64_t parentId;
+      int64_t parentId = -1;  // Dummy initialization
       
       {
         DatabaseManager::CachedStatement lookupSiblings(

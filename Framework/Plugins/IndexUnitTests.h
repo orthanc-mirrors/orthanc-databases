@@ -612,15 +612,15 @@ TEST(IndexBackend, Basic)
       resources.push_back(db.CreateResource(*manager, "series", OrthancPluginResourceType_Series));
       resources.push_back(db.CreateResource(*manager, "instance", OrthancPluginResourceType_Instance));
 
-      OrthancPluginAttachment a;
-      a.uuid = "attachment";
-      a.contentType = Orthanc::FileContentType_DicomAsJson;
-      a.uncompressedSize = 4242;
-      a.uncompressedHash = "md5";
-      a.compressionType = Orthanc::CompressionType_None;
-      a.compressedSize = 4242;
-      a.compressedHash = "md5";
-      db.AddAttachment(*manager, resources[attachmentLevel], a, 42);
+      OrthancPluginAttachment d;
+      d.uuid = "attachment";
+      d.contentType = Orthanc::FileContentType_DicomAsJson;
+      d.uncompressedSize = 4242;
+      d.uncompressedHash = "md5";
+      d.compressionType = Orthanc::CompressionType_None;
+      d.compressedSize = 4242;
+      d.compressedHash = "md5";
+      db.AddAttachment(*manager, resources[attachmentLevel], d, 42);
     
       db.AttachChild(*manager, resources[0], resources[1]);
       db.AttachChild(*manager, resources[1], resources[2]);
@@ -666,23 +666,23 @@ TEST(IndexBackend, Basic)
       db.AttachChild(*manager, resources[level - 1], remaining);
       ASSERT_EQ(6u, db.GetAllResourcesCount(*manager));
 
-      OrthancPluginAttachment a;
-      a.uuid = "attachment";
-      a.contentType = Orthanc::FileContentType_DicomAsJson;
-      a.uncompressedSize = 4242;
-      a.uncompressedHash = "md5";
-      a.compressionType = Orthanc::CompressionType_None;
-      a.compressedSize = 4242;
-      a.compressedHash = "md5";
-      db.AddAttachment(*manager, resources[attachmentLevel], a, 42);
+      OrthancPluginAttachment d;
+      d.uuid = "attachment";
+      d.contentType = Orthanc::FileContentType_DicomAsJson;
+      d.uncompressedSize = 4242;
+      d.uncompressedHash = "md5";
+      d.compressionType = Orthanc::CompressionType_None;
+      d.compressedSize = 4242;
+      d.compressedHash = "md5";
+      db.AddAttachment(*manager, resources[attachmentLevel], d, 42);
 
       deletedAttachments.clear();
-      a.uuid = "attachment2";
+      d.uuid = "attachment2";
       db.DeleteAttachment(*output, *manager, resources[attachmentLevel], Orthanc::FileContentType_DicomAsJson);
       ASSERT_EQ(1u, deletedAttachments.size());
       ASSERT_EQ("attachment", *deletedAttachments.begin());
       
-      db.AddAttachment(*manager, resources[attachmentLevel], a, 43);
+      db.AddAttachment(*manager, resources[attachmentLevel], d, 43);
       
       deletedAttachments.clear();
       deletedResources.clear();
