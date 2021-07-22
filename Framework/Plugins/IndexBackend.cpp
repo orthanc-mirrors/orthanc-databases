@@ -568,8 +568,8 @@ namespace OrthancDatabases
     
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Changes.date, "
-      "Resources.publicId FROM Changes INNER JOIN Resources "
+      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, "
+      "Changes.date FROM Changes INNER JOIN Resources "
       "ON Changes.internalId = Resources.internalId WHERE seq>${since} ORDER BY seq " + suffix);
 
     statement.SetReadOnly(true);
@@ -671,8 +671,8 @@ namespace OrthancDatabases
 
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
-      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Changes.date, "
-      "Resources.publicId FROM Changes INNER JOIN Resources "
+      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, "
+      "Changes.date FROM Changes INNER JOIN Resources "
       "ON Changes.internalId = Resources.internalId ORDER BY seq DESC " + suffix);
 
     statement.SetReadOnly(true);

@@ -1,6 +1,8 @@
 Pending changes in the mainline
 ===============================
 
+* Fix issue 200 (fields messed up in /changes route)
+
 
 Release 4.2 (2021-07-20)
 ========================
