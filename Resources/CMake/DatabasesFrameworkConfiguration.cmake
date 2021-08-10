@@ -47,6 +47,10 @@ if (ENABLE_MYSQL_BACKEND)
   endif()
 endif()
 
+if (ENABLE_ODBC_BACKEND)
+endif()
+  
+
 
 #####################################################################
 ## Configure the Orthanc Framework
@@ -170,4 +174,27 @@ if (ENABLE_POSTGRESQL_BACKEND)
 else()
   unset(USE_SYSTEM_LIBPQ CACHE)
   add_definitions(-DORTHANC_ENABLE_POSTGRESQL=0)
+endif()
+
+
+
+#####################################################################
+## Configure ODBC if need be
+#####################################################################
+
+if (ENABLE_ODBC_BACKEND)
+  include(${CMAKE_CURRENT_LIST_DIR}/UnixOdbcConfiguration.cmake)
+  add_definitions(-DORTHANC_ENABLE_ODBC=1)
+  list(APPEND DATABASES_SOURCES
+    ${ORTHANC_DATABASES_ROOT}/Framework/Odbc/OdbcDatabase.cpp
+    ${ORTHANC_DATABASES_ROOT}/Framework/Odbc/OdbcEnvironment.cpp
+    ${ORTHANC_DATABASES_ROOT}/Framework/Odbc/OdbcPreparedStatement.cpp
+    ${ORTHANC_DATABASES_ROOT}/Framework/Odbc/OdbcResult.cpp
+    ${ORTHANC_DATABASES_ROOT}/Framework/Odbc/OdbcStatement.cpp
+    ${LIBPQ_SOURCES}
+    )
+else()
+  unset(USE_SYSTEM_UNIX_ODBC)
+  unset(USE_SYSTEM_LTDL)
+  add_definitions(-DORTHANC_ENABLE_ODBC=0)
 endif()

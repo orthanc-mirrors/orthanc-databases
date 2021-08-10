@@ -36,6 +36,11 @@ endif()
 set(USE_SYSTEM_LIBPQ ON CACHE BOOL "Use the system version of the PostgreSQL client library")
 set(USE_SYSTEM_MYSQL_CLIENT ON CACHE BOOL "Use the system version of the MySQL client library")
 
+if (NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(USE_SYSTEM_UNIX_ODBC ON CACHE BOOL "Use the system version of unixODBC")
+  set(USE_SYSTEM_LTDL ON CACHE BOOL "Use the system version of libltdl")
+endif()
+
 
 #####################################################################
 ## Internal CMake parameters to enable the optional subcomponents of
@@ -43,5 +48,6 @@ set(USE_SYSTEM_MYSQL_CLIENT ON CACHE BOOL "Use the system version of the MySQL c
 #####################################################################
 
 set(ENABLE_MYSQL_BACKEND OFF)
+set(ENABLE_ODBC_BACKEND OFF)
 set(ENABLE_POSTGRESQL_BACKEND OFF)
 set(ENABLE_SQLITE_BACKEND OFF)
