@@ -369,7 +369,7 @@ int main(int argc, char **argv)
   ::testing::InitGoogleTest(&argc, argv);
   Orthanc::Logging::Initialize();
   Orthanc::Logging::EnableInfoLevel(true);
-  Orthanc::Logging::EnableTraceLevel(true);
+  // Orthanc::Logging::EnableTraceLevel(true);
   Orthanc::Toolbox::InitializeOpenSsl();
   Orthanc::HttpClient::GlobalInitialize();
   

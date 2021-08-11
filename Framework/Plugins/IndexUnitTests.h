@@ -66,6 +66,29 @@ namespace Orthanc
 }
 
 
+/**
+ * This is a sample UTF8 string that is the concatenation of a Korean
+ * and a Kanji text. Check out "utf8raw" in
+ * "OrthancFramework/UnitTestsSources/FromDcmtkTests.cpp" for the
+ * sources of these binary values.
+ **/
+static const uint8_t UTF8[] = {
+  // cf. TEST(Toolbox, EncodingsKorean)
+  0x48, 0x6f, 0x6e, 0x67, 0x5e, 0x47, 0x69, 0x6c, 0x64, 0x6f, 0x6e, 0x67, 0x3d, 0xe6,
+  0xb4, 0xaa, 0x5e, 0xe5, 0x90, 0x89, 0xe6, 0xb4, 0x9e, 0x3d, 0xed, 0x99, 0x8d, 0x5e,
+  0xea, 0xb8, 0xb8, 0xeb, 0x8f, 0x99,
+  
+  // cf. TEST(Toolbox, EncodingsJapaneseKanji)
+  0x59, 0x61, 0x6d, 0x61, 0x64, 0x61, 0x5e, 0x54, 0x61, 0x72, 0x6f, 0x75, 0x3d, 0xe5,
+  0xb1, 0xb1, 0xe7, 0x94, 0xb0, 0x5e, 0xe5, 0xa4, 0xaa, 0xe9, 0x83, 0x8e, 0x3d, 0xe3,
+  0x82, 0x84, 0xe3, 0x81, 0xbe, 0xe3, 0x81, 0xa0, 0x5e, 0xe3, 0x81, 0x9f, 0xe3, 0x82,
+  0x8d, 0xe3, 0x81, 0x86,
+
+  // End of text
+  0x00
+};
+
+
 static std::unique_ptr<OrthancPluginAttachment>  expectedAttachment;
 static std::list<OrthancPluginDicomTag>  expectedDicomTags;
 static std::unique_ptr<OrthancPluginExportedResource>  expectedExported;
@@ -73,6 +96,7 @@ static std::unique_ptr<OrthancPluginExportedResource>  expectedExported;
 static std::map<std::string, OrthancPluginResourceType> deletedResources;
 static std::unique_ptr< std::pair<std::string, OrthancPluginResourceType> > remainingAncestor;
 static std::set<std::string> deletedAttachments;
+static unsigned int countDicomTags = 0;
 
 
 static void CheckAttachment(const OrthancPluginAttachment& attachment)
@@ -152,6 +176,7 @@ static OrthancPluginErrorCode InvokeService(struct _OrthancPluginContext_t* cont
           const OrthancPluginDicomTag& tag = 
             *reinterpret_cast<const OrthancPluginDicomTag*>(answer.valueGeneric);
           CheckDicomTag(tag);
+          countDicomTags++;
           break;
         }
 
@@ -325,9 +350,9 @@ TEST(IndexBackend, Basic)
   ASSERT_EQ(0, revision);
 #endif
 
-  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, "update", 44);
+  db.SetMetadata(*manager, a, Orthanc::MetadataType_LastUpdate, reinterpret_cast<const char*>(UTF8), 44);
   ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
-  ASSERT_EQ("update", s);
+  ASSERT_STREQ(reinterpret_cast<const char*>(UTF8), s.c_str());
 
 #if HAS_REVISIONS == 1
   ASSERT_EQ(44, revision);
@@ -351,7 +376,7 @@ TEST(IndexBackend, Basic)
 #endif
 
   ASSERT_TRUE(db.LookupMetadata(mdd, revision, *manager, a, Orthanc::MetadataType_LastUpdate));
-  ASSERT_EQ("update", mdd);
+  ASSERT_EQ(reinterpret_cast<const char*>(UTF8), mdd);
 
 #if HAS_REVISIONS == 1
   ASSERT_EQ(44, revision);
@@ -451,21 +476,29 @@ TEST(IndexBackend, Basic)
   db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(0u, fc.size());
 
-
   db.SetIdentifierTag(*manager, a, 0x0010, 0x0020, "patient");
   db.SetIdentifierTag(*manager, a, 0x0020, 0x000d, "study");
+  db.SetMainDicomTag(*manager, a, 0x0010, 0x0020, "patient");
+  db.SetMainDicomTag(*manager, a, 0x0020, 0x000d, "study");
+  db.SetMainDicomTag(*manager, a, 0x0008, 0x1030, reinterpret_cast<const char*>(UTF8));
 
   expectedDicomTags.clear();
   expectedDicomTags.push_back(OrthancPluginDicomTag());
+  expectedDicomTags.back().group = 0x0010;
+  expectedDicomTags.back().element = 0x0020;
+  expectedDicomTags.back().value = "patient";
   expectedDicomTags.push_back(OrthancPluginDicomTag());
-  expectedDicomTags.front().group = 0x0010;
-  expectedDicomTags.front().element = 0x0020;
-  expectedDicomTags.front().value = "patient";
   expectedDicomTags.back().group = 0x0020;
   expectedDicomTags.back().element = 0x000d;
   expectedDicomTags.back().value = "study";
-  db.GetMainDicomTags(*output, *manager, a);
+  expectedDicomTags.push_back(OrthancPluginDicomTag());
+  expectedDicomTags.back().group = 0x0008;
+  expectedDicomTags.back().element = 0x1030;
+  expectedDicomTags.back().value = reinterpret_cast<const char*>(UTF8);
 
+  countDicomTags = 0;
+  db.GetMainDicomTags(*output, *manager, a);
+  ASSERT_EQ(3u, countDicomTags);
 
   db.LookupIdentifier(ci, *manager, OrthancPluginResourceType_Study, 0x0010, 0x0020, 
                       OrthancPluginIdentifierConstraint_Equal, "patient");

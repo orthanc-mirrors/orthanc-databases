@@ -130,7 +130,7 @@ int main(int argc, char **argv)
   Orthanc::Toolbox::InitializeOpenSsl();
   Orthanc::Logging::Initialize();
   Orthanc::Logging::EnableInfoLevel(true);
-  Orthanc::Logging::EnableTraceLevel(true);
+  //Orthanc::Logging::EnableTraceLevel(true);
 
   int result = RUN_ALL_TESTS();
 
