@@ -49,5 +49,7 @@ namespace OrthancDatabases
 
     static std::string FormatError(SQLHANDLE handle,
                                    SQLSMALLINT type);
+
+    static void GlobalInitialization();
   };
 }

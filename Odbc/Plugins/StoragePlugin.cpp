@@ -148,6 +148,8 @@ extern "C"
       return 0;
     }
 
+    OrthancDatabases::OdbcEnvironment::GlobalInitialization();
+
     try
     {
       const std::string connectionString = odbc.GetStringValue("StorageConnectionString", "");

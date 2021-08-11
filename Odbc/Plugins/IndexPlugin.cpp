@@ -21,6 +21,7 @@
 
 #include "OdbcIndex.h"
 
+#include "../../Framework/Odbc/OdbcEnvironment.h"
 #include "../../Framework/Plugins/PluginInitialization.h"
 #include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
 
@@ -83,6 +84,8 @@ extern "C"
                    << "to \"true\" in the \"" << KEY_ODBC << "\" section of the configuration file of Orthanc";
       return 0;
     }
+
+    OrthancDatabases::OdbcEnvironment::GlobalInitialization();
 
     try
     {

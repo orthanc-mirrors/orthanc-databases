@@ -94,4 +94,17 @@ namespace OrthancDatabases
       }
     }
   }
+
+
+  void OdbcEnvironment::GlobalInitialization()
+  {
+    /**
+     * Explicitly inform the ODBC driver that the application is using
+     * UTF-8, by making sure that default "C" locale is used. We are
+     * in the scenario "ANSI application with a Unicode driver".
+     * https://docs.microsoft.com/en-us/sql/connect/odbc/linux-mac/programming-guidelines
+     * https://www.progress.com/tutorials/odbc/unicode
+     **/
+    setlocale(LC_ALL, "C");
+  }
 }

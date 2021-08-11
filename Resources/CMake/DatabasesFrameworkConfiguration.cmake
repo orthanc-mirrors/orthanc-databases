@@ -183,7 +183,10 @@ endif()
 #####################################################################
 
 if (ENABLE_ODBC_BACKEND)
-  include(${CMAKE_CURRENT_LIST_DIR}/UnixOdbcConfiguration.cmake)
+  if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    include(${CMAKE_CURRENT_LIST_DIR}/UnixOdbcConfiguration.cmake)
+  endif()
+  
   add_definitions(-DORTHANC_ENABLE_ODBC=1)
   list(APPEND DATABASES_SOURCES
     ${ORTHANC_DATABASES_ROOT}/Framework/Odbc/OdbcDatabase.cpp

@@ -23,6 +23,7 @@
 
 static std::string connectionString_;
 
+#include "../../Framework/Odbc/OdbcEnvironment.h"
 #include "../../Framework/Plugins/IndexUnitTests.h"
 
 #include <Logging.h>
@@ -84,6 +85,8 @@ int main(int argc, char **argv)
   Orthanc::Logging::Initialize();
   Orthanc::Logging::EnableInfoLevel(true);
   //Orthanc::Logging::EnableTraceLevel(true);
+
+  OrthancDatabases::OdbcEnvironment::GlobalInitialization();
 
   int result = RUN_ALL_TESTS();
   
