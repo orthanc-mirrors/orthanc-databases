@@ -183,7 +183,9 @@ endif()
 #####################################################################
 
 if (ENABLE_ODBC_BACKEND)
-  if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+  if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
+    link_libraries(odbc32)
+  else()
     include(${CMAKE_CURRENT_LIST_DIR}/UnixOdbcConfiguration.cmake)
   endif()
   
