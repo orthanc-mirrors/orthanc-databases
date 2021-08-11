@@ -23,7 +23,7 @@ If you downloaded this project as a versioned release package
 (.tar.gz) focused on one given RDBMS, you will only find the folders
 that are related to this specific RDBMS. The full source code is
 available at:
-https://bitbucket.org/sjodogne/orthanc-databases/
+https://hg.orthanc-server.com/orthanc-databases/
 
 
 Compilation and usage
@@ -44,7 +44,7 @@ that was only focused on PostgreSQL.
 
 Releases <= 2.1 of the PostgreSQL plugins can still be found in the
 following legacy repository:
-https://bitbucket.org/sjodogne/orthanc-postgresql/
+https://hg.orthanc-server.com/orthanc-postgresql/
 
 
 Licensing
