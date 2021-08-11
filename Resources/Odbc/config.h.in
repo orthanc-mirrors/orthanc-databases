@@ -489,13 +489,13 @@
 #cmakedefine _THREAD_SAFE
 
 /* Define so that glibc/gnulib argp.h does not typedef error_t. */
-#cmakedefine __error_t_defined
+#cmakedefine __error_t_defined @__error_t_defined@
 
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
 
 /* Define to a type to use for 'error_t' if it is not otherwise available. */
-#undef error_t
+#cmakedefine error_t @error_t@
 
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef gid_t

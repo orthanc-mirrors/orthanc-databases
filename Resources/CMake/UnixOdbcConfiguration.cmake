@@ -50,6 +50,22 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_UNIX_ODBC)
       ${UNIX_ODBC_SOURCES_DIR}/libltdl/ltdl.c
       ${UNIX_ODBC_SOURCES_DIR}/libltdl/slist.c
       )
+
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+      set(OSXHEADER 1)
+      set(__error_t_defined 1)
+      set(error_t int)
+
+      # NB: The lines below might also be used for compatibility with
+      # LSB target version 4.0 instead of 5.0 (untested)
+      configure_file(
+        ${UNIX_ODBC_SOURCES_DIR}/libltdl/libltdl/lt__argz_.h
+        ${UNIX_ODBC_SOURCES_DIR}/libltdl/libltdl/lt__argz.h
+        COPYONLY)
+      list(APPEND LTDL_SOURCES
+        ${UNIX_ODBC_SOURCES_DIR}/libltdl/lt__argz.c
+        )
+    endif()
   else()
     check_include_file("libltdl/lt_dlloader.h"  HAVE_LT_DLLOADER_H)
     if (NOT HAVE_LT_DLLOADER_H)
