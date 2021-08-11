@@ -21,6 +21,7 @@
 
 #include "OdbcStatement.h"
 
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"  // For ORTHANC_PLUGINS_VERSION_IS_ABOVE
 #include "OdbcEnvironment.h"
 
 #include <Logging.h>

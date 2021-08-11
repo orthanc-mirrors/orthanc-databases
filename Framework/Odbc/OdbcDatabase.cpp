@@ -21,6 +21,7 @@
 
 #include "OdbcDatabase.h"
 
+#include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"  // For ORTHANC_PLUGINS_VERSION_IS_ABOVE
 #include "../Common/ImplicitTransaction.h"
 #include "../Common/RetryDatabaseFactory.h"
 #include "../Common/Utf8StringValue.h"
