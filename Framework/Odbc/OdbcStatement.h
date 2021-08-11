@@ -40,7 +40,7 @@ namespace OrthancDatabases
     SQLHSTMT handle_;
       
   public:
-    OdbcStatement(SQLHSTMT databaseHandle);
+    explicit OdbcStatement(SQLHSTMT databaseHandle);
 
     ~OdbcStatement();
 

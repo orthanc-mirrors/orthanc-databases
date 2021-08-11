@@ -70,7 +70,7 @@ namespace OrthancDatabases
     }
       
   public:
-    OdbcImplicitTransaction(OdbcDatabase& db) :
+    explicit OdbcImplicitTransaction(OdbcDatabase& db) :
       db_(db)
     {
       SetAutoCommitTransaction(db_.GetHandle(), true);
@@ -123,7 +123,11 @@ namespace OrthancDatabases
 
           if (state == "40001")
           {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
             throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+#else
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
+#endif
           }
         }
         
@@ -142,7 +146,7 @@ namespace OrthancDatabases
     }
       
   public:
-    OdbcExplicitTransaction(OdbcDatabase& db) :
+    explicit OdbcExplicitTransaction(OdbcDatabase& db) :
       db_(db),
       isOpen_(true)
     {
@@ -504,7 +508,7 @@ namespace OrthancDatabases
       }
 
       
-      void CheckMSSQLEncodings(OdbcDatabase& db)
+      void CheckMSSQLEncodings(const OdbcDatabase& db)
       {
         // https://en.wikipedia.org/wiki/History_of_Microsoft_SQL_Server
         if (db.GetDbmsMajorVersion() <= 14)
@@ -541,7 +545,7 @@ namespace OrthancDatabases
       }
 
 
-      void CheckMySQLEncodings(OdbcDatabase& db)
+      void CheckMySQLEncodings(const OdbcDatabase& db)
       {
         // https://dev.mysql.com/doc/connector-odbc/en/connector-odbc-configuration-connection-parameters.html
 
