@@ -17,6 +17,7 @@ Content
 * ./Framework/  : code shared by all the plugins
 * ./MySQL/      : index and storage plugins for MySQL and MariaDB
 * ./PostgreSQL/ : index and storage plugins for PostgreSQL
+* ./Odbc/       : index and storage plugins for Odbc
 * ./SQLite/     : index plugin for SQLite (for experimentation)
 
 If you downloaded this project as a versioned release package
@@ -34,6 +35,7 @@ Book:
 
 * MySQL/MariaDB : http://book.orthanc-server.com/plugins/mysql.html
 * PostgreSQL    : http://book.orthanc-server.com/plugins/postgresql.html
+* ODBC          : http://book.orthanc-server.com/plugins/odbc.html
 
 
 Older releases of PostgreSQL
