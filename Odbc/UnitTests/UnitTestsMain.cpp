@@ -30,7 +30,6 @@ static std::string connectionString_;
 
 
 #if defined(_WIN32)
-#  warning Strings have not been tested on Windows (UTF16 issues ahead)!
 #  include <windows.h>
 #else
 #  include <ltdl.h>

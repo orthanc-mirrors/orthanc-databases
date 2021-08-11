@@ -29,7 +29,11 @@
 
 
 #if defined(_WIN32)
-#  warning Strings have not been tested on Windows (UTF-16 issues ahead)!
+#  ifdef _MSC_VER
+#    pragma message("Warning: Strings have not been tested on Windows (UTF-16 issues ahead)!")
+#  else
+#    warning Strings have not been tested on Windows (UTF-16 issues ahead)!
+#  endif
 #  include <windows.h>
 #else
 #  include <ltdl.h>
