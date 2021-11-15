@@ -172,6 +172,14 @@ namespace Orthanc
             {
               escaped += "_";
             }
+            else if (value[i] == '[')
+            {
+              escaped += "\\[";
+            }
+            else if (value[i] == ']')
+            {
+              escaped += "\\]";
+            }
             else if (value[i] == '%')
             {
               escaped += "\\%";

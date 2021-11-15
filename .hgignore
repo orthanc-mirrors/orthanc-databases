@@ -1,4 +1,7 @@
 build*
 PostgreSQL/CMakeLists.txt.user
 PostgreSQL/ThirdPartyDownloads/
+Odbc/ThirdPartyDownloads/
+MySQL/ThirdPartyDownloads/
+.vscode/
 
