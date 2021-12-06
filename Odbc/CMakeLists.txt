@@ -20,7 +20,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(OrthancOdbc)
 
-set(ORTHANC_PLUGIN_VERSION "mainline")
+set(ORTHANC_PLUGIN_VERSION "1.1")
 
 set(ORTHANC_OPTIMAL_VERSION_MAJOR    1)
 set(ORTHANC_OPTIMAL_VERSION_MINOR    9)
