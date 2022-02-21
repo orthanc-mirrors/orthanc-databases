@@ -29,10 +29,7 @@ endif()
 if (ENABLE_POSTGRESQL_BACKEND)
   set(ENABLE_CRYPTO_OPTIONS ON)
   set(ENABLE_ZLIB ON)
-
-  if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(ENABLE_OPENSSL_ENGINES ON)
-  endif()
+  set(ENABLE_OPENSSL_ENGINES ON)
 endif()
 
 if (ENABLE_MYSQL_BACKEND)
@@ -41,10 +38,7 @@ if (ENABLE_MYSQL_BACKEND)
   set(ENABLE_ZLIB ON)
   set(ENABLE_LOCALE ON)      # iconv is needed
   set(ENABLE_WEB_CLIENT ON)  # libcurl is needed
-
-  if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(ENABLE_OPENSSL_ENGINES ON)
-  endif()
+  set(ENABLE_OPENSSL_ENGINES ON)
 endif()
 
 if (ENABLE_ODBC_BACKEND)

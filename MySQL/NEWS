@@ -1,6 +1,9 @@
 Pending changes in the mainline
 ===============================
 
+* Upgraded dependencies for static builds (notably on Windows and LSB):
+  - openssl 3.0.1
+
 
 Release 4.3 (2021-07-22)
 ========================

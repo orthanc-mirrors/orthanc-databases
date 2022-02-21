@@ -38,7 +38,7 @@ set(ENABLE_SSL ON)
 include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginParameters.cmake)
 
 set(ENABLE_POSTGRESQL_BACKEND ON)
-set(OPENSSL_STATIC_VERSION "1.1.1" CACHE STRING "Force the use of OpenSSL 1.1.1" FORCE)
+set(OPENSSL_STATIC_VERSION "3.0" CACHE STRING "Force the use of OpenSSL 3.0.x" FORCE)
 
 include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginConfiguration.cmake)
 
