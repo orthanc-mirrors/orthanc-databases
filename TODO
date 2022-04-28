@@ -23,6 +23,14 @@ Common - Storage area
 * Performance: Add a pool of connections to PostgreSQL/MySQL, as
   already done in the database index plugins
 
+----------
+PostgreSQL
+----------
+
+* reported issue to validate:  uploading lots of files through HTTP with:
+  - 1 client and IndexConnectionsCount==1 took 100s
+  - 2 client and IndexConnectionsCount==2 took 600s (lots of transaction replayed)
+
 
 -----
 MySQL
