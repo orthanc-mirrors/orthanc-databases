@@ -31,6 +31,8 @@ PostgreSQL
   - 1 client and IndexConnectionsCount==1 took 100s
   - 2 client and IndexConnectionsCount==2 took 600s (lots of transaction replayed)
 
+* Reduce the verbosity of some error messages: 
+  https://groups.google.com/g/orthanc-users/c/1bkClfZ0KBA/m/s4AlwVh3CQAJ
 
 -----
 MySQL
