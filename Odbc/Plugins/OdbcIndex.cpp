@@ -160,6 +160,49 @@ namespace OrthancDatabases
     return OdbcDatabase::CreateDatabaseFactory(maxConnectionRetries_, connectionRetryInterval_, connectionString_, true);
   }
   
+  static void AdaptTypesToDialect(std::string& sql, Dialect dialect)
+  {
+    switch (dialect)
+    {
+      case Dialect_SQLite:
+        boost::replace_all(sql, "${LONGTEXT}", "TEXT");
+        boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT");
+        boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "NULL, ");
+        break;
+      
+      case Dialect_PostgreSQL:
+        boost::replace_all(sql, "${LONGTEXT}", "TEXT");
+        boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "BIGSERIAL NOT NULL PRIMARY KEY");
+        boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "DEFAULT, ");
+        break;
+      
+      case Dialect_MySQL:
+        boost::replace_all(sql, "${LONGTEXT}", "LONGTEXT");
+        boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY");
+        boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "NULL, ");
+        break;
+
+      case Dialect_MSSQL:
+        /**
+         * cf. OMSSQL-5: Use VARCHAR(MAX) instead of TEXT: (1)
+         * Microsoft issued a warning stating that "ntext, text, and
+         * image data types will be removed in a future version of
+         * SQL Server"
+         * (https://msdn.microsoft.com/en-us/library/ms187993.aspx),
+         * and (2) SQL Server does not support comparison of TEXT
+         * with '=' operator (e.g. in WHERE statements such as
+         * IndexBackend::LookupIdentifier())."
+         **/
+        boost::replace_all(sql, "${LONGTEXT}", "VARCHAR(MAX)");
+        boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "BIGINT IDENTITY NOT NULL PRIMARY KEY");
+        boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "");
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+  }
+
   
   void OdbcIndex::ConfigureDatabase(DatabaseManager& manager)
   {
@@ -185,46 +228,8 @@ namespace OrthancDatabases
     {
       std::string sql;
       Orthanc::EmbeddedResources::GetFileResource(sql, Orthanc::EmbeddedResources::ODBC_PREPARE_INDEX);
-
-      switch (db.GetDialect())
-      {
-        case Dialect_SQLite:
-          boost::replace_all(sql, "${LONGTEXT}", "TEXT");
-          boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT");
-          boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "NULL, ");
-          break;
-        
-        case Dialect_PostgreSQL:
-          boost::replace_all(sql, "${LONGTEXT}", "TEXT");
-          boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "BIGSERIAL NOT NULL PRIMARY KEY");
-          boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "DEFAULT, ");
-          break;
-        
-        case Dialect_MySQL:
-          boost::replace_all(sql, "${LONGTEXT}", "LONGTEXT");
-          boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY");
-          boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "NULL, ");
-          break;
-
-        case Dialect_MSSQL:
-          /**
-           * cf. OMSSQL-5: Use VARCHAR(MAX) instead of TEXT: (1)
-           * Microsoft issued a warning stating that "ntext, text, and
-           * image data types will be removed in a future version of
-           * SQL Server"
-           * (https://msdn.microsoft.com/en-us/library/ms187993.aspx),
-           * and (2) SQL Server does not support comparison of TEXT
-           * with '=' operator (e.g. in WHERE statements such as
-           * IndexBackend::LookupIdentifier())."
-           **/
-          boost::replace_all(sql, "${LONGTEXT}", "VARCHAR(MAX)");
-          boost::replace_all(sql, "${AUTOINCREMENT_TYPE}", "BIGINT IDENTITY NOT NULL PRIMARY KEY");
-          boost::replace_all(sql, "${AUTOINCREMENT_INSERT}", "");
-          break;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-      }
+      
+      AdaptTypesToDialect(sql, db.GetDialect());
 
       {
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
@@ -236,6 +241,22 @@ namespace OrthancDatabases
           // Switch to the collation that is the default since MySQL
           // 8.0.1. This must be *after* the creation of the tables.
           db.ExecuteMultiLines("ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        }
+
+        { // v 4.X: add customData
+          int patchLevel;
+      
+          if (!LookupGlobalIntegerProperty(patchLevel, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+          {
+            std::string sqlAddCustomData = "ALTER TABLE AttachedFiles ADD customData ${LONGTEXT};"
+                                           "ALTER TABLE DeletedFiles ADD customData ${LONGTEXT}";
+
+            AdaptTypesToDialect(sqlAddCustomData, db.GetDialect());
+
+            db.ExecuteMultiLines(sqlAddCustomData);
+            
+            SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
+          }
         }
 
         t.Commit();

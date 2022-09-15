@@ -294,6 +294,49 @@ namespace OrthancDatabases
           t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN revision INTEGER");
         }
 
+        // new in v 4.X
+        if (!db.DoesColumnExist("DeletedFiles", "revision"))
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE DeletedFiles ADD COLUMN revision INTEGER");
+        }
+
+        if (!db.DoesColumnExist("AttachedFiles", "customData"))
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN customData TEXT");
+        }
+
+        if (!db.DoesColumnExist("DeletedFiles", "customData"))
+        {
+          // add the column and modify the trigger
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE DeletedFiles ADD COLUMN customData TEXT");
+
+          t.GetDatabaseTransaction().ExecuteMultiLines(
+            "DROP TRIGGER AttachedFileDeleted ON AttachedFiles");
+
+          t.GetDatabaseTransaction().ExecuteMultiLines(
+            "DROP FUNCTION AttachedFileDeletedFunc");
+
+          t.GetDatabaseTransaction().ExecuteMultiLines(
+            "CREATE FUNCTION AttachedFileDeletedFunc() "
+            "RETURNS TRIGGER AS $body$"
+            "BEGIN"
+            "  INSERT INTO DeletedFiles VALUES"
+            "    (old.uuid, old.filetype, old.compressedSize,"
+            "     old.uncompressedSize, old.compressionType,"
+            "     old.uncompressedHash, old.compressedHash,"
+            "     old.revision, old.customData);"
+            "  RETURN NULL;"
+            "END;"
+            "$body$ LANGUAGE plpgsql;");
+
+          t.GetDatabaseTransaction().ExecuteMultiLines(
+            "CREATE TRIGGER AttachedFileDeleted "
+            "AFTER DELETE ON AttachedFiles "
+            "FOR EACH ROW "
+            "EXECUTE PROCEDURE AttachedFileDeletedFunc();"
+          );
+        }
+
         t.Commit();
       }
     }

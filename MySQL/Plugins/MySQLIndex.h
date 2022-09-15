@@ -47,7 +47,12 @@ namespace OrthancDatabases
  
     virtual bool HasRevisionsSupport() const ORTHANC_OVERRIDE
     {
-      return false;  // TODO - REVISIONS
+      return true;
+    }
+
+    virtual bool HasAttachmentCustomDataSupport() const ORTHANC_OVERRIDE
+    {
+      return true;
     }
     
     virtual int64_t CreateResource(DatabaseManager& manager,

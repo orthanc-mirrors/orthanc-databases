@@ -30,6 +30,7 @@ CREATE TABLE Metadata(
        id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
        type INTEGER NOT NULL,
        value TEXT,
+       -- revision INTEGER,                   -- new in v4.0 (this column is added in PostgreSQLIndex::ConfigureDatabase)
        PRIMARY KEY(id, type)
        );
 
@@ -42,6 +43,8 @@ CREATE TABLE AttachedFiles(
        compressionType INTEGER,
        uncompressedHash VARCHAR(40),
        compressedHash VARCHAR(40),
+       -- revision BIGINT,                    -- new in v 4.0 (this column is added in PostgreSQLIndex::ConfigureDatabase)
+       -- customData TEXT,                    -- new in v 4.X (this column is added in PostgreSQLIndex::ConfigureDatabase)
        PRIMARY KEY(id, fileType)
        );              
 
@@ -112,7 +115,9 @@ BEGIN
   INSERT INTO DeletedFiles VALUES
     (old.uuid, old.filetype, old.compressedSize,
      old.uncompressedSize, old.compressionType,
-     old.uncompressedHash, old.compressedHash);
+     old.uncompressedHash, old.compressedHash
+     -- old.customData                        -- new in v 4.X (this column is added in PostgreSQLIndex::ConfigureDatabase)
+     );
   RETURN NULL;
 END;
 $body$ LANGUAGE plpgsql;

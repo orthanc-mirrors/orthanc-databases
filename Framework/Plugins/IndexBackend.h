@@ -85,7 +85,16 @@ namespace OrthancDatabases
                                int64_t id,
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) ORTHANC_OVERRIDE;
-    
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+
+    virtual void AddAttachment2(DatabaseManager& manager,
+                               int64_t id,
+                               const OrthancPluginAttachment2& attachment,
+                               int64_t revision) ORTHANC_OVERRIDE;
+
+#endif
+
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,
                              int64_t child) ORTHANC_OVERRIDE;

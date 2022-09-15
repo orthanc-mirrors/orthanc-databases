@@ -79,6 +79,7 @@ list(APPEND DATABASES_SOURCES
   ${ORTHANC_CORE_SOURCES}
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/DatabaseBackendAdapterV2.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/DatabaseBackendAdapterV3.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/DatabaseBackendAdapterV4.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/IndexBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Databases/DatabaseConstraint.cpp

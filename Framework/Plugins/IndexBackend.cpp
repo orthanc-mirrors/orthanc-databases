@@ -27,6 +27,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "DatabaseBackendAdapterV2.h"
 #include "DatabaseBackendAdapterV3.h"
+#include "DatabaseBackendAdapterV4.h"
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -202,7 +203,7 @@ namespace OrthancDatabases
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "SELECT uuid, fileType, uncompressedSize, uncompressedHash, compressionType, "
-      "compressedSize, compressedHash FROM DeletedFiles");
+      "compressedSize, compressedHash, revision, customData FROM DeletedFiles");
 
     statement.SetReadOnly(true);
     statement.Execute();
@@ -215,7 +216,8 @@ namespace OrthancDatabases
                                      statement.ReadString(3),
                                      statement.ReadInteger32(4),
                                      statement.ReadInteger64(5),
-                                     statement.ReadString(6));
+                                     statement.ReadString(6),
+                                     statement.ReadString(8));
       
       statement.Next();
     }
@@ -282,12 +284,25 @@ namespace OrthancDatabases
     }
   }
 
-
-  static void ExecuteAddAttachment(DatabaseManager::CachedStatement& statement,
-                                   Dictionary& args,
+  static void ExecuteAddAttachment(DatabaseManager& manager,
                                    int64_t id,
-                                   const OrthancPluginAttachment& attachment)
+                                   const char* uuid,
+                                   int32_t     contentType,
+                                   uint64_t    uncompressedSize,
+                                   const char* uncompressedHash,
+                                   int32_t     compressionType,
+                                   uint64_t    compressedSize,
+                                   const char* compressedHash,
+                                   const char* customData,
+                                   int64_t     revision)
   {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
+      "${uncompressed}, ${compression}, ${hash}, ${hash-compressed}, ${revision}, ${custom-data})");
+
+    Dictionary args;
+
     statement.SetParameterType("id", ValueType_Integer64);
     statement.SetParameterType("type", ValueType_Integer64);
     statement.SetParameterType("uuid", ValueType_Utf8String);
@@ -296,51 +311,45 @@ namespace OrthancDatabases
     statement.SetParameterType("compression", ValueType_Integer64);
     statement.SetParameterType("hash", ValueType_Utf8String);
     statement.SetParameterType("hash-compressed", ValueType_Utf8String);
+    statement.SetParameterType("revision", ValueType_Integer64);
+    statement.SetParameterType("custom-data", ValueType_Utf8String);
 
     args.SetIntegerValue("id", id);
-    args.SetIntegerValue("type", attachment.contentType);
-    args.SetUtf8Value("uuid", attachment.uuid);
-    args.SetIntegerValue("compressed", attachment.compressedSize);
-    args.SetIntegerValue("uncompressed", attachment.uncompressedSize);
-    args.SetIntegerValue("compression", attachment.compressionType);
-    args.SetUtf8Value("hash", attachment.uncompressedHash);
-    args.SetUtf8Value("hash-compressed", attachment.compressedHash);
+    args.SetIntegerValue("type", contentType);
+    args.SetUtf8Value("uuid", uuid);
+    args.SetIntegerValue("compressed", compressedSize);
+    args.SetIntegerValue("uncompressed", uncompressedSize);
+    args.SetIntegerValue("compression", compressionType);
+    args.SetUtf8Value("hash", uncompressedHash);
+    args.SetUtf8Value("hash-compressed", compressedHash);
+    args.SetIntegerValue("revision", revision);
+    args.SetUtf8Value("custom-data", customData);
 
     statement.Execute(args);
   }
 
-  
+
   void IndexBackend::AddAttachment(DatabaseManager& manager,
                                    int64_t id,
                                    const OrthancPluginAttachment& attachment,
                                    int64_t revision)
   {
-    if (HasRevisionsSupport())
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
-        "${uncompressed}, ${compression}, ${hash}, ${hash-compressed}, ${revision})");
-
-      Dictionary args;
-
-      statement.SetParameterType("revision", ValueType_Integer64);
-      args.SetIntegerValue("revision", revision);
-      
-      ExecuteAddAttachment(statement, args, id, attachment);
-    }
-    else
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
-        "${uncompressed}, ${compression}, ${hash}, ${hash-compressed})");
-
-      Dictionary args;
-      ExecuteAddAttachment(statement, args, id, attachment);
-    }
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins supports these features now
+    ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
+                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash, "", revision);
   }
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+  void IndexBackend::AddAttachment2(DatabaseManager& manager,
+                                   int64_t id,
+                                   const OrthancPluginAttachment2& attachment,
+                                   int64_t revision)
+  {
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins supports these features now
+    ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
+                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash, attachment.customData, revision);
+  }
+#endif
     
   void IndexBackend::AttachChild(DatabaseManager& manager,
                                  int64_t parent,
@@ -1037,12 +1046,21 @@ namespace OrthancDatabases
     statement.Execute(args);
   }
 
-
-  static bool ExecuteLookupAttachment(DatabaseManager::CachedStatement& statement,
-                                      IDatabaseBackendOutput& output,
+    
+  /* Use GetOutput().AnswerAttachment() */
+  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
+                                      int64_t& revision /*out*/,
+                                      DatabaseManager& manager,
                                       int64_t id,
                                       int32_t contentType)
   {
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // we force v4 plugins to support both ! 
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
+      "compressedHash, revision, customData FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
+
+
     statement.SetReadOnly(true);
     statement.SetParameterType("id", ValueType_Integer64);
     statement.SetParameterType("type", ValueType_Integer64);
@@ -1059,64 +1077,35 @@ namespace OrthancDatabases
     }
     else
     {
+      if (statement.GetResultField(6).GetType() == ValueType_Null)
+      {
+        // "NULL" can happen with a database created by PostgreSQL
+        // plugin <= 3.3 (because of "ALTER TABLE AttachedFiles")
+        revision = 0;
+      }
+      else
+      {
+        revision = statement.ReadInteger64(6);
+      }
+
+      std::string customData;
+      if (statement.GetResultField(7).GetType() == ValueType_Utf8String) // column has been added in 1.12.0
+      {
+        customData = statement.ReadString(7);
+      }
+
+
       output.AnswerAttachment(statement.ReadString(0),
                               contentType,
                               statement.ReadInteger64(1),
                               statement.ReadString(4),
                               statement.ReadInteger32(2),
                               statement.ReadInteger64(3),
-                              statement.ReadString(5));
+                              statement.ReadString(5),
+                              customData);
       return true;
     }
-  }
-                                      
-  
-    
-  /* Use GetOutput().AnswerAttachment() */
-  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
-                                      int64_t& revision /*out*/,
-                                      DatabaseManager& manager,
-                                      int64_t id,
-                                      int32_t contentType)
-  {
-    if (HasRevisionsSupport())
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
-        "compressedHash, revision FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
-      
-      if (ExecuteLookupAttachment(statement, output, id, contentType))
-      {
-        if (statement.GetResultField(6).GetType() == ValueType_Null)
-        {
-          // "NULL" can happen with a database created by PostgreSQL
-          // plugin <= 3.3 (because of "ALTER TABLE AttachedFiles")
-          revision = 0;
-        }
-        else
-        {
-          revision = statement.ReadInteger64(6);
-        }
-        
-        return true;
-      }
-      else
-      {
-        return false;
-      }
-    }
-    else
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
-        "compressedHash FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
-      
-      revision = 0;
 
-      return ExecuteLookupAttachment(statement, output, id, contentType);
-    }
   }
 
 
@@ -2609,22 +2598,31 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     
-    bool hasLoadedV3 = false;
+    bool hasLoadedV3OrAbove = false;
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
+    {
+      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
+                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
+      
+      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      hasLoadedV3OrAbove = true;
+    }
+#  elif ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
       LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
                    << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
       
       OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
-      hasLoadedV3 = true;
+      hasLoadedV3OrAbove = true;
     }
 #  endif
 #endif
 
-    if (!hasLoadedV3)
+    if (!hasLoadedV3OrAbove)
     {
       LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
       OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);

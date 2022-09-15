@@ -50,6 +50,11 @@ namespace OrthancDatabases
       return true;
     }
     
+    virtual bool HasAttachmentCustomDataSupport() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
                                    OrthancPluginResourceType type)

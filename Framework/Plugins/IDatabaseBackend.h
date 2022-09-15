@@ -50,10 +50,20 @@ namespace OrthancDatabases
 
     virtual bool HasRevisionsSupport() const = 0;
 
+    virtual bool HasAttachmentCustomDataSupport() const = 0;
+
     virtual void AddAttachment(DatabaseManager& manager,
                                int64_t id,
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) = 0;
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+
+    virtual void AddAttachment2(DatabaseManager& manager,
+                               int64_t id,
+                               const OrthancPluginAttachment2& attachment,
+                               int64_t revision) = 0;
+#endif
 
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,
