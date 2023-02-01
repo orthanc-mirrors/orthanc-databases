@@ -387,7 +387,7 @@ namespace OrthancDatabases
 
     OrthancPluginResourceType type;
     bool hasParent;
-    int64_t parentId;
+    int64_t parentId = 0;
 
     {
       DatabaseManager::CachedStatement lookupResource(
@@ -482,7 +482,7 @@ namespace OrthancDatabases
 
     bool hasRemainingAncestor = false;
     std::string remainingAncestor;
-    OrthancPluginResourceType ancestorType;
+    OrthancPluginResourceType ancestorType = OrthancPluginResourceType_None;
     
     if (hasParent)
     {
