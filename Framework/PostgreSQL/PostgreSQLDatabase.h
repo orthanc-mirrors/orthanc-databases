@@ -36,6 +36,7 @@ namespace OrthancDatabases
   private:
     friend class PostgreSQLStatement;
     friend class PostgreSQLLargeObject;
+    friend class PostgreSQLTransaction;
 
     class Factory;
 
@@ -99,5 +100,17 @@ namespace OrthancDatabases
     static IDatabaseFactory* CreateDatabaseFactory(const PostgreSQLParameters& parameters);
 
     static PostgreSQLDatabase* CreateDatabaseConnection(const PostgreSQLParameters& parameters);
+
+  protected:
+    const std::string& GetReadWriteTransactionStatement() const
+    {
+      return parameters_.GetReadWriteTransactionStatement();
+    }
+
+    const std::string& GetReadOnlyTransactionStatement() const
+    {
+      return parameters_.GetReadOnlyTransactionStatement();
+    }
+
   };
 }

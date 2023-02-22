@@ -4,6 +4,13 @@ Pending changes in the mainline
 * Upgraded dependencies for static builds (notably on Windows and LSB):
   - openssl 3.0.1
 
+* Experimental debug feature:
+  Introduced 2 new configurations with these default values:
+    "ReadOnlyTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY"
+    "ReadWriteTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE"
+  You can now customize the transaction isolation level.
+  If setting these values to "", no statement is run and therefore, the default DB or server
+  isolation level is used.
 
 Release 4.0 (2021-04-22)
 ========================

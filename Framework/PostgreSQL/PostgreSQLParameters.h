@@ -43,6 +43,8 @@ namespace OrthancDatabases
     bool         lock_;
     unsigned int maxConnectionRetries_;
     unsigned int connectionRetryInterval_;
+    std::string  readWriteTransactionStatement_;
+    std::string  readOnlyTransactionStatement_;
 
     void Reset();
 
@@ -123,6 +125,26 @@ namespace OrthancDatabases
     unsigned int GetConnectionRetryInterval() const
     {
       return connectionRetryInterval_;
+    }
+
+    void SetReadWriteTransactionStatement(const std::string& statement)
+    {
+      readWriteTransactionStatement_ = statement;
+    }
+
+    void SetReadOnlyTransactionStatement(const std::string& statement)
+    {
+      readOnlyTransactionStatement_ = statement;
+    }
+
+    const std::string& GetReadWriteTransactionStatement() const
+    {
+      return readWriteTransactionStatement_;
+    }
+
+    const std::string& GetReadOnlyTransactionStatement() const
+    {
+      return readOnlyTransactionStatement_;
     }
 
     void Format(std::string& target) const;
