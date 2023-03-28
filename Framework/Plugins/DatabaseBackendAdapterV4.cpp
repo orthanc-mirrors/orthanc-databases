@@ -46,14 +46,66 @@ namespace OrthancDatabases
   static bool isBackendInUse_ = false;  // Only for sanity checks
 
 
+  static Orthanc::DatabasePluginMessages::ResourceType Convert(OrthancPluginResourceType resourceType)
+  {
+    switch (resourceType)
+    {
+      case OrthancPluginResourceType_Patient:
+        return Orthanc::DatabasePluginMessages::RESOURCE_PATIENT;
+
+      case OrthancPluginResourceType_Study:
+        return Orthanc::DatabasePluginMessages::RESOURCE_STUDY;
+
+      case OrthancPluginResourceType_Series:
+        return Orthanc::DatabasePluginMessages::RESOURCE_SERIES;
+
+      case OrthancPluginResourceType_Instance:
+        return Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+
+  static OrthancPluginResourceType Convert(Orthanc::DatabasePluginMessages::ResourceType resourceType)
+  {
+    switch (resourceType)
+    {
+      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
+        return OrthancPluginResourceType_Patient;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
+        return OrthancPluginResourceType_Study;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
+        return OrthancPluginResourceType_Series;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
+        return OrthancPluginResourceType_Instance;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+
   class Output : public IDatabaseBackendOutput
   {
   private:
-    Orthanc::DatabasePluginMessages::DeleteAttachment::Response*  deleteAttachment_;
+    Orthanc::DatabasePluginMessages::DeleteAttachment::Response*     deleteAttachment_;
+    Orthanc::DatabasePluginMessages::DeleteResource::Response*       deleteResource_;
+    Orthanc::DatabasePluginMessages::GetChanges::Response*           getChanges_;
+    Orthanc::DatabasePluginMessages::GetExportedResources::Response* getExportedResources_;
+    Orthanc::DatabasePluginMessages::GetLastChange::Response*        getLastChange_;
 
     void Clear()
     {
       deleteAttachment_ = NULL;
+      deleteResource_ = NULL;
+      getChanges_ = NULL;
+      getExportedResources_ = NULL;
+      getLastChange_ = NULL;
     }
     
   public:
@@ -61,6 +113,30 @@ namespace OrthancDatabases
     {
       Clear();
       deleteAttachment_ = &deleteAttachment;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::DeleteResource::Response& deleteResource)
+    {
+      Clear();
+      deleteResource_ = &deleteResource;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetChanges::Response& getChanges)
+    {
+      Clear();
+      getChanges_ = &getChanges;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
+    {
+      Clear();
+      getExportedResources_ = &getExportedResources;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetLastChange::Response& getLastChange)
+    {
+      Clear();
+      getLastChange_ = &getLastChange;
     }
     
     virtual void SignalDeletedAttachment(const std::string& uuid,
@@ -72,6 +148,7 @@ namespace OrthancDatabases
                                          const std::string& compressedHash) ORTHANC_OVERRIDE
     {
       Orthanc::DatabasePluginMessages::FileInfo* attachment;
+
       if (deleteAttachment_ != NULL)
       {
         if (deleteAttachment_->has_deleted_attachment())
@@ -80,6 +157,10 @@ namespace OrthancDatabases
         }
         
         attachment = deleteAttachment_->mutable_deleted_attachment();
+      }
+      else if (deleteResource_ != NULL)
+      {
+        attachment = deleteResource_->add_deleted_attachments();
       }
       else
       {
@@ -98,13 +179,38 @@ namespace OrthancDatabases
     virtual void SignalDeletedResource(const std::string& publicId,
                                        OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (deleteResource_ != NULL)
+      {
+        Orthanc::DatabasePluginMessages::DeleteResource_Response_Resource* resource = deleteResource_->add_deleted_resources();
+        resource->set_level(Convert(resourceType));
+        resource->set_public_id(publicId);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
 
     virtual void SignalRemainingAncestor(const std::string& ancestorId,
                                          OrthancPluginResourceType ancestorType) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (deleteResource_ != NULL)
+      {
+        if (deleteResource_->is_remaining_ancestor())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+        else
+        {
+          deleteResource_->set_is_remaining_ancestor(true);
+          deleteResource_->mutable_remaining_ancestor()->set_level(Convert(ancestorType));
+          deleteResource_->mutable_remaining_ancestor()->set_public_id(ancestorId);
+        }
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
     
     virtual void AnswerAttachment(const std::string& uuid,
@@ -124,7 +230,32 @@ namespace OrthancDatabases
                               const std::string&         publicId,
                               const std::string&         date) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      Orthanc::DatabasePluginMessages::ServerIndexChange* change;
+      
+      if (getChanges_ != NULL)
+      {
+        change = getChanges_->add_changes();
+      }
+      else if (getLastChange_ != NULL)
+      {
+        if (getLastChange_->exists())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+
+        getLastChange_->set_exists(true);
+        change = getLastChange_->mutable_change();
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+
+      change->set_seq(seq);
+      change->set_change_type(changeType);
+      change->set_resource_type(Convert(resourceType));
+      change->set_public_id(publicId);
+      change->set_date(date);
     }
 
     virtual void AnswerDicomTag(uint16_t group,
@@ -144,7 +275,23 @@ namespace OrthancDatabases
                                         const std::string&         seriesInstanceUid,
                                         const std::string&         sopInstanceUid) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (getExportedResources_ != NULL)
+      {
+        Orthanc::DatabasePluginMessages::ExportedResource* resource = getExportedResources_->add_resources();
+        resource->set_seq(seq);
+        resource->set_resource_type(Convert(resourceType));
+        resource->set_public_id(publicId);
+        resource->set_modality(modality);
+        resource->set_date(date);
+        resource->set_patient_id(patientId);
+        resource->set_study_instance_uid(studyInstanceUid);
+        resource->set_series_instance_uid(seriesInstanceUid);
+        resource->set_sop_instance_uid(sopInstanceUid);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
     
     virtual void AnswerMatchingResource(const std::string& resourceId) ORTHANC_OVERRIDE
@@ -291,6 +438,122 @@ namespace OrthancDatabases
         break;
       }
       
+      case Orthanc::DatabasePluginMessages::OPERATION_DELETE_RESOURCE:
+      {
+        response.mutable_delete_resource()->set_is_remaining_ancestor(false);
+
+        Output output(*response.mutable_delete_resource());
+        transaction.GetBackend().DeleteResource(output, transaction.GetManager(), request.delete_resource().id());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_METADATA:
+      {
+        typedef std::map<int32_t, std::string>  Values;
+
+        Values values;
+        transaction.GetBackend().GetAllMetadata(values, transaction.GetManager(), request.get_all_metadata().id());
+
+        for (Values::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          Orthanc::DatabasePluginMessages::GetAllMetadata_Response_Metadata* metadata = response.mutable_get_all_metadata()->add_metadata();
+          metadata->set_type(it->first);
+          metadata->set_value(it->second);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_PUBLIC_IDS:
+      {
+        std::list<std::string>  values;
+        transaction.GetBackend().GetAllPublicIds(values, transaction.GetManager(), Convert(request.get_all_public_ids().resource_type()));
+
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_all_public_ids()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_PUBLIC_IDS_WITH_LIMITS:
+      {
+        std::list<std::string>  values;
+        transaction.GetBackend().GetAllPublicIds(values, transaction.GetManager(),
+                                                 Convert(request.get_all_public_ids_with_limits().resource_type()),
+                                                 request.get_all_public_ids_with_limits().since(),
+                                                 request.get_all_public_ids_with_limits().limit());
+
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_all_public_ids_with_limits()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES:
+      {
+        Output output(*response.mutable_get_changes());
+
+        bool done;
+        transaction.GetBackend().GetChanges(output, done, transaction.GetManager(),
+                                            request.get_changes().since(),
+                                            request.get_changes().limit());
+
+        response.mutable_get_changes()->set_done(done);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_INTERNAL_ID:
+      {
+        std::list<int64_t>  values;
+        transaction.GetBackend().GetChildrenInternalId(values, transaction.GetManager(), request.get_children_internal_id().id());
+
+        for (std::list<int64_t>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_children_internal_id()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_PUBLIC_ID:
+      {
+        std::list<std::string>  values;
+        transaction.GetBackend().GetChildrenPublicId(values, transaction.GetManager(), request.get_children_public_id().id());
+
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_children_public_id()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_EXPORTED_RESOURCES:
+      {
+        Output output(*response.mutable_get_exported_resources());
+
+        bool done;
+        transaction.GetBackend().GetExportedResources(output, done, transaction.GetManager(),
+                                                      request.get_exported_resources().since(),
+                                                      request.get_exported_resources().limit());
+
+        response.mutable_get_exported_resources()->set_done(done);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_CHANGE:
+      {
+        response.mutable_get_last_change()->set_exists(false);
+
+        Output output(*response.mutable_get_last_change());
+        transaction.GetBackend().GetLastChange(output, transaction.GetManager());
+        break;
+      }
+
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
