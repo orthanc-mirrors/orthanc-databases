@@ -1988,6 +1988,8 @@ namespace OrthancDatabases
                                           size_t countConnections,
                                           unsigned int maxDatabaseRetries)
   {
+    std::unique_ptr<IndexBackend> protection(backend);
+    
     if (isBackendInUse_)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
@@ -2071,12 +2073,13 @@ namespace OrthancDatabases
     params.setProtectedPatient = SetProtectedPatient;
     params.setResourcesContent = SetResourcesContent;
 
-    OrthancPluginContext* context = backend->GetContext();
+    OrthancPluginContext* context = protection->GetContext();
  
     if (OrthancPluginRegisterDatabaseBackendV3(
           context, &params, sizeof(params), maxDatabaseRetries,
-          new Adapter(backend, countConnections)) != OrthancPluginErrorCode_Success)
+          new Adapter(protection.release(), countConnections)) != OrthancPluginErrorCode_Success)
     {
+      delete backend;
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }
 

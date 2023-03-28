@@ -28,18 +28,12 @@
 #include "../Common/Utf8StringValue.h"
 #include "DatabaseBackendAdapterV2.h"
 #include "DatabaseBackendAdapterV3.h"
+#include "DatabaseBackendAdapterV4.h"
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
-
-
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
-#    include "OrthancDatabasePlugin.pb.h"   // Include protobuf messages
-#  endif
-#endif
 
 
 namespace OrthancDatabases
@@ -2617,13 +2611,23 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     
+    LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
+                 << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
+      
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
+    {
+      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      return;
+    }
+#  endif
+#endif
+
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
-                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
-      
       OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
       return;
     }
