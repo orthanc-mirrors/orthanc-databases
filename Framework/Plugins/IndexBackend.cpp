@@ -35,6 +35,13 @@
 #include <OrthancException.h>
 
 
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+#    include "OrthancDatabasePlugin.pb.h"   // Include protobuf messages
+#  endif
+#endif
+
+
 namespace OrthancDatabases
 {
   static std::string ConvertWildcardToLike(const std::string& query)
@@ -2610,8 +2617,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     
-    bool hasLoadedV3 = false;
-      
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
@@ -2620,16 +2625,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                    << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
       
       OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
-      hasLoadedV3 = true;
+      return;
     }
 #  endif
 #endif
 
-    if (!hasLoadedV3)
-    {
-      LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
-      OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
-    }
+    LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
+    OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
   }
 
 
