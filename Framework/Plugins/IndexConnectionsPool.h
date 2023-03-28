@@ -26,6 +26,8 @@
 
 #include <MultiThreading/SharedMessageQueue.h>
 
+#include <list>
+
 namespace OrthancDatabases
 {
   class IndexConnectionsPool : public boost::noncopyable
@@ -41,7 +43,7 @@ namespace OrthancDatabases
     Orthanc::SharedMessageQueue    availableConnections_;
 
   public:
-    IndexConnectionsPool(IndexBackend* backend,
+    IndexConnectionsPool(IndexBackend* backend /* takes ownership */,
                          size_t countConnections);
 
     ~IndexConnectionsPool();
