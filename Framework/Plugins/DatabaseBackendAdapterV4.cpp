@@ -93,11 +93,13 @@ namespace OrthancDatabases
   class Output : public IDatabaseBackendOutput
   {
   private:
-    Orthanc::DatabasePluginMessages::DeleteAttachment::Response*     deleteAttachment_;
-    Orthanc::DatabasePluginMessages::DeleteResource::Response*       deleteResource_;
-    Orthanc::DatabasePluginMessages::GetChanges::Response*           getChanges_;
-    Orthanc::DatabasePluginMessages::GetExportedResources::Response* getExportedResources_;
-    Orthanc::DatabasePluginMessages::GetLastChange::Response*        getLastChange_;
+    Orthanc::DatabasePluginMessages::DeleteAttachment::Response*         deleteAttachment_;
+    Orthanc::DatabasePluginMessages::DeleteResource::Response*           deleteResource_;
+    Orthanc::DatabasePluginMessages::GetChanges::Response*               getChanges_;
+    Orthanc::DatabasePluginMessages::GetExportedResources::Response*     getExportedResources_;
+    Orthanc::DatabasePluginMessages::GetLastChange::Response*            getLastChange_;
+    Orthanc::DatabasePluginMessages::GetLastExportedResource::Response*  getLastExportedResource_;
+    Orthanc::DatabasePluginMessages::GetMainDicomTags::Response*         getMainDicomTags_;
 
     void Clear()
     {
@@ -106,6 +108,7 @@ namespace OrthancDatabases
       getChanges_ = NULL;
       getExportedResources_ = NULL;
       getLastChange_ = NULL;
+      getLastExportedResource_ = NULL;
     }
     
   public:
@@ -137,6 +140,18 @@ namespace OrthancDatabases
     {
       Clear();
       getLastChange_ = &getLastChange;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetLastExportedResource::Response& getLastExportedResource)
+    {
+      Clear();
+      getLastExportedResource_ = &getLastExportedResource;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetMainDicomTags::Response& getMainDicomTags)
+    {
+      Clear();
+      getMainDicomTags_ = &getMainDicomTags;
     }
     
     virtual void SignalDeletedAttachment(const std::string& uuid,
@@ -262,7 +277,16 @@ namespace OrthancDatabases
                                 uint16_t element,
                                 const std::string& value) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (getMainDicomTags_ != NULL)
+      {
+        Orthanc::DatabasePluginMessages::GetMainDicomTags_Response_Tag* tag = getMainDicomTags_->add_tags();
+        tag->set_key((static_cast<uint32_t>(group) << 16) + static_cast<uint32_t>(element));
+        tag->set_value(value);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
 
     virtual void AnswerExportedResource(int64_t                    seq,
@@ -275,23 +299,36 @@ namespace OrthancDatabases
                                         const std::string&         seriesInstanceUid,
                                         const std::string&         sopInstanceUid) ORTHANC_OVERRIDE
     {
+      Orthanc::DatabasePluginMessages::ExportedResource* resource;
+
       if (getExportedResources_ != NULL)
       {
-        Orthanc::DatabasePluginMessages::ExportedResource* resource = getExportedResources_->add_resources();
-        resource->set_seq(seq);
-        resource->set_resource_type(Convert(resourceType));
-        resource->set_public_id(publicId);
-        resource->set_modality(modality);
-        resource->set_date(date);
-        resource->set_patient_id(patientId);
-        resource->set_study_instance_uid(studyInstanceUid);
-        resource->set_series_instance_uid(seriesInstanceUid);
-        resource->set_sop_instance_uid(sopInstanceUid);
+        resource = getExportedResources_->add_resources();
+      }
+      else if (getLastExportedResource_ != NULL)
+      {
+        if (getLastExportedResource_->exists())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+
+        getLastExportedResource_->set_exists(true);
+        resource = getLastExportedResource_->mutable_resource();
       }
       else
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
       }
+      
+      resource->set_seq(seq);
+      resource->set_resource_type(Convert(resourceType));
+      resource->set_public_id(publicId);
+      resource->set_modality(modality);
+      resource->set_date(date);
+      resource->set_patient_id(patientId);
+      resource->set_study_instance_uid(studyInstanceUid);
+      resource->set_series_instance_uid(seriesInstanceUid);
+      resource->set_sop_instance_uid(sopInstanceUid);
     }
     
     virtual void AnswerMatchingResource(const std::string& resourceId) ORTHANC_OVERRIDE
@@ -379,19 +416,20 @@ namespace OrthancDatabases
   
   static void ProcessTransactionOperation(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                           const Orthanc::DatabasePluginMessages::TransactionRequest& request,
-                                          IndexConnectionsPool::Accessor& transaction)
+                                          IndexBackend& backend,
+                                          DatabaseManager& manager)
   {
     switch (request.operation())
     {
       case Orthanc::DatabasePluginMessages::OPERATION_ROLLBACK:
       {
-        transaction.GetManager().RollbackTransaction();
+        manager.RollbackTransaction();
         break;
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_COMMIT:
       {
-        transaction.GetManager().CommitTransaction();
+        manager.CommitTransaction();
         break;
       }
       
@@ -406,35 +444,32 @@ namespace OrthancDatabases
         attachment.compressedSize = request.add_attachment().attachment().compressed_size();
         attachment.compressedHash = request.add_attachment().attachment().compressed_hash().c_str();
         
-        transaction.GetBackend().AddAttachment(transaction.GetManager(), request.add_attachment().id(), attachment,
-                                               request.add_attachment().revision());
+        backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision());
         break;
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_CHANGES:
       {
-        transaction.GetBackend().ClearChanges(transaction.GetManager());
+        backend.ClearChanges(manager);
         break;
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_EXPORTED_RESOURCES:
       {
-        transaction.GetBackend().ClearExportedResources(transaction.GetManager());
+        backend.ClearExportedResources(manager);
         break;
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_DELETE_ATTACHMENT:
       {
         Output output(*response.mutable_delete_attachment());
-        transaction.GetBackend().DeleteAttachment(
-          output, transaction.GetManager(), request.delete_attachment().id(), request.delete_attachment().type());
+        backend.DeleteAttachment(output, manager, request.delete_attachment().id(), request.delete_attachment().type());
         break;
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_DELETE_METADATA:
       {
-        transaction.GetBackend().DeleteMetadata(
-          transaction.GetManager(), request.delete_metadata().id(), request.delete_metadata().type());
+        backend.DeleteMetadata(manager, request.delete_metadata().id(), request.delete_metadata().type());
         break;
       }
       
@@ -443,7 +478,7 @@ namespace OrthancDatabases
         response.mutable_delete_resource()->set_is_remaining_ancestor(false);
 
         Output output(*response.mutable_delete_resource());
-        transaction.GetBackend().DeleteResource(output, transaction.GetManager(), request.delete_resource().id());
+        backend.DeleteResource(output, manager, request.delete_resource().id());
         break;
       }
       
@@ -452,11 +487,12 @@ namespace OrthancDatabases
         typedef std::map<int32_t, std::string>  Values;
 
         Values values;
-        transaction.GetBackend().GetAllMetadata(values, transaction.GetManager(), request.get_all_metadata().id());
+        backend.GetAllMetadata(values, manager, request.get_all_metadata().id());
 
         for (Values::const_iterator it = values.begin(); it != values.end(); ++it)
         {
-          Orthanc::DatabasePluginMessages::GetAllMetadata_Response_Metadata* metadata = response.mutable_get_all_metadata()->add_metadata();
+          Orthanc::DatabasePluginMessages::GetAllMetadata_Response_Metadata* metadata =
+            response.mutable_get_all_metadata()->add_metadata();
           metadata->set_type(it->first);
           metadata->set_value(it->second);
         }
@@ -467,7 +503,7 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_PUBLIC_IDS:
       {
         std::list<std::string>  values;
-        transaction.GetBackend().GetAllPublicIds(values, transaction.GetManager(), Convert(request.get_all_public_ids().resource_type()));
+        backend.GetAllPublicIds(values, manager, Convert(request.get_all_public_ids().resource_type()));
 
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
@@ -480,10 +516,9 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_PUBLIC_IDS_WITH_LIMITS:
       {
         std::list<std::string>  values;
-        transaction.GetBackend().GetAllPublicIds(values, transaction.GetManager(),
-                                                 Convert(request.get_all_public_ids_with_limits().resource_type()),
-                                                 request.get_all_public_ids_with_limits().since(),
-                                                 request.get_all_public_ids_with_limits().limit());
+        backend.GetAllPublicIds(values, manager, Convert(request.get_all_public_ids_with_limits().resource_type()),
+                                request.get_all_public_ids_with_limits().since(),
+                                request.get_all_public_ids_with_limits().limit());
 
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
@@ -498,9 +533,7 @@ namespace OrthancDatabases
         Output output(*response.mutable_get_changes());
 
         bool done;
-        transaction.GetBackend().GetChanges(output, done, transaction.GetManager(),
-                                            request.get_changes().since(),
-                                            request.get_changes().limit());
+        backend.GetChanges(output, done, manager, request.get_changes().since(), request.get_changes().limit());
 
         response.mutable_get_changes()->set_done(done);
         break;
@@ -509,7 +542,7 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_INTERNAL_ID:
       {
         std::list<int64_t>  values;
-        transaction.GetBackend().GetChildrenInternalId(values, transaction.GetManager(), request.get_children_internal_id().id());
+        backend.GetChildrenInternalId(values, manager, request.get_children_internal_id().id());
 
         for (std::list<int64_t>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
@@ -522,7 +555,7 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_PUBLIC_ID:
       {
         std::list<std::string>  values;
-        transaction.GetBackend().GetChildrenPublicId(values, transaction.GetManager(), request.get_children_public_id().id());
+        backend.GetChildrenPublicId(values, manager, request.get_children_public_id().id());
 
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
@@ -537,9 +570,8 @@ namespace OrthancDatabases
         Output output(*response.mutable_get_exported_resources());
 
         bool done;
-        transaction.GetBackend().GetExportedResources(output, done, transaction.GetManager(),
-                                                      request.get_exported_resources().since(),
-                                                      request.get_exported_resources().limit());
+        backend.GetExportedResources(output, done, manager, request.get_exported_resources().since(),
+                                     request.get_exported_resources().limit());
 
         response.mutable_get_exported_resources()->set_done(done);
         break;
@@ -550,10 +582,60 @@ namespace OrthancDatabases
         response.mutable_get_last_change()->set_exists(false);
 
         Output output(*response.mutable_get_last_change());
-        transaction.GetBackend().GetLastChange(output, transaction.GetManager());
+        backend.GetLastChange(output, manager);
         break;
       }
 
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_EXPORTED_RESOURCE:
+      {
+        response.mutable_get_last_exported_resource()->set_exists(false);
+
+        Output output(*response.mutable_get_last_exported_resource());
+        backend.GetLastExportedResource(output, manager);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_MAIN_DICOM_TAGS:
+      {
+        Output output(*response.mutable_get_main_dicom_tags());
+        backend.GetMainDicomTags(output, manager, request.get_main_dicom_tags().id());
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_PUBLIC_ID:
+      {
+        const std::string id = backend.GetPublicId(manager, request.get_public_id().id());
+        response.mutable_get_public_id()->set_id(id);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_RESOURCES_COUNT:
+      {
+        OrthancPluginResourceType type = Convert(request.get_resources_count().type());
+        uint64_t count = backend.GetResourcesCount(manager, type);
+        response.mutable_get_resources_count()->set_count(count);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_RESOURCE_TYPE:
+      {
+        OrthancPluginResourceType type = backend.GetResourceType(manager, request.get_public_id().id());
+        response.mutable_get_resource_type()->set_type(Convert(type));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_TOTAL_COMPRESSED_SIZE:
+      {
+        response.mutable_get_total_compressed_size()->set_size(backend.GetTotalCompressedSize(manager));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_TOTAL_UNCOMPRESSED_SIZE:
+      {
+        response.mutable_get_total_uncompressed_size()->set_size(backend.GetTotalUncompressedSize(manager));
+        break;
+      }
+      
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
@@ -594,7 +676,8 @@ namespace OrthancDatabases
         case Orthanc::DatabasePluginMessages::REQUEST_TRANSACTION:
         {
           IndexConnectionsPool::Accessor& transaction = *reinterpret_cast<IndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
-          ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(), transaction);
+          ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(),
+                                      transaction.GetBackend(), transaction.GetManager());
           break;
         }
           
