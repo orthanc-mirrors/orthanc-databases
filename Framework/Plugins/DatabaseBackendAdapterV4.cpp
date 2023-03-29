@@ -100,6 +100,7 @@ namespace OrthancDatabases
     Orthanc::DatabasePluginMessages::GetLastChange::Response*            getLastChange_;
     Orthanc::DatabasePluginMessages::GetLastExportedResource::Response*  getLastExportedResource_;
     Orthanc::DatabasePluginMessages::GetMainDicomTags::Response*         getMainDicomTags_;
+    Orthanc::DatabasePluginMessages::LookupAttachment::Response*         lookupAttachment_;
 
     void Clear()
     {
@@ -109,6 +110,7 @@ namespace OrthancDatabases
       getExportedResources_ = NULL;
       getLastChange_ = NULL;
       getLastExportedResource_ = NULL;
+      lookupAttachment_ = NULL;
     }
     
   public:
@@ -152,6 +154,12 @@ namespace OrthancDatabases
     {
       Clear();
       getMainDicomTags_ = &getMainDicomTags;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::LookupAttachment::Response& lookupAttachment)
+    {
+      Clear();
+      lookupAttachment_ = &lookupAttachment;
     }
     
     virtual void SignalDeletedAttachment(const std::string& uuid,
@@ -236,7 +244,26 @@ namespace OrthancDatabases
                                   uint64_t           compressedSize,
                                   const std::string& compressedHash) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (lookupAttachment_ != NULL)
+      {
+        if (lookupAttachment_->found())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+
+        lookupAttachment_->set_found(true);
+        lookupAttachment_->mutable_attachment()->set_uuid(uuid);
+        lookupAttachment_->mutable_attachment()->set_content_type(contentType);
+        lookupAttachment_->mutable_attachment()->set_uncompressed_size(uncompressedSize);
+        lookupAttachment_->mutable_attachment()->set_uncompressed_hash(uncompressedHash);
+        lookupAttachment_->mutable_attachment()->set_compression_type(compressionType);
+        lookupAttachment_->mutable_attachment()->set_compressed_size(compressedSize);
+        lookupAttachment_->mutable_attachment()->set_compressed_hash(compressedHash);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
 
     virtual void AnswerChange(int64_t                    seq,
@@ -253,12 +280,12 @@ namespace OrthancDatabases
       }
       else if (getLastChange_ != NULL)
       {
-        if (getLastChange_->exists())
+        if (getLastChange_->found())
         {
           throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
         }
 
-        getLastChange_->set_exists(true);
+        getLastChange_->set_found(true);
         change = getLastChange_->mutable_change();
       }
       else
@@ -307,12 +334,12 @@ namespace OrthancDatabases
       }
       else if (getLastExportedResource_ != NULL)
       {
-        if (getLastExportedResource_->exists())
+        if (getLastExportedResource_->found())
         {
           throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
         }
 
-        getLastExportedResource_->set_exists(true);
+        getLastExportedResource_->set_found(true);
         resource = getLastExportedResource_->mutable_resource();
       }
       else
@@ -579,7 +606,7 @@ namespace OrthancDatabases
 
       case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_CHANGE:
       {
-        response.mutable_get_last_change()->set_exists(false);
+        response.mutable_get_last_change()->set_found(false);
 
         Output output(*response.mutable_get_last_change());
         backend.GetLastChange(output, manager);
@@ -588,7 +615,7 @@ namespace OrthancDatabases
 
       case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_EXPORTED_RESOURCE:
       {
-        response.mutable_get_last_exported_resource()->set_exists(false);
+        response.mutable_get_last_exported_resource()->set_found(false);
 
         Output output(*response.mutable_get_last_exported_resource());
         backend.GetLastExportedResource(output, manager);
@@ -676,6 +703,159 @@ namespace OrthancDatabases
                                     request.log_exported_resource().study_instance_uid().c_str(),
                                     request.log_exported_resource().series_instance_uid().c_str(),
                                     request.log_exported_resource().sop_instance_uid().c_str());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_ATTACHMENT:
+      {
+        Output output(*response.mutable_lookup_attachment());
+        
+        int64_t revision = -1;
+        backend.LookupAttachment(output, revision, manager, request.lookup_attachment().id(), request.lookup_attachment().content_type());
+
+        if (response.lookup_attachment().found())
+        {
+          response.mutable_lookup_attachment()->set_revision(revision);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_GLOBAL_PROPERTY:
+      {
+        std::string value;
+        if (backend.LookupGlobalProperty(value, manager, request.lookup_global_property().server_id().c_str(),
+                                         request.lookup_global_property().property()))
+        {
+          response.mutable_lookup_global_property()->set_found(true);
+          response.mutable_lookup_global_property()->set_value(value);
+        }
+        else
+        {
+          response.mutable_lookup_global_property()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_METADATA:
+      {
+        std::string value;
+        int64_t revision = -1;
+        if (backend.LookupMetadata(value, revision, manager, request.lookup_metadata().id(), request.lookup_metadata().metadata_type()))
+        {
+          response.mutable_lookup_metadata()->set_found(true);
+          response.mutable_lookup_metadata()->set_value(value);
+          response.mutable_lookup_metadata()->set_revision(revision);
+        }
+        else
+        {
+          response.mutable_lookup_metadata()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_PARENT:
+      {
+        int64_t parent = -1;
+        if (backend.LookupParent(parent, manager, request.lookup_parent().id()))
+        {
+          response.mutable_lookup_parent()->set_found(true);
+          response.mutable_lookup_parent()->set_parent(parent);
+        }
+        else
+        {
+          response.mutable_lookup_parent()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCE:
+      {
+        int64_t internalId = -1;
+        OrthancPluginResourceType type;
+        if (backend.LookupResource(internalId, type, manager, request.lookup_resource().public_id().c_str()))
+        {
+          response.mutable_lookup_resource()->set_found(true);
+          response.mutable_lookup_resource()->set_internal_id(internalId);
+          response.mutable_lookup_resource()->set_type(Convert(type));
+        }
+        else
+        {
+          response.mutable_lookup_resource()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SELECT_PATIENT_TO_RECYCLE:
+      {
+        int64_t patientId = -1;
+        if (backend.SelectPatientToRecycle(patientId, manager))
+        {
+          response.mutable_select_patient_to_recycle()->set_found(true);
+          response.mutable_select_patient_to_recycle()->set_patient_id(patientId);
+        }
+        else
+        {
+          response.mutable_select_patient_to_recycle()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SELECT_PATIENT_TO_RECYCLE_WITH_AVOID:
+      {
+        int64_t patientId = -1;
+        if (backend.SelectPatientToRecycle(patientId, manager, request.select_patient_to_recycle_with_avoid().patient_id_to_avoid()))
+        {
+          response.mutable_select_patient_to_recycle_with_avoid()->set_found(true);
+          response.mutable_select_patient_to_recycle_with_avoid()->set_patient_id(patientId);
+        }
+        else
+        {
+          response.mutable_select_patient_to_recycle_with_avoid()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_GLOBAL_PROPERTY:
+      {
+        backend.SetGlobalProperty(manager, request.set_global_property().server_id().c_str(),
+                                  request.set_global_property().property(),
+                                  request.set_global_property().value().c_str());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_MAIN_DICOM_TAGS:
+      {
+        backend.ClearMainDicomTags(manager, request.clear_main_dicom_tags().id());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_METADATA:
+      {
+        backend.SetMetadata(manager, request.set_metadata().id(),
+                            request.set_metadata().metadata_type(),
+                            request.set_metadata().value().c_str(),
+                            request.set_metadata().revision());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_PROTECTED_PATIENT:
+      {
+        backend.SetProtectedPatient(manager, request.set_protected_patient().patient_id(),
+                                    request.set_protected_patient().protected_patient());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_IS_DISK_SIZE_ABOVE:
+      {
+        bool above = (backend.GetTotalCompressedSize(manager) >= request.is_disk_size_above().threshold());
+        response.mutable_is_disk_size_above()->set_result(above);
         break;
       }
       
