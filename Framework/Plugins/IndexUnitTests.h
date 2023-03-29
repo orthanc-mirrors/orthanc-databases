@@ -510,20 +510,19 @@ TEST(IndexBackend, Basic)
   ASSERT_EQ(0u, ci.size());
 
 
-  OrthancPluginExportedResource exp;
-  exp.seq = -1;
-  exp.resourceType = OrthancPluginResourceType_Study;
-  exp.publicId = "id";
-  exp.modality = "remote";
-  exp.date = "date";
-  exp.patientId = "patient";
-  exp.studyInstanceUid = "study";
-  exp.seriesInstanceUid = "series";
-  exp.sopInstanceUid = "instance";
-  db.LogExportedResource(*manager, exp);
+  db.LogExportedResource(*manager, OrthancPluginResourceType_Study, "id", "remote", "date",
+                         "patient", "study", "series", "instance");
 
   expectedExported.reset(new OrthancPluginExportedResource());
-  *expectedExported = exp;
+  expectedExported->seq = -1;
+  expectedExported->resourceType = OrthancPluginResourceType_Study;
+  expectedExported->publicId = "id";
+  expectedExported->modality = "remote";
+  expectedExported->date = "date";
+  expectedExported->patientId = "patient";
+  expectedExported->studyInstanceUid = "study";
+  expectedExported->seriesInstanceUid = "series";
+  expectedExported->sopInstanceUid = "instance";
 
   bool done;
   db.GetExportedResources(*output, done, *manager, 0, 10);

@@ -186,7 +186,14 @@ namespace OrthancDatabases
                            const char* date) ORTHANC_OVERRIDE;
     
     virtual void LogExportedResource(DatabaseManager& manager,
-                                     const OrthancPluginExportedResource& resource) ORTHANC_OVERRIDE;
+                                     OrthancPluginResourceType resourceType,
+                                     const char* publicId,
+                                     const char* modality,
+                                     const char* date,
+                                     const char* patientId,
+                                     const char* studyInstanceUid,
+                                     const char* seriesInstanceUid,
+                                     const char* sopInstanceUid) ORTHANC_OVERRIDE;
     
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
                                   int64_t& revision /*out*/,

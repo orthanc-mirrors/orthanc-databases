@@ -1501,19 +1501,9 @@ namespace OrthancDatabases
 
     try
     {
-      OrthancPluginExportedResource exported;
-      exported.seq = 0;
-      exported.resourceType = resourceType;
-      exported.publicId = publicId;
-      exported.modality = modality;
-      exported.date = date;
-      exported.patientId = patientId;
-      exported.studyInstanceUid = studyInstanceUid;
-      exported.seriesInstanceUid = seriesInstanceUid;
-      exported.sopInstanceUid = sopInstanceUid;
-        
       t->GetOutput().Clear();
-      t->GetBackend().LogExportedResource(t->GetManager(), exported);
+      t->GetBackend().LogExportedResource(t->GetManager(), resourceType, publicId, modality, date,
+                                          patientId, studyInstanceUid, seriesInstanceUid, sopInstanceUid);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());

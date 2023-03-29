@@ -636,6 +636,49 @@ namespace OrthancDatabases
         break;
       }
       
+      case Orthanc::DatabasePluginMessages::OPERATION_IS_PROTECTED_PATIENT:
+      {
+        bool isProtected = backend.IsProtectedPatient(manager, request.is_protected_patient().patient_id());
+        response.mutable_is_protected_patient()->set_protected_patient(isProtected);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_AVAILABLE_ATTACHMENTS:
+      {
+        std::list<int32_t>  values;
+        backend.ListAvailableAttachments(values, manager, request.list_available_attachments().id());
+
+        for (std::list<int32_t>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_list_available_attachments()->add_attachments(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOG_CHANGE:
+      {
+        backend.LogChange(manager, request.log_change().change_type(),
+                          request.log_change().resource_id(),
+                          Convert(request.log_change().resource_type()),
+                          request.log_change().date().c_str());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOG_EXPORTED_RESOURCE:
+      {
+        backend.LogExportedResource(manager,
+                                    Convert(request.log_exported_resource().resource_type()),
+                                    request.log_exported_resource().public_id().c_str(),
+                                    request.log_exported_resource().modality().c_str(),
+                                    request.log_exported_resource().date().c_str(),
+                                    request.log_exported_resource().patient_id().c_str(),
+                                    request.log_exported_resource().study_instance_uid().c_str(),
+                                    request.log_exported_resource().series_instance_uid().c_str(),
+                                    request.log_exported_resource().sop_instance_uid().c_str());
+        break;
+      }
+      
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

@@ -946,7 +946,9 @@ namespace OrthancDatabases
     try
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
-      adapter->GetBackend().LogExportedResource(accessor.GetManager(), *exported);
+      adapter->GetBackend().LogExportedResource(accessor.GetManager(), exported->resourceType, exported->publicId,
+                                                exported->modality, exported->date, exported->patientId,
+                                                exported->studyInstanceUid, exported->seriesInstanceUid, exported->sopInstanceUid);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

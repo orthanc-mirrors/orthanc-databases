@@ -164,7 +164,14 @@ namespace OrthancDatabases
                            const char* date) = 0;
     
     virtual void LogExportedResource(DatabaseManager& manager,
-                                     const OrthancPluginExportedResource& resource) = 0;
+                                     OrthancPluginResourceType resourceType,
+                                     const char* publicId,
+                                     const char* modality,
+                                     const char* date,
+                                     const char* patientId,
+                                     const char* studyInstanceUid,
+                                     const char* seriesInstanceUid,
+                                     const char* sopInstanceUid) = 0;
     
     /* Use GetOutput().AnswerAttachment() */
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,

@@ -1010,7 +1010,14 @@ namespace OrthancDatabases
 
     
   void IndexBackend::LogExportedResource(DatabaseManager& manager,
-                                         const OrthancPluginExportedResource& resource)
+                                         OrthancPluginResourceType resourceType,
+                                         const char* publicId,
+                                         const char* modality,
+                                         const char* date,
+                                         const char* patientId,
+                                         const char* studyInstanceUid,
+                                         const char* seriesInstanceUid,
+                                         const char* sopInstanceUid)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
@@ -1027,14 +1034,14 @@ namespace OrthancDatabases
     statement.SetParameterType("date", ValueType_Utf8String);
 
     Dictionary args;
-    args.SetIntegerValue("type", resource.resourceType);
-    args.SetUtf8Value("publicId", resource.publicId);
-    args.SetUtf8Value("modality", resource.modality);
-    args.SetUtf8Value("patient", resource.patientId);
-    args.SetUtf8Value("study", resource.studyInstanceUid);
-    args.SetUtf8Value("series", resource.seriesInstanceUid);
-    args.SetUtf8Value("instance", resource.sopInstanceUid);
-    args.SetUtf8Value("date", resource.date);
+    args.SetIntegerValue("type", resourceType);
+    args.SetUtf8Value("publicId", publicId);
+    args.SetUtf8Value("modality", modality);
+    args.SetUtf8Value("patient", patientId);
+    args.SetUtf8Value("study", studyInstanceUid);
+    args.SetUtf8Value("series", seriesInstanceUid);
+    args.SetUtf8Value("instance", sopInstanceUid);
+    args.SetUtf8Value("date", date);
 
     statement.Execute(args);
   }
