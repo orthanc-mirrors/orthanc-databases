@@ -101,6 +101,7 @@ namespace OrthancDatabases
     Orthanc::DatabasePluginMessages::GetLastExportedResource::Response*  getLastExportedResource_;
     Orthanc::DatabasePluginMessages::GetMainDicomTags::Response*         getMainDicomTags_;
     Orthanc::DatabasePluginMessages::LookupAttachment::Response*         lookupAttachment_;
+    Orthanc::DatabasePluginMessages::LookupResources::Response*          lookupResources_;
 
     void Clear()
     {
@@ -110,7 +111,9 @@ namespace OrthancDatabases
       getExportedResources_ = NULL;
       getLastChange_ = NULL;
       getLastExportedResource_ = NULL;
+      getMainDicomTags_ = NULL;
       lookupAttachment_ = NULL;
+      lookupResources_ = NULL;
     }
     
   public:
@@ -160,6 +163,12 @@ namespace OrthancDatabases
     {
       Clear();
       lookupAttachment_ = &lookupAttachment;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::LookupResources::Response& lookupResources)
+    {
+      Clear();
+      lookupResources_ = &lookupResources;
     }
     
     virtual void SignalDeletedAttachment(const std::string& uuid,
@@ -307,7 +316,8 @@ namespace OrthancDatabases
       if (getMainDicomTags_ != NULL)
       {
         Orthanc::DatabasePluginMessages::GetMainDicomTags_Response_Tag* tag = getMainDicomTags_->add_tags();
-        tag->set_key((static_cast<uint32_t>(group) << 16) + static_cast<uint32_t>(element));
+        tag->set_group(group);
+        tag->set_element(element);
         tag->set_value(value);
       }
       else
@@ -360,13 +370,28 @@ namespace OrthancDatabases
     
     virtual void AnswerMatchingResource(const std::string& resourceId) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (lookupResources_ != NULL)
+      {
+        lookupResources_->add_resources_ids(resourceId);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
     
     virtual void AnswerMatchingResource(const std::string& resourceId,
                                         const std::string& someInstanceId) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      if (lookupResources_ != NULL)
+      {
+        lookupResources_->add_resources_ids(resourceId);
+        lookupResources_->add_instances_ids(someInstanceId);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
   };
   
@@ -438,6 +463,97 @@ namespace OrthancDatabases
         LOG(ERROR) << "Not implemented database operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
+  }
+
+
+  static void ApplyLookupResources(Orthanc::DatabasePluginMessages::LookupResources_Response& response,
+                                   const Orthanc::DatabasePluginMessages::LookupResources_Request& request,
+                                   IndexBackend& backend,
+                                   DatabaseManager& manager)
+  {
+    std::vector<Orthanc::DatabaseConstraint> lookup;
+    lookup.reserve(request.lookup().size());
+
+    size_t countValues = 0;
+
+    for (int i = 0; i < request.lookup().size(); i++)
+    {
+      const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint = request.lookup(i);
+      countValues += constraint.values().size();
+    }
+
+    std::vector<const char*> values;
+    values.reserve(countValues);
+
+    for (int i = 0; i < request.lookup().size(); i++)
+    {
+      const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint = request.lookup(i);
+
+      if (constraint.tag_group() > 0xffffu ||
+          constraint.tag_element() > 0xffffu)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+          
+      OrthancPluginDatabaseConstraint c;
+      c.level = Convert(constraint.level());
+      c.tagGroup = constraint.tag_group();
+      c.tagElement = constraint.tag_element();
+      c.isIdentifierTag = (constraint.is_identifier_tag() ? 1 : 0);
+      c.isCaseSensitive = (constraint.is_case_sensitive() ? 1 : 0);
+      c.isMandatory = (constraint.is_mandatory() ? 1 : 0);
+
+      switch (constraint.type())
+      {
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_EQUAL:
+          c.type = OrthancPluginConstraintType_Equal;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_SMALLER_OR_EQUAL:
+          c.type = OrthancPluginConstraintType_SmallerOrEqual;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_GREATER_OR_EQUAL:
+          c.type = OrthancPluginConstraintType_GreaterOrEqual;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_WILDCARD:
+          c.type = OrthancPluginConstraintType_Wildcard;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_LIST:
+          c.type = OrthancPluginConstraintType_List;
+          break;
+              
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+          
+      c.valuesCount = constraint.values().size();
+
+      if (c.valuesCount == 0)
+      {
+        c.values = NULL;
+      }
+      else
+      {
+        c.values = &values[values.size()];
+            
+        for (int j = 0; j < constraint.values().size(); j++)
+        {
+          assert(values.size() < countValues);
+          values.push_back(constraint.values(j).c_str());
+        }
+      }
+
+      lookup.push_back(Orthanc::DatabaseConstraint(c));
+    }
+
+    assert(values.size() == countValues);
+
+    Output output(response);
+    backend.LookupResources(output, manager, lookup, Convert(request.query_level()),
+                            request.limit(), request.retrieve_instances_ids());
   }
 
   
@@ -856,6 +972,144 @@ namespace OrthancDatabases
       {
         bool above = (backend.GetTotalCompressedSize(manager) >= request.is_disk_size_above().threshold());
         response.mutable_is_disk_size_above()->set_result(above);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCES:
+      {
+        ApplyLookupResources(*response.mutable_lookup_resources(), request.lookup_resources(), backend, manager);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_CREATE_INSTANCE:
+      {
+        const char* hashPatient = request.create_instance().patient().c_str();
+        const char* hashStudy = request.create_instance().study().c_str();
+        const char* hashSeries = request.create_instance().series().c_str();
+        const char* hashInstance = request.create_instance().instance().c_str();
+        
+        OrthancPluginCreateInstanceResult result;
+        
+        if (backend.HasCreateInstance())
+        {
+          backend.CreateInstance(result, manager, hashPatient, hashStudy, hashSeries, hashInstance);
+        }
+        else
+        {
+          backend.CreateInstanceGeneric(result, manager, hashPatient, hashStudy, hashSeries, hashInstance);
+        }
+
+        response.mutable_create_instance()->set_is_new_instance(result.isNewInstance);
+        response.mutable_create_instance()->set_instance_id(result.instanceId);
+
+        if (result.isNewInstance)
+        {
+          response.mutable_create_instance()->set_is_new_patient(result.isNewPatient);
+          response.mutable_create_instance()->set_is_new_study(result.isNewStudy);
+          response.mutable_create_instance()->set_is_new_series(result.isNewSeries);
+          response.mutable_create_instance()->set_patient_id(result.patientId);
+          response.mutable_create_instance()->set_study_id(result.studyId);
+          response.mutable_create_instance()->set_series_id(result.seriesId);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_RESOURCES_CONTENT:
+      {
+        std::vector<OrthancPluginResourcesContentTags> identifierTags;
+        std::vector<OrthancPluginResourcesContentTags> mainDicomTags;
+
+        identifierTags.reserve(request.set_resources_content().tags().size());
+        mainDicomTags.reserve(request.set_resources_content().tags().size());
+        
+        for (int i = 0; i < request.set_resources_content().tags().size(); i++)
+        {
+          if (request.set_resources_content().tags(i).group() > 0xffff ||
+              request.set_resources_content().tags(i).element() > 0xffff)
+          {
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+          }
+          
+          OrthancPluginResourcesContentTags tag;
+          tag.resource = request.set_resources_content().tags(i).resource_id();
+          tag.group = request.set_resources_content().tags(i).group();
+          tag.element = request.set_resources_content().tags(i).element();
+          tag.value = request.set_resources_content().tags(i).value().c_str();
+          
+          if (request.set_resources_content().tags(i).is_identifier())
+          {
+            identifierTags.push_back(tag);
+          }
+          else
+          {
+            mainDicomTags.push_back(tag);
+          }
+        }
+        
+        std::vector<OrthancPluginResourcesContentMetadata> metadata(request.set_resources_content().metadata().size());
+        for (int i = 0; i < request.set_resources_content().metadata().size(); i++)
+        {
+          OrthancPluginResourcesContentMetadata item;
+          item.resource = request.set_resources_content().metadata(i).resource_id();
+          item.metadata = request.set_resources_content().metadata(i).metadata();
+          item.value = request.set_resources_content().metadata(i).value().c_str();
+          metadata.push_back(item);
+        }
+
+        backend.SetResourcesContent(manager,
+                                    identifierTags.size(), (identifierTags.empty() ? NULL : &identifierTags[0]),
+                                    mainDicomTags.size(), (mainDicomTags.empty() ? NULL : &mainDicomTags[0]),
+                                    metadata.size(), (metadata.empty() ? NULL : &metadata[0]));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_METADATA:
+      {
+        std::list<std::string> values;
+        backend.GetChildrenMetadata(values, manager, request.get_children_metadata().id(), request.get_children_metadata().metadata());
+
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_children_metadata()->add_values(*it);
+        }
+
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_CHANGE_INDEX:
+      {
+        response.mutable_get_last_change_index()->set_result(backend.GetLastChangeIndex(manager));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCE_AND_PARENT:
+      {
+        int64_t id;
+        OrthancPluginResourceType type;
+        std::string parent;
+        
+        if (backend.LookupResourceAndParent(id, type, parent, manager, request.lookup_resource_and_parent().public_id().c_str()))
+        {
+          response.mutable_lookup_resource_and_parent()->set_found(true);
+          response.mutable_lookup_resource_and_parent()->set_id(id);
+          response.mutable_lookup_resource_and_parent()->set_type(Convert(type));
+
+          if (parent.empty())
+          {
+            response.mutable_lookup_resource_and_parent()->set_has_parent(true);
+          }
+          else
+          {
+            response.mutable_lookup_resource_and_parent()->set_has_parent(false);
+            response.mutable_lookup_resource_and_parent()->set_parent_public_id(parent);
+          }
+        }
+        else
+        {
+          response.mutable_lookup_resource_and_parent()->set_found(false);
+        }
+
         break;
       }
       
