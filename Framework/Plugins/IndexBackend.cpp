@@ -2692,6 +2692,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
 #  endif
 #endif
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
+#  endif
+#endif
   }
 
 
