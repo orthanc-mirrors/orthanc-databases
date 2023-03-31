@@ -459,6 +459,22 @@ namespace OrthancDatabases
         break;
       }
               
+      case Orthanc::DatabasePluginMessages::OPERATION_FINALIZE_TRANSACTION:
+      {
+        IndexConnectionsPool::Accessor* transaction = reinterpret_cast<IndexConnectionsPool::Accessor*>(request.finalize_transaction().transaction());
+        
+        if (transaction == NULL)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+        }
+        else
+        {
+          delete transaction;
+        }
+        
+        break;
+      }
+              
       default:
         LOG(ERROR) << "Not implemented database operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
