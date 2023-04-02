@@ -1041,8 +1041,8 @@ namespace OrthancDatabases
         
         for (int i = 0; i < request.set_resources_content().tags().size(); i++)
         {
-          if (request.set_resources_content().tags(i).group() > 0xffff ||
-              request.set_resources_content().tags(i).element() > 0xffff)
+          if (request.set_resources_content().tags(i).group() > 0xffffu ||
+              request.set_resources_content().tags(i).element() > 0xffffu)
           {
             throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
           }
