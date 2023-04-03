@@ -1,7 +1,8 @@
 Pending changes in the mainline
 ===============================
 
-* Compatibility with Orthanc SDK 1.12.0
+* Compatibility with Orthanc SDK 1.12.0 (communications between the
+  Orthanc core and the database plugin using Google Protocol Buffers)
 * Upgraded dependencies for static builds (notably on Windows and LSB):
   - openssl 3.0.1
 
