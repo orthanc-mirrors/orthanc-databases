@@ -92,15 +92,15 @@ namespace OrthancDatabases
     virtual void GetAllPublicIds(std::list<std::string>& target,
                                  DatabaseManager& manager,
                                  OrthancPluginResourceType resourceType,
-                                 uint64_t since,
-                                 uint64_t limit) = 0;
+                                 int64_t since,
+                                 uint32_t limit) = 0;
 
     /* Use GetOutput().AnswerChange() */
     virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
                             DatabaseManager& manager,
                             int64_t since,
-                            uint32_t maxResults) = 0;
+                            uint32_t limit) = 0;
 
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
@@ -115,7 +115,7 @@ namespace OrthancDatabases
                                       bool& done /*out*/,
                                       DatabaseManager& manager,
                                       int64_t since,
-                                      uint32_t maxResults) = 0;
+                                      uint32_t limit) = 0;
 
     /* Use GetOutput().AnswerChange() */
     virtual void GetLastChange(IDatabaseBackendOutput& output,

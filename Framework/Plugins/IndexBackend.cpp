@@ -116,13 +116,13 @@ namespace OrthancDatabases
                                          DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
-                                         uint32_t maxResults)
+                                         uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       output.AnswerChange(
@@ -136,7 +136,7 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
 
@@ -145,13 +145,13 @@ namespace OrthancDatabases
                                                    bool& done,
                                                    DatabaseManager::CachedStatement& statement,
                                                    const Dictionary& args,
-                                                   uint32_t maxResults)
+                                                   uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       int64_t seq = statement.ReadInteger64(0);
@@ -173,7 +173,7 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
 
@@ -519,8 +519,8 @@ namespace OrthancDatabases
   void IndexBackend::GetAllPublicIds(std::list<std::string>& target,
                                      DatabaseManager& manager,
                                      OrthancPluginResourceType resourceType,
-                                     uint64_t since,
-                                     uint64_t limit)
+                                     int64_t since,
+                                     uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -556,7 +556,7 @@ namespace OrthancDatabases
                                 bool& done /*out*/,
                                 DatabaseManager& manager,
                                 int64_t since,
-                                uint32_t maxResults)
+                                uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -579,10 +579,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, statement, args, maxResults);
+    ReadChangesInternal(output, done, manager, statement, args, limit);
   }
 
     
@@ -629,7 +629,7 @@ namespace OrthancDatabases
                                           bool& done /*out*/,
                                           DatabaseManager& manager,
                                           int64_t since,
-                                          uint32_t maxResults)
+                                          uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -650,10 +650,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, statement, args, limit);
   }
 
     
