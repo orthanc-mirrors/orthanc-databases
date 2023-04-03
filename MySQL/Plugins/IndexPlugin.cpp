@@ -28,11 +28,15 @@
 #include <Logging.h>
 #include <Toolbox.h>
 
+#include <google/protobuf/any.h>
+
 
 extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     if (!OrthancDatabases::InitializePlugin(context, "MySQL", true))
     {
       return -1;
@@ -93,6 +97,7 @@ extern "C"
     OrthancDatabases::MySQLDatabase::GlobalFinalization();
     Orthanc::HttpClient::GlobalFinalize();
     Orthanc::Toolbox::FinalizeOpenSsl();
+    google::protobuf::ShutdownProtobufLibrary();
   }
 
 

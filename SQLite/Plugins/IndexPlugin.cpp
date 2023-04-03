@@ -25,11 +25,15 @@
 
 #include <Logging.h>
 
+#include <google/protobuf/any.h>
+
 
 extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     if (!OrthancDatabases::InitializePlugin(context, "SQLite", true))
     {
       return -1;
@@ -84,6 +88,7 @@ extern "C"
   {
     LOG(WARNING) << "SQLite index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
+    google::protobuf::ShutdownProtobufLibrary();
   }
 
 

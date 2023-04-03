@@ -27,7 +27,7 @@
 
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 
 namespace OrthancDatabases
 {  
@@ -36,27 +36,17 @@ namespace OrthancDatabases
    * 
    * Class creating the bridge between the C low-level primitives for
    * custom database engines, and the high-level IDatabaseBackend C++
-   * interface, for Orthanc >= 1.9.2.
+   * interface, through ProtocolBuffers for Orthanc >= 1.12.0.
    **/
-  class DatabaseBackendAdapterV3
+  class DatabaseBackendAdapterV4
   {
   private:
-    class Output;
-    
     // This class cannot be instantiated
-    DatabaseBackendAdapterV3()
+    DatabaseBackendAdapterV4()
     {
     }
 
   public:
-    class Transaction;
-
-    class Factory : public IDatabaseBackendOutput::IFactory
-    {
-    public:
-      virtual IDatabaseBackendOutput* CreateOutput() ORTHANC_OVERRIDE;
-    };
-
     static void Register(IndexBackend* backend,
                          size_t countConnections,
                          unsigned int maxDatabaseRetries);

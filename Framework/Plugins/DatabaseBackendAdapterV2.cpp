@@ -946,7 +946,9 @@ namespace OrthancDatabases
     try
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
-      adapter->GetBackend().LogExportedResource(accessor.GetManager(), *exported);
+      adapter->GetBackend().LogExportedResource(accessor.GetManager(), exported->resourceType, exported->publicId,
+                                                exported->modality, exported->date, exported->patientId,
+                                                exported->studyInstanceUid, exported->seriesInstanceUid, exported->sopInstanceUid);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1632,17 +1634,21 @@ namespace OrthancDatabases
 
   void DatabaseBackendAdapterV2::Register(IDatabaseBackend* backend)
   {
-    if (backend == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-    }
+      std::unique_ptr<IDatabaseBackend> protection(backend);
+    
+      if (backend == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+      }
 
-    if (adapter_.get() != NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
+      if (adapter_.get() != NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
 
-    adapter_.reset(new Adapter(backend));
+      adapter_.reset(new Adapter(protection.release()));
+    }
     
     OrthancPluginDatabaseBackend  params;
     memset(&params, 0, sizeof(params));

@@ -28,6 +28,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "DatabaseBackendAdapterV2.h"
 #include "DatabaseBackendAdapterV3.h"
+#include "DatabaseBackendAdapterV4.h"
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -115,13 +116,13 @@ namespace OrthancDatabases
                                          DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
-                                         uint32_t maxResults)
+                                         uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       output.AnswerChange(
@@ -135,7 +136,7 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
 
@@ -144,13 +145,13 @@ namespace OrthancDatabases
                                                    bool& done,
                                                    DatabaseManager::CachedStatement& statement,
                                                    const Dictionary& args,
-                                                   uint32_t maxResults)
+                                                   uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       int64_t seq = statement.ReadInteger64(0);
@@ -172,7 +173,7 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
 
@@ -518,8 +519,8 @@ namespace OrthancDatabases
   void IndexBackend::GetAllPublicIds(std::list<std::string>& target,
                                      DatabaseManager& manager,
                                      OrthancPluginResourceType resourceType,
-                                     uint64_t since,
-                                     uint64_t limit)
+                                     int64_t since,
+                                     uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -555,7 +556,7 @@ namespace OrthancDatabases
                                 bool& done /*out*/,
                                 DatabaseManager& manager,
                                 int64_t since,
-                                uint32_t maxResults)
+                                uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -578,10 +579,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, statement, args, maxResults);
+    ReadChangesInternal(output, done, manager, statement, args, limit);
   }
 
     
@@ -628,7 +629,7 @@ namespace OrthancDatabases
                                           bool& done /*out*/,
                                           DatabaseManager& manager,
                                           int64_t since,
-                                          uint32_t maxResults)
+                                          uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -649,10 +650,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, statement, args, limit);
   }
 
     
@@ -1009,7 +1010,14 @@ namespace OrthancDatabases
 
     
   void IndexBackend::LogExportedResource(DatabaseManager& manager,
-                                         const OrthancPluginExportedResource& resource)
+                                         OrthancPluginResourceType resourceType,
+                                         const char* publicId,
+                                         const char* modality,
+                                         const char* date,
+                                         const char* patientId,
+                                         const char* studyInstanceUid,
+                                         const char* seriesInstanceUid,
+                                         const char* sopInstanceUid)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
@@ -1026,14 +1034,14 @@ namespace OrthancDatabases
     statement.SetParameterType("date", ValueType_Utf8String);
 
     Dictionary args;
-    args.SetIntegerValue("type", resource.resourceType);
-    args.SetUtf8Value("publicId", resource.publicId);
-    args.SetUtf8Value("modality", resource.modality);
-    args.SetUtf8Value("patient", resource.patientId);
-    args.SetUtf8Value("study", resource.studyInstanceUid);
-    args.SetUtf8Value("series", resource.seriesInstanceUid);
-    args.SetUtf8Value("instance", resource.sopInstanceUid);
-    args.SetUtf8Value("date", resource.date);
+    args.SetIntegerValue("type", resourceType);
+    args.SetUtf8Value("publicId", publicId);
+    args.SetUtf8Value("modality", modality);
+    args.SetUtf8Value("patient", patientId);
+    args.SetUtf8Value("study", studyInstanceUid);
+    args.SetUtf8Value("series", seriesInstanceUid);
+    args.SetUtf8Value("instance", sopInstanceUid);
+    args.SetUtf8Value("date", date);
 
     statement.Execute(args);
   }
@@ -2610,26 +2618,31 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     
-    bool hasLoadedV3 = false;
+    LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
+                 << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
-                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
-      
-      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
-      hasLoadedV3 = true;
+      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      return;
     }
 #  endif
 #endif
 
-    if (!hasLoadedV3)
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
-      OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
+      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
+      return;
     }
+#  endif
+#endif
+
+    LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
+    OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
   }
 
 
@@ -2677,6 +2690,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
+#  endif
+#endif
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
 #  endif
 #endif
   }

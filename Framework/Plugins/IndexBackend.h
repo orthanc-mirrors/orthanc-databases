@@ -62,13 +62,13 @@ namespace OrthancDatabases
                              DatabaseManager& manager,
                              DatabaseManager::CachedStatement& statement,
                              const Dictionary& args,
-                             uint32_t maxResults);
+                             uint32_t limit);
 
     void ReadExportedResourcesInternal(IDatabaseBackendOutput& output,
                                        bool& done,
                                        DatabaseManager::CachedStatement& statement,
                                        const Dictionary& args,
-                                       uint32_t maxResults);
+                                       uint32_t limit);
 
   public:
     explicit IndexBackend(OrthancPluginContext* context);
@@ -119,14 +119,14 @@ namespace OrthancDatabases
     virtual void GetAllPublicIds(std::list<std::string>& target,
                                  DatabaseManager& manager,
                                  OrthancPluginResourceType resourceType,
-                                 uint64_t since,
-                                 uint64_t limit) ORTHANC_OVERRIDE;
+                                 int64_t since,
+                                 uint32_t limit) ORTHANC_OVERRIDE;
     
     virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
                             DatabaseManager& manager,
                             int64_t since,
-                            uint32_t maxResults) ORTHANC_OVERRIDE;
+                            uint32_t limit) ORTHANC_OVERRIDE;
     
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
@@ -140,7 +140,7 @@ namespace OrthancDatabases
                                       bool& done /*out*/,
                                       DatabaseManager& manager,
                                       int64_t since,
-                                      uint32_t maxResults) ORTHANC_OVERRIDE;
+                                      uint32_t limit) ORTHANC_OVERRIDE;
     
     virtual void GetLastChange(IDatabaseBackendOutput& output,
                                DatabaseManager& manager) ORTHANC_OVERRIDE;
@@ -186,7 +186,14 @@ namespace OrthancDatabases
                            const char* date) ORTHANC_OVERRIDE;
     
     virtual void LogExportedResource(DatabaseManager& manager,
-                                     const OrthancPluginExportedResource& resource) ORTHANC_OVERRIDE;
+                                     OrthancPluginResourceType resourceType,
+                                     const char* publicId,
+                                     const char* modality,
+                                     const char* date,
+                                     const char* patientId,
+                                     const char* studyInstanceUid,
+                                     const char* seriesInstanceUid,
+                                     const char* sopInstanceUid) ORTHANC_OVERRIDE;
     
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
                                   int64_t& revision /*out*/,
