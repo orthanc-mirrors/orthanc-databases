@@ -648,6 +648,7 @@ namespace OrthancDatabases
         Values values;
         backend.GetAllMetadata(values, manager, request.get_all_metadata().id());
 
+        response.mutable_get_all_metadata()->mutable_metadata()->Reserve(values.size());
         for (Values::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           Orthanc::DatabasePluginMessages::GetAllMetadata_Response_Metadata* metadata =
@@ -664,6 +665,7 @@ namespace OrthancDatabases
         std::list<std::string>  values;
         backend.GetAllPublicIds(values, manager, Convert(request.get_all_public_ids().resource_type()));
 
+        response.mutable_get_all_public_ids()->mutable_ids()->Reserve(values.size());
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           response.mutable_get_all_public_ids()->add_ids(*it);
@@ -679,6 +681,7 @@ namespace OrthancDatabases
                                 request.get_all_public_ids_with_limits().since(),
                                 request.get_all_public_ids_with_limits().limit());
 
+        response.mutable_get_all_public_ids_with_limits()->mutable_ids()->Reserve(values.size());
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           response.mutable_get_all_public_ids_with_limits()->add_ids(*it);
@@ -703,6 +706,7 @@ namespace OrthancDatabases
         std::list<int64_t>  values;
         backend.GetChildrenInternalId(values, manager, request.get_children_internal_id().id());
 
+        response.mutable_get_children_internal_id()->mutable_ids()->Reserve(values.size());
         for (std::list<int64_t>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           response.mutable_get_children_internal_id()->add_ids(*it);
@@ -716,6 +720,7 @@ namespace OrthancDatabases
         std::list<std::string>  values;
         backend.GetChildrenPublicId(values, manager, request.get_children_public_id().id());
 
+        response.mutable_get_children_public_id()->mutable_ids()->Reserve(values.size());
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           response.mutable_get_children_public_id()->add_ids(*it);
@@ -778,7 +783,7 @@ namespace OrthancDatabases
       
       case Orthanc::DatabasePluginMessages::OPERATION_GET_RESOURCE_TYPE:
       {
-        OrthancPluginResourceType type = backend.GetResourceType(manager, request.get_public_id().id());
+        OrthancPluginResourceType type = backend.GetResourceType(manager, request.get_resource_type().id());
         response.mutable_get_resource_type()->set_type(Convert(type));
         break;
       }
@@ -807,6 +812,7 @@ namespace OrthancDatabases
         std::list<int32_t>  values;
         backend.ListAvailableAttachments(values, manager, request.list_available_attachments().id());
 
+        response.mutable_list_available_attachments()->mutable_attachments()->Reserve(values.size());
         for (std::list<int32_t>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           response.mutable_list_available_attachments()->add_attachments(*it);
@@ -1052,7 +1058,7 @@ namespace OrthancDatabases
           tag.group = request.set_resources_content().tags(i).group();
           tag.element = request.set_resources_content().tags(i).element();
           tag.value = request.set_resources_content().tags(i).value().c_str();
-          
+
           if (request.set_resources_content().tags(i).is_identifier())
           {
             identifierTags.push_back(tag);
@@ -1063,7 +1069,9 @@ namespace OrthancDatabases
           }
         }
         
-        std::vector<OrthancPluginResourcesContentMetadata> metadata(request.set_resources_content().metadata().size());
+        std::vector<OrthancPluginResourcesContentMetadata> metadata;
+        metadata.reserve(request.set_resources_content().metadata().size());
+        
         for (int i = 0; i < request.set_resources_content().metadata().size(); i++)
         {
           OrthancPluginResourcesContentMetadata item;
@@ -1085,6 +1093,7 @@ namespace OrthancDatabases
         std::list<std::string> values;
         backend.GetChildrenMetadata(values, manager, request.get_children_metadata().id(), request.get_children_metadata().metadata());
 
+        response.mutable_get_children_metadata()->mutable_values()->Reserve(values.size());
         for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
         {
           response.mutable_get_children_metadata()->add_values(*it);
@@ -1111,14 +1120,30 @@ namespace OrthancDatabases
           response.mutable_lookup_resource_and_parent()->set_id(id);
           response.mutable_lookup_resource_and_parent()->set_type(Convert(type));
 
-          if (parent.empty())
+          switch (type)
           {
-            response.mutable_lookup_resource_and_parent()->set_has_parent(true);
-          }
-          else
-          {
-            response.mutable_lookup_resource_and_parent()->set_has_parent(false);
-            response.mutable_lookup_resource_and_parent()->set_parent_public_id(parent);
+            case OrthancPluginResourceType_Study:
+            case OrthancPluginResourceType_Series:
+            case OrthancPluginResourceType_Instance:
+              if (parent.empty())
+              {
+                throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+              }
+              else
+              {
+                response.mutable_lookup_resource_and_parent()->set_parent_public_id(parent);
+              }
+              break;
+
+            case OrthancPluginResourceType_Patient:
+              if (!parent.empty())
+              {
+                throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+              }
+              break;
+
+            default:
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
           }
         }
         else
