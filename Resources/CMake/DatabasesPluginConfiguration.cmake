@@ -88,6 +88,14 @@ add_definitions(
   )
 
 
+if (STATIC_BUILD OR NOT USE_SYSTEM_PROTOBUF)
+  # This is necessary, at least on LSB (Linux Standard Base),
+  # otherwise the following error is generated: "undefined reference
+  # to `__tls_get_addr'"
+  add_definitions(-DGOOGLE_PROTOBUF_NO_THREADLOCAL=1)
+endif()
+
+
 list(APPEND DATABASES_SOURCES
   ${ORTHANC_CORE_SOURCES}
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/DatabaseBackendAdapterV2.cpp
