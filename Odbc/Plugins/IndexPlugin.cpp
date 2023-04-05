@@ -42,6 +42,9 @@
 #endif
 
 
+#include <google/protobuf/any.h>
+
+
 static const char* const KEY_ODBC = "Odbc";
 
 
@@ -54,6 +57,8 @@ extern "C"
   
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     if (!OrthancDatabases::InitializePlugin(context, "ODBC", true))
     {
       return -1;
@@ -130,6 +135,7 @@ extern "C"
   {
     LOG(WARNING) << "ODBC index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
+    google::protobuf::ShutdownProtobufLibrary();
   }
 
 
