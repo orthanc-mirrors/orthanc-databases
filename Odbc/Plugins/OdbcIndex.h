@@ -83,5 +83,11 @@ namespace OrthancDatabases
                                   DatabaseManager& manager,
                                   int64_t id,
                                   int32_t attachment) ORTHANC_OVERRIDE;
+    
+    // New primitive since Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
   };
 }

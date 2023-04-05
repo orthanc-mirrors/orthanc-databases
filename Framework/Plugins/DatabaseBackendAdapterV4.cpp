@@ -567,9 +567,21 @@ namespace OrthancDatabases
 
     assert(values.size() == countValues);
 
+    std::set<std::string> withLabels, withoutLabels;
+
+    for (int i = 0; i < request.with_labels().size(); i++)
+    {
+      withLabels.insert(request.with_labels(i));
+    }
+
+    for (int i = 0; i < request.without_labels().size(); i++)
+    {
+      withoutLabels.insert(request.without_labels(i));
+    }
+    
     Output output(response);
     backend.LookupResources(output, manager, lookup, Convert(request.query_level()),
-                            request.limit(), request.retrieve_instances_ids());
+                            withLabels, withoutLabels, request.limit(), request.retrieve_instances_ids());
   }
 
   

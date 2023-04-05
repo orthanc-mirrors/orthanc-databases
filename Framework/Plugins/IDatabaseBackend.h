@@ -271,6 +271,8 @@ namespace OrthancDatabases
                                  DatabaseManager& manager,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
+                                 const std::set<std::string>& withLabels,     // New in Orthanc 1.12.0
+                                 const std::set<std::string>& withoutLabels,  // New in Orthanc 1.12.0
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
 #endif
@@ -307,23 +309,30 @@ namespace OrthancDatabases
     virtual void TagMostRecentPatient(DatabaseManager& manager,
                                       int64_t patientId) = 0;
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     // NB: "parentPublicId" must be cleared if the resource has no parent
     virtual bool LookupResourceAndParent(int64_t& id,
                                          OrthancPluginResourceType& type,
                                          std::string& parentPublicId,
                                          DatabaseManager& manager,
                                          const char* publicId) = 0;
-#  endif
-#endif
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
                                 DatabaseManager& manager,
                                 int64_t id) = 0;
-#  endif
-#endif
+
+    // New in Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void AddLabel(int64_t resource,
+                          const std::string& label) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void RemoveLabel(int64_t resource,
+                             const std::string& label) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void ListLabels(std::set<std::string>& target,
+                            int64_t resource) = 0;
   };
 }

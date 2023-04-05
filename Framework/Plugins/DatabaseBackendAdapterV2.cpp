@@ -1419,7 +1419,10 @@ namespace OrthancDatabases
         lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
       }
         
-      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, limit, (requestSomeInstance != 0));
+      std::set<std::string> noLabels;
+      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel,
+                                            noLabels, noLabels, limit, (requestSomeInstance != 0));
+      
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

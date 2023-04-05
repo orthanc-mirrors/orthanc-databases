@@ -2065,9 +2065,17 @@ namespace OrthancDatabases
                                      DatabaseManager& manager,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
+                                     const std::set<std::string>& withLabels,
+                                     const std::set<std::string>& withoutLabels,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
+    if (!withLabels.empty() ||
+        !withoutLabels.empty())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+
     LookupFormatter formatter(manager.GetDialect());
 
     std::string sql;
@@ -2608,6 +2616,27 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 #endif
 
+
+  void IndexBackend::AddLabel(int64_t resource,
+                              const std::string& label)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+
+  void IndexBackend::RemoveLabel(int64_t resource,
+                                 const std::string& label)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+
+  void IndexBackend::ListLabels(std::set<std::string>& target,
+                                int64_t resource)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+  
 
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
