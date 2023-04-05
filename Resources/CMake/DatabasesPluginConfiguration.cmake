@@ -88,7 +88,8 @@ add_definitions(
   )
 
 
-if (STATIC_BUILD OR NOT USE_SYSTEM_PROTOBUF)
+if ((STATIC_BUILD OR NOT USE_SYSTEM_PROTOBUF) AND
+    CMAKE_SYSTEM_VERSION STREQUAL "LinuxStandardBase")
   # This is necessary, at least on LSB (Linux Standard Base),
   # otherwise the following error is generated: "undefined reference
   # to `__tls_get_addr'"
