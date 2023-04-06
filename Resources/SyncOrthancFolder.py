@@ -39,9 +39,10 @@ FILES = [
     ('default', 'OrthancServer/Plugins/Samples/Common/VersionScriptPlugins.map', 'Plugins'),
     ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.cpp', 'Databases'),
     ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.h', 'Databases'),
-    
-    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
-    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
+
+    # TODO - Replace "db-protobuf" by "default" once Orthanc 1.12.0 is released
+    ('db-protobuf', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
+    ('db-protobuf', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
 ]
 
 SDK = [

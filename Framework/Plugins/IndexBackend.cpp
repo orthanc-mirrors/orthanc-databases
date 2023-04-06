@@ -2070,17 +2070,12 @@ namespace OrthancDatabases
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
-    if (!withLabels.empty() ||
-        !withoutLabels.empty())
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-    }
-
     LookupFormatter formatter(manager.GetDialect());
 
     std::string sql;
-    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
-                                        Orthanc::Plugins::Convert(queryLevel), limit);
+    Orthanc::ISqlLookupFormatter::Apply(
+      sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel),
+      withLabels, withoutLabels, limit);
 
     if (requestSomeInstance)
     {
