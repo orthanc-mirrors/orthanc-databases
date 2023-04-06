@@ -324,15 +324,18 @@ namespace OrthancDatabases
     virtual bool HasLabelsSupport() const = 0;
 
     // New in Orthanc 1.12.0
-    virtual void AddLabel(int64_t resource,
+    virtual void AddLabel(DatabaseManager& manager,
+                          int64_t resource,
                           const std::string& label) = 0;
 
     // New in Orthanc 1.12.0
-    virtual void RemoveLabel(int64_t resource,
+    virtual void RemoveLabel(DatabaseManager& manager,
+                             int64_t resource,
                              const std::string& label) = 0;
 
     // New in Orthanc 1.12.0
-    virtual void ListLabels(std::set<std::string>& target,
+    virtual void ListLabels(std::list<std::string>& target,
+                            DatabaseManager& manager,
                             int64_t resource) = 0;
   };
 }

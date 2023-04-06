@@ -2617,24 +2617,69 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #endif
 
 
-  void IndexBackend::AddLabel(int64_t resource,
+  void IndexBackend::AddLabel(DatabaseManager& manager,
+                              int64_t resource,
                               const std::string& label)
   {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+    switch (manager.GetDialect())
+    {
+      case Dialect_PostgreSQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT INTO Labels VALUES(${id}, ${label}) ON CONFLICT DO NOTHING"));
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    
+    statement->SetParameterType("id", ValueType_Integer64);
+    statement->SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement->Execute(args);
   }
 
 
-  void IndexBackend::RemoveLabel(int64_t resource,
+  void IndexBackend::RemoveLabel(DatabaseManager& manager,
+                                 int64_t resource,
                                  const std::string& label)
   {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM Labels WHERE id=${id} AND label=${label}");
+
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement.Execute(args);
   }
 
 
-  void IndexBackend::ListLabels(std::set<std::string>& target,
+  void IndexBackend::ListLabels(std::list<std::string>& target,
+                                DatabaseManager& manager,
                                 int64_t resource)
   {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT label FROM Labels WHERE id=${id}");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+
+    ReadListOfStrings(target, statement, args);
   }
   
 
@@ -2691,7 +2736,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       catch (boost::bad_lexical_cast&)
       {
-        LOG(ERROR) << "Corrupted PostgreSQL database";
+        LOG(ERROR) << "Corrupted database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }      
     }

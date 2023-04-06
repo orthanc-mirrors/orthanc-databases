@@ -297,6 +297,24 @@ namespace OrthancDatabases
 
         t.Commit();
       }
+ 
+
+      {
+        // New in release 5.0 to deal with labels
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        if (!t.GetDatabaseTransaction().DoesTableExist("Labels"))
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines(
+            "CREATE TABLE Labels("
+            "id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,"
+            "label TEXT, PRIMARY KEY(id, label));"
+            "CREATE INDEX LabelsIndex1 ON LABELS(id);"
+            "CREATE INDEX LabelsIndex2 ON LABELS(label);");
+        }
+
+        t.Commit();
+      }
     }
   }
 

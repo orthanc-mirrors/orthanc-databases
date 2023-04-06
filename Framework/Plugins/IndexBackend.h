@@ -381,13 +381,16 @@ namespace OrthancDatabases
                                   int32_t property,
                                   int value);
 
-    virtual void AddLabel(int64_t resource,
+    virtual void AddLabel(DatabaseManager& manager,
+                          int64_t resource,
                           const std::string& label) ORTHANC_OVERRIDE;
 
-    virtual void RemoveLabel(int64_t resource,
+    virtual void RemoveLabel(DatabaseManager& manager,
+                             int64_t resource,
                              const std::string& label) ORTHANC_OVERRIDE;
 
-    virtual void ListLabels(std::set<std::string>& target,
+    virtual void ListLabels(std::list<std::string>& target,
+                            DatabaseManager& manager,
                             int64_t resource) ORTHANC_OVERRIDE;
     
     /**

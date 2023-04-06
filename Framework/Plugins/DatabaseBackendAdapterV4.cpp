@@ -408,6 +408,7 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_database_version(accessor.GetBackend().GetDatabaseVersion(accessor.GetManager()));
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
+        response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
         break;
       }
 
@@ -1163,6 +1164,32 @@ namespace OrthancDatabases
           response.mutable_lookup_resource_and_parent()->set_found(false);
         }
 
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_ADD_LABEL:
+      {
+        backend.AddLabel(manager, request.add_label().id(), request.add_label().label());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_REMOVE_LABEL:
+      {
+        backend.RemoveLabel(manager, request.remove_label().id(), request.remove_label().label());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_LABELS:
+      {
+        std::list<std::string>  labels;
+        backend.ListLabels(labels, manager, request.list_labels().id());
+
+        response.mutable_list_available_attachments()->mutable_attachments()->Reserve(labels.size());
+        for (std::list<std::string>::const_iterator it = labels.begin(); it != labels.end(); ++it)
+        {
+          response.mutable_list_labels()->add_labels(*it);
+        }
+        
         break;
       }
       
