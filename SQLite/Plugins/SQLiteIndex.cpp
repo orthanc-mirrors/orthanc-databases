@@ -166,6 +166,23 @@ namespace OrthancDatabases
 
       t.Commit();
     }    
+
+    {
+      DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+      if (!t.GetDatabaseTransaction().DoesTableExist("Labels"))
+      {
+        t.GetDatabaseTransaction().ExecuteMultiLines(
+          "CREATE TABLE Labels("
+          "  id INTEGER REFERENCES Resources(internalId) ON DELETE CASCADE,"
+          "  label TEXT NOT NULL,"
+          "  PRIMARY KEY(id, label));"
+          "CREATE INDEX LabelsIndex1 ON Labels(id);"
+          "CREATE INDEX LabelsIndex2 ON Labels(label);");
+      }
+
+      t.Commit();
+    }    
   }
 
 

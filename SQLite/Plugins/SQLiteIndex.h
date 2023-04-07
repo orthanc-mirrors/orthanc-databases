@@ -62,7 +62,7 @@ namespace OrthancDatabases
     // New primitive since Orthanc 1.12.0
     virtual bool HasLabelsSupport() const ORTHANC_OVERRIDE
     {
-      return false;
+      return true;
     }
   };
 }

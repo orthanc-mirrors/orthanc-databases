@@ -2626,6 +2626,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                           "INSERT INTO Labels VALUES(${id}, ${label}) ON CONFLICT DO NOTHING"));
         break;
 
+      case Dialect_SQLite:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT OR IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
     }
