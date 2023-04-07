@@ -2632,6 +2632,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                           "INSERT OR IGNORE INTO Labels VALUES(${id}, ${label})"));
         break;
 
+      case Dialect_MySQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
     }

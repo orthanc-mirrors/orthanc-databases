@@ -295,7 +295,27 @@ namespace OrthancDatabases
         t.Commit();
       }
 
-      if (revision != 6)
+      if (revision == 6)
+      {
+        // Added new table "Labels" since release 5.0 to deal with
+        // labels that were introduced in Orthanc 1.12.0
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        t.GetDatabaseTransaction().ExecuteMultiLines(
+          "CREATE TABLE Labels(id BIGINT NOT NULL,"
+          "label VARCHAR(64) NOT NULL,"
+          "PRIMARY KEY(id, label),"
+          "CONSTRAINT Labels1 FOREIGN KEY (id) REFERENCES Resources(internalId) ON DELETE CASCADE);"
+          "CREATE INDEX LabelsIndex1 ON Labels(id);"
+          "CREATE INDEX LabelsIndex2 ON Labels(label);");
+
+        revision = 7;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+
+        t.Commit();
+      }
+
+      if (revision != 7)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
