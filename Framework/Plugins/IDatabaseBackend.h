@@ -23,9 +23,10 @@
 
 #pragma once
 
-#include "IDatabaseBackendOutput.h"
-#include "../Common/DatabasesEnumerations.h"
+#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/DatabaseManager.h"
+#include "../Common/DatabasesEnumerations.h"
+#include "IDatabaseBackendOutput.h"
 
 #include <list>
 
@@ -271,8 +272,8 @@ namespace OrthancDatabases
                                  DatabaseManager& manager,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
-                                 const std::set<std::string>& withLabels,     // New in Orthanc 1.12.0
-                                 const std::set<std::string>& withoutLabels,  // New in Orthanc 1.12.0
+                                 const std::set<std::string>& labels,         // New in Orthanc 1.12.0
+                                 Orthanc::LabelsConstraint labelsConstraint,  // New in Orthanc 1.12.0
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
 #endif

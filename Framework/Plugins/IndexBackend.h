@@ -302,8 +302,8 @@ namespace OrthancDatabases
                                  DatabaseManager& manager,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
-                                 const std::set<std::string>& withLabels,
-                                 const std::set<std::string>& withoutLabels,
+                                 const std::set<std::string>& labels,
+                                 Orthanc::LabelsConstraint labelsConstraint,
                                  uint32_t limit,
                                  bool requestSomeInstance) ORTHANC_OVERRIDE;
 #endif

@@ -22,7 +22,6 @@
 
 #include "IndexBackend.h"
 
-#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/BinaryStringValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
@@ -2065,17 +2064,16 @@ namespace OrthancDatabases
                                      DatabaseManager& manager,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
-                                     const std::set<std::string>& withLabels,
-                                     const std::set<std::string>& withoutLabels,
+                                     const std::set<std::string>& labels,
+                                     Orthanc::LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
 
     std::string sql;
-    Orthanc::ISqlLookupFormatter::Apply(
-      sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel),
-      withLabels, withoutLabels, limit);
+    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel),
+                                        labels, labelsConstraint, limit);
 
     if (requestSomeInstance)
     {

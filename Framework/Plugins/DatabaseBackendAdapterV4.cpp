@@ -568,21 +568,35 @@ namespace OrthancDatabases
 
     assert(values.size() == countValues);
 
-    std::set<std::string> withLabels, withoutLabels;
+    std::set<std::string> labels;
 
-    for (int i = 0; i < request.with_labels().size(); i++)
+    for (int i = 0; i < request.labels().size(); i++)
     {
-      withLabels.insert(request.with_labels(i));
+      labels.insert(request.labels(i));
     }
 
-    for (int i = 0; i < request.without_labels().size(); i++)
+    Orthanc::LabelsConstraint labelsConstraint;
+    switch (request.labels_constraint())
     {
-      withoutLabels.insert(request.without_labels(i));
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ALL:
+        labelsConstraint = Orthanc::LabelsConstraint_All;
+        break;
+            
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ANY:
+        labelsConstraint = Orthanc::LabelsConstraint_Any;
+        break;
+            
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE:
+        labelsConstraint = Orthanc::LabelsConstraint_None;
+        break;
+            
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
-    
+
     Output output(response);
     backend.LookupResources(output, manager, lookup, Convert(request.query_level()),
-                            withLabels, withoutLabels, request.limit(), request.retrieve_instances_ids());
+                            labels, labelsConstraint, request.limit(), request.retrieve_instances_ids());
   }
 
   
