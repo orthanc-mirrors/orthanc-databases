@@ -338,5 +338,9 @@ namespace OrthancDatabases
     virtual void ListLabels(std::list<std::string>& target,
                             DatabaseManager& manager,
                             int64_t resource) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void ListAllLabels(std::list<std::string>& target,
+                               DatabaseManager& manager) = 0;
   };
 }

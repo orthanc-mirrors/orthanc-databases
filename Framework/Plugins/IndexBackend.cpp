@@ -2688,6 +2688,18 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
   
 
+  void IndexBackend::ListAllLabels(std::list<std::string>& target,
+                                   DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT DISTINCT label FROM Labels");
+      
+    Dictionary args;
+    ReadListOfStrings(target, statement, args);
+  }
+
+  
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
                               unsigned int maxDatabaseRetries)

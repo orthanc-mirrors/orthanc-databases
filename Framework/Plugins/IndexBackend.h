@@ -392,6 +392,9 @@ namespace OrthancDatabases
     virtual void ListLabels(std::list<std::string>& target,
                             DatabaseManager& manager,
                             int64_t resource) ORTHANC_OVERRIDE;
+
+    virtual void ListAllLabels(std::list<std::string>& target,
+                               DatabaseManager& manager) ORTHANC_OVERRIDE;
     
     /**
      * "maxDatabaseRetries" is to handle

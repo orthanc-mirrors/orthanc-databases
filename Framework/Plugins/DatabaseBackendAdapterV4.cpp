@@ -1196,7 +1196,15 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_LIST_LABELS:
       {
         std::list<std::string>  labels;
-        backend.ListLabels(labels, manager, request.list_labels().id());
+
+        if (request.list_labels().single_resource())
+        {
+          backend.ListLabels(labels, manager, request.list_labels().id());
+        }
+        else
+        {
+          backend.ListAllLabels(labels, manager);
+        }
 
         response.mutable_list_available_attachments()->mutable_attachments()->Reserve(labels.size());
         for (std::list<std::string>::const_iterator it = labels.begin(); it != labels.end(); ++it)
