@@ -2792,10 +2792,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 
 
-  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
+  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend,
+                                                             bool hasIdentifierTags,
+                                                             const std::list<IdentifierTag>& identifierTags)
   {
     std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.CreateDatabaseFactory()));
-    backend.ConfigureDatabase(*manager);
+    backend.ConfigureDatabase(*manager, hasIdentifierTags, identifierTags);
     return manager.release();
   }
 }

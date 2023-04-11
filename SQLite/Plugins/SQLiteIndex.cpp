@@ -85,7 +85,9 @@ namespace OrthancDatabases
   }
 
 
-  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager)
+  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager,
+                                      bool hasIdentifierTags,
+                                      const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
 

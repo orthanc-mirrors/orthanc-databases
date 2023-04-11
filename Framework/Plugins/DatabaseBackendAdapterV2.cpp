@@ -90,7 +90,8 @@ namespace OrthancDatabases
 
       if (manager_.get() == NULL)
       {
-        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_));
+        std::list<IdentifierTag> identifierTags;
+        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_, false, identifierTags));
       }
       else
       {

@@ -408,6 +408,8 @@ namespace OrthancDatabases
 
     static void Finalize();
 
-    static DatabaseManager* CreateSingleDatabaseManager(IDatabaseBackend& backend);
+    static DatabaseManager* CreateSingleDatabaseManager(IDatabaseBackend& backend,
+                                                        bool hasIdentifierTags,
+                                                        const std::list<IdentifierTag>& identifierTags);
   };
 }

@@ -800,7 +800,8 @@ namespace OrthancDatabases
 
     try
     {
-      pool->OpenConnections();
+      std::list<IdentifierTag> identifierTags;
+      pool->OpenConnections(false, identifierTags);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());

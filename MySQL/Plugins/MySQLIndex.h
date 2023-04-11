@@ -44,7 +44,9 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE;
 
-    virtual void ConfigureDatabase(DatabaseManager& database) ORTHANC_OVERRIDE;
+    virtual void ConfigureDatabase(DatabaseManager& database,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;
  
     virtual bool HasRevisionsSupport() const ORTHANC_OVERRIDE
     {

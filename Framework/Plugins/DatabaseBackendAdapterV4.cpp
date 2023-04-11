@@ -90,6 +90,28 @@ namespace OrthancDatabases
   }
 
 
+  static Orthanc::ResourceType Convert2(Orthanc::DatabasePluginMessages::ResourceType resourceType)
+  {
+    switch (resourceType)
+    {
+      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
+        return Orthanc::ResourceType_Patient;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
+        return Orthanc::ResourceType_Study;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
+        return Orthanc::ResourceType_Series;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
+        return Orthanc::ResourceType_Instance;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+
   class Output : public IDatabaseBackendOutput
   {
   private:
@@ -414,7 +436,24 @@ namespace OrthancDatabases
 
       case Orthanc::DatabasePluginMessages::OPERATION_OPEN:
       {
-        pool.OpenConnections();
+        std::list<IdentifierTag> identifierTags;
+
+        if (request.open().identifier_tags().empty())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError,
+                                          "No identifier tag was provided by the Orthanc core");
+        }
+
+        for (int i = 0; i < request.open().identifier_tags().size(); i++)
+        {
+          const Orthanc::DatabasePluginMessages::Open_Request_IdentifierTag& tag = request.open().identifier_tags(i);
+          identifierTags.push_back(IdentifierTag(Convert2(tag.level()),
+                                                 Orthanc::DicomTag(tag.group(), tag.element()),
+                                                 tag.name()));
+        }
+          
+        pool.OpenConnections(true, identifierTags);
+        
         break;
       }
 

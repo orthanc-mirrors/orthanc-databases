@@ -27,6 +27,7 @@
 #include "../Common/DatabaseManager.h"
 #include "../Common/DatabasesEnumerations.h"
 #include "IDatabaseBackendOutput.h"
+#include "IdentifierTag.h"
 
 #include <list>
 
@@ -43,8 +44,13 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() = 0;
 
-    // This function is invoked once, even if multiple connections are open
-    virtual void ConfigureDatabase(DatabaseManager& database) = 0;
+    /**
+     * This function is invoked once, even if multiple connections are
+     * open. It is notably used to update the schema of the database.
+     **/
+    virtual void ConfigureDatabase(DatabaseManager& database,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) = 0;
 
     virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
                         

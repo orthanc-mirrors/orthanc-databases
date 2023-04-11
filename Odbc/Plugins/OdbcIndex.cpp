@@ -162,7 +162,9 @@ namespace OrthancDatabases
   }
   
   
-  void OdbcIndex::ConfigureDatabase(DatabaseManager& manager)
+  void OdbcIndex::ConfigureDatabase(DatabaseManager& manager,
+                                    bool hasIdentifierTags,
+                                    const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
     
