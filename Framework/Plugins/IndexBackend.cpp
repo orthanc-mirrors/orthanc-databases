@@ -2384,9 +2384,7 @@ namespace OrthancDatabases
   }
 
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
-  // New primitive since Orthanc 1.5.4
+// New primitive since Orthanc 1.5.4
 bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                            OrthancPluginResourceType& type,
                                            std::string& parentPublicId,
@@ -2444,12 +2442,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     return true;
   }
 }
-#  endif
-#endif
   
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
   // New primitive since Orthanc 1.5.4
   void IndexBackend::GetAllMetadata(std::map<int32_t, std::string>& result,
                                     DatabaseManager& manager,
@@ -2486,8 +2480,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
     }
   }
-#  endif
-#endif
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
