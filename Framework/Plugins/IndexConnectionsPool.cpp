@@ -30,7 +30,7 @@ namespace OrthancDatabases
     DatabaseManager*  manager_;
 
   public:
-    ManagerReference(DatabaseManager& manager) :
+    explicit ManagerReference(DatabaseManager& manager) :
       manager_(&manager)
     {
     }

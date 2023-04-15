@@ -54,7 +54,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   SET(LIBPQ_SOURCES_DIR ${CMAKE_BINARY_DIR}/postgresql-${LIBPQ_VERSION})
   DownloadPackage(
     "551302a823a1ab48b4ed14166beebba9"
-    "http://orthanc.osimis.io/ThirdPartyDownloads/postgresql-${LIBPQ_VERSION}.tar.gz"
+    "https://orthanc.uclouvain.be/third-party-downloads/postgresql-${LIBPQ_VERSION}.tar.gz"
     "${LIBPQ_SOURCES_DIR}")
 
   

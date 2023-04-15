@@ -2070,9 +2070,10 @@ namespace OrthancDatabases
   {
     LookupFormatter formatter(manager.GetDialect());
 
+    std::set<std::string> noLabels;
     std::string sql;
-    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
-                                        Orthanc::Plugins::Convert(queryLevel), limit);
+    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel),
+                                        noLabels, Orthanc::LabelsConstraint_All, limit);
 
     if (requestSomeInstance)
     {
