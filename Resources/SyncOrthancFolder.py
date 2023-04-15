@@ -27,6 +27,8 @@ FILES = [
     ('default', 'OrthancFramework/Resources/CMake/DownloadOrthancFramework.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/CMake/DownloadPackage.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/CMake/GoogleTestConfiguration.cmake', 'CMake'),
+    ('default', 'OrthancFramework/Resources/CMake/OpenSslConfiguration.cmake', 'CMake'),
+    ('default', 'OrthancFramework/Resources/CMake/ProtobufConfiguration.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/EmbedResources.py', '.'),
     ('default', 'OrthancFramework/Resources/Toolchains/LinuxStandardBaseToolchain.cmake', '.'),
     ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain32.cmake', '.'),
