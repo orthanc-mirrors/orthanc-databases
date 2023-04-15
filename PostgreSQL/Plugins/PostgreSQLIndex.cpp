@@ -61,7 +61,9 @@ namespace OrthancDatabases
   }
 
   
-  void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager)
+  void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager,
+                                          bool hasIdentifierTags,
+                                          const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
 
@@ -293,6 +295,24 @@ namespace OrthancDatabases
         if (!db.DoesColumnExist("AttachedFiles", "revision"))
         {
           t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN revision INTEGER");
+        }
+
+        t.Commit();
+      }
+ 
+
+      {
+        // New in release 5.0 to deal with labels
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        if (!t.GetDatabaseTransaction().DoesTableExist("Labels"))
+        {
+          t.GetDatabaseTransaction().ExecuteMultiLines(
+            "CREATE TABLE Labels("
+            "id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,"
+            "label TEXT, PRIMARY KEY(id, label));"
+            "CREATE INDEX LabelsIndex1 ON LABELS(id);"
+            "CREATE INDEX LabelsIndex2 ON LABELS(label);");
         }
 
         t.Commit();

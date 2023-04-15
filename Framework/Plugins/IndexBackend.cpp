@@ -22,7 +22,6 @@
 
 #include "IndexBackend.h"
 
-#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/BinaryStringValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
@@ -2065,15 +2064,16 @@ namespace OrthancDatabases
                                      DatabaseManager& manager,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                      OrthancPluginResourceType queryLevel,
+                                     const std::set<std::string>& labels,
+                                     Orthanc::LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
 
-    std::set<std::string> noLabels;
     std::string sql;
     Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel),
-                                        noLabels, Orthanc::LabelsConstraint_All, limit);
+                                        labels, labelsConstraint, limit);
 
     if (requestSomeInstance)
     {
@@ -2610,6 +2610,96 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #endif
 
 
+  void IndexBackend::AddLabel(DatabaseManager& manager,
+                              int64_t resource,
+                              const std::string& label)
+  {
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+    switch (manager.GetDialect())
+    {
+      case Dialect_PostgreSQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT INTO Labels VALUES(${id}, ${label}) ON CONFLICT DO NOTHING"));
+        break;
+
+      case Dialect_SQLite:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT OR IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
+      case Dialect_MySQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    
+    statement->SetParameterType("id", ValueType_Integer64);
+    statement->SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement->Execute(args);
+  }
+
+
+  void IndexBackend::RemoveLabel(DatabaseManager& manager,
+                                 int64_t resource,
+                                 const std::string& label)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM Labels WHERE id=${id} AND label=${label}");
+
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement.Execute(args);
+  }
+
+
+  void IndexBackend::ListLabels(std::list<std::string>& target,
+                                DatabaseManager& manager,
+                                int64_t resource)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT label FROM Labels WHERE id=${id}");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+
+    ReadListOfStrings(target, statement, args);
+  }
+  
+
+  void IndexBackend::ListAllLabels(std::list<std::string>& target,
+                                   DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT DISTINCT label FROM Labels");
+      
+    Dictionary args;
+    ReadListOfStrings(target, statement, args);
+  }
+
+  
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
                               unsigned int maxDatabaseRetries)
@@ -2663,7 +2753,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       catch (boost::bad_lexical_cast&)
       {
-        LOG(ERROR) << "Corrupted PostgreSQL database";
+        LOG(ERROR) << "Corrupted database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }      
     }
@@ -2702,10 +2792,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   }
 
 
-  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
+  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend,
+                                                             bool hasIdentifierTags,
+                                                             const std::list<IdentifierTag>& identifierTags)
   {
     std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.CreateDatabaseFactory()));
-    backend.ConfigureDatabase(*manager);
+    backend.ConfigureDatabase(*manager, hasIdentifierTags, identifierTags);
     return manager.release();
   }
 }

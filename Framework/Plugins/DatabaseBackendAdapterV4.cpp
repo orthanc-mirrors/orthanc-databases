@@ -90,6 +90,28 @@ namespace OrthancDatabases
   }
 
 
+  static Orthanc::ResourceType Convert2(Orthanc::DatabasePluginMessages::ResourceType resourceType)
+  {
+    switch (resourceType)
+    {
+      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
+        return Orthanc::ResourceType_Patient;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
+        return Orthanc::ResourceType_Study;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
+        return Orthanc::ResourceType_Series;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
+        return Orthanc::ResourceType_Instance;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+
   class Output : public IDatabaseBackendOutput
   {
   private:
@@ -408,12 +430,30 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_database_version(accessor.GetBackend().GetDatabaseVersion(accessor.GetManager()));
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
+        response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
         break;
       }
 
       case Orthanc::DatabasePluginMessages::OPERATION_OPEN:
       {
-        pool.OpenConnections();
+        std::list<IdentifierTag> identifierTags;
+
+        if (request.open().identifier_tags().empty())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError,
+                                          "No identifier tag was provided by the Orthanc core");
+        }
+
+        for (int i = 0; i < request.open().identifier_tags().size(); i++)
+        {
+          const Orthanc::DatabasePluginMessages::Open_Request_IdentifierTag& tag = request.open().identifier_tags(i);
+          identifierTags.push_back(IdentifierTag(Convert2(tag.level()),
+                                                 Orthanc::DicomTag(tag.group(), tag.element()),
+                                                 tag.name()));
+        }
+          
+        pool.OpenConnections(true, identifierTags);
+        
         break;
       }
 
@@ -567,9 +607,35 @@ namespace OrthancDatabases
 
     assert(values.size() == countValues);
 
+    std::set<std::string> labels;
+
+    for (int i = 0; i < request.labels().size(); i++)
+    {
+      labels.insert(request.labels(i));
+    }
+
+    Orthanc::LabelsConstraint labelsConstraint;
+    switch (request.labels_constraint())
+    {
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ALL:
+        labelsConstraint = Orthanc::LabelsConstraint_All;
+        break;
+            
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ANY:
+        labelsConstraint = Orthanc::LabelsConstraint_Any;
+        break;
+            
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE:
+        labelsConstraint = Orthanc::LabelsConstraint_None;
+        break;
+            
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+
     Output output(response);
     backend.LookupResources(output, manager, lookup, Convert(request.query_level()),
-                            request.limit(), request.retrieve_instances_ids());
+                            labels, labelsConstraint, request.limit(), request.retrieve_instances_ids());
   }
 
   
@@ -1151,6 +1217,40 @@ namespace OrthancDatabases
           response.mutable_lookup_resource_and_parent()->set_found(false);
         }
 
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_ADD_LABEL:
+      {
+        backend.AddLabel(manager, request.add_label().id(), request.add_label().label());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_REMOVE_LABEL:
+      {
+        backend.RemoveLabel(manager, request.remove_label().id(), request.remove_label().label());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_LABELS:
+      {
+        std::list<std::string>  labels;
+
+        if (request.list_labels().single_resource())
+        {
+          backend.ListLabels(labels, manager, request.list_labels().id());
+        }
+        else
+        {
+          backend.ListAllLabels(labels, manager);
+        }
+
+        response.mutable_list_available_attachments()->mutable_attachments()->Reserve(labels.size());
+        for (std::list<std::string>::const_iterator it = labels.begin(); it != labels.end(); ++it)
+        {
+          response.mutable_list_labels()->add_labels(*it);
+        }
+        
         break;
       }
       

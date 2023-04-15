@@ -75,7 +75,8 @@ namespace OrthancDatabases
   }
 
 
-  void IndexConnectionsPool::OpenConnections()
+  void IndexConnectionsPool::OpenConnections(bool hasIdentifierTags,
+                                             const std::list<IdentifierTag>& identifierTags)
   {
     boost::unique_lock<boost::shared_mutex>  lock(connectionsMutex_);
 
@@ -87,7 +88,7 @@ namespace OrthancDatabases
         std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend_->CreateDatabaseFactory()));
         manager->GetDatabase();  // Make sure to open the database connection
           
-        backend_->ConfigureDatabase(*manager);
+        backend_->ConfigureDatabase(*manager, hasIdentifierTags, identifierTags);
         connections_.push_back(manager.release());
       }
 

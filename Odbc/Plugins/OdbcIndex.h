@@ -56,7 +56,9 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE;    
     
-    virtual void ConfigureDatabase(DatabaseManager& manager) ORTHANC_OVERRIDE;
+    virtual void ConfigureDatabase(DatabaseManager& manager,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;
     
     virtual bool HasRevisionsSupport() const ORTHANC_OVERRIDE
     {
@@ -83,5 +85,11 @@ namespace OrthancDatabases
                                   DatabaseManager& manager,
                                   int64_t id,
                                   int32_t attachment) ORTHANC_OVERRIDE;
+    
+    // New primitive since Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
   };
 }

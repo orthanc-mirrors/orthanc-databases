@@ -51,19 +51,21 @@ TEST(MySQLIndex, Lock)
   OrthancDatabases::MySQLIndex db1(NULL, noLock);
   db1.SetClearAll(true);
 
-  std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
+  std::list<OrthancDatabases::IdentifierTag> identifierTags;
+  
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1, false, identifierTags));
 
   {
     OrthancDatabases::MySQLIndex db2(NULL, lock);
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2, false, identifierTags));
 
     OrthancDatabases::MySQLIndex db3(NULL, lock);
-    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3), Orthanc::OrthancException);
+    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3, false, identifierTags), Orthanc::OrthancException);
 
   }
 
   OrthancDatabases::MySQLIndex db4(NULL, lock);
-  std::unique_ptr<OrthancDatabases::DatabaseManager> manager4(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db4));
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager4(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db4, false, identifierTags));
 }
 
 

@@ -90,7 +90,8 @@ namespace OrthancDatabases
 
       if (manager_.get() == NULL)
       {
-        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_));
+        std::list<IdentifierTag> identifierTags;
+        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_, false, identifierTags));
       }
       else
       {
@@ -1419,7 +1420,10 @@ namespace OrthancDatabases
         lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
       }
         
-      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, limit, (requestSomeInstance != 0));
+      std::set<std::string> noLabel;
+      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, noLabel,
+                                            Orthanc::LabelsConstraint_All, limit, (requestSomeInstance != 0));
+      
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;

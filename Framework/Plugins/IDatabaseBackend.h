@@ -23,9 +23,11 @@
 
 #pragma once
 
-#include "IDatabaseBackendOutput.h"
-#include "../Common/DatabasesEnumerations.h"
+#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/DatabaseManager.h"
+#include "../Common/DatabasesEnumerations.h"
+#include "IDatabaseBackendOutput.h"
+#include "IdentifierTag.h"
 
 #include <list>
 
@@ -42,8 +44,13 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() = 0;
 
-    // This function is invoked once, even if multiple connections are open
-    virtual void ConfigureDatabase(DatabaseManager& database) = 0;
+    /**
+     * This function is invoked once, even if multiple connections are
+     * open. It is notably used to update the schema of the database.
+     **/
+    virtual void ConfigureDatabase(DatabaseManager& database,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) = 0;
 
     virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
                         
@@ -271,6 +278,8 @@ namespace OrthancDatabases
                                  DatabaseManager& manager,
                                  const std::vector<Orthanc::DatabaseConstraint>& lookup,
                                  OrthancPluginResourceType queryLevel,
+                                 const std::set<std::string>& labels,         // New in Orthanc 1.12.0
+                                 Orthanc::LabelsConstraint labelsConstraint,  // New in Orthanc 1.12.0
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
 #endif
@@ -307,23 +316,37 @@ namespace OrthancDatabases
     virtual void TagMostRecentPatient(DatabaseManager& manager,
                                       int64_t patientId) = 0;
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     // NB: "parentPublicId" must be cleared if the resource has no parent
     virtual bool LookupResourceAndParent(int64_t& id,
                                          OrthancPluginResourceType& type,
                                          std::string& parentPublicId,
                                          DatabaseManager& manager,
                                          const char* publicId) = 0;
-#  endif
-#endif
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
                                 DatabaseManager& manager,
                                 int64_t id) = 0;
-#  endif
-#endif
+
+    // New in Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void AddLabel(DatabaseManager& manager,
+                          int64_t resource,
+                          const std::string& label) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void RemoveLabel(DatabaseManager& manager,
+                             int64_t resource,
+                             const std::string& label) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void ListLabels(std::list<std::string>& target,
+                            DatabaseManager& manager,
+                            int64_t resource) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void ListAllLabels(std::list<std::string>& target,
+                               DatabaseManager& manager) = 0;
   };
 }

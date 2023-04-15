@@ -246,7 +246,8 @@ TEST(IndexBackend, Basic)
 
   db.SetOutputFactory(new DatabaseBackendAdapterV2::Factory(&context, NULL));
 
-  std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db));
+  std::list<IdentifierTag> identifierTags;
+  std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db, false, identifierTags));
   
   std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());
 

@@ -85,7 +85,9 @@ namespace OrthancDatabases
   }
 
 
-  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager)
+  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager,
+                                      bool hasIdentifierTags,
+                                      const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
 
@@ -162,6 +164,23 @@ namespace OrthancDatabases
       {
         t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server TEXT, "
                                                      "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
+      }
+
+      t.Commit();
+    }    
+
+    {
+      DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+      if (!t.GetDatabaseTransaction().DoesTableExist("Labels"))
+      {
+        t.GetDatabaseTransaction().ExecuteMultiLines(
+          "CREATE TABLE Labels("
+          "  id INTEGER REFERENCES Resources(internalId) ON DELETE CASCADE,"
+          "  label TEXT NOT NULL,"
+          "  PRIMARY KEY(id, label));"
+          "CREATE INDEX LabelsIndex1 ON Labels(id);"
+          "CREATE INDEX LabelsIndex2 ON Labels(label);");
       }
 
       t.Commit();

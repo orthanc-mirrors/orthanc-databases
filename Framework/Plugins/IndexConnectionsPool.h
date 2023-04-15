@@ -22,6 +22,7 @@
 
 #pragma once
 
+#include "IdentifierTag.h"
 #include "IndexBackend.h"
 
 #include <MultiThreading/SharedMessageQueue.h>
@@ -53,7 +54,8 @@ namespace OrthancDatabases
       return context_;
     }
 
-    void OpenConnections();
+    void OpenConnections(bool hasIdentifierTags,
+                         const std::list<IdentifierTag>& identifierTags);
 
     void CloseConnections();
 

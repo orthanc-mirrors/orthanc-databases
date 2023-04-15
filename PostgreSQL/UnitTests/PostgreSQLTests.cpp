@@ -542,7 +542,8 @@ TEST(PostgreSQLIndex, CreateInstance)
   OrthancDatabases::PostgreSQLIndex db(NULL, globalParameters_);
   db.SetClearAll(true);
 
-  std::unique_ptr<OrthancDatabases::DatabaseManager> manager(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db));
+  std::list<OrthancDatabases::IdentifierTag> tags;
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db, false, tags));
 
   std::string s;
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal1));
