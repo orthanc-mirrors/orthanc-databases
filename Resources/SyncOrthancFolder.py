@@ -17,7 +17,8 @@ else:
 
 TARGET = os.path.join(os.path.dirname(__file__), 'Orthanc')
 PLUGIN_SDK_VERSION_OLD = [ '0.9.5', '1.4.0', '1.5.2', '1.5.4' ]
-PLUGIN_SDK_VERSION_NEW = [ '1.9.2' ]
+PLUGIN_SDK_VERSION_NEW = [ '1.9.2', '1.12.0' ]
+HAS_PROTOCOL_BUFFERS = [ '1.12.0' ]
 REPOSITORY = 'https://hg.orthanc-server.com/orthanc/raw-file'
 
 FILES = [
@@ -39,15 +40,19 @@ FILES = [
     ('default', 'OrthancServer/Plugins/Samples/Common/VersionScriptPlugins.map', 'Plugins'),
     ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.cpp', 'Databases'),
     ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.h', 'Databases'),
-
-    # TODO - Replace "db-protobuf" by "default" once Orthanc 1.12.0 is released
-    ('db-protobuf', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
-    ('db-protobuf', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
+    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
+    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
 ]
 
 SDK = [
     'orthanc/OrthancCPlugin.h',
     'orthanc/OrthancCDatabasePlugin.h',
+]
+
+SDK_PROTOCOL_BUFFERS = [
+    'orthanc/OrthancCPlugin.h',
+    'orthanc/OrthancCDatabasePlugin.h',
+    'orthanc/OrthancDatabasePlugin.proto',
 ]
 
 
@@ -87,7 +92,12 @@ for version in PLUGIN_SDK_VERSION_OLD:
         ])
 
 for version in PLUGIN_SDK_VERSION_NEW:
-    for f in SDK:
+    if version in HAS_PROTOCOL_BUFFERS:
+        files = SDK_PROTOCOL_BUFFERS
+    else:
+        files = SDK
+    
+    for f in files:
         commands.append([
             'Orthanc-%s' % version, 
             'OrthancServer/Plugins/Include/%s' % f,

@@ -67,7 +67,7 @@ namespace OrthancDatabases
       DatabaseManager*                         manager_;
       
     public:
-      Accessor(IndexConnectionsPool& pool);
+      explicit Accessor(IndexConnectionsPool& pool);
 
       ~Accessor();
 
