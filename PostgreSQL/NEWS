@@ -5,6 +5,7 @@ Pending changes in the mainline
 Release 5.0 (2023-04-15)
 ========================
 
+* Added support for labels
 * Compatibility with Orthanc SDK 1.12.0 (communications between the
   Orthanc core and the database plugin using Google Protocol Buffers)
 * Upgraded dependencies for static builds (notably on Windows and LSB):
