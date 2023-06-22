@@ -658,18 +658,19 @@ namespace Orthanc
 
     if (dicomIdentifiersComparisons.size() > 0)
     {
-      std::string comparisons;
-      Toolbox::JoinStrings(comparisons, dicomIdentifiersComparisons, " AND ");
-      sql += (" AND internalId IN (SELECT id FROM DicomIdentifiers WHERE "
-              + comparisons + ") ");
+      for (std::vector<std::string>::const_iterator it = dicomIdentifiersComparisons.begin(); it < dicomIdentifiersComparisons.end(); ++it)
+      {
+        sql += (" AND internalId IN (SELECT id FROM DicomIdentifiers WHERE " + *it + ") ");
+      }
     }
 
     if (mainDicomTagsComparisons.size() > 0)
     {
       std::string comparisons;
-      Toolbox::JoinStrings(comparisons, mainDicomTagsComparisons, " AND ");
-      sql += (" AND internalId IN (SELECT id FROM MainDicomTags WHERE "
-              + comparisons + ") ");
+      for (std::vector<std::string>::const_iterator it = mainDicomTagsComparisons.begin(); it < mainDicomTagsComparisons.end(); ++it)
+      {
+        sql += (" AND internalId IN (SELECT id FROM MainDicomTags WHERE " + *it + ") ");
+      }
     }
 
     if (!labels.empty())
