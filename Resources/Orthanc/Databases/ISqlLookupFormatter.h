@@ -70,5 +70,13 @@ namespace Orthanc
                       const std::set<std::string>& labels,  // New in Orthanc 1.12.0
                       LabelsConstraint labelsConstraint,    // New in Orthanc 1.12.0
                       size_t limit);
+
+    static void ApplyExperimental(std::string& sql,
+                                  ISqlLookupFormatter& formatter,
+                                  const std::vector<DatabaseConstraint>& lookup,
+                                  ResourceType queryLevel,
+                                  const std::set<std::string>& labels,  // New in Orthanc 1.12.0
+                                  LabelsConstraint labelsConstraint,    // New in Orthanc 1.12.0
+                                  size_t limit);
   };
 }
