@@ -1,6 +1,9 @@
 Pending changes in the mainline
 ===============================
 
+* Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
+  The optimization mainly affects find at study level.
+
 
 Release 5.0 (2023-04-16)
 ========================

@@ -2063,46 +2063,79 @@ namespace OrthancDatabases
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
-                                     OrthancPluginResourceType queryLevel,
+                                     OrthancPluginResourceType queryLevel_,
                                      const std::set<std::string>& labels,
                                      Orthanc::LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
+    Orthanc::ResourceType queryLevel = Orthanc::Plugins::Convert(queryLevel_);
+    Orthanc::ResourceType lowerLevel, upperLevel;
+    Orthanc::ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
     bool enableNewStudyCode = true;
 
-    if (enableNewStudyCode && queryLevel == OrthancPluginResourceType_Study)
+    if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
     {
-      // separate path for the studies since it has been specifically optimized
-      Orthanc::ISqlLookupFormatter::ApplyExperimental(sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel), labels, labelsConstraint, limit);
-
-      if (requestSomeInstance)
-      {
-        sql = ("SELECT studies_series.studies_public_id, MIN(instances.publicId) AS instances_public_id "
-                "FROM (SELECT studies.publicId AS studies_public_id, MIN(series.internalId) AS series_internal_id "
-                      "FROM (" + sql + 
-                            ") AS studies "
-                            "INNER JOIN Resources series ON series.parentId = studies.internalId "
-                            "GROUP BY studies.publicId "
-                      ") AS studies_series "
-                "INNER JOIN Resources instances ON instances.parentId = studies_series.series_internal_id "
-                "GROUP BY studies_series.studies_public_id");
-      }
-    }
-    else
-    {
-      Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, Orthanc::Plugins::Convert(queryLevel),
-                                          labels, labelsConstraint, limit);      
+      Orthanc::ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
       if (requestSomeInstance)
       {
         // Composite query to find some instance if requested
         switch (queryLevel)
         {
-          case OrthancPluginResourceType_Patient:
+          case Orthanc::ResourceType_Patient:
+            sql = ("SELECT patients_studies.patients_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT patients.publicId AS patients_public_id, MIN(studies.internalId) AS studies_internal_id "
+                          "FROM (" + sql + 
+                                ") AS patients "
+                                "INNER JOIN Resources studies ON studies.parentId = patients.internalId "
+                                "GROUP BY patients.publicId "
+                          ") AS patients_studies "
+                    "INNER JOIN Resources series ON series.parentId = patients_studies.studies_internal_id "
+                    "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                    "GROUP BY patients_studies.patients_public_id");
+            break;
+          case Orthanc::ResourceType_Study:
+            sql = ("SELECT studies_series.studies_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT studies.publicId AS studies_public_id, MIN(series.internalId) AS series_internal_id "
+                          "FROM (" + sql + 
+                                ") AS studies "
+                                "INNER JOIN Resources series ON series.parentId = studies.internalId "
+                                "GROUP BY studies.publicId "
+                          ") AS studies_series "
+                    "INNER JOIN Resources instances ON instances.parentId = studies_series.series_internal_id "
+                    "GROUP BY studies_series.studies_public_id");
+            break;
+          case Orthanc::ResourceType_Series:
+            sql = ("SELECT series.publicId AS series_public_id, MIN(instances.publicId) AS instances_public_id "
+                          "FROM (" + sql + 
+                                ") AS series "
+                                "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                                "GROUP BY series.publicId ");
+            break;
+
+          case Orthanc::ResourceType_Instance:
+            sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+      }
+    }
+    else
+    {
+      Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);      
+
+      if (requestSomeInstance)
+      {
+        // Composite query to find some instance if requested
+        switch (queryLevel)
+        {
+          case Orthanc::ResourceType_Patient:
             sql = ("SELECT patients.publicId, MIN(instances.publicId) FROM (" + sql + ") patients "
                   "INNER JOIN Resources studies   ON studies.parentId   = patients.internalId "
                   "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
@@ -2110,19 +2143,19 @@ namespace OrthancDatabases
                   "GROUP BY patients.publicId");
             break;
 
-          case OrthancPluginResourceType_Study:
+          case Orthanc::ResourceType_Study:
             sql = ("SELECT studies.publicId, MIN(instances.publicId) FROM (" + sql + ") studies "
                   "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
                   "INNER JOIN Resources instances ON instances.parentId = series.internalId "
                   "GROUP BY studies.publicId");                 
             break;
-          case OrthancPluginResourceType_Series:
+          case Orthanc::ResourceType_Series:
             sql = ("SELECT series.publicId, MIN(instances.publicId) FROM (" + sql + ") series "
                   "INNER JOIN Resources instances ON instances.parentId = series.internalId "
                   "GROUP BY series.publicId");
             break;
 
-          case OrthancPluginResourceType_Instance:
+          case Orthanc::ResourceType_Instance:
             sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
             break;
 

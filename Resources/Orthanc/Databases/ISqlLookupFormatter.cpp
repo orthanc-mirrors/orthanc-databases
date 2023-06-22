@@ -475,23 +475,14 @@ namespace Orthanc
   }
 
 
-
-  
-
-  void ISqlLookupFormatter::Apply(std::string& sql,
-                                  ISqlLookupFormatter& formatter,
-                                  const std::vector<DatabaseConstraint>& lookup,
-                                  ResourceType queryLevel,
-                                  const std::set<std::string>& labels,
-                                  LabelsConstraint labelsConstraint,
-                                  size_t limit)
+  void ISqlLookupFormatter::GetLookupLevels(ResourceType& lowerLevel, ResourceType& upperLevel, const ResourceType& queryLevel, const std::vector<DatabaseConstraint>& lookup)
   {
     assert(ResourceType_Patient < ResourceType_Study &&
            ResourceType_Study < ResourceType_Series &&
            ResourceType_Series < ResourceType_Instance);
     
-    ResourceType upperLevel = queryLevel;
-    ResourceType lowerLevel = queryLevel;
+    lowerLevel = queryLevel;
+    upperLevel = queryLevel;
 
     for (size_t i = 0; i < lookup.size(); i++)
     {
@@ -507,7 +498,20 @@ namespace Orthanc
         lowerLevel = level;
       }
     }
-    
+  }
+  
+
+  void ISqlLookupFormatter::Apply(std::string& sql,
+                                  ISqlLookupFormatter& formatter,
+                                  const std::vector<DatabaseConstraint>& lookup,
+                                  ResourceType queryLevel,
+                                  const std::set<std::string>& labels,
+                                  LabelsConstraint labelsConstraint,
+                                  size_t limit)
+  {
+    ResourceType lowerLevel, upperLevel;
+    GetLookupLevels(lowerLevel, upperLevel, queryLevel, lookup);
+
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
 
@@ -608,39 +612,20 @@ namespace Orthanc
   }
 
 
-  void ISqlLookupFormatter::ApplyExperimental(std::string& sql,
-                                              ISqlLookupFormatter& formatter,
-                                              const std::vector<DatabaseConstraint>& lookup,
-                                              ResourceType queryLevel,
-                                              const std::set<std::string>& labels,
-                                              LabelsConstraint labelsConstraint,
-                                              size_t limit
-                                              )
+  void ISqlLookupFormatter::ApplySingleLevel(std::string& sql,
+                                             ISqlLookupFormatter& formatter,
+                                             const std::vector<DatabaseConstraint>& lookup,
+                                             ResourceType queryLevel,
+                                             const std::set<std::string>& labels,
+                                             LabelsConstraint labelsConstraint,
+                                             size_t limit
+                                             )
   {
-    assert(ResourceType_Patient < ResourceType_Study &&
-           ResourceType_Study < ResourceType_Series &&
-           ResourceType_Series < ResourceType_Instance);
+    ResourceType lowerLevel, upperLevel;
+    GetLookupLevels(lowerLevel, upperLevel, queryLevel, lookup);
     
-    ResourceType upperLevel = queryLevel;
-    ResourceType lowerLevel = queryLevel;
-
-    for (size_t i = 0; i < lookup.size(); i++)
-    {
-      ResourceType level = lookup[i].GetLevel();
-
-      if (level < upperLevel)
-      {
-        upperLevel = level;
-      }
-
-      if (level > lowerLevel)
-      {
-        lowerLevel = level;
-      }
-    }
-    
-    assert(upperLevel <= queryLevel &&
-           queryLevel <= lowerLevel);
+    assert(upperLevel == queryLevel &&
+           queryLevel == lowerLevel);
 
     const bool escapeBrackets = formatter.IsEscapeBrackets();
     
@@ -703,25 +688,29 @@ namespace Orthanc
       }
 
       std::string condition;
+      std::string inOrNotIn;
       switch (labelsConstraint)
       {
         case LabelsConstraint_Any:
           condition = "> 0";
+          inOrNotIn = "IN";
           break;
           
         case LabelsConstraint_All:
           condition = "= " + boost::lexical_cast<std::string>(labels.size());
+          inOrNotIn = "IN";
           break;
           
         case LabelsConstraint_None:
-          condition = "= 0";
+          condition = "> 0";
+          inOrNotIn = "NOT IN";
           break;
           
         default:
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
       
-      sql += (" AND internalId IN (SELECT id"
+      sql += (" AND internalId " + inOrNotIn + " (SELECT id"
                                  " FROM (SELECT id, COUNT(1) AS labelsCount "
                                         "FROM Labels "
                                         "WHERE label IN (" + Join(formattedLabels, "", ", ") + ") GROUP BY id"
