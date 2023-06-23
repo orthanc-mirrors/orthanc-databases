@@ -2,8 +2,8 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2022 Osimis S.A., Belgium
- * Copyright (C) 2021-2022 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -22,12 +22,12 @@
 
 #include "IndexBackend.h"
 
-#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/BinaryStringValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
 #include "DatabaseBackendAdapterV2.h"
 #include "DatabaseBackendAdapterV3.h"
+#include "DatabaseBackendAdapterV4.h"
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
@@ -115,13 +115,13 @@ namespace OrthancDatabases
                                          DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
-                                         uint32_t maxResults)
+                                         uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       output.AnswerChange(
@@ -135,7 +135,7 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
 
@@ -144,13 +144,13 @@ namespace OrthancDatabases
                                                    bool& done,
                                                    DatabaseManager::CachedStatement& statement,
                                                    const Dictionary& args,
-                                                   uint32_t maxResults)
+                                                   uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       int64_t seq = statement.ReadInteger64(0);
@@ -172,7 +172,7 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
 
@@ -518,8 +518,8 @@ namespace OrthancDatabases
   void IndexBackend::GetAllPublicIds(std::list<std::string>& target,
                                      DatabaseManager& manager,
                                      OrthancPluginResourceType resourceType,
-                                     uint64_t since,
-                                     uint64_t limit)
+                                     int64_t since,
+                                     uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -555,7 +555,7 @@ namespace OrthancDatabases
                                 bool& done /*out*/,
                                 DatabaseManager& manager,
                                 int64_t since,
-                                uint32_t maxResults)
+                                uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -578,10 +578,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, statement, args, maxResults);
+    ReadChangesInternal(output, done, manager, statement, args, limit);
   }
 
     
@@ -628,7 +628,7 @@ namespace OrthancDatabases
                                           bool& done /*out*/,
                                           DatabaseManager& manager,
                                           int64_t since,
-                                          uint32_t maxResults)
+                                          uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -649,10 +649,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, statement, args, limit);
   }
 
     
@@ -1009,7 +1009,14 @@ namespace OrthancDatabases
 
     
   void IndexBackend::LogExportedResource(DatabaseManager& manager,
-                                         const OrthancPluginExportedResource& resource)
+                                         OrthancPluginResourceType resourceType,
+                                         const char* publicId,
+                                         const char* modality,
+                                         const char* date,
+                                         const char* patientId,
+                                         const char* studyInstanceUid,
+                                         const char* seriesInstanceUid,
+                                         const char* sopInstanceUid)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
@@ -1026,14 +1033,14 @@ namespace OrthancDatabases
     statement.SetParameterType("date", ValueType_Utf8String);
 
     Dictionary args;
-    args.SetIntegerValue("type", resource.resourceType);
-    args.SetUtf8Value("publicId", resource.publicId);
-    args.SetUtf8Value("modality", resource.modality);
-    args.SetUtf8Value("patient", resource.patientId);
-    args.SetUtf8Value("study", resource.studyInstanceUid);
-    args.SetUtf8Value("series", resource.seriesInstanceUid);
-    args.SetUtf8Value("instance", resource.sopInstanceUid);
-    args.SetUtf8Value("date", resource.date);
+    args.SetIntegerValue("type", resourceType);
+    args.SetUtf8Value("publicId", publicId);
+    args.SetUtf8Value("modality", modality);
+    args.SetUtf8Value("patient", patientId);
+    args.SetUtf8Value("study", studyInstanceUid);
+    args.SetUtf8Value("series", seriesInstanceUid);
+    args.SetUtf8Value("instance", sopInstanceUid);
+    args.SetUtf8Value("date", date);
 
     statement.Execute(args);
   }
@@ -2056,48 +2063,105 @@ namespace OrthancDatabases
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
                                      const std::vector<Orthanc::DatabaseConstraint>& lookup,
-                                     OrthancPluginResourceType queryLevel,
+                                     OrthancPluginResourceType queryLevel_,
+                                     const std::set<std::string>& labels,
+                                     Orthanc::LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
+    Orthanc::ResourceType queryLevel = Orthanc::Plugins::Convert(queryLevel_);
+    Orthanc::ResourceType lowerLevel, upperLevel;
+    Orthanc::ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
-    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
-                                        Orthanc::Plugins::Convert(queryLevel), limit);
+    bool enableNewStudyCode = true;
 
-    if (requestSomeInstance)
+    if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
     {
-      // Composite query to find some instance if requested
-      switch (queryLevel)
+      Orthanc::ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
+
+      if (requestSomeInstance)
       {
-        case OrthancPluginResourceType_Patient:
-          sql = ("SELECT patients.publicId, MIN(instances.publicId) FROM (" + sql + ") patients "
-                 "INNER JOIN Resources studies   ON studies.parentId   = patients.internalId "
-                 "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
-                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
-                 "GROUP BY patients.publicId");
-          break;
+        // Composite query to find some instance if requested
+        switch (queryLevel)
+        {
+          case Orthanc::ResourceType_Patient:
+            sql = ("SELECT patients_studies.patients_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT patients.publicId AS patients_public_id, MIN(studies.internalId) AS studies_internal_id "
+                          "FROM (" + sql + 
+                                ") AS patients "
+                                "INNER JOIN Resources studies ON studies.parentId = patients.internalId "
+                                "GROUP BY patients.publicId "
+                          ") AS patients_studies "
+                    "INNER JOIN Resources series ON series.parentId = patients_studies.studies_internal_id "
+                    "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                    "GROUP BY patients_studies.patients_public_id");
+            break;
+          case Orthanc::ResourceType_Study:
+            sql = ("SELECT studies_series.studies_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT studies.publicId AS studies_public_id, MIN(series.internalId) AS series_internal_id "
+                          "FROM (" + sql + 
+                                ") AS studies "
+                                "INNER JOIN Resources series ON series.parentId = studies.internalId "
+                                "GROUP BY studies.publicId "
+                          ") AS studies_series "
+                    "INNER JOIN Resources instances ON instances.parentId = studies_series.series_internal_id "
+                    "GROUP BY studies_series.studies_public_id");
+            break;
+          case Orthanc::ResourceType_Series:
+            sql = ("SELECT series.publicId AS series_public_id, MIN(instances.publicId) AS instances_public_id "
+                          "FROM (" + sql + 
+                                ") AS series "
+                                "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                                "GROUP BY series.publicId ");
+            break;
 
-        case OrthancPluginResourceType_Study:
-          sql = ("SELECT studies.publicId, MIN(instances.publicId) FROM (" + sql + ") studies "
-                 "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
-                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
-                 "GROUP BY studies.publicId");                 
-          break;
+          case Orthanc::ResourceType_Instance:
+            sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
+            break;
 
-        case OrthancPluginResourceType_Series:
-          sql = ("SELECT series.publicId, MIN(instances.publicId) FROM (" + sql + ") series "
-                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
-                 "GROUP BY series.publicId");
-          break;
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+      }
+    }
+    else
+    {
+      Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);      
 
-        case OrthancPluginResourceType_Instance:
-          sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
-          break;
+      if (requestSomeInstance)
+      {
+        // Composite query to find some instance if requested
+        switch (queryLevel)
+        {
+          case Orthanc::ResourceType_Patient:
+            sql = ("SELECT patients.publicId, MIN(instances.publicId) FROM (" + sql + ") patients "
+                  "INNER JOIN Resources studies   ON studies.parentId   = patients.internalId "
+                  "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
+                  "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                  "GROUP BY patients.publicId");
+            break;
 
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          case Orthanc::ResourceType_Study:
+            sql = ("SELECT studies.publicId, MIN(instances.publicId) FROM (" + sql + ") studies "
+                  "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
+                  "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                  "GROUP BY studies.publicId");                 
+            break;
+          case Orthanc::ResourceType_Series:
+            sql = ("SELECT series.publicId, MIN(instances.publicId) FROM (" + sql + ") series "
+                  "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                  "GROUP BY series.publicId");
+            break;
+
+          case Orthanc::ResourceType_Instance:
+            sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
       }
     }
 
@@ -2375,9 +2439,7 @@ namespace OrthancDatabases
   }
 
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
-  // New primitive since Orthanc 1.5.4
+// New primitive since Orthanc 1.5.4
 bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                            OrthancPluginResourceType& type,
                                            std::string& parentPublicId,
@@ -2435,12 +2497,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     return true;
   }
 }
-#  endif
-#endif
   
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
   // New primitive since Orthanc 1.5.4
   void IndexBackend::GetAllMetadata(std::map<int32_t, std::string>& result,
                                     DatabaseManager& manager,
@@ -2477,8 +2535,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
     }
   }
-#  endif
-#endif
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
@@ -2601,6 +2657,96 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #endif
 
 
+  void IndexBackend::AddLabel(DatabaseManager& manager,
+                              int64_t resource,
+                              const std::string& label)
+  {
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+    switch (manager.GetDialect())
+    {
+      case Dialect_PostgreSQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT INTO Labels VALUES(${id}, ${label}) ON CONFLICT DO NOTHING"));
+        break;
+
+      case Dialect_SQLite:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT OR IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
+      case Dialect_MySQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    
+    statement->SetParameterType("id", ValueType_Integer64);
+    statement->SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement->Execute(args);
+  }
+
+
+  void IndexBackend::RemoveLabel(DatabaseManager& manager,
+                                 int64_t resource,
+                                 const std::string& label)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM Labels WHERE id=${id} AND label=${label}");
+
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement.Execute(args);
+  }
+
+
+  void IndexBackend::ListLabels(std::list<std::string>& target,
+                                DatabaseManager& manager,
+                                int64_t resource)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT label FROM Labels WHERE id=${id}");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+
+    ReadListOfStrings(target, statement, args);
+  }
+  
+
+  void IndexBackend::ListAllLabels(std::list<std::string>& target,
+                                   DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT DISTINCT label FROM Labels");
+      
+    Dictionary args;
+    ReadListOfStrings(target, statement, args);
+  }
+
+  
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
                               unsigned int maxDatabaseRetries)
@@ -2610,26 +2756,31 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     
-    bool hasLoadedV3 = false;
+    LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
+                 << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
-                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
-      
-      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
-      hasLoadedV3 = true;
+      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      return;
     }
 #  endif
 #endif
 
-    if (!hasLoadedV3)
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
-      OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
+      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
+      return;
     }
+#  endif
+#endif
+
+    LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
+    OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
   }
 
 
@@ -2649,7 +2800,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       catch (boost::bad_lexical_cast&)
       {
-        LOG(ERROR) << "Corrupted PostgreSQL database";
+        LOG(ERROR) << "Corrupted database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }      
     }
@@ -2679,13 +2830,21 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
 #  endif
 #endif
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
+#  endif
+#endif
   }
 
 
-  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
+  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend,
+                                                             bool hasIdentifierTags,
+                                                             const std::list<IdentifierTag>& identifierTags)
   {
     std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.CreateDatabaseFactory()));
-    backend.ConfigureDatabase(*manager);
+    backend.ConfigureDatabase(*manager, hasIdentifierTags, identifierTags);
     return manager.release();
   }
 }

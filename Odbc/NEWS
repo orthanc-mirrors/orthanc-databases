@@ -1,6 +1,12 @@
 Pending changes in the mainline
 ===============================
 
+* Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
+  The optimization mainly affects find at study level.
+* Added support for labels
+* Compatibility with Orthanc SDK 1.12.0 (communications between the
+  Orthanc core and the database plugin using Google Protocol Buffers)
+
 
 Release 1.1 (2021-12-06)
 ========================

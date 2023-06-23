@@ -2,8 +2,8 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2022 Osimis S.A., Belgium
- * Copyright (C) 2021-2022 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -35,28 +35,30 @@
 
 TEST(SQLiteIndex, Lock)
 {
+  std::list<OrthancDatabases::IdentifierTag> identifierTags;
+  
   {
     // No locking if using memory backend
     OrthancDatabases::SQLiteIndex db1(NULL);
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1, false, identifierTags));
 
     OrthancDatabases::SQLiteIndex db2(NULL);
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2, false, identifierTags));
   }
 
   Orthanc::SystemToolbox::RemoveFile("index.db");
 
   {
     OrthancDatabases::SQLiteIndex db1(NULL, "index.db");
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1, false, identifierTags));
 
     OrthancDatabases::SQLiteIndex db2(NULL, "index.db");
-    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2), Orthanc::OrthancException);
+    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2, false, identifierTags), Orthanc::OrthancException);
   }
 
   {
     OrthancDatabases::SQLiteIndex db3(NULL, "index.db");
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager3(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager3(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3, false, identifierTags));
   }
 }
 

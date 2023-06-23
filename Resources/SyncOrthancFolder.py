@@ -8,11 +8,17 @@
 import multiprocessing
 import os
 import stat
-import urllib2
+import sys
+
+if sys.version_info[0] < 3:
+    from urllib2 import urlopen
+else:
+    from urllib.request import urlopen
 
 TARGET = os.path.join(os.path.dirname(__file__), 'Orthanc')
 PLUGIN_SDK_VERSION_OLD = [ '0.9.5', '1.4.0', '1.5.2', '1.5.4' ]
-PLUGIN_SDK_VERSION_NEW = [ '1.9.2' ]
+PLUGIN_SDK_VERSION_NEW = [ '1.9.2', '1.12.0' ]
+HAS_PROTOCOL_BUFFERS = [ '1.12.0' ]
 REPOSITORY = 'https://hg.orthanc-server.com/orthanc/raw-file'
 
 FILES = [
@@ -21,23 +27,23 @@ FILES = [
     ('default', 'OrthancFramework/Resources/CMake/DownloadOrthancFramework.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/CMake/DownloadPackage.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/CMake/GoogleTestConfiguration.cmake', 'CMake'),
+    ('default', 'OrthancFramework/Resources/CMake/OpenSslConfiguration.cmake', 'CMake'),
+    ('default', 'OrthancFramework/Resources/CMake/ProtobufConfiguration.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/EmbedResources.py', '.'),
     ('default', 'OrthancFramework/Resources/Toolchains/LinuxStandardBaseToolchain.cmake', '.'),
     ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain32.cmake', '.'),
     ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain64.cmake', '.'),
     ('default', 'OrthancFramework/Resources/Toolchains/MinGWToolchain.cmake', '.'),
-
-    # TODO - Replace branch "openssl-3.x" by "default" once it is reintegrated into mainline
-    ('openssl-3.x', 'OrthancServer/Plugins/Samples/Common/ExportedSymbolsPlugins.list', 'Plugins'),
-    ('openssl-3.x', 'OrthancServer/Plugins/Samples/Common/OrthancPluginCppWrapper.cpp', 'Plugins'),
-    ('openssl-3.x', 'OrthancServer/Plugins/Samples/Common/OrthancPluginCppWrapper.h', 'Plugins'),
-    ('openssl-3.x', 'OrthancServer/Plugins/Samples/Common/OrthancPluginException.h', 'Plugins'),
-    ('openssl-3.x', 'OrthancServer/Plugins/Samples/Common/OrthancPluginsExports.cmake', 'Plugins'),
-    ('openssl-3.x', 'OrthancServer/Plugins/Samples/Common/VersionScriptPlugins.map', 'Plugins'),
-    ('openssl-3.x', 'OrthancServer/Sources/Search/DatabaseConstraint.cpp', 'Databases'),
-    ('openssl-3.x', 'OrthancServer/Sources/Search/DatabaseConstraint.h', 'Databases'),
-    ('openssl-3.x', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
-    ('openssl-3.x', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
+    ('default', 'OrthancServer/Plugins/Samples/Common/ExportedSymbolsPlugins.list', 'Plugins'),
+    ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginCppWrapper.cpp', 'Plugins'),
+    ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginCppWrapper.h', 'Plugins'),
+    ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginException.h', 'Plugins'),
+    ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginsExports.cmake', 'Plugins'),
+    ('default', 'OrthancServer/Plugins/Samples/Common/VersionScriptPlugins.map', 'Plugins'),
+    ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.cpp', 'Databases'),
+    ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.h', 'Databases'),
+    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
+    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
 ]
 
 SDK = [
@@ -45,12 +51,18 @@ SDK = [
     'orthanc/OrthancCDatabasePlugin.h',
 ]
 
+SDK_PROTOCOL_BUFFERS = [
+    'orthanc/OrthancCPlugin.h',
+    'orthanc/OrthancCDatabasePlugin.h',
+    'orthanc/OrthancDatabasePlugin.proto',
+]
+
 
 def Download(x):
     branch = x[0]
     source = x[1]
     target = os.path.join(TARGET, x[2])
-    print target
+    print(target)
 
     try:
         os.makedirs(os.path.dirname(target))
@@ -60,8 +72,8 @@ def Download(x):
     url = '%s/%s/%s' % (REPOSITORY, branch, source)
 
     try:
-        with open(target, 'w') as f:
-            f.write(urllib2.urlopen(url).read())
+        with open(target, 'wb') as f:
+            f.write(urlopen(url).read())
     except Exception as e:
         raise Exception('Cannot download: %s' % url)    
 
@@ -82,7 +94,12 @@ for version in PLUGIN_SDK_VERSION_OLD:
         ])
 
 for version in PLUGIN_SDK_VERSION_NEW:
-    for f in SDK:
+    if version in HAS_PROTOCOL_BUFFERS:
+        files = SDK_PROTOCOL_BUFFERS
+    else:
+        files = SDK
+    
+    for f in files:
         commands.append([
             'Orthanc-%s' % version, 
             'OrthancServer/Plugins/Include/%s' % f,

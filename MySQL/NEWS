@@ -1,8 +1,18 @@
 Pending changes in the mainline
 ===============================
 
+* Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
+  The optimization mainly affects find at study level.
+
+
+Release 5.0 (2023-04-16)
+========================
+
+* Added support for labels
+* Compatibility with Orthanc SDK 1.12.0 (communications between the
+  Orthanc core and the database plugin using Google Protocol Buffers)
 * Upgraded dependencies for static builds (notably on Windows and LSB):
-  - openssl 3.0.1
+  - openssl 3.1.0
 
 
 Release 4.3 (2021-07-22)

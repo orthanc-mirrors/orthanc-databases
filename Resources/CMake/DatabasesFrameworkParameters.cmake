@@ -1,8 +1,8 @@
 # Orthanc - A Lightweight, RESTful DICOM Store
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
-# Copyright (C) 2017-2022 Osimis S.A., Belgium
-# Copyright (C) 2021-2022 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+# Copyright (C) 2017-2023 Osimis S.A., Belgium
+# Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -51,4 +51,6 @@ endif()
 set(ENABLE_MYSQL_BACKEND OFF)
 set(ENABLE_ODBC_BACKEND OFF)
 set(ENABLE_POSTGRESQL_BACKEND OFF)
+set(ENABLE_PROTOBUF ON)
+set(ENABLE_PROTOBUF_COMPILER ON)
 set(ENABLE_SQLITE_BACKEND OFF)

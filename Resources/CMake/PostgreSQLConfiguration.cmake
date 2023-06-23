@@ -1,8 +1,8 @@
 # Orthanc - A Lightweight, RESTful DICOM Store
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
-# Copyright (C) 2017-2022 Osimis S.A., Belgium
-# Copyright (C) 2021-2022 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+# Copyright (C) 2017-2023 Osimis S.A., Belgium
+# Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -54,7 +54,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   SET(LIBPQ_SOURCES_DIR ${CMAKE_BINARY_DIR}/postgresql-${LIBPQ_VERSION})
   DownloadPackage(
     "551302a823a1ab48b4ed14166beebba9"
-    "http://orthanc.osimis.io/ThirdPartyDownloads/postgresql-${LIBPQ_VERSION}.tar.gz"
+    "https://orthanc.uclouvain.be/third-party-downloads/postgresql-${LIBPQ_VERSION}.tar.gz"
     "${LIBPQ_SOURCES_DIR}")
 
   

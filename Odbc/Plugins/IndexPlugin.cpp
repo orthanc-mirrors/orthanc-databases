@@ -2,8 +2,8 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2022 Osimis S.A., Belgium
- * Copyright (C) 2021-2022 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -42,6 +42,9 @@
 #endif
 
 
+#include <google/protobuf/any.h>
+
+
 static const char* const KEY_ODBC = "Odbc";
 
 
@@ -54,6 +57,8 @@ extern "C"
   
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     if (!OrthancDatabases::InitializePlugin(context, "ODBC", true))
     {
       return -1;
@@ -130,6 +135,7 @@ extern "C"
   {
     LOG(WARNING) << "ODBC index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
+    google::protobuf::ShutdownProtobufLibrary();
   }
 
 

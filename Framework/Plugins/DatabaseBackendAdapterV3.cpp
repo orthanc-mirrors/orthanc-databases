@@ -2,8 +2,8 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2022 Osimis S.A., Belgium
- * Copyright (C) 2021-2022 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -25,8 +25,9 @@
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
 
+#include "IndexConnectionsPool.h"
+
 #include <Logging.h>
-#include <MultiThreading/SharedMessageQueue.h>
 #include <OrthancException.h>
 
 #include <stdexcept>
@@ -82,172 +83,6 @@ namespace OrthancDatabases
   }
     
     
-  class DatabaseBackendAdapterV3::Adapter : public boost::noncopyable
-  {
-  private:
-    class ManagerReference : public Orthanc::IDynamicObject
-    {
-    private:
-      DatabaseManager*  manager_;
-
-    public:
-      ManagerReference(DatabaseManager& manager) :
-        manager_(&manager)
-      {
-      }
-
-      DatabaseManager& GetManager()
-      {
-        assert(manager_ != NULL);
-        return *manager_;
-      }
-    };
-    
-    std::unique_ptr<IndexBackend>  backend_;
-    OrthancPluginContext*          context_;
-    boost::shared_mutex            connectionsMutex_;
-    size_t                         countConnections_;
-    std::list<DatabaseManager*>    connections_;
-    Orthanc::SharedMessageQueue    availableConnections_;
-
-  public:
-    Adapter(IndexBackend* backend,
-            size_t countConnections) :
-      backend_(backend),
-      countConnections_(countConnections)
-    {
-      if (countConnections == 0)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange,
-                                        "There must be a non-zero number of connections to the database");
-      }
-      else if (backend == NULL)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-      }
-      else
-      {
-        context_ = backend_->GetContext();
-      }
-    }
-
-    ~Adapter()
-    {
-      for (std::list<DatabaseManager*>::iterator
-             it = connections_.begin(); it != connections_.end(); ++it)
-      {
-        assert(*it != NULL);
-        delete *it;
-      }
-    }
-
-    OrthancPluginContext* GetContext() const
-    {
-      return context_;
-    }
-
-    void OpenConnections()
-    {
-      boost::unique_lock<boost::shared_mutex>  lock(connectionsMutex_);
-
-      if (connections_.size() == 0)
-      {
-        assert(backend_.get() != NULL);
-
-        {
-          std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend_->CreateDatabaseFactory()));
-          manager->GetDatabase();  // Make sure to open the database connection
-          
-          backend_->ConfigureDatabase(*manager);
-          connections_.push_back(manager.release());
-        }
-
-        for (size_t i = 1; i < countConnections_; i++)
-        {
-          connections_.push_back(new DatabaseManager(backend_->CreateDatabaseFactory()));
-          connections_.back()->GetDatabase();  // Make sure to open the database connection
-        }
-
-        for (std::list<DatabaseManager*>::iterator
-               it = connections_.begin(); it != connections_.end(); ++it)
-        {
-          assert(*it != NULL);
-          availableConnections_.Enqueue(new ManagerReference(**it));
-        }        
-      }
-      else
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-      }
-    }
-
-    void CloseConnections()
-    {
-      boost::unique_lock<boost::shared_mutex>  lock(connectionsMutex_);
-
-      if (connections_.size() != countConnections_)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-      }
-      else if (availableConnections_.GetSize() != countConnections_)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Some connections are still in use, bug in the Orthanc core");
-      }
-      else
-      {
-        for (std::list<DatabaseManager*>::iterator
-               it = connections_.begin(); it != connections_.end(); ++it)
-        {
-          assert(*it != NULL);
-          (*it)->Close();
-        }
-      }
-    }
-
-    class DatabaseAccessor : public boost::noncopyable
-    {
-    private:
-      boost::shared_lock<boost::shared_mutex>  lock_;
-      Adapter&                                 adapter_;
-      DatabaseManager*                         manager_;
-      
-    public:
-      DatabaseAccessor(Adapter& adapter) :
-        lock_(adapter.connectionsMutex_),
-        adapter_(adapter),
-        manager_(NULL)
-      {
-        for (;;)
-        {
-          std::unique_ptr<Orthanc::IDynamicObject> manager(adapter.availableConnections_.Dequeue(100));
-          if (manager.get() != NULL)
-          {
-            manager_ = &dynamic_cast<ManagerReference&>(*manager).GetManager();
-            return;
-          }
-        }
-      }
-
-      ~DatabaseAccessor()
-      {
-        assert(manager_ != NULL);
-        adapter_.availableConnections_.Enqueue(new ManagerReference(*manager_));
-      }
-
-      IndexBackend& GetBackend() const
-      {
-        return *adapter_.backend_;
-      }
-
-      DatabaseManager& GetManager() const
-      {
-        assert(manager_ != NULL);
-        return *manager_;
-      }
-    };
-  };
-
-
   class DatabaseBackendAdapterV3::Output : public IDatabaseBackendOutput
   {
   private:
@@ -802,14 +637,14 @@ namespace OrthancDatabases
   class DatabaseBackendAdapterV3::Transaction : public boost::noncopyable
   {
   private:
-    Adapter&   adapter_;
-    std::unique_ptr<Adapter::DatabaseAccessor>  accessor_;
-    std::unique_ptr<Output>    output_;
+    IndexConnectionsPool&                            pool_;
+    std::unique_ptr<IndexConnectionsPool::Accessor>  accessor_;
+    std::unique_ptr<Output>                          output_;
     
   public:
-    Transaction(Adapter& adapter) :
-      adapter_(adapter),
-      accessor_(new Adapter::DatabaseAccessor(adapter)),
+    Transaction(IndexConnectionsPool& pool) :
+      pool_(pool),
+      accessor_(new IndexConnectionsPool::Accessor(pool)),
       output_(new Output)
     {
     }
@@ -961,35 +796,36 @@ namespace OrthancDatabases
     
   static OrthancPluginErrorCode Open(void* database)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
 
     try
     {
-      adapter->OpenConnections();
+      std::list<IdentifierTag> identifierTags;
+      pool->OpenConnections(false, identifierTags);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());
   }
 
   
   static OrthancPluginErrorCode Close(void* database)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
 
     try
     {
-      adapter->CloseConnections();
+      pool->CloseConnections();
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());
   }
 
   
   static OrthancPluginErrorCode DestructDatabase(void* database)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
 
-    if (adapter == NULL)
+    if (pool == NULL)
     {
       return OrthancPluginErrorCode_InternalError;
     }
@@ -1001,10 +837,10 @@ namespace OrthancDatabases
       }
       else
       {
-        OrthancPluginLogError(adapter->GetContext(), "More than one index backend was registered, internal error");
+        OrthancPluginLogError(pool->GetContext(), "More than one index backend was registered, internal error");
       }
       
-      delete adapter;
+      delete pool;
 
       return OrthancPluginErrorCode_Success;
     }
@@ -1014,15 +850,15 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetDatabaseVersion(void* database,
                                                    uint32_t* version)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
       
     try
     {
-      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      IndexConnectionsPool::Accessor accessor(*pool);
       *version = accessor.GetBackend().GetDatabaseVersion(accessor.GetManager());
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());
   }
 
 
@@ -1030,30 +866,30 @@ namespace OrthancDatabases
                                                 OrthancPluginStorageArea* storageArea,
                                                 uint32_t  targetVersion)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
       
     try
     {
-      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      IndexConnectionsPool::Accessor accessor(*pool);
       accessor.GetBackend().UpgradeDatabase(accessor.GetManager(), targetVersion, storageArea);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());
   }
 
 
   static OrthancPluginErrorCode HasRevisionsSupport(void* database,
                                                     uint8_t* target)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
       
     try
     {
-      DatabaseBackendAdapterV3::Adapter::DatabaseAccessor accessor(*adapter);
+      IndexConnectionsPool::Accessor accessor(*pool);
       *target = (accessor.GetBackend().HasRevisionsSupport() ? 1 : 0);
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());
   }
 
 
@@ -1061,11 +897,11 @@ namespace OrthancDatabases
                                                  OrthancPluginDatabaseTransaction** target /* out */,
                                                  OrthancPluginDatabaseTransactionType type)
   {
-    DatabaseBackendAdapterV3::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV3::Adapter*>(database);
+    IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(database);
       
     try
     {
-      std::unique_ptr<DatabaseBackendAdapterV3::Transaction> transaction(new DatabaseBackendAdapterV3::Transaction(*adapter));
+      std::unique_ptr<DatabaseBackendAdapterV3::Transaction> transaction(new DatabaseBackendAdapterV3::Transaction(*pool));
       
       switch (type)
       {
@@ -1085,7 +921,7 @@ namespace OrthancDatabases
       
       return OrthancPluginErrorCode_Success;
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
+    ORTHANC_PLUGINS_DATABASE_CATCH(pool->GetContext());
   }
 
   
@@ -1666,19 +1502,9 @@ namespace OrthancDatabases
 
     try
     {
-      OrthancPluginExportedResource exported;
-      exported.seq = 0;
-      exported.resourceType = resourceType;
-      exported.publicId = publicId;
-      exported.modality = modality;
-      exported.date = date;
-      exported.patientId = patientId;
-      exported.studyInstanceUid = studyInstanceUid;
-      exported.seriesInstanceUid = seriesInstanceUid;
-      exported.sopInstanceUid = sopInstanceUid;
-        
       t->GetOutput().Clear();
-      t->GetBackend().LogExportedResource(t->GetManager(), exported);
+      t->GetBackend().LogExportedResource(t->GetManager(), resourceType, publicId, modality, date,
+                                          patientId, studyInstanceUid, seriesInstanceUid, sopInstanceUid);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
@@ -1821,7 +1647,9 @@ namespace OrthancDatabases
         lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
       }
         
-      t->GetBackend().LookupResources(t->GetOutput(), t->GetManager(), lookup, queryLevel, limit, (requestSomeInstanceId != 0));
+      std::set<std::string> noLabel;
+      t->GetBackend().LookupResources(t->GetOutput(), t->GetManager(), lookup, queryLevel, noLabel,
+                                      Orthanc::LabelsConstraint_All, limit, (requestSomeInstanceId != 0));
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
@@ -1988,6 +1816,8 @@ namespace OrthancDatabases
                                           size_t countConnections,
                                           unsigned int maxDatabaseRetries)
   {
+    std::unique_ptr<IndexBackend> protection(backend);
+    
     if (isBackendInUse_)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
@@ -2071,12 +1901,13 @@ namespace OrthancDatabases
     params.setProtectedPatient = SetProtectedPatient;
     params.setResourcesContent = SetResourcesContent;
 
-    OrthancPluginContext* context = backend->GetContext();
+    OrthancPluginContext* context = protection->GetContext();
  
     if (OrthancPluginRegisterDatabaseBackendV3(
           context, &params, sizeof(params), maxDatabaseRetries,
-          new Adapter(backend, countConnections)) != OrthancPluginErrorCode_Success)
+          new IndexConnectionsPool(protection.release(), countConnections)) != OrthancPluginErrorCode_Success)
     {
+      delete backend;
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }
 
