@@ -1,6 +1,17 @@
 Pending changes in the mainline
 ===============================
 
+* Experimental debug feature:
+  Introduced 2 new configurations with these default values:
+    "ReadOnlyTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY"
+    "ReadWriteTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE"
+  You can now customize the transaction isolation level.
+  If setting these values to "", no statement is run and therefore, the default DB or server
+  isolation level is used.
+* internals:
+  - Added a UNIQUE constraint on Resources.publicId to detect DB inconsistencies
+  - Added an advisory lock around CreateInstance
+
 * Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
   The optimization mainly affects find at study level.
 
@@ -13,13 +24,6 @@ Release 5.0 (2023-04-15)
 * Upgraded dependencies for static builds (notably on Windows and LSB):
   - openssl 3.1.0
 
-* Experimental debug feature:
-  Introduced 2 new configurations with these default values:
-    "ReadOnlyTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY"
-    "ReadWriteTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE"
-  You can now customize the transaction isolation level.
-  If setting these values to "", no statement is run and therefore, the default DB or server
-  isolation level is used.
 
 Release 4.0 (2021-04-22)
 ========================

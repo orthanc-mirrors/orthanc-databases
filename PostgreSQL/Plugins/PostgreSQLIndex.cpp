@@ -133,7 +133,16 @@ namespace OrthancDatabases
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
         }
 
-        if (revision != 1)
+        if (revision == 1)
+        {
+          LOG(WARNING) << "PostgreSQL plugin: adding UNIQUE(publicId) constraint to the 'Resources' table ";
+          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Resources ADD UNIQUE (publicId);");
+
+          revision = 2;
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        }
+
+        if (revision != 2)
         {
           LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
           throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -406,8 +415,17 @@ namespace OrthancDatabases
     args.SetUtf8Value("study", hashStudy);
     args.SetUtf8Value("series", hashSeries);
     args.SetUtf8Value("instance", hashInstance);
-    
-    statement.Execute(args);
+
+    { // The CreateInstance procedure is not 100% safe in highly concurrent environments when the
+      // transaction isolation is set to "READ COMMITED": (e.g, with 10 clients
+      // anonymizing studies in parallel with the "ResourceModification" config set to 8, we have observed
+      // the same series being created twice).  Therefore, we protect the whole CreateInstance procedure
+      // with an advisory lock
+      PostgreSQLDatabase& db = dynamic_cast<PostgreSQLDatabase&>(manager.GetDatabase());
+      PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_CREATE_INSTANCE, 100, 1);
+
+      statement.Execute(args);
+    }
 
     if (statement.IsDone() ||
         statement.GetResultFieldsCount() != 8)

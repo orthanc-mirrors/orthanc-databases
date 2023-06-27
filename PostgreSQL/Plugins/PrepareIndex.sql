@@ -8,6 +8,7 @@ CREATE TABLE Resources(
        resourceType INTEGER NOT NULL,
        publicId VARCHAR(64) NOT NULL,
        parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE
+       -- UNIQUE (publicId)  -- this is made unique in C++ code (new in plugin v X.Y.Z)
        );
 
 CREATE TABLE MainDicomTags(

@@ -92,7 +92,9 @@ namespace OrthancDatabases
 
     public:
       TransientAdvisoryLock(PostgreSQLDatabase&  database,
-                            int32_t lock);
+                            int32_t lock,
+                            unsigned int retries = 10,
+                            unsigned int retryInterval = 500);
 
       ~TransientAdvisoryLock();
     };
