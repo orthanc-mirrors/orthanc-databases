@@ -12,6 +12,9 @@ Common - Database index
   instead of recompiling for each request
 * Do not log "DatabaseCannotSerialize" errors in the plugin but only
   in Orthanc after all retries have been made.
+* Try to avoid the use of temporary tables:
+  https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor/3820
+
 
 ---------------------
 Common - Storage area
