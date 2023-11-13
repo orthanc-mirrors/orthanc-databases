@@ -97,6 +97,8 @@ set_target_properties(OrthancSQLiteIndex PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=1
   )
 
+DefineSourceBasenameForTarget(OrthancSQLiteIndex)
+
 install(
   TARGETS OrthancSQLiteIndex  # OrthancSQLiteStorage  TODO
   RUNTIME DESTINATION lib    # Destination for Windows
@@ -117,3 +119,5 @@ target_link_libraries(UnitTests ${GOOGLE_TEST_LIBRARIES})
 set_target_properties(UnitTests PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=0
   )
+
+DefineSourceBasenameForTarget(UnitTests)
