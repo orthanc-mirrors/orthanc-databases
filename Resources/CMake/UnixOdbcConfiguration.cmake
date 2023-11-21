@@ -25,7 +25,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_UNIX_ODBC)
   set(VERSION "2.3.9")  # Used in "config.h.in"
   set(UNIX_ODBC_SOURCES_DIR ${CMAKE_BINARY_DIR}/unixODBC-${VERSION})
   set(UNIX_ODBC_MD5 "06f76e034bb41df5233554abe961a16f")
-  set(UNIX_ODBC_URL "https://orthanc.uclouvain.be/third-party-downloads/unixODBC-${VERSION}.tar.gz")
+  set(UNIX_ODBC_URL "https://orthanc.uclouvain.be/downloads/third-party-downloads/unixODBC-${VERSION}.tar.gz")
 
   DownloadPackage(${UNIX_ODBC_MD5} ${UNIX_ODBC_URL} "${UNIX_ODBC_SOURCES_DIR}")
 

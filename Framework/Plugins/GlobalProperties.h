@@ -31,7 +31,7 @@ namespace Orthanc
    * The enum "GlobalProperty" is a subset of the "GlobalProperty_XXX"
    * values from the Orthanc server that have a special meaning to the
    * database plugins:
-   * https://hg.orthanc-server.com/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
+   * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
    *
    * WARNING: The values must be the same between the Orthanc core and
    * this enum!

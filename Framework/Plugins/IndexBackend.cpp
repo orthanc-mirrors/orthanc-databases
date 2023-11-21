@@ -2036,7 +2036,7 @@ namespace OrthancDatabases
     virtual bool IsEscapeBrackets() const
     {
       // This was initially done at a bad location by the following changeset:
-      // https://hg.orthanc-server.com/orthanc-databases/rev/389c037387ea
+      // https://orthanc.uclouvain.be/hg/orthanc-databases/rev/389c037387ea
       return (dialect_ == Dialect_MSSQL);
     }
 

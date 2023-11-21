@@ -158,7 +158,7 @@ namespace OrthancDatabases
            * performance for "strict" searches (i.e. searches involving
            * no wildcard).
            * https://www.postgresql.org/docs/current/static/pgtrgm.html
-           * https://bugs.orthanc-server.com/show_bug.cgi?id=47
+           * https://orthanc.uclouvain.be/bugs/show_bug.cgi?id=47
            **/
           try
           {
