@@ -150,6 +150,9 @@ set_target_properties(OrthancOdbcIndex PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=1
   )
 
+DefineSourceBasenameForTarget(OrthancOdbcIndex)
+DefineSourceBasenameForTarget(OrthancOdbcStorage)
+
 install(
   TARGETS OrthancOdbcIndex OrthancOdbcStorage
   RUNTIME DESTINATION lib    # Destination for Windows
@@ -174,3 +177,5 @@ target_link_libraries(UnitTests ${GOOGLE_TEST_LIBRARIES})
 set_target_properties(UnitTests PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=0
   )
+
+DefineSourceBasenameForTarget(UnitTests)

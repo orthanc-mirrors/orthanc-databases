@@ -237,7 +237,7 @@ namespace OrthancDatabases
         // to the LONGTEXT type (up to 4GB). This might be important
         // for applications such as the Osimis Web viewer that stores
         // large amount of metadata.
-        // http://book.orthanc-server.com/faq/features.html#central-registry-of-metadata-and-attachments
+        // https://orthanc.uclouvain.be/book/faq/features.html#central-registry-of-metadata-and-attachments
         t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Metadata MODIFY value LONGTEXT");
         
         revision = 4;

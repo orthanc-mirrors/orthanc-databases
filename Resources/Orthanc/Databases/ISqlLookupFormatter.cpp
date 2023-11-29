@@ -32,15 +32,16 @@
 
 #if ORTHANC_BUILDING_SERVER_LIBRARY == 1
 #  include "../../../OrthancFramework/Sources/OrthancException.h"
+#  include "../../../OrthancFramework/Sources/Toolbox.h"
 #else
 #  include <OrthancException.h>
+#  include <Toolbox.h>
 #endif
 
 #include "DatabaseConstraint.h"
 
 #include <boost/lexical_cast.hpp>
 #include <list>
-#include <Toolbox.h>
 
 
 namespace Orthanc
@@ -303,14 +304,11 @@ namespace Orthanc
     }
   }
 
-  static bool FormatComparisonExperimental(std::string& target,
-                                           ISqlLookupFormatter& formatter,
-                                           const DatabaseConstraint& constraint,
-                                           //size_t index,
-                                           bool escapeBrackets)
+  static bool FormatComparison2(std::string& target,
+                                ISqlLookupFormatter& formatter,
+                                const DatabaseConstraint& constraint,
+                                bool escapeBrackets)
   {
-    //std::string tag = "t" + boost::lexical_cast<std::string>(index);
-
     std::string comparison;
     std::string tagFilter = ("tagGroup = " + boost::lexical_cast<std::string>(constraint.GetTag().GetGroup())
                               + " AND tagElement = " + boost::lexical_cast<std::string>(constraint.GetTag().GetElement()));
@@ -635,7 +633,7 @@ namespace Orthanc
     {
       std::string comparison;
       
-      if (FormatComparisonExperimental(comparison, formatter, lookup[i], escapeBrackets))
+      if (FormatComparison2(comparison, formatter, lookup[i], escapeBrackets))
       {
         if (!comparison.empty())
         {
