@@ -204,7 +204,7 @@ namespace OrthancDatabases
         int property = 0;
         if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_HasCreateInstance) ||
-            property != 2)
+            property != 3)
         {
           LOG(INFO) << "Installing the CreateInstance extension";
 
@@ -215,12 +215,16 @@ namespace OrthancDatabases
                                                          "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
           }
         
+          // property == 2 was a first version of the CreateInstance -> we need to replace it by the new one
+          // property == 3 is a new version (in v5.2) with same signature and CREATE OR UPDATE 
+          //  -> we can replace the previous one without deleting it
+          //     and we can create it if it has never been created.
           std::string query;
           Orthanc::EmbeddedResources::GetFileResource
             (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
           t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 2);
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 3);
         }
 
       
@@ -367,7 +371,8 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }
     
-    assert(result == IndexBackend::GetTotalCompressedSize(manager));
+    // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
+    //assert(result == IndexBackend::GetTotalCompressedSize(manager));
     return result;
   }
 
@@ -388,7 +393,8 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }
     
-    assert(result == IndexBackend::GetTotalUncompressedSize(manager));
+    // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
+    // assert(result == IndexBackend::GetTotalUncompressedSize(manager));
     return result;
   }
 
@@ -416,16 +422,7 @@ namespace OrthancDatabases
     args.SetUtf8Value("series", hashSeries);
     args.SetUtf8Value("instance", hashInstance);
 
-    { // The CreateInstance procedure is not 100% safe in highly concurrent environments when the
-      // transaction isolation is set to "READ COMMITED": (e.g, with 10 clients
-      // anonymizing studies in parallel with the "ResourceModification" config set to 8, we have observed
-      // the same series being created twice).  Therefore, we protect the whole CreateInstance procedure
-      // with an advisory lock
-      PostgreSQLDatabase& db = dynamic_cast<PostgreSQLDatabase&>(manager.GetDatabase());
-      PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_CREATE_INSTANCE, 100, 1);
-
-      statement.Execute(args);
-    }
+    statement.Execute(args);
 
     if (statement.IsDone() ||
         statement.GetResultFieldsCount() != 8)
@@ -484,7 +481,9 @@ namespace OrthancDatabases
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }
       
+    // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
     assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
+
     return result;
   }
 

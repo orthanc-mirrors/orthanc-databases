@@ -1,4 +1,4 @@
-CREATE FUNCTION CreateInstance(
+CREATE OR REPLACE FUNCTION CreateInstance(
   IN patient TEXT,
   IN study TEXT,
   IN series TEXT,
@@ -17,67 +17,44 @@ DECLARE
   countRecycling BIGINT;
 
 BEGIN
-  SELECT internalId FROM Resources INTO instanceKey WHERE publicId = instance AND resourceType = 3;
+	isNewPatient := 1;
+	isNewStudy := 1;
+	isNewSeries := 1;
+	isNewInstance := 1;
 
-  IF NOT (instanceKey IS NULL) THEN
-    -- This instance already exists, stop here
-    isNewInstance := 0;
-  ELSE
-    SELECT internalId FROM Resources INTO patientKey WHERE publicId = patient AND resourceType = 0;
-    SELECT internalId FROM Resources INTO studyKey WHERE publicId = study AND resourceType = 1;
-    SELECT internalId FROM Resources INTO seriesKey WHERE publicId = series AND resourceType = 2;
+	BEGIN
+        INSERT INTO "resources" VALUES (DEFAULT, 0, patient, NULL);
+    exception
+        when unique_violation then
+            isNewPatient := 0;
+    end;
+    select internalid into patientKey from "resources" where publicId=patient and resourcetype = 0;
 
-    IF patientKey IS NULL THEN
-      -- Must create a new patient
-      IF NOT (studyKey IS NULL AND seriesKey IS NULL AND instanceKey IS NULL) THEN
-         RAISE EXCEPTION 'Broken invariant';
-      END IF;
+	BEGIN
+        INSERT INTO "resources" VALUES (DEFAULT, 1, study, patientKey);
+    exception
+        when unique_violation then
+            isNewStudy := 0;
+    end;
+    select internalid into studyKey from "resources" where publicId=study and resourcetype = 1;
 
-      INSERT INTO Resources VALUES (DEFAULT, 0, patient, NULL) RETURNING internalId INTO patientKey;
-      isNewPatient := 1;
-    ELSE
-      isNewPatient := 0;
-    END IF;
-  
-    IF (patientKey IS NULL) THEN
-       RAISE EXCEPTION 'Broken invariant';
-    END IF;
+	BEGIN
+	    INSERT INTO "resources" VALUES (DEFAULT, 2, series, studyKey);
+    exception
+        when unique_violation then
+            isNewSeries := 0;
+    end;
+	select internalid into seriesKey from "resources" where publicId=series and resourcetype = 2;
 
-    IF studyKey IS NULL THEN
-      -- Must create a new study
-      IF NOT (seriesKey IS NULL AND instanceKey IS NULL) THEN
-         RAISE EXCEPTION 'Broken invariant';
-      END IF;
+  	BEGIN
+		INSERT INTO "resources" VALUES (DEFAULT, 3, instance, seriesKey);
+    exception
+        when unique_violation then
+            isNewInstance := 0;
+    end;
+    select internalid into instanceKey from "resources" where publicId=instance and resourcetype = 3;   
 
-      INSERT INTO Resources VALUES (DEFAULT, 1, study, patientKey) RETURNING internalId INTO studyKey;
-      isNewStudy := 1;
-    ELSE
-      isNewStudy := 0;
-    END IF;
-
-    IF (studyKey IS NULL) THEN
-       RAISE EXCEPTION 'Broken invariant';
-    END IF;
-
-    IF seriesKey IS NULL THEN
-      -- Must create a new series
-      IF NOT (instanceKey IS NULL) THEN
-         RAISE EXCEPTION 'Broken invariant';
-      END IF;
-
-      INSERT INTO Resources VALUES (DEFAULT, 2, series, studyKey) RETURNING internalId INTO seriesKey;
-      isNewSeries := 1;
-    ELSE
-      isNewSeries := 0;
-    END IF;
-  
-    IF (seriesKey IS NULL OR NOT instanceKey IS NULL) THEN
-       RAISE EXCEPTION 'Broken invariant';
-    END IF;
-
-    INSERT INTO Resources VALUES (DEFAULT, 3, instance, seriesKey) RETURNING internalId INTO instanceKey;
-    isNewInstance := 1;
-
+  IF isNewInstance > 0 THEN
     -- Move the patient to the end of the recycling order
     SELECT seq FROM PatientRecyclingOrder WHERE patientId = patientKey INTO patientSeq;
 
