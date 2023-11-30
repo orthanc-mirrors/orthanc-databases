@@ -1,12 +1,6 @@
 Pending changes in the mainline
 ===============================
 
-* New "EnableVerboseLogs" configuration to show SQL statements being executed.
-
-
-Release 5.1 (2023-06-27)
-========================
-
 * Experimental debug feature:
   Introduced 2 new configurations with these default values:
     "ReadOnlyTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY"
@@ -16,7 +10,11 @@ Release 5.1 (2023-06-27)
   isolation level is used.
 * internals:
   - Added a UNIQUE constraint on Resources.publicId to detect DB inconsistencies
-  - Added an advisory lock around CreateInstance
+* New "EnableVerboseLogs" configuration to show SQL statements being executed.
+
+
+Release 5.1 (2023-06-27)
+========================
 
 * Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
 
