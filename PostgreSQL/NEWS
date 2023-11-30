@@ -1,3 +1,9 @@
+Pending changes in the mainline
+===============================
+
+* New "EnableVerboseLogs" configuration to show SQL statements being executed.
+
+
 Release 5.1 (2023-06-27)
 ========================
 

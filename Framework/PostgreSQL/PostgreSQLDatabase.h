@@ -60,6 +60,11 @@ namespace OrthancDatabases
 
     void Open();
 
+    bool IsVerboseEnabled() const
+    {
+      return parameters_.IsVerboseEnabled();
+    }
+
     bool AcquireAdvisoryLock(int32_t lock);
 
     bool ReleaseAdvisoryLock(int32_t lock);

@@ -44,6 +44,7 @@ namespace OrthancDatabases
     connectionRetryInterval_ = 5;
     readWriteTransactionStatement_ = "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE";
     readOnlyTransactionStatement_ = "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY";
+    isVerboseEnabled_ = false;
   }
 
 
@@ -95,6 +96,8 @@ namespace OrthancDatabases
     }
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
+
+    isVerboseEnabled_ = configuration.GetBooleanValue("EnableVerboseLogs", false);
 
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);

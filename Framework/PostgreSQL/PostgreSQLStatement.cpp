@@ -308,7 +308,10 @@ namespace OrthancDatabases
     inputs_(new Inputs),
     formatter_(Dialect_PostgreSQL)
   {
-    LOG(TRACE) << "PostgreSQL: " << sql;
+    if (database.IsVerboseEnabled())
+    {
+      LOG(TRACE) << "PostgreSQL: " << sql;
+    }
   }
 
 
@@ -319,7 +322,11 @@ namespace OrthancDatabases
     formatter_(Dialect_PostgreSQL)
   {
     query.Format(sql_, formatter_);
-    LOG(TRACE) << "PostgreSQL: " << sql_;
+    
+    if (database.IsVerboseEnabled())
+    {
+      LOG(TRACE) << "PostgreSQL: " << sql_;
+    }
 
     for (size_t i = 0; i < formatter_.GetParametersCount(); i++)
     {

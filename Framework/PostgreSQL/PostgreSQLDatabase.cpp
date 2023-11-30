@@ -159,7 +159,10 @@ namespace OrthancDatabases
 
   void PostgreSQLDatabase::ExecuteMultiLines(const std::string& sql)
   {
-    LOG(TRACE) << "PostgreSQL: " << sql;
+    if (IsVerboseEnabled())
+    {
+      LOG(INFO) << "PostgreSQL: " << sql;
+    }
     Open();
 
     PGresult* result = PQexec(reinterpret_cast<PGconn*>(pg_), sql.c_str());

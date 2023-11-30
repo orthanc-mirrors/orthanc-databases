@@ -45,6 +45,7 @@ namespace OrthancDatabases
     unsigned int connectionRetryInterval_;
     std::string  readWriteTransactionStatement_;
     std::string  readOnlyTransactionStatement_;
+    bool         isVerboseEnabled_;
 
     void Reset();
 
@@ -146,6 +147,17 @@ namespace OrthancDatabases
     {
       return readOnlyTransactionStatement_;
     }
+
+    void SetVerboseEnabled(bool enabled)
+    {
+      isVerboseEnabled_ = enabled;
+    }
+
+    bool IsVerboseEnabled() const
+    {
+      return isVerboseEnabled_;
+    }
+
 
     void Format(std::string& target) const;
   };

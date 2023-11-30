@@ -84,6 +84,11 @@ namespace OrthancDatabases
     position_(0), 
     database_(statement.GetDatabase())
   {
+    if (database_.IsVerboseEnabled())
+    {
+      LOG(INFO) << "PostgreSQL: " << statement.sql_;
+    }
+    
     result_ = statement.Execute();
     assert(result_ != NULL);   // An exception would have been thrown otherwise
 
