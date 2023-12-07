@@ -348,5 +348,12 @@ namespace OrthancDatabases
     // New in Orthanc 1.12.0
     virtual void ListAllLabels(std::list<std::string>& target,
                                DatabaseManager& manager) = 0;
+
+    virtual bool HasAtomicIncrementGlobalProperty() = 0;
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) = 0;
   };
 }

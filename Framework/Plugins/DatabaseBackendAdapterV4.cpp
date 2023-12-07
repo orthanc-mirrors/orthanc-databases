@@ -431,6 +431,7 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
         response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
+        response.mutable_get_system_information()->set_supports_increment_global_property(accessor.GetBackend().HasAtomicIncrementGlobalProperty());
         break;
       }
 
@@ -941,7 +942,16 @@ namespace OrthancDatabases
         
         break;
       }
-      
+
+      case Orthanc::DatabasePluginMessages::OPERATION_INCREMENT_GLOBAL_PROPERTY:
+      {
+        int64_t value = backend.IncrementGlobalProperty(manager, request.increment_global_property().server_id().c_str(),
+                                                        request.increment_global_property().property(),
+                                                        request.increment_global_property().increment());
+        response.mutable_increment_global_property()->set_new_value(value);
+        break;
+      }
+
       case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_METADATA:
       {
         std::string value;

@@ -90,5 +90,16 @@ namespace OrthancDatabases
     {
       return true;
     }
+
+    virtual bool HasAtomicIncrementGlobalProperty() ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) ORTHANC_OVERRIDE;
+
   };
 }

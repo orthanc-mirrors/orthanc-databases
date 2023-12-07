@@ -1204,6 +1204,18 @@ namespace OrthancDatabases
     }
   }
 
+  bool IndexBackend::HasAtomicIncrementGlobalProperty()
+  {
+    return false; // currently only implemented in Postgres
+  }
+
+  int64_t IndexBackend::IncrementGlobalProperty(DatabaseManager& manager,
+                                                const char* serverIdentifier,
+                                                int32_t property,
+                                                int64_t increment)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
     
   void IndexBackend::LookupIdentifier(std::list<int64_t>& target /*out*/,
                                       DatabaseManager& manager,

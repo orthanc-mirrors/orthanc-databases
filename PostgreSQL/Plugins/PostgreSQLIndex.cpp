@@ -398,6 +398,60 @@ namespace OrthancDatabases
     return result;
   }
 
+  int64_t PostgreSQLIndex::IncrementGlobalProperty(DatabaseManager& manager,
+                                                   const char* serverIdentifier,
+                                                   int32_t property,
+                                                   int64_t increment)
+  {
+    if (serverIdentifier == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    else
+    {
+      if (strlen(serverIdentifier) == 0)
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT INTO GlobalProperties (property, value) VALUES(${property}, ${increment}) "
+          "  ON CONFLICT (property) DO UPDATE SET value = CAST(GlobalProperties.value AS BIGINT) + ${increment}"
+          " RETURNING CAST(value AS BIGINT)");
+
+        statement.SetParameterType("property", ValueType_Integer64);
+        statement.SetParameterType("increment", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetIntegerValue("property", property);
+        args.SetIntegerValue("increment", increment);
+        
+        statement.Execute(args);
+
+        return statement.ReadInteger64(0);
+      }
+      else
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT INTO ServerProperties (server, property, value) VALUES(${server}, ${property}, ${increment}) "
+          "  ON CONFLICT (server, property) DO UPDATE SET value = CAST(ServerProperties.value AS BIGINT) + ${increment}"
+          " RETURNING CAST(value AS BIGINT)");
+
+        statement.SetParameterType("server", ValueType_Utf8String);
+        statement.SetParameterType("property", ValueType_Integer64);
+        statement.SetParameterType("increment", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetUtf8Value("server", serverIdentifier);
+        args.SetIntegerValue("property", property);
+        args.SetIntegerValue("increment", increment);
+        
+        statement.Execute(args);
+
+        return statement.ReadInteger64(0);
+      }
+    }
+  }
+
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,

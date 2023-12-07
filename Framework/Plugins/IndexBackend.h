@@ -396,6 +396,14 @@ namespace OrthancDatabases
     virtual void ListAllLabels(std::list<std::string>& target,
                                DatabaseManager& manager) ORTHANC_OVERRIDE;
     
+    virtual bool HasAtomicIncrementGlobalProperty() ORTHANC_OVERRIDE;
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) ORTHANC_OVERRIDE;
+
+
     /**
      * "maxDatabaseRetries" is to handle
      * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a

@@ -134,7 +134,8 @@ BEGIN
   
   -- http://stackoverflow.com/a/11299968/881731
   IF EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId) THEN
-    -- Signal that the deleted resource has a remaining parent
+    -- Signal that the deleted resource has a remaining parent 
+    -- (a parent that must not be deleted but whose LastUpdate must be updated)
     INSERT INTO RemainingAncestor
       SELECT resourceType, publicId FROM Resources WHERE internalId = old.parentId;
   ELSE
