@@ -2,12 +2,13 @@ Pending changes in the mainline
 ===============================
 
 * Experimental debug feature:
-  Introduced 2 new configurations with these default values:
-    "ReadOnlyTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY"
-    "ReadWriteTransactionStatement": "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE"
-  You can now customize the transaction isolation level.
-  If setting these values to "", no statement is run and therefore, the default DB or server
-  isolation level is used.
+  Introduced a new configuration to select the transaction isolation level
+    "TransactionMode": "SERIALIZABLE"
+  Allowed values: "SERIALIZABLE", "READ COMMITTED", "DEFAULT".
+  The "SERIALIZABLE" mode was the only available value up to now.  It is still the default
+  value now.
+  The "READ COMMITTED" is possible now due to rewrites of SQL queries.
+  The "DEFAULT" value uses the default transaction isolation level defined at the database level.
 * internals:
   - Added a UNIQUE constraint on Resources.publicId to detect DB inconsistencies
 * New "EnableVerboseLogs" configuration to show SQL statements being executed.

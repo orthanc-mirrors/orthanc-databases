@@ -109,12 +109,12 @@ namespace OrthancDatabases
     static PostgreSQLDatabase* CreateDatabaseConnection(const PostgreSQLParameters& parameters);
 
   protected:
-    const std::string& GetReadWriteTransactionStatement() const
+    const char* GetReadWriteTransactionStatement() const
     {
       return parameters_.GetReadWriteTransactionStatement();
     }
 
-    const std::string& GetReadOnlyTransactionStatement() const
+    const char* GetReadOnlyTransactionStatement() const
     {
       return parameters_.GetReadOnlyTransactionStatement();
     }

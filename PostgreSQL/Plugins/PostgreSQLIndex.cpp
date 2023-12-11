@@ -142,7 +142,20 @@ namespace OrthancDatabases
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
         }
 
-        if (revision != 2)
+        if (revision == 2)
+        {
+          LOG(WARNING) << "PostgreSQL plugin: adding or replacing ResourceDeletedFunc";
+
+          std::string query;
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_RESOURCE_DELETED_FUNC);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+
+          revision = 3;
+          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+        }
+
+        if (revision != 3)
         {
           LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
           throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -488,6 +501,8 @@ namespace OrthancDatabases
     {
       statement.SetResultFieldType(i, ValueType_Integer64);
     }
+
+    // LOG(INFO) << statement.ReadInteger64(0) << statement.ReadInteger64(1) << statement.ReadInteger64(2) << statement.ReadInteger64(3);
 
     result.isNewInstance = (statement.ReadInteger64(3) == 1);
     result.instanceId = statement.ReadInteger64(7);

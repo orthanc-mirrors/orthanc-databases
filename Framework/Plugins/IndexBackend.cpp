@@ -470,7 +470,7 @@ namespace OrthancDatabases
           static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0)));
           
         // There is at most 1 remaining ancestor
-        assert((statement.Next(), statement.IsDone()));
+        //assert((statement.Next(), statement.IsDone()));
       }
     }
     

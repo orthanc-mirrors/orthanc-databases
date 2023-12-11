@@ -42,8 +42,6 @@ namespace OrthancDatabases
     lock_ = true;
     maxConnectionRetries_ = 10;
     connectionRetryInterval_ = 5;
-    readWriteTransactionStatement_ = "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE";
-    readOnlyTransactionStatement_ = "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY";
     isVerboseEnabled_ = false;
   }
 
@@ -102,16 +100,23 @@ namespace OrthancDatabases
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
 
-    if (configuration.LookupStringValue(s, "ReadWriteTransactionStatement"))
+    std::string transactionMode = configuration.GetStringValue("TransactionMode", "SERIALIZABLE");
+    if (transactionMode == "DEFAULT")
     {
-      SetReadWriteTransactionStatement(s);
+      SetIsolationMode(IsolationMode_DbDefault);
     }
-
-    if (configuration.LookupStringValue(s, "ReadOnlyTransactionStatement"))
+    else if (transactionMode == "READ COMMITTED")
     {
-      SetReadOnlyTransactionStatement(s);
+      SetIsolationMode(IsolationMode_ReadCommited);
     }
-
+    else if (transactionMode == "SERIALIZABLE")
+    {
+      SetIsolationMode(IsolationMode_Serializable);
+    }
+    else
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType, std::string("Invalid value for 'TransactionMode': ") + transactionMode);
+    }
   }
 
 

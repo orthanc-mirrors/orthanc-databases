@@ -124,32 +124,34 @@ FOR EACH ROW
 EXECUTE PROCEDURE AttachedFileDeletedFunc();
 
 
--- The following trigger combines 2 triggers from SQLite:
--- ResourceDeleted + ResourceDeletedParentCleaning
-CREATE FUNCTION ResourceDeletedFunc() 
-RETURNS TRIGGER AS $body$
-BEGIN
-  --RAISE NOTICE 'Delete resource %', old.parentId;
-  INSERT INTO DeletedResources VALUES (old.resourceType, old.publicId);
+-- previous version of the trigger, moved into ResourceDeletedFunc.sql
+-- 
+-- -- The following trigger combines 2 triggers from SQLite:
+-- -- ResourceDeleted + ResourceDeletedParentCleaning
+-- CREATE FUNCTION ResourceDeletedFunc() 
+-- RETURNS TRIGGER AS $body$
+-- BEGIN
+--   --RAISE NOTICE 'Delete resource %', old.parentId;
+--   INSERT INTO DeletedResources VALUES (old.resourceType, old.publicId);
   
-  -- http://stackoverflow.com/a/11299968/881731
-  IF EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId) THEN
-    -- Signal that the deleted resource has a remaining parent 
-    -- (a parent that must not be deleted but whose LastUpdate must be updated)
-    INSERT INTO RemainingAncestor
-      SELECT resourceType, publicId FROM Resources WHERE internalId = old.parentId;
-  ELSE
-    -- Delete a parent resource when its unique child is deleted 
-    DELETE FROM Resources WHERE internalId = old.parentId;
-  END IF;
-  RETURN NULL;
-END;
-$body$ LANGUAGE plpgsql;
+--   -- http://stackoverflow.com/a/11299968/881731
+--   IF EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId) THEN
+--     -- Signal that the deleted resource has a remaining parent 
+--     -- (a parent that must not be deleted but whose LastUpdate must be updated)
+--     INSERT INTO RemainingAncestor
+--       SELECT resourceType, publicId FROM Resources WHERE internalId = old.parentId;
+--   ELSE
+--     -- Delete a parent resource when its unique child is deleted 
+--     DELETE FROM Resources WHERE internalId = old.parentId;
+--   END IF;
+--   RETURN NULL;
+-- END;
+-- $body$ LANGUAGE plpgsql;
 
-CREATE TRIGGER ResourceDeleted
-AFTER DELETE ON Resources
-FOR EACH ROW
-EXECUTE PROCEDURE ResourceDeletedFunc();
+-- CREATE TRIGGER ResourceDeleted
+-- AFTER DELETE ON Resources
+-- FOR EACH ROW
+-- EXECUTE PROCEDURE ResourceDeletedFunc();
 
 
 

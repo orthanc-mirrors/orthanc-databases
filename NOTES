@@ -3,6 +3,63 @@ Resources:
 - PG transaction modes explained: https://www.postgresql.org/files/developer/concurrency.pdf
 - Isoolation level explained (PG + MySQL): https://amirsoleimani.medium.com/understanding-database-isolation-level-via-examples-mysql-and-postgres-a86b5502d404
 
+Create and delete instances Internals:
+*************************************
+
+isNewInstance = CreateInstance(...)
+
+if (!isNewInstance && overwriteInstances)
+  DeleteResource(instance)
+       -> ClearDeletedFiles(manager);
+            DELETE FROM DeletedFiles  ------> this is not a temporary table in postgres but it is supposed to be empty before and after each transaction -> it is empty when taking a snapshot of the DB in READ COMMITTED mode!!!
+          ClearDeletedResources(manager);
+            DELETE FROM DeletedResources  ------> this is not a temporary table in postgres but it is supposed to be empty before and after each transaction !!!
+
+            DELETE FROM RemainingAncestor  ------> this is not a temporary table in postgres but it is supposed to be empty before and after each transaction !!!
+            DELETE FROM Resources WHERE internalId=..
+               -> cascades delete the MainDicomTags, the Metadata and the AttachedFiles
+                  -> this triggers AttachedFileDeletedFunc
+                         INSERT INTO DeletedFiles VALUES
+                            (old.uuid, old.filetype, old.compressedSize,
+                            old.uncompressedSize, old.compressionType,
+                            old.uncompressedHash, old.compressedHash);
+                        RETURN NULL;
+               -> this triggers a SQL trigger: ResourceDeletedFunc
+                        INSERT INTO DeletedResources VALUES (old.resourceType, old.publicId);
+                        IF EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId) THEN
+                            -- Signal that the deleted resource has a remaining parent 
+                            -- (a parent that must not be deleted but whose LastUpdate must be updated)
+                            INSERT INTO RemainingAncestor
+                            SELECT resourceType, publicId FROM Resources WHERE internalId = old.parentId;
+                        ELSE
+                            -- Delete a parent resource when its unique child is deleted 
+                            DELETE FROM Resources WHERE internalId = old.parentId;
+                        END IF;
+
+            SELECT * FROM RemainingAncestor
+              -> SignalRemainingAncestor()  // There is at most 1 remaining ancestor
+                 -> ServerIndex::TransactionContext::SignalRemainingAncestor()
+                    -> stores remainingType and remainingPublicId (this is used in StatelessDatabaseOperations::DeleteResource to build the Rest Response of /delete 
+                                                                   and to update the LastUpdate of all parent (only when deleted from /delete))
+
+          SignalDeletedFiles(output, manager);
+            SELECT * FROM DeletedFiles
+              -> SignalDeletedAttachment()
+                 -> ServerIndex::TransactionContext::SignalAttachmentDeleted()
+                    -> pendingFilesToRemove_.push_back(FileToRemove(info))  (files are deleted in CommitFilesToRemove in the ServerIndex::TransactionContext::Commit)
+
+          SignalDeletedResources(output, manager);
+            SELECT resourceType, publicId FROM DeletedResources
+              -> SignalDeletedResource()
+                 -> Emit DeletedResource event (lua)
+
+
+  if (!CreateInstance(...))
+    Error: "No new instance while overwriting; this should not happen"
+
+if isNewInstance -> LogChange
+if isNewSeries -> LogChange
+....
 
 Sample SQL code that you can execute in DBeaver to test new functions/procedures:
 
@@ -113,8 +170,13 @@ Orthanc 1.12.1 + PG 5.1 (serializable mode)           : test_concurrent_anonymiz
 Orthanc mainline + PG maineline (serializable mode)   : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 51.913 s
 Orthanc mainline + PG maineline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 24.754 s
 
-Orthanc 1.12.1 + PG 5.1 (serializable mode)           : test_concurrent_uploads_same_study with 40 workers and 1x repeat: 55.932 s
+Orthanc 1.12.1 + PG 5.1 (serializable mode)           : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
 Orthanc mainline + PG maineline (serializable mode)   : fails: No new instance while overwriting; this should not happen
-Orthanc mainline + PG maineline (read-committed mode) : 
+Orthanc mainline + PG maineline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 1.394 s (with assert((statement.Next(), statement.IsDone())) commented out)
 
 TODO:
+- assert((statement.Next(), statement.IsDone())) commented out  -> create temporary tables ?
+- PatientAddedFunc contains an IF
+- validate upgrade DB from previous Orthanc and from scratch
+- test with older version of PG
+- force the create/update DB transaction to be serializable (not needed: this is handled by POSTGRESQL_LOCK_DATABASE_SETUP)
