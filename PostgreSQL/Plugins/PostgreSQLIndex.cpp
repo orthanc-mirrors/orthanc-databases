@@ -539,6 +539,45 @@ namespace OrthancDatabases
 
   }
 
+  void PostgreSQLIndex::DeleteResource(IDatabaseBackendOutput& output,
+                                       DatabaseManager& manager,
+                                       int64_t id)
+  {
+    ClearDeletedFiles(manager);
+    ClearDeletedResources(manager);
+
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT * FROM DeleteResource(${id})");
+
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", id);
+
+    statement.Execute(args);
+
+    if (statement.IsDone() ||
+        statement.GetResultFieldsCount() != 2)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+
+    statement.SetResultFieldType(0, ValueType_Integer64);
+    statement.SetResultFieldType(1, ValueType_Utf8String);
+
+    if (!statement.IsNull(0))
+    {
+      output.SignalRemainingAncestor(
+        statement.ReadString(1),
+        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0)));
+    }
+
+    SignalDeletedFiles(output, manager);
+    SignalDeletedResources(output, manager);
+
+  }
+
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1

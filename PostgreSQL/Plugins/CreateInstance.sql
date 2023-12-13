@@ -24,35 +24,35 @@ BEGIN
 
 	BEGIN
         INSERT INTO "resources" VALUES (DEFAULT, 0, patient, NULL);
-    exception
-        when unique_violation then
+    EXCEPTION
+        WHEN unique_violation THEN
             isNewPatient := 0;
-    end;
-    select internalid into patientKey from "resources" where publicId=patient and resourcetype = 0;
+    END;
+    SELECT internalid INTO patientKey FROM "resources" WHERE publicId=patient AND resourcetype = 0;
 
 	BEGIN
         INSERT INTO "resources" VALUES (DEFAULT, 1, study, patientKey);
-    exception
-        when unique_violation then
+    EXCEPTION
+        WHEN unique_violation THEN
             isNewStudy := 0;
-    end;
-    select internalid into studyKey from "resources" where publicId=study and resourcetype = 1;
+    END;
+    SELECT internalid INTO studyKey FROM "resources" WHERE publicId=study AND resourcetype = 1;
 
 	BEGIN
 	    INSERT INTO "resources" VALUES (DEFAULT, 2, series, studyKey);
-    exception
-        when unique_violation then
+    EXCEPTION
+        WHEN unique_violation THEN
             isNewSeries := 0;
-    end;
-	select internalid into seriesKey from "resources" where publicId=series and resourcetype = 2;
+    END;
+	SELECT internalid INTO seriesKey FROM "resources" WHERE publicId=series AND resourcetype = 2;
 
   	BEGIN
 		INSERT INTO "resources" VALUES (DEFAULT, 3, instance, seriesKey);
-    exception
-        when unique_violation then
+    EXCEPTION
+        WHEN unique_violation THEN
             isNewInstance := 0;
-    end;
-    select internalid into instanceKey from "resources" where publicId=instance and resourcetype = 3;   
+    END;
+    SELECT internalid INTO instanceKey FROM "resources" WHERE publicId=instance AND resourcetype = 3;   
 
   IF isNewInstance > 0 THEN
     -- Move the patient to the end of the recycling order

@@ -187,6 +187,8 @@ namespace OrthancDatabases
 
       std::string ReadString(size_t field) const;
 
+      bool IsNull(size_t field) const;
+
       void PrintResult(std::ostream& stream)
       {
         IResult::Print(stream, GetResult());

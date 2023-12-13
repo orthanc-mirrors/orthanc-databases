@@ -63,8 +63,11 @@ namespace OrthancDatabases
     
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
-                                   OrthancPluginResourceType type)
-      ORTHANC_OVERRIDE;
+                                   OrthancPluginResourceType type) ORTHANC_OVERRIDE;
+
+    virtual void DeleteResource(IDatabaseBackendOutput& output,
+                                DatabaseManager& manager,
+                                int64_t id) ORTHANC_OVERRIDE;
 
     virtual uint64_t GetTotalCompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
 

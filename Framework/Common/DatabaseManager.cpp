@@ -492,7 +492,7 @@ namespace OrthancDatabases
           return dynamic_cast<const Integer64Value&>(value).GetValue();
 
         default:
-          //LOG(ERROR) << value.Format();
+          // LOG(ERROR) << value.GetType();
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
     }
@@ -521,7 +521,18 @@ namespace OrthancDatabases
     }
   }
 
-    
+  bool DatabaseManager::StatementBase::IsNull(size_t field) const
+  {
+    if (IsDone())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+    else
+    {
+      return GetResultField(field).GetType() == ValueType_Null;
+    }
+  }
+
   std::string DatabaseManager::StatementBase::ReadString(size_t field) const
   {
     const IValue& value = GetResultField(field);
