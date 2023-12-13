@@ -176,6 +176,16 @@ namespace OrthancDatabases
             statement.IsDone());
   }
 
+  void IndexBackend::ClearRemainingAncestor(DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM RemainingAncestor");
+
+    statement.Execute();
+  }
+
+
 
   void IndexBackend::ClearDeletedFiles(DatabaseManager& manager)
   {
@@ -433,14 +443,7 @@ namespace OrthancDatabases
   {
     ClearDeletedFiles(manager);
     ClearDeletedResources(manager);
-    
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "DELETE FROM RemainingAncestor");
-
-      statement.Execute();
-    }
+    ClearRemainingAncestor(manager);
       
     {
       DatabaseManager::CachedStatement statement(
@@ -460,7 +463,6 @@ namespace OrthancDatabases
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "SELECT * FROM RemainingAncestor");
-
       statement.Execute();
 
       if (!statement.IsDone())
@@ -470,12 +472,13 @@ namespace OrthancDatabases
           static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0)));
           
         // There is at most 1 remaining ancestor
-        //assert((statement.Next(), statement.IsDone()));
+        assert((statement.Next(), statement.IsDone()));
       }
     }
-    
+
     SignalDeletedFiles(output, manager);
     SignalDeletedResources(output, manager);
+
   }
 
 

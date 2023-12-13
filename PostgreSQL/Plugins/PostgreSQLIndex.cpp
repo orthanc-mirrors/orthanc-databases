@@ -465,6 +465,81 @@ namespace OrthancDatabases
     }
   }
 
+  void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
+  {
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles("
+        "uuid VARCHAR(64) NOT NULL,"
+        "fileType INTEGER,         "
+        "compressedSize BIGINT,    "
+        "uncompressedSize BIGINT,  "
+        "compressionType INTEGER,  "
+        "uncompressedHash VARCHAR(40),"
+        "compressedHash VARCHAR(40)"
+        ");"
+        );
+      statement.Execute();
+    }
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM DeletedFiles;"
+        );
+
+      statement.Execute();
+    }
+  }
+
+  void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)
+  {
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE IF NOT EXISTS  DeletedResources("
+        "resourceType INTEGER NOT NULL,"
+        "publicId VARCHAR(64) NOT NULL"
+        ");"
+        );
+      statement.Execute();
+    }
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM DeletedResources;"
+        );
+
+      statement.Execute();
+    }
+
+  }
+
+  void PostgreSQLIndex::ClearRemainingAncestor(DatabaseManager& manager)
+  {
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE IF NOT EXISTS  RemainingAncestor("
+        "resourceType INTEGER NOT NULL,"
+        "publicId VARCHAR(64) NOT NULL"
+        ")"
+        );
+
+      statement.Execute();
+    }
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM RemainingAncestor;"
+        );
+
+      statement.Execute();
+    }
+
+  }
+
+
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   void PostgreSQLIndex::CreateInstance(OrthancPluginCreateInstanceResult& result,

@@ -11,7 +11,7 @@ BEGIN
   
   -- If this resource still has siblings, keep track of the remaining parent
   -- (a parent that must not be deleted but whose LastUpdate must be updated)
-  INSERT INTO RemainingAncestor SELECT resourceType, publicId 
+  INSERT INTO RemainingAncestor SELECT resourceType, publicId
                                 FROM Resources 
                                 WHERE internalId = old.parentId
                                       AND EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId);
@@ -26,3 +26,8 @@ CREATE TRIGGER ResourceDeleted
 AFTER DELETE ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE ResourceDeletedFunc();
+
+-- we'll now use temporary tables so we need to remove the old tables !
+DROP TABLE IF EXISTS DeletedFiles;
+DROP TABLE IF EXISTS RemainingAncestor;
+DROP TABLE IF EXISTS DeletedResources;

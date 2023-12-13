@@ -33,6 +33,14 @@ namespace OrthancDatabases
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
 
+  protected:
+    virtual void ClearDeletedFiles(DatabaseManager& manager);
+
+    virtual void ClearDeletedResources(DatabaseManager& manager);
+
+    virtual void ClearRemainingAncestor(DatabaseManager& manager);
+
+
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
                     const PostgreSQLParameters& parameters);

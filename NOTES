@@ -1,7 +1,9 @@
 Resources:
 *********
 - PG transaction modes explained: https://www.postgresql.org/files/developer/concurrency.pdf
-- Isoolation level explained (PG + MySQL): https://amirsoleimani.medium.com/understanding-database-isolation-level-via-examples-mysql-and-postgres-a86b5502d404
+- Isolation level explained (PG + MySQL): https://amirsoleimani.medium.com/understanding-database-isolation-level-via-examples-mysql-and-postgres-a86b5502d404
+- Message queuing in PG: https://www.crunchydata.com/blog/message-queuing-using-native-postgresql
+
 
 Create and delete instances Internals:
 *************************************
@@ -166,17 +168,32 @@ END $$;
 ************************************************************************
 
 In debug, no verbose logs
-Orthanc 1.12.1 + PG 5.1 (serializable mode)           : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 51.703 s
-Orthanc mainline + PG maineline (serializable mode)   : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 51.913 s
-Orthanc mainline + PG maineline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 24.754 s
+Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 43.957 s
+Orthanc mainline + PG mainline (serializable mode)   : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: XX s
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 19.861 s
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 22.500 s (with temporary tables)
 
-Orthanc 1.12.1 + PG 5.1 (serializable mode)           : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
-Orthanc mainline + PG maineline (serializable mode)   : fails: No new instance while overwriting; this should not happen
-Orthanc mainline + PG maineline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 1.394 s (with assert((statement.Next(), statement.IsDone())) commented out)
+Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
+Orthanc mainline + PG mainline (serializable mode)   : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 23.010 s
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 1.71 s (with RemainingAncestor.id)
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 3.26 s (with temporary tables)
+
+Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 23.016 s
+Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 8.788 s
+Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 17.129 s (with temporary tables)
 
 TODO:
 - assert((statement.Next(), statement.IsDone())) commented out  -> create temporary tables ?
+  try again temporary tables (with different names ?  Have a switch in the code ?)
+- have a separate "thread" to increment/decrement statistics because everybody is fighting to modify the GlobalIntegers rows
+- test events generation StableSeries ....
+- test RemainingAncestor response in integration tests: OK
+- disable MySQL ODBC plugin
+- run tests with docker localy + in CI
+- check https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820
 - PatientAddedFunc contains an IF
 - validate upgrade DB from previous Orthanc and from scratch
 - test with older version of PG
+
+DONE:
 - force the create/update DB transaction to be serializable (not needed: this is handled by POSTGRESQL_LOCK_DATABASE_SETUP)

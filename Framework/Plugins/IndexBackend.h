@@ -46,9 +46,11 @@ namespace OrthancDatabases
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
-    void ClearDeletedFiles(DatabaseManager& manager);
+    virtual void ClearDeletedFiles(DatabaseManager& manager);
 
-    void ClearDeletedResources(DatabaseManager& manager);
+    virtual void ClearDeletedResources(DatabaseManager& manager);
+
+    virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
     void SignalDeletedFiles(IDatabaseBackendOutput& output,
                             DatabaseManager& manager);
