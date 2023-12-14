@@ -571,8 +571,7 @@ namespace OrthancDatabases
     }
   }
 
-      
-  void DatabaseManager::CachedStatement::Execute(const Dictionary& parameters)
+  void DatabaseManager::CachedStatement::ExecuteInternal(const Dictionary& parameters, bool withResults)
   {
     try
     {
@@ -598,7 +597,14 @@ namespace OrthancDatabases
         #endif
       */
 
-      SetResult(GetTransaction().Execute(*statement_, parameters));
+      if (withResults)
+      {
+        SetResult(GetTransaction().Execute(*statement_, parameters));
+      }
+      else
+      {
+        GetTransaction().ExecuteWithoutResult(*statement_, parameters);
+      }
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -606,7 +612,18 @@ namespace OrthancDatabases
       throw;
     }
   }
+
+      
+  void DatabaseManager::CachedStatement::Execute(const Dictionary& parameters)
+  {
+    ExecuteInternal(parameters, true);
+  }
   
+  void DatabaseManager::CachedStatement::ExecuteWithoutResult(const Dictionary& parameters)
+  {
+    ExecuteInternal(parameters, false);
+  }
+
   
   DatabaseManager::StandaloneStatement::StandaloneStatement(DatabaseManager& manager,
                                                             const std::string& sql) :

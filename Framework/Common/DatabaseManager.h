@@ -221,6 +221,17 @@ namespace OrthancDatabases
       }
 
       void Execute(const Dictionary& parameters);
+
+      void ExecuteWithoutResult()
+      {
+        Dictionary parameters;
+        ExecuteWithoutResult(parameters);
+      }
+
+      void ExecuteWithoutResult(const Dictionary& parameters);
+
+    private:
+      void ExecuteInternal(const Dictionary& parameters, bool withResults);
     };
 
 

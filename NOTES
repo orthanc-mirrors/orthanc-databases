@@ -171,17 +171,17 @@ In debug, no verbose logs
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 43.957 s
 Orthanc mainline + PG mainline (serializable mode)   : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: XX s
 Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 19.861 s
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 22.500 s (with temporary tables)
-                                                       test_concurrent_anonymize_same_study deletion took: 32.265 s
-                                                       
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 20.027 s (with temporary tables)
+                                                       test_concurrent_anonymize_same_study deletion took: 28.4 s
+
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
 Orthanc mainline + PG mainline (serializable mode)   : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 23.010 s
 Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 1.71 s (with RemainingAncestor.id)
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 3.26 s (with temporary tables)
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 2.97 s (with temporary tables)
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 23.016 s
 Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 8.788 s
-Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 17.129 s (with temporary tables)
+Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 11.872 s (with temporary tables)
 
 TODO:
 - assert((statement.Next(), statement.IsDone())) commented out  -> create temporary tables ?

@@ -56,11 +56,6 @@ namespace OrthancDatabases
       
     for (size_t i = 0; i < fields_.size(); i++)
     {
-      if (fields_[i] == NULL)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-      }
-
       ValueType sourceType = fields_[i]->GetType();
       ValueType targetType = expectedType_[i];
 
@@ -95,11 +90,11 @@ namespace OrthancDatabases
       for (size_t i = 0; i < fields_.size(); i++)
       {
         fields_[i] = FetchField(i);
+      }
 
-        if (fields_[i] == NULL)
-        {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-        }
+      if (fields_.size() == 1 && fields_[0] == NULL)  // this is a "void" result
+      {
+        return;
       }
 
       ConvertFields();

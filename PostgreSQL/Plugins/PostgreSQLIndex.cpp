@@ -470,26 +470,11 @@ namespace OrthancDatabases
     { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles("
-        "uuid VARCHAR(64) NOT NULL,"
-        "fileType INTEGER,         "
-        "compressedSize BIGINT,    "
-        "uncompressedSize BIGINT,  "
-        "compressionType INTEGER,  "
-        "uncompressedHash VARCHAR(40),"
-        "compressedHash VARCHAR(40)"
-        ");"
+        "SELECT CreateDeletedFilesTemporaryTable()"
         );
-      statement.Execute();
+      statement.ExecuteWithoutResult();
     }
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "DELETE FROM DeletedFiles;"
-        );
 
-      statement.Execute();
-    }
   }
 
   void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)
@@ -517,35 +502,13 @@ namespace OrthancDatabases
 
   void PostgreSQLIndex::ClearRemainingAncestor(DatabaseManager& manager)
   {
-    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "CREATE TEMPORARY TABLE IF NOT EXISTS  RemainingAncestor("
-        "resourceType INTEGER NOT NULL,"
-        "publicId VARCHAR(64) NOT NULL"
-        ")"
-        );
-
-      statement.Execute();
-    }
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "DELETE FROM RemainingAncestor;"
-        );
-
-      statement.Execute();
-    }
-
   }
 
   void PostgreSQLIndex::DeleteResource(IDatabaseBackendOutput& output,
                                        DatabaseManager& manager,
                                        int64_t id)
   {
-    ClearDeletedFiles(manager);
-    ClearDeletedResources(manager);
-
+    // clearing of temporary table is now implemented in the funcion DeleteResource
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "SELECT * FROM DeleteResource(${id})");
@@ -575,7 +538,6 @@ namespace OrthancDatabases
 
     SignalDeletedFiles(output, manager);
     SignalDeletedResources(output, manager);
-
   }
 
 

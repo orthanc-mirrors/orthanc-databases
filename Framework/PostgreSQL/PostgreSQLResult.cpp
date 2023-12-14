@@ -260,6 +260,9 @@ namespace OrthancDatabases
       case OIDOID:
         return new LargeObjectResult(database_, GetLargeObjectOid(column));
 
+      case VOIDOID:
+        return NULL;
+
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
     }
