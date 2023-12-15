@@ -355,5 +355,16 @@ namespace OrthancDatabases
                                             const char* serverIdentifier,
                                             int32_t property,
                                             int64_t increment) = 0;
+
+    virtual bool HasUpdateAndGetStatistics() = 0;
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) = 0;
+
   };
 }

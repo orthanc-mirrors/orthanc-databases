@@ -405,6 +405,15 @@ namespace OrthancDatabases
                                             int32_t property,
                                             int64_t increment) ORTHANC_OVERRIDE;
 
+    virtual bool HasUpdateAndGetStatistics() ORTHANC_OVERRIDE;
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) ORTHANC_OVERRIDE;
 
     /**
      * "maxDatabaseRetries" is to handle

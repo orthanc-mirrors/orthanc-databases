@@ -69,6 +69,14 @@ namespace OrthancDatabases
                                 DatabaseManager& manager,
                                 int64_t id) ORTHANC_OVERRIDE;
 
+    virtual void SetResourcesContent(DatabaseManager& manager,
+                                     uint32_t countIdentifierTags,
+                                     const OrthancPluginResourcesContentTags* identifierTags,
+                                     uint32_t countMainDicomTags,
+                                     const OrthancPluginResourcesContentTags* mainDicomTags,
+                                     uint32_t countMetadata,
+                                     const OrthancPluginResourcesContentMetadata* metadata) ORTHANC_OVERRIDE;
+
     virtual uint64_t GetTotalCompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
     virtual uint64_t GetTotalUncompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
@@ -111,6 +119,19 @@ namespace OrthancDatabases
                                             const char* serverIdentifier,
                                             int32_t property,
                                             int64_t increment) ORTHANC_OVERRIDE;
+
+    virtual bool HasUpdateAndGetStatistics() ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) ORTHANC_OVERRIDE;
 
   };
 }

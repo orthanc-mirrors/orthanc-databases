@@ -432,6 +432,7 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
         response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
         response.mutable_get_system_information()->set_supports_increment_global_property(accessor.GetBackend().HasAtomicIncrementGlobalProperty());
+        response.mutable_get_system_information()->set_has_update_and_get_statistics(accessor.GetBackend().HasUpdateAndGetStatistics());
         break;
       }
 
@@ -940,6 +941,20 @@ namespace OrthancDatabases
           response.mutable_lookup_global_property()->set_found(false);
         }
         
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_UPDATE_AND_GET_STATISTICS:
+      {
+        int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
+        backend.UpdateAndGetStatistics(manager, patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize);
+
+        response.mutable_update_and_get_statistics()->set_patients_count(patientsCount);
+        response.mutable_update_and_get_statistics()->set_studies_count(studiesCount);
+        response.mutable_update_and_get_statistics()->set_series_count(seriesCount);
+        response.mutable_update_and_get_statistics()->set_instances_count(instancesCount);
+        response.mutable_update_and_get_statistics()->set_total_compressed_size(compressedSize);
+        response.mutable_update_and_get_statistics()->set_total_uncompressed_size(uncompressedSize);
         break;
       }
 

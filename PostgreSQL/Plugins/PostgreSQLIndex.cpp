@@ -30,6 +30,7 @@
 #include <EmbeddedResources.h>  // Auto-generated file
 
 #include <Compatibility.h>  // For std::unique_ptr<>
+#include <Toolbox.h>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -90,6 +91,7 @@ namespace OrthancDatabases
 
     {
       PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
+      bool shouldInstallFastTotalStats2 = false;
 
       if (clearAll_)
       {
@@ -135,27 +137,36 @@ namespace OrthancDatabases
 
         if (revision == 1)
         {
-          LOG(WARNING) << "PostgreSQL plugin: adding UNIQUE(publicId) constraint to the 'Resources' table ";
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Resources ADD UNIQUE (publicId);");
+          {
+            LOG(WARNING) << "PostgreSQL plugin: adding UNIQUE(publicId) constraint to the 'Resources' table ";
+            t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Resources ADD UNIQUE (publicId);");
+          }
+
+          {
+            LOG(WARNING) << "PostgreSQL plugin: adding or replacing ResourceDeletedFunc";
+
+            std::string query;
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_RESOURCE_DELETED_FUNC);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          }
+
+          {
+            LOG(WARNING) << "PostgreSQL plugin: adding or replacing InsertOrUpdateMetadata";
+
+            std::string query;
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_INSERT_UPDATE_METADATA);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          }
+
+          shouldInstallFastTotalStats2 = true;
 
           revision = 2;
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
         }
 
-        if (revision == 2)
-        {
-          LOG(WARNING) << "PostgreSQL plugin: adding or replacing ResourceDeletedFunc";
-
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_RESOURCE_DELETED_FUNC);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
-
-          revision = 3;
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-        }
-
-        if (revision != 3)
+        if (revision != 2)
         {
           LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
           throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -240,7 +251,6 @@ namespace OrthancDatabases
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 3);
         }
 
-      
         if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                          Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
             property != 1)
@@ -289,6 +299,16 @@ namespace OrthancDatabases
           t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
           SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+        }
+
+        if (shouldInstallFastTotalStats2)
+        {
+          LOG(WARNING) << "PostgreSQL plugin: installing FastTotalStats2 to replace FastTotalSize and FastCountResources";
+
+          std::string query;
+          Orthanc::EmbeddedResources::GetFileResource
+            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_STATS_2);
+          t.GetDatabaseTransaction().ExecuteMultiLines(query);
         }
 
         t.Commit();
@@ -465,6 +485,28 @@ namespace OrthancDatabases
     }
   }
 
+  void PostgreSQLIndex::UpdateAndGetStatistics(DatabaseManager& manager,
+                                               int64_t& patientsCount,
+                                               int64_t& studiesCount,
+                                               int64_t& seriesCount,
+                                               int64_t& instancesCount,
+                                               int64_t& compressedSize,
+                                               int64_t& uncompressedSize)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT * FROM UpdateStatistics()");
+
+    statement.Execute();
+
+    patientsCount = statement.ReadInteger64(0);
+    studiesCount = statement.ReadInteger64(1);
+    seriesCount = statement.ReadInteger64(2);
+    instancesCount = statement.ReadInteger64(3);
+    compressedSize = statement.ReadInteger64(4);
+    uncompressedSize = statement.ReadInteger64(5);
+  }
+
   void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
   {
     { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
@@ -594,6 +636,133 @@ namespace OrthancDatabases
     }
   }
 #endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  static void ExecuteSetResourcesContentTags(
+    DatabaseManager& manager,
+    const std::string& table,
+    const std::string& variablePrefix,
+    uint32_t count,
+    const OrthancPluginResourcesContentTags* tags)
+  {
+    std::string sql;
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string name = variablePrefix + boost::lexical_cast<std::string>(i);
+
+      args.SetUtf8Value(name, tags[i].value);
+      
+      std::string insert = ("(" + boost::lexical_cast<std::string>(tags[i].resource) + ", " +
+                            boost::lexical_cast<std::string>(tags[i].group) + ", " +
+                            boost::lexical_cast<std::string>(tags[i].element) + ", " +
+                            "${" + name + "})");
+
+      if (sql.empty())
+      {
+        sql = "INSERT INTO " + table + " VALUES " + insert;
+      }
+      else
+      {
+        sql += ", " + insert;
+      }
+    }
+
+    if (!sql.empty())
+    {
+      DatabaseManager::StandaloneStatement statement(manager, sql);
+
+      for (uint32_t i = 0; i < count; i++)
+      {
+        statement.SetParameterType(variablePrefix + boost::lexical_cast<std::string>(i),
+                                   ValueType_Utf8String);
+      }
+
+      statement.Execute(args);
+    }
+  }
+#endif
+  
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  static void ExecuteSetResourcesContentMetadata(
+    DatabaseManager& manager,
+    bool hasRevisionsSupport,
+    uint32_t count,
+    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    if (count < 1)
+    {
+      return;
+    }
+
+    std::vector<std::string> resourceIds;
+    std::vector<std::string> metadataTypes;
+    std::vector<std::string> metadataValues;
+    std::vector<std::string> revisions;
+
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string argName = "m" + boost::lexical_cast<std::string>(i);
+
+      args.SetUtf8Value(argName, metadata[i].value);
+
+      resourceIds.push_back(boost::lexical_cast<std::string>(metadata[i].resource));
+      metadataTypes.push_back(boost::lexical_cast<std::string>(metadata[i].metadata));
+      metadataValues.push_back("${" + argName + "}");
+      revisions.push_back("0");
+    }
+
+    std::string joinedResourceIds;
+    std::string joinedMetadataTypes;
+    std::string joinedMetadataValues;
+    std::string joinedRevisions;
+
+    Orthanc::Toolbox::JoinStrings(joinedResourceIds, resourceIds, ",");
+    Orthanc::Toolbox::JoinStrings(joinedMetadataTypes, metadataTypes, ",");
+    Orthanc::Toolbox::JoinStrings(joinedMetadataValues, metadataValues, ",");
+    Orthanc::Toolbox::JoinStrings(joinedRevisions, revisions, ",");
+
+    std::string sql = std::string("SELECT InsertOrUpdateMetadata(ARRAY[") + 
+                                  joinedResourceIds + "], ARRAY[" + 
+                                  joinedMetadataTypes + "], ARRAY[" + 
+                                  joinedMetadataValues + "], ARRAY[" + 
+                                  joinedRevisions + "])";
+
+    DatabaseManager::StandaloneStatement statement(manager, sql);
+
+    for (uint32_t i = 0; i < count; i++)
+    {
+      statement.SetParameterType("m" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Utf8String);
+    }
+
+    statement.Execute(args);
+  }
+#endif
+
+
+  void PostgreSQLIndex::SetResourcesContent(DatabaseManager& manager,
+                                     uint32_t countIdentifierTags,
+                                     const OrthancPluginResourcesContentTags* identifierTags,
+                                     uint32_t countMainDicomTags,
+                                     const OrthancPluginResourcesContentTags* mainDicomTags,
+                                     uint32_t countMetadata,
+                                     const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", "i",
+                                   countIdentifierTags, identifierTags);
+
+    ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",
+                                   countMainDicomTags, mainDicomTags);
+    
+    ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);
+
+  }
 
 
   uint64_t PostgreSQLIndex::GetResourcesCount(DatabaseManager& manager,

@@ -1219,7 +1219,23 @@ namespace OrthancDatabases
   {
     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
-    
+
+  bool IndexBackend::HasUpdateAndGetStatistics()
+  {
+    return false; // currently only implemented in Postgres
+  }
+
+  void IndexBackend::UpdateAndGetStatistics(DatabaseManager& manager,
+                                            int64_t& patientsCount,
+                                            int64_t& studiesCount,
+                                            int64_t& seriesCount,
+                                            int64_t& instancesCount,
+                                            int64_t& compressedSize,
+                                            int64_t& uncompressedSize)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
   void IndexBackend::LookupIdentifier(std::list<int64_t>& target /*out*/,
                                       DatabaseManager& manager,
                                       OrthancPluginResourceType resourceType,

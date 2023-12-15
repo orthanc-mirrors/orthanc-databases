@@ -169,32 +169,102 @@ END $$;
 
 In debug, no verbose logs
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 43.957 s
-Orthanc mainline + PG mainline (serializable mode)   : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: XX s
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 19.861 s
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 20.027 s (with temporary tables)
-                                                       test_concurrent_anonymize_same_study deletion took: 28.4 s
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 15.744 s
+                                                       test_concurrent_anonymize_same_study deletion took: 18.8 s
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
-Orthanc mainline + PG mainline (serializable mode)   : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 23.010 s
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 1.71 s (with RemainingAncestor.id)
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 2.97 s (with temporary tables)
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 6.57 s (with temporary tables)
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 23.016 s
-Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 8.788 s
-Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 11.872 s (with temporary tables)
+Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 7.129 s 
+
+With Docker with 10 connections SQL:
+osimis/orthanc:23.11.0: TIMING test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 25.047 s
+osimis/orthanc:current: TIMING test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 8.649 s
+
+osimis/orthanc:23.11.0: TIMING test_concurrent_anonymize_same_study deletion took: 11.807 s
+osimis/orthanc:current: TIMING test_concurrent_anonymize_same_study deletion took: 10.620 s
+
+osimis/orthanc:23.11.0: TIMING test_concurrent_uploads_same_study with 20 workers and 1x repeat: 10.736 s
+osimis/orthanc:current: TIMING test_concurrent_uploads_same_study with 20 workers and 1x repeat: 3.465 s
+
+osimis/orthanc:23.11.0: TIMING test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 11.966 s
+osimis/orthanc:current: TIMING test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 5.092 s
+
 
 TODO:
-- assert((statement.Next(), statement.IsDone())) commented out  -> create temporary tables ?
-  try again temporary tables (with different names ?  Have a switch in the code ?)
+- check RETURNS SET OF !
+  CREATE FUNCTION getfoo(int) RETURNS SETOF foo AS $$
+      SELECT * FROM foo WHERE fooid = $1;
+  $$ LANGUAGE SQL;
 - have a separate "thread" to increment/decrement statistics because everybody is fighting to modify the GlobalIntegers rows
+    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", "i",      -> make unique + handle on conflicts
+                                   countIdentifierTags, identifierTags);
+
+    ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",         -> make unique + handle on conflicts
+                                   countMainDicomTags, mainDicomTags);
+    
+    ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);  handle on conflicts
+
+CREATE OR REPLACE FUNCTION InsertOrReplaceMetadata(VARIADIC params SETOF metadata)
+RETURNS VOID AS $$
+BEGIN
+
+  FOR i IN 1..array_length(my_params, 1) LOOP
+    my_sum := my_sum + my_params[i].my_column;
+  END LOOP;
+  RETURN my_sum;
+END;
+$$ LANGUAGE plpgsql;
+
+#include <postgresql/libpq-fe.h>
+
+int main() {
+  PGconn *conn = PQconnectdb("dbname=mydb user=myuser password=mypassword");
+  if (PQstatus(conn) != CONNECTION_OK) {
+    std::cerr << "Connection to database failed: " << PQerrorMessage(conn) << std::endl;
+    PQfinish(conn);
+    return 1;
+  }
+
+  const char *function_name = "my_function";
+  int num_params = 3;
+  int params[] = {1, 2, 3};
+
+  char *query = PQescapeLiteral(conn, function_name, strlen(function_name));
+  for (int i = 0; i < num_params; i++) {
+    char *param = PQescapeLiteral(conn, (const char *)&params[i], sizeof(int));
+    query = (char *)realloc(query, strlen(query) + strlen(param) + 1);
+    strcat(query, ",");
+    strcat(query, param);
+    PQfreemem(param);
+  }
+  strcat(query, ")");
+
+  PGresult *res = PQexec(conn, query);
+  if (PQresultStatus(res) != PGRES_TUPLES_OK) {
+    std::cerr << "Function call failed: " << PQerrorMessage(conn) << std::endl;
+    PQfreemem(query);
+    PQclear(res);
+    PQfinish(conn);
+    return 1;
+  }
+
+  int result = atoi(PQgetvalue(res, 0, 0));
+  std::cout << "Result: " << result << std::endl;
+
+  PQfreemem(query);
+  PQclear(res);
+  PQfinish(conn);
+
+
 - test events generation StableSeries ....
-- test RemainingAncestor response in integration tests: OK
-- disable MySQL ODBC plugin
 - run tests with docker localy + in CI
 - check https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820
 - PatientAddedFunc contains an IF
 - validate upgrade DB from previous Orthanc and from scratch
 - test with older version of PG
+- In Docker images, re-enable MySQL & ODBC plugins + tests
 
 DONE:
 - force the create/update DB transaction to be serializable (not needed: this is handled by POSTGRESQL_LOCK_DATABASE_SETUP)
