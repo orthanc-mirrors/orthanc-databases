@@ -61,6 +61,22 @@ namespace OrthancDatabases
     return PostgreSQLDatabase::CreateDatabaseFactory(parameters_);
   }
 
+  void PostgreSQLIndex::ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager)
+  {
+    std::string query;
+
+    Orthanc::EmbeddedResources::GetFileResource
+      (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX_V2);
+    t.GetDatabaseTransaction().ExecuteMultiLines(query);
+
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, 6);
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 2);
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 3);  // this is the 3rd version !
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 1);
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
+    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
+  }
   
   void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager,
                                           bool hasIdentifierTags,
@@ -77,7 +93,7 @@ namespace OrthancDatabases
     if (expectedVersion != 6)
     {
       LOG(ERROR) << "This database plugin is incompatible with your version of Orthanc "
-                 << "expecting the DB schema version " << expectedVersion 
+                 << "expecting the Orthanc DB schema version " << expectedVersion 
                  << ", but this plugin is only compatible with version 6";
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
     }
@@ -90,8 +106,8 @@ namespace OrthancDatabases
     }
 
     {
+      // lock the full DB while checking if it needs to be create/ugraded
       PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
-      bool shouldInstallFastTotalStats2 = false;
 
       if (clearAll_)
       {
@@ -103,262 +119,98 @@ namespace OrthancDatabases
 
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
-          std::string query;
+          LOG(WARNING) << "PostgreSQL is creating the database schema";
 
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          ApplyPrepareIndex(t, manager);
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 0);
-        }
-          
-        if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
-        {
-          LOG(ERROR) << "Corrupted PostgreSQL database";
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
-        }
-
-        int version = 0;
-        if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
-            version != 6)
-        {
-          LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema version: " << version;
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-        }
-
-        int revision;
-        if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
-        {
-          revision = 1;
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-        }
-
-        if (revision == 1)
-        {
+          if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
           {
-            LOG(WARNING) << "PostgreSQL plugin: adding UNIQUE(publicId) constraint to the 'Resources' table ";
-            t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Resources ADD UNIQUE (publicId);");
-          }
-
-          {
-            LOG(WARNING) << "PostgreSQL plugin: adding or replacing ResourceDeletedFunc";
-
-            std::string query;
-            Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_RESOURCE_DELETED_FUNC);
-            t.GetDatabaseTransaction().ExecuteMultiLines(query);
-          }
-
-          {
-            LOG(WARNING) << "PostgreSQL plugin: adding or replacing InsertOrUpdateMetadata";
-
-            std::string query;
-            Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_INSERT_UPDATE_METADATA);
-            t.GetDatabaseTransaction().ExecuteMultiLines(query);
-          }
-
-          shouldInstallFastTotalStats2 = true;
-
-          revision = 2;
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-        }
-
-        if (revision != 2)
-        {
-          LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-        }
-
-        t.Commit();
-      }
-
-      {
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        int hasTrigram = 0;
-        if (!LookupGlobalIntegerProperty(hasTrigram, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_HasTrigramIndex) ||
-            hasTrigram != 1)
-        {
-          /**
-           * Apply fix for performance issue (speed up wildcard search
-           * by using GIN trigrams). This implements the patch suggested
-           * in issue #47, BUT we also keep the original
-           * "DicomIdentifiersIndexValues", as it leads to better
-           * performance for "strict" searches (i.e. searches involving
-           * no wildcard).
-           * https://www.postgresql.org/docs/current/static/pgtrgm.html
-           * https://orthanc.uclouvain.be/bugs/show_bug.cgi?id=47
-           **/
-          try
-          {
-            // We've observed 9 minutes on DB with 100000 studies
-            LOG(WARNING) << "Trying to enable trigram matching on the PostgreSQL database "
-                         << "to speed up wildcard searches. This may take several minutes";
-
-            t.GetDatabaseTransaction().ExecuteMultiLines(
-              "CREATE EXTENSION IF NOT EXISTS pg_trgm; "
-              "CREATE INDEX DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);");
-
-            SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 1);
-            LOG(WARNING) << "Trigram index has been created";
-
-            t.Commit();
-          }
-          catch (Orthanc::OrthancException&)
-          {
-            LOG(WARNING) << "Performance warning: Your PostgreSQL server does "
-                         << "not support trigram matching";
-            LOG(WARNING) << "-> Consider installing the \"pg_trgm\" extension on the "
-                         << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
+            LOG(ERROR) << "Corrupted PostgreSQL database or failed to create the database schema";
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
           }
         }
         else
         {
-          t.Commit();
-        }
-      }
+          LOG(WARNING) << "The database schema already exists, checking if it needs to be updated";
 
-      {
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        int property = 0;
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_HasCreateInstance) ||
-            property != 3)
-        {
-          LOG(INFO) << "Installing the CreateInstance extension";
-
-          if (property == 1)
+          int version = 0;
+          if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+              version != 6)
           {
-            // Drop older, experimental versions of this extension
-            t.GetDatabaseTransaction().ExecuteMultiLines("DROP FUNCTION CreateInstance("
-                                                         "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+            LOG(ERROR) << "PostgreSQL plugin is incompatible with Orthanc database schema version: " << version;
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
           }
-        
-          // property == 2 was a first version of the CreateInstance -> we need to replace it by the new one
-          // property == 3 is a new version (in v5.2) with same signature and CREATE OR UPDATE 
-          //  -> we can replace the previous one without deleting it
-          //     and we can create it if it has never been created.
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 3);
-        }
+          bool needToRunUpgradeFromUnknownToV1 = false;
+          bool needToRunUpgradeV1toV2 = false;
 
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-            property != 1)
-        {
-          LOG(INFO) << "Installing the FastTotalSize extension";
+          int revision;
+          if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+          {
+            LOG(WARNING) << "No DatabasePatchLevel found, assuming it's 1";
+            revision = 1;
+            needToRunUpgradeFromUnknownToV1 = true;
+            needToRunUpgradeV1toV2 = true;
+          }
+          else if (revision == 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
 
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          int hasTrigram = 0;
+          if (!LookupGlobalIntegerProperty(hasTrigram, manager, MISSING_SERVER_IDENTIFIER,
+                                           Orthanc::GlobalProperty_HasTrigramIndex) || 
+              hasTrigram != 1)
+          {
+            // We've observed 9 minutes on DB with 100000 studies
+            LOG(WARNING) << "The DB schema update will try to enable trigram matching on the PostgreSQL database "
+                         << "to speed up wildcard searches. This may take several minutes";
+            needToRunUpgradeV1toV2 = true;
+          }
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
-        }
+          int property = 0;
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                           Orthanc::GlobalProperty_HasFastCountResources) ||
+              property != 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                          Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
+              property != 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                          Orthanc::GlobalProperty_GetLastChangeIndex) ||
+              property != 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
 
+          if (needToRunUpgradeFromUnknownToV1)
+          {
+            LOG(WARNING) << "Upgrading DB schema from unknown to revision 1";
+            std::string query;
 
-        // Installing this extension requires the "GlobalIntegers" table
-        // created by the "FastTotalSize" extension
-        property = 0;
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_HasFastCountResources) ||
-            property != 1)
-        {
-          LOG(INFO) << "Installing the FastCountResources extension";
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_V1);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          }
+          
+          if (needToRunUpgradeV1toV2)
+          {
+            LOG(WARNING) << "Upgrading DB schema from revision 1 to revision 2";
 
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            std::string query;
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
-        }
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_V1_TO_V2);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
-
-        // Installing this extension requires the "GlobalIntegers" table
-        // created by the "GetLastChangeIndex" extension
-        property = 0;
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_GetLastChangeIndex) ||
-            property != 1)
-        {
-          LOG(INFO) << "Installing the GetLastChangeIndex extension";
-
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
-
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
-        }
-
-        if (shouldInstallFastTotalStats2)
-        {
-          LOG(WARNING) << "PostgreSQL plugin: installing FastTotalStats2 to replace FastTotalSize and FastCountResources";
-
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_STATS_2);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
-        }
-
-        t.Commit();
-      }
- 
-
-      {
-        // New in release 4.0 to deal with multiple writers
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        if (!t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
-                                                       "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
-        }
-
-        /**
-         * PostgreSQL 9.5: "Adding a column with a default requires
-         * updating each row of the table (to store the new column
-         * value). However, if no default is specified, PostgreSQL is
-         * able to avoid the physical update." => We set no default
-         * for performance (older entries will be NULL)
-         * https://www.postgresql.org/docs/9.5/ddl-alter.html
-         **/
-        if (!db.DoesColumnExist("Metadata", "revision"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Metadata ADD COLUMN revision INTEGER");
-        }
-
-        if (!db.DoesColumnExist("AttachedFiles", "revision"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN revision INTEGER");
-        }
-
-        t.Commit();
-      }
- 
-
-      {
-        // New in release 5.0 to deal with labels
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        if (!t.GetDatabaseTransaction().DoesTableExist("Labels"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines(
-            "CREATE TABLE Labels("
-            "id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,"
-            "label TEXT, PRIMARY KEY(id, label));"
-            "CREATE INDEX LabelsIndex1 ON LABELS(id);"
-            "CREATE INDEX LabelsIndex2 ON LABELS(label);");
+            // apply all idempotent changes that are in the PrepareIndexV2
+            ApplyPrepareIndex(t, manager);
+          }
         }
 
         t.Commit();

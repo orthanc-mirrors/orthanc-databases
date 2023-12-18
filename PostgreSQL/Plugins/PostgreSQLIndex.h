@@ -40,6 +40,7 @@ namespace OrthancDatabases
 
     virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
+    void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
 
   public:
     PostgreSQLIndex(OrthancPluginContext* context,

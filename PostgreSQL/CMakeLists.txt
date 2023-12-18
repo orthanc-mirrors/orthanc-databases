@@ -77,14 +77,9 @@ endif()
 
 
 EmbedResources(
-  POSTGRESQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
-  POSTGRESQL_CREATE_INSTANCE        ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
-  POSTGRESQL_FAST_TOTAL_SIZE        ${CMAKE_SOURCE_DIR}/Plugins/FastTotalSize.sql
-  POSTGRESQL_FAST_COUNT_RESOURCES   ${CMAKE_SOURCE_DIR}/Plugins/FastCountResources.sql
-  POSTGRESQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
-  POSTGRESQL_RESOURCE_DELETED_FUNC  ${CMAKE_SOURCE_DIR}/Plugins/ResourceDeletedFunc.sql
-  POSTGRESQL_INSERT_UPDATE_METADATA ${CMAKE_SOURCE_DIR}/Plugins/InsertOrUpdateMetadata.sql
-  POSTGRESQL_FAST_TOTAL_STATS_2     ${CMAKE_SOURCE_DIR}/Plugins/FastTotalStats2.sql
+  POSTGRESQL_PREPARE_INDEX_V2       ${CMAKE_SOURCE_DIR}/Plugins/SQL/PrepareIndexV2.sql
+  POSTGRESQL_UPGRADE_UNKNOWN_TO_V1  ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/UnknownToV1.sql
+  POSTGRESQL_UPGRADE_V1_TO_V2       ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/V1ToV2.sql
   )
 
 

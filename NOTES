@@ -193,78 +193,16 @@ osimis/orthanc:current: TIMING test_upload_delete_same_study_from_multiple_threa
 
 
 TODO:
-- check RETURNS SET OF !
-  CREATE FUNCTION getfoo(int) RETURNS SETOF foo AS $$
-      SELECT * FROM foo WHERE fooid = $1;
-  $$ LANGUAGE SQL;
-- have a separate "thread" to increment/decrement statistics because everybody is fighting to modify the GlobalIntegers rows
-    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", "i",      -> make unique + handle on conflicts
-                                   countIdentifierTags, identifierTags);
-
-    ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",         -> make unique + handle on conflicts
-                                   countMainDicomTags, mainDicomTags);
-    
-    ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);  handle on conflicts
-
-CREATE OR REPLACE FUNCTION InsertOrReplaceMetadata(VARIADIC params SETOF metadata)
-RETURNS VOID AS $$
-BEGIN
-
-  FOR i IN 1..array_length(my_params, 1) LOOP
-    my_sum := my_sum + my_params[i].my_column;
-  END LOOP;
-  RETURN my_sum;
-END;
-$$ LANGUAGE plpgsql;
-
-#include <postgresql/libpq-fe.h>
-
-int main() {
-  PGconn *conn = PQconnectdb("dbname=mydb user=myuser password=mypassword");
-  if (PQstatus(conn) != CONNECTION_OK) {
-    std::cerr << "Connection to database failed: " << PQerrorMessage(conn) << std::endl;
-    PQfinish(conn);
-    return 1;
-  }
-
-  const char *function_name = "my_function";
-  int num_params = 3;
-  int params[] = {1, 2, 3};
-
-  char *query = PQescapeLiteral(conn, function_name, strlen(function_name));
-  for (int i = 0; i < num_params; i++) {
-    char *param = PQescapeLiteral(conn, (const char *)&params[i], sizeof(int));
-    query = (char *)realloc(query, strlen(query) + strlen(param) + 1);
-    strcat(query, ",");
-    strcat(query, param);
-    PQfreemem(param);
-  }
-  strcat(query, ")");
-
-  PGresult *res = PQexec(conn, query);
-  if (PQresultStatus(res) != PGRES_TUPLES_OK) {
-    std::cerr << "Function call failed: " << PQerrorMessage(conn) << std::endl;
-    PQfreemem(query);
-    PQclear(res);
-    PQfinish(conn);
-    return 1;
-  }
-
-  int result = atoi(PQgetvalue(res, 0, 0));
-  std::cout << "Result: " << result << std::endl;
-
-  PQfreemem(query);
-  PQclear(res);
-  PQfinish(conn);
-
-
+- reenable PatientRecyclingOrder
+- have a separate "thread" to UpdateStatistics ?
 - test events generation StableSeries ....
-- run tests with docker localy + in CI
 - check https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820
-- PatientAddedFunc contains an IF
 - validate upgrade DB from previous Orthanc and from scratch
+- check minimal version of PG (9.5 - 9.6 ? for create index if not exists)
+- implement a downgrade script ?
 - test with older version of PG
 - In Docker images, re-enable MySQL & ODBC plugins + tests
 
 DONE:
 - force the create/update DB transaction to be serializable (not needed: this is handled by POSTGRESQL_LOCK_DATABASE_SETUP)
+- PatientAddedFunc contains an IF  (check if other IF/THEN/ELSE pattern remains)
