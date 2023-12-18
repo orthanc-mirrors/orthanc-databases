@@ -453,7 +453,8 @@ RETURNS VOID AS $body$
 BEGIN
   	FOR i IN 1 .. ARRAY_LENGTH(resource_ids, 1) LOOP
 		-- RAISE NOTICE 'Parameter %: % % %', i, resource_ids[i], metadata_types[i], metadata_values[i];
-		INSERT INTO Metadata VALUES(resource_ids[i], metadata_types[i], metadata_values[i], revisions[i]) ON CONFLICT DO NOTHING;
+		INSERT INTO Metadata VALUES(resource_ids[i], metadata_types[i], metadata_values[i], revisions[i]) 
+          ON CONFLICT (id, type) DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
 	END LOOP;
   
 END;
