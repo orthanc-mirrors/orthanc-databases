@@ -441,7 +441,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
 
 else()
   set(PostgreSQL_ADDITIONAL_VERSIONS
-    "15" "14" "13" "12" "11" "10" "9.6" "9.5" "9.4" "9.3" "9.2" "9.1" "9.0" "8.4" "8.3" "8.2" "8.1" "8.0")
+    "16" "15" "14" "13" "12" "11" "10" "9.6" "9.5" "9.4" "9.3" "9.2" "9.1" "9.0" "8.4" "8.3" "8.2" "8.1" "8.0")
   if (NOT WIN32)
     foreach (suffix ${PostgreSQL_ADDITIONAL_VERSIONS})
       list(APPEND PostgreSQL_ADDITIONAL_SEARCH_PATHS
