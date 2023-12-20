@@ -155,9 +155,6 @@ set_target_properties(OrthancPostgreSQLIndex PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=1
   )
 
-DefineSourceBasenameForTarget(OrthancPostgreSQLIndex)
-DefineSourceBasenameForTarget(OrthancPostgreSQLStorage)
- 
 
 install(
   TARGETS OrthancPostgreSQLIndex OrthancPostgreSQLStorage
@@ -183,4 +180,9 @@ set_target_properties(UnitTests PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=0
   )
 
-DefineSourceBasenameForTarget(UnitTests)
+if (COMMAND DefineSourceBasenameForTarget)
+  DefineSourceBasenameForTarget(FrameworkForPlugins)
+  DefineSourceBasenameForTarget(OrthancPostgreSQLIndex)
+  DefineSourceBasenameForTarget(OrthancPostgreSQLStorage)
+  DefineSourceBasenameForTarget(UnitTests)
+endif()

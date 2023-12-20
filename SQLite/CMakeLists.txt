@@ -97,8 +97,6 @@ set_target_properties(OrthancSQLiteIndex PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=1
   )
 
-DefineSourceBasenameForTarget(OrthancSQLiteIndex)
-
 install(
   TARGETS OrthancSQLiteIndex  # OrthancSQLiteStorage  TODO
   RUNTIME DESTINATION lib    # Destination for Windows
@@ -120,4 +118,7 @@ set_target_properties(UnitTests PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=0
   )
 
-DefineSourceBasenameForTarget(UnitTests)
+if (COMMAND DefineSourceBasenameForTarget)
+  DefineSourceBasenameForTarget(OrthancSQLiteIndex)
+  DefineSourceBasenameForTarget(UnitTests)
+endif()
