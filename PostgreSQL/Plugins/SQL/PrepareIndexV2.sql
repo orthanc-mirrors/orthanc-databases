@@ -216,6 +216,7 @@ CREATE OR REPLACE FUNCTION DeleteResource(
 
 DECLARE
     deleted_row RECORD;
+    locked_row RECORD;
 
 BEGIN
 
@@ -235,6 +236,12 @@ BEGIN
     
     -- create/clear the DeletedFiles temporary table
     PERFORM CreateDeletedFilesTemporaryTable();
+
+    -- Before deleting an object, we need to lock its parent until the end of the transaction to avoid that
+    -- 2 threads deletes the last 2 instances of a series at the same time -> none of them would realize
+    -- that they are deleting the last instance and the parent resources would not be deleted.
+    -- Locking only the immediate parent is sufficient to prevent from this.
+    SELECT * INTO locked_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
 
     -- delete the resource itself
     DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_row;
@@ -501,36 +508,36 @@ BEGIN
 	is_new_instance := 1;
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL);
+        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL) RETURNING internalid INTO patient_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_patient := 0;
+            SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
     END;
-    SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id AND resourcetype = 0;
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id);
+        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id) RETURNING internalid INTO study_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_study := 0;
+            SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction    END;
     END;
-    SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id AND resourcetype = 1;
 
 	BEGIN
-	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id);
+	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id) RETURNING internalid INTO series_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_series := 0;
+            SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction    END;
     END;
-	SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id AND resourcetype = 2;
 
   	BEGIN
-		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id);
+		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id) RETURNING internalid INTO instance_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_instance := 0;
+            SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
     END;
-    SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id AND resourcetype = 3;   
 
     IF is_new_instance > 0 THEN
         -- Move the patient to the end of the recycling order.

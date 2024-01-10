@@ -68,60 +68,67 @@ Sample SQL code that you can execute in DBeaver to test new functions/procedures
 CreateInstance
 ************************************************************************
 
-CREATE OR replace FUNCTION CreateInstance(
-  IN patient TEXT,
-  IN study TEXT,
-  IN series TEXT,
-  IN instance TEXT,
-  OUT isNewPatient BIGINT,
-  OUT isNewStudy BIGINT,
-  OUT isNewSeries BIGINT,
-  OUT isNewInstance BIGINT,
-  OUT patientKey BIGINT,
-  OUT studyKey BIGINT,
-  OUT seriesKey BIGINT,
-  OUT instanceKey BIGINT)
-AS $$ 
-begin
-	isNewPatient := 1;
-	isNewStudy := 1;
-	isNewSeries := 1;
-	isNewInstance := 1;
+CREATE OR REPLACE FUNCTION CreateInstance(
+  IN patient_public_id TEXT,
+  IN study_public_id TEXT,
+  IN series_public_id TEXT,
+  IN instance_public_id TEXT,
+  OUT is_new_patient BIGINT,
+  OUT is_new_study BIGINT,
+  OUT is_new_series BIGINT,
+  OUT is_new_instance BIGINT,
+  OUT patient_internal_id BIGINT,
+  OUT study_internal_id BIGINT,
+  OUT series_internal_id BIGINT,
+  OUT instance_internal_id BIGINT) AS $body$
+
+BEGIN
+	is_new_patient := 1;
+	is_new_study := 1;
+	is_new_series := 1;
+	is_new_instance := 1;
+
+	
+	BEGIN
+        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL);
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_patient := 0;
+    END;
+    SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id AND resourcetype = 0 FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 0, patient, NULL);
-    exception
-        when unique_violation then
-            isNewPatient := 0;
-    end;
-    select internalid into patientKey from "resources" where publicId=patient and resourcetype = 0;
+        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id);
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_study := 0;
+    END;
+    SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id AND resourcetype = 1 FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 1, study, patientKey);
-    exception
-        when unique_violation then
-            isNewStudy := 0;
-    end;
-    select internalid into studyKey from "resources" where publicId=study and resourcetype = 1;
-
-	BEGIN
-	    INSERT INTO "resources" VALUES (DEFAULT, 2, series, studyKey);
-    exception
-        when unique_violation then
-            isNewSeries := 0;
-    end;
-	select internalid into seriesKey from "resources" where publicId=series and resourcetype = 2;
+	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id);
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_series := 0;
+    END;
+	SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id AND resourcetype = 2 FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
 
   	BEGIN
-		INSERT INTO "resources" VALUES (DEFAULT, 3, instance, seriesKey);
-    exception
-        when unique_violation then
-            isNewInstance := 0;
-    end;
-    select internalid into instanceKey from "resources" where publicId=instance and resourcetype = 3;
-   
+		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id);
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_instance := 0;
+    END;
+    SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id AND resourcetype = 3 FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
+
+    IF is_new_instance > 0 THEN
+        -- Move the patient to the end of the recycling order.
+        PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
+    END IF;  
 END;
-$$ LANGUAGE plpgsql;
+
+$body$ LANGUAGE plpgsql;
+
 
 DO $$ 
 DECLARE 
@@ -131,29 +138,30 @@ begin
 
     SELECT * INTO result from CreateInstance('patient1', 'study1', 'series1', 'instance1');
 
-    RAISE NOTICE 'Value patientInternalId: %, is_new: %', result.patientKey, result.isNewPatient;
-    RAISE NOTICE 'Value studyInternalId: %, is_new: %', result.studyKey, result.isNewStudy;
-    RAISE NOTICE 'Value seriesInternalId: %, is_new: %', result.seriesKey, result.isNewSeries;
-    RAISE NOTICE 'Value instanceInternalId: %, is_new: %', result.instanceKey, result.isNewInstance;
+    RAISE NOTICE 'Value patientInternalId: %, is_new: %', result.patient_internal_id, result.is_new_patient;
+    RAISE NOTICE 'Value studyInternalId: %, is_new: %', result.study_internal_id, result.is_new_study;
+    RAISE NOTICE 'Value seriesInternalId: %, is_new: %', result.series_internal_id, result.is_new_series;
+    RAISE NOTICE 'Value instanceInternalId: %, is_new: %', result.instance_internal_id, result.is_new_instance;
     RAISE NOTICE '--------------';
 
     SELECT * INTO result from CreateInstance('patient1', 'study1', 'series1', 'instance2');
 
-    RAISE NOTICE 'Value patientInternalId: %, is_new: %', result.patientKey, result.isNewPatient;
-    RAISE NOTICE 'Value studyInternalId: %, is_new: %', result.studyKey, result.isNewStudy;
-    RAISE NOTICE 'Value seriesInternalId: %, is_new: %', result.seriesKey, result.isNewSeries;
-    RAISE NOTICE 'Value instanceInternalId: %, is_new: %', result.instanceKey, result.isNewInstance;
+    RAISE NOTICE 'Value patientInternalId: %, is_new: %', result.patient_internal_id, result.is_new_patient;
+    RAISE NOTICE 'Value studyInternalId: %, is_new: %', result.study_internal_id, result.is_new_study;
+    RAISE NOTICE 'Value seriesInternalId: %, is_new: %', result.series_internal_id, result.is_new_series;
+    RAISE NOTICE 'Value instanceInternalId: %, is_new: %', result.instance_internal_id, result.is_new_instance;
     RAISE NOTICE '--------------';
 
     SELECT * INTO result from CreateInstance('patient1', 'study1', 'series1', 'instance2');
 
-    RAISE NOTICE 'Value patientInternalId: %, is_new: %', result.patientKey, result.isNewPatient;
-    RAISE NOTICE 'Value studyInternalId: %, is_new: %', result.studyKey, result.isNewStudy;
-    RAISE NOTICE 'Value seriesInternalId: %, is_new: %', result.seriesKey, result.isNewSeries;
-    RAISE NOTICE 'Value instanceInternalId: %, is_new: %', result.instanceKey, result.isNewInstance;
+    RAISE NOTICE 'Value patientInternalId: %, is_new: %', result.patient_internal_id, result.is_new_patient;
+    RAISE NOTICE 'Value studyInternalId: %, is_new: %', result.study_internal_id, result.is_new_study;
+    RAISE NOTICE 'Value seriesInternalId: %, is_new: %', result.series_internal_id, result.is_new_series;
+    RAISE NOTICE 'Value instanceInternalId: %, is_new: %', result.instance_internal_id, result.is_new_instance;
     RAISE NOTICE '--------------';
 
 END $$;
+
 
 -- \set patient_key 'patient_key'
 -- SELECT CreateInstance('patient', 'study', 'series', 'instance', patient_key) ;
@@ -173,10 +181,12 @@ Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize
                                                        test_concurrent_anonymize_same_study deletion took: 18.8 s
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 6.57 s (with temporary tables)
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 6.57 s
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 23.016 s
 Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 7.129 s 
+
+Orthanc mainline + PG mainline (read-committed mode) : test_upload_multiple_studies_from_multiple_threads with 10 workers and 25 files and repeat 3x: 6.454 s
 
 With Docker with 10 connections SQL:
 osimis/orthanc:23.11.0: TIMING test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 25.047 s
@@ -202,6 +212,7 @@ Testing the connecions (note: Orthanc and PG server running on the same server)
 
 TODO:
 - have a separate "thread" to UpdateStatistics ?
+- perf tests: upload generated data (different studies)
 - check https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820
 - implement a downgrade script ?  And test it in PotgresUpgrades integ tests
 - In Docker images, re-enable MySQL & ODBC plugins + tests
