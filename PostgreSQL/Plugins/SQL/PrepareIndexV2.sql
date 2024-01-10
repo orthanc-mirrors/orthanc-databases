@@ -152,11 +152,10 @@ BEGIN
     BEGIN
         UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
         IF is_update > 0 THEN
-            -- Note: Protected patient are not listed in this table !  So, they won't be updated
+            -- Note: Protected patients are not listed in this table !  So, they won't be updated
             UPDATE PatientRecyclingOrder SET seq = newSeq WHERE PatientRecyclingOrder.patientId = patient_id;
         ELSE
             INSERT INTO PatientRecyclingOrder VALUES (newSeq, patient_id);
-                -- ON CONFLICT (patientId) DO UPDATE SET seq = newSeq;
         END IF;
     END;
 END;
@@ -168,9 +167,6 @@ BEGIN
   -- The "0" corresponds to "OrthancPluginResourceType_Patient"
   IF new.resourceType = 0 THEN
     PERFORM PatientAddedOrUpdated(new.internalId, 0);
-    -- UPDATE GlobalIntegers WHERE key = 7 SET value = value + 1 RETURNING value 
-    -- INSERT INTO PatientRecyclingOrder VALUES ((SELECT value FROM GlobalIntegers WHERE key = 7), new.internalId) 
-    --     ON CONFLICT ;
   END IF;
   RETURN NULL;
 END;
@@ -181,7 +177,7 @@ AFTER INSERT ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE PatientAddedFunc();
 
--- initial value for PatientRecyclingOrderSeq
+-- initial population of PatientRecyclingOrderSeq
 INSERT INTO GlobalIntegers
     SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
     ON CONFLICT DO NOTHING;
@@ -303,7 +299,7 @@ EXECUTE PROCEDURE AttachedFileDeletedFunc();
 
 ------------------- Fast Statistics -------------------
 
--- initialize values if not already theere
+-- initial population of GlobalIntegers if not already there
 INSERT INTO GlobalIntegers
     SELECT 0, CAST(COALESCE(SUM(compressedSize), 0) AS BIGINT) FROM AttachedFiles
     ON CONFLICT DO NOTHING;
@@ -497,10 +493,6 @@ CREATE OR REPLACE FUNCTION CreateInstance(
   OUT study_internal_id BIGINT,
   OUT series_internal_id BIGINT,
   OUT instance_internal_id BIGINT) AS $body$
-
-DECLARE
-  patientSeq BIGINT;
-  countRecycling BIGINT;
 
 BEGIN
 	is_new_patient := 1;

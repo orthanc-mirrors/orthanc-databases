@@ -167,7 +167,7 @@ END $$;
 
 ************************************************************************
 
-In debug, no verbose logs
+In debug, no verbose logs, 10 connections
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 43.957 s
 Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 15.744 s
                                                        test_concurrent_anonymize_same_study deletion took: 18.8 s
@@ -175,8 +175,8 @@ Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
 Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 6.57 s (with temporary tables)
 
-Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 23.016 s
-Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 7.129 s 
+Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 23.016 s
+Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 7.129 s 
 
 With Docker with 10 connections SQL:
 osimis/orthanc:23.11.0: TIMING test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 25.047 s
@@ -191,18 +191,49 @@ osimis/orthanc:current: TIMING test_concurrent_uploads_same_study with 20 worker
 osimis/orthanc:23.11.0: TIMING test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 11.966 s
 osimis/orthanc:current: TIMING test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 5.092 s
 
+Testing the connecions (note: Orthanc and PG server running on the same server)
+10 connections : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 15.744 s
+1  connection  : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 21.341 s
+10 connections : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 6.57 s
+1  connection  : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 10.223 s
+10 connections : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 7.129 s 
+1  connection  : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 11.172 s 
+
 
 TODO:
-- reenable PatientRecyclingOrder
 - have a separate "thread" to UpdateStatistics ?
-- test events generation StableSeries ....
 - check https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820
-- validate upgrade DB from previous Orthanc and from scratch
-- check minimal version of PG (9.5 - 9.6 ? for create index if not exists)
-- implement a downgrade script ?
-- test with older version of PG
+- implement a downgrade script ?  And test it in PotgresUpgrades integ tests
 - In Docker images, re-enable MySQL & ODBC plugins + tests
 
+- this error sometimes occur...
+======================================================================
+FAIL: test_upload_delete_same_study_from_multiple_threads (Concurrency.test_concurrency.TestConcurrency)
+----------------------------------------------------------------------
+    Traceback (most recent call last):
+    File "/home/runner/work/orthanc-builder/orthanc-builder/docker/integration-tests/orthanc-tests-repo-normal/NewTests/Concurrency/test_concurrency.py", line 254, in test_upload_delete_same_study_from_multiple_threads
+        self.assertEqual(0, len(self.o.studies.get_all_ids()))
+    AssertionError: 0 != 1
+
+    2023-12-21 17:10:04.737 UTC [69] ERROR:  deadlock detected
+    2023-12-21 17:10:04.737 UTC [69] DETAIL:  Process 69 waits for ShareLock on transaction 20657; blocked by process 70.
+        Process 70 waits for ShareLock on transaction 18193; blocked by process 69.
+        Process 69: SELECT * FROM DeleteResource($1)
+        Process 70: SELECT * FROM CreateInstance($1, $2, $3, $4)
+    2023-12-21 17:10:04.737 UTC [69] HINT:  See server log for query details.
+    2023-12-21 17:10:04.737 UTC [69] CONTEXT:  while deleting tuple (134,66) in relation "resources"
+        SQL statement "DELETE FROM ONLY "public"."resources" WHERE $1 OPERATOR(pg_catalog.=) "parentid""
+        SQL statement "DELETE FROM Resources WHERE internalId = old.parentId
+                                    AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId)"
+        PL/pgSQL function resourcedeletedfunc() line 7 at SQL statement
+        SQL statement "DELETE FROM Resources WHERE internalId=id RETURNING *"
+        PL/pgSQL function deleteresource(bigint) line 26 at SQL statement
+    2023-12-21 17:10:04.737 UTC [69] STATEMENT:  SELECT * FROM DeleteResource($1)
+
 DONE:
+- reenable PatientRecyclingOrder
 - force the create/update DB transaction to be serializable (not needed: this is handled by POSTGRESQL_LOCK_DATABASE_SETUP)
 - PatientAddedFunc contains an IF  (check if other IF/THEN/ELSE pattern remains)
+- validate upgrade DB from previous Orthanc and from scratch
+- check minimal version of PG (9.5 - 9.6 ? for create index if not exists): seems to work with 9.5 cfr PotgresUpgrades integ tests
+- test events generation StableSeries .... (count the NewSeries, NewInstances event and make sure they match the numb)
