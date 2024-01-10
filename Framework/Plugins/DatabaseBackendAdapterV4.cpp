@@ -1350,7 +1350,14 @@ namespace OrthancDatabases
     }
     catch (::Orthanc::OrthancException& e)
     {
-      LOG(ERROR) << "Exception in database back-end: " << e.What();
+      if (e.GetErrorCode() == ::Orthanc::ErrorCode_DatabaseCannotSerialize)
+      {
+        LOG(WARNING) << "An SQL transaction failed and will likely be retried: " << e.GetDetails();
+      }
+      else
+      {
+        LOG(ERROR) << "Exception in database back-end: " << e.What();
+      }
       return static_cast<OrthancPluginErrorCode>(e.GetErrorCode());
     }
     catch (::std::runtime_error& e)

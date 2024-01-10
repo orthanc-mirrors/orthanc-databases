@@ -493,7 +493,7 @@ namespace OrthancDatabases
 
         default:
           // LOG(ERROR) << value.GetType();
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "The returned field is not of the correct type (Integer64)");
       }
     }
   }
@@ -511,8 +511,7 @@ namespace OrthancDatabases
 
       if (value != static_cast<int64_t>(static_cast<int32_t>(value)))
       {
-        LOG(ERROR) << "Integer overflow";
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Integer overflow");
       }
       else
       {
@@ -546,8 +545,7 @@ namespace OrthancDatabases
         return dynamic_cast<const Utf8StringValue&>(value).GetContent();
 
       default:
-        //LOG(ERROR) << value.Format();
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "The returned field is not of the correct type (String)");
     }
   }
   

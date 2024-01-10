@@ -287,7 +287,8 @@ namespace OrthancDatabases
       }
       
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+      std::string errorString(PQresultErrorMessage(result));
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize, errorString, false); // don't log here, it is handled at higher level
 #else
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
 #endif
