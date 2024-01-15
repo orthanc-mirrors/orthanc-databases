@@ -181,7 +181,7 @@ Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_anonymize
                                                        test_concurrent_anonymize_same_study deletion took: 18.8 s
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 21.214 s
-Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 6.57 s
+Orthanc mainline + PG mainline (read-committed mode) : test_concurrent_uploads_same_study with 20 workers and 1x repeat: 9.514 s
 
 Orthanc 1.12.1 + PG 5.1 (serializable mode)          : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 23.016 s
 Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 7.129 s 
@@ -189,17 +189,19 @@ Orthanc mainline + PG mainline (read-committed mode) : test_upload_delete_same_s
 Orthanc mainline + PG mainline (read-committed mode) : test_upload_multiple_studies_from_multiple_threads with 10 workers and 25 files and repeat 3x: 6.454 s
 
 With Docker with 10 connections SQL:
-osimis/orthanc:23.11.0: TIMING test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 25.047 s
-osimis/orthanc:current: TIMING test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 8.649 s
+osimis/orthanc:24.1.2 : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 18.956 s  FAIL !!!
+                        test_concurrent_anonymize_same_study deletion took: NA
+osimis/orthanc:current: test_concurrent_anonymize_same_study with 4 workers and 10x repeat:  6.867 s
+                        test_concurrent_anonymize_same_study deletion took: 9.095 s
 
-osimis/orthanc:23.11.0: TIMING test_concurrent_anonymize_same_study deletion took: 11.807 s
-osimis/orthanc:current: TIMING test_concurrent_anonymize_same_study deletion took: 10.620 s
+osimis/orthanc:24.1.2 : test_concurrent_uploads_same_study with 20 workers and 1x repeat:  9.822 s 
+osimis/orthanc:current: test_concurrent_uploads_same_study with 20 workers and 1x repeat: 16.027 s up to 38s !  (slower but the test is not representative of a real life scenario !!!!!)
 
-osimis/orthanc:23.11.0: TIMING test_concurrent_uploads_same_study with 20 workers and 1x repeat: 10.736 s
-osimis/orthanc:current: TIMING test_concurrent_uploads_same_study with 20 workers and 1x repeat: 3.465 s
+osimis/orthanc:24.1.2 : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 12.966 s
+osimis/orthanc:current: test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x):  4.196 s
 
-osimis/orthanc:23.11.0: TIMING test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 11.966 s
-osimis/orthanc:current: TIMING test_upload_delete_same_study_from_multiple_threads with 5 workers and 30x repeat: 5.092 s
+osimis/orthanc:24.1.2 : test_upload_multiple_studies_from_multiple_threads with 10 workers and 25 files and repeat 3x: 8.957 s
+osimis/orthanc:current: test_upload_multiple_studies_from_multiple_threads with 10 workers and 25 files and repeat 3x: 2.671 s
 
 Testing the connecions (note: Orthanc and PG server running on the same server)
 10 connections : test_concurrent_anonymize_same_study with 4 workers and 10x repeat: 15.744 s
