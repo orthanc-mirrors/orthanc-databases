@@ -415,6 +415,10 @@ namespace OrthancDatabases
                                         int64_t& compressedSize,
                                         int64_t& uncompressedSize) ORTHANC_OVERRIDE;
 
+    virtual bool HasMeasureLatency() ORTHANC_OVERRIDE;
+
+    virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
     /**
      * "maxDatabaseRetries" is to handle
      * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a

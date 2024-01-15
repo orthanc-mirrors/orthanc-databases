@@ -433,6 +433,7 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
         response.mutable_get_system_information()->set_supports_increment_global_property(accessor.GetBackend().HasAtomicIncrementGlobalProperty());
         response.mutable_get_system_information()->set_has_update_and_get_statistics(accessor.GetBackend().HasUpdateAndGetStatistics());
+        response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
         break;
       }
 
@@ -516,7 +517,14 @@ namespace OrthancDatabases
         
         break;
       }
-              
+
+      case Orthanc::DatabasePluginMessages::OPERATION_MEASURE_LATENCY:
+      {
+        IndexConnectionsPool::Accessor accessor(pool);
+        response.mutable_measure_latency()->set_latency_us(accessor.GetBackend().MeasureLatency(accessor.GetManager()));
+        break;
+      }
+
       default:
         LOG(ERROR) << "Not implemented database operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

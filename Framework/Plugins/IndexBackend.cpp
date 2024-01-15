@@ -33,6 +33,7 @@
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
+#include <Toolbox.h>
 
 
 namespace OrthancDatabases
@@ -1235,6 +1236,12 @@ namespace OrthancDatabases
   {
     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
+
+  bool IndexBackend::HasMeasureLatency()
+  {
+    return true;
+  }
+
 
   void IndexBackend::LookupIdentifier(std::list<int64_t>& target /*out*/,
                                       DatabaseManager& manager,
@@ -2867,6 +2874,30 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
 #  endif
 #endif
+  }
+
+
+  uint64_t IndexBackend::MeasureLatency(DatabaseManager& manager)
+  {
+    // execute 11x the simplest statement and return the median value
+    std::vector<uint64_t> measures;
+
+    for (int i = 0; i < 11; i++)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT 1");
+
+      Orthanc::Toolbox::ElapsedTimer timer;
+
+      statement.Execute();
+
+      measures.push_back(timer.GetElapsedMicroseconds());
+    }
+    
+    std::sort(measures.begin(), measures.end());
+
+    return measures[measures.size() / 2];
   }
 
 
