@@ -66,7 +66,7 @@ namespace OrthancDatabases
     std::string query;
 
     Orthanc::EmbeddedResources::GetFileResource
-      (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX_V2);
+      (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
     t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
     SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, 6);
@@ -194,7 +194,7 @@ namespace OrthancDatabases
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_V1);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_V6_1);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
           }
           
@@ -205,7 +205,7 @@ namespace OrthancDatabases
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_V1_TO_V2);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_V6_1_TO_V6_2);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
             // apply all idempotent changes that are in the PrepareIndexV2

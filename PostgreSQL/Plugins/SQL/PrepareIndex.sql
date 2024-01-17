@@ -1,7 +1,9 @@
--- This SQL file creates a DB in revision 2 directly (version is being used from v 6.0 of the PostgreSQL plugin)
+-- This SQL file creates a DB in version.revision 6.2 directly
 -- It is also run after upgrade scripts to create new tables and or create/replace triggers and functions.
 -- This script is self contained, it contains everything that needs to be run to create an Orthanc DB.
--- Note: it is and must be idempotent.
+-- Note to developers: 
+--   - it is and must stay idempotent.
+--   - it is executed when the DB is "locked", only one Orthanc instance can execute it at a given time.                
 
 CREATE TABLE IF NOT EXISTS GlobalProperties(
        property INTEGER PRIMARY KEY,
@@ -285,8 +287,6 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
-DROP TRIGGER IF EXISTS AttachedFileDeleted ON AttachedFiles;
-
 CREATE OR REPLACE FUNCTION AttachedFileDeletedFunc() 
 RETURNS TRIGGER AS $body$
 BEGIN
@@ -546,3 +546,15 @@ BEGIN
 END;
 
 $body$ LANGUAGE plpgsql;
+
+
+
+-- set the global properties that actually documents the DB version, revision and some of the capabilities
+DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13);
+INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
+INSERT INTO GlobalProperties VALUES (4, 2); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
+INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
+INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance
+INSERT INTO GlobalProperties VALUES (12, 1); -- GlobalProperty_HasFastCountResources
+INSERT INTO GlobalProperties VALUES (13, 1); -- GlobalProperty_GetLastChangeIndex
