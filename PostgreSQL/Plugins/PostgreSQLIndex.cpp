@@ -68,14 +68,6 @@ namespace OrthancDatabases
     Orthanc::EmbeddedResources::GetFileResource
       (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
     t.GetDatabaseTransaction().ExecuteMultiLines(query);
-
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, 6);
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 2);
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 3);  // this is the 3rd version !
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 1);
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
-    SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
   }
   
   void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager,
