@@ -130,7 +130,13 @@ CREATE TABLE DeletedResources(
        );
 
 
--- this trigger has been removed in 6.2
+-- these triggers have been introduced in 6.2, remove them
+DROP TRIGGER IF EXISTS IncrementResourcesTracker on Resources;
+DROP TRIGGER IF EXISTS DecrementResourcesTracker on Resources;
+DROP FUNCTION IF EXISTS IncrementResourcesTrackerFunc;
+DROP FUNCTION IF EXISTS DecrementResourcesTrackerFunc;
+
+-- this trigger has been removed in 6.2, reinstall it
 CREATE OR REPLACE FUNCTION CountResourcesTrackerFunc()
 RETURNS TRIGGER AS $$
 BEGIN
