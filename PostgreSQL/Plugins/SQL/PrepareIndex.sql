@@ -298,6 +298,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS AttachedFileDeleted on AttachedFiles;
 CREATE TRIGGER AttachedFileDeleted
 AFTER DELETE ON AttachedFiles
 FOR EACH ROW
