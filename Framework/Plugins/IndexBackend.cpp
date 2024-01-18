@@ -2884,13 +2884,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     for (int i = 0; i < 11; i++)
     {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT 1");
+      DatabaseManager::StandaloneStatement statement(manager, "SELECT 1");
 
       Orthanc::Toolbox::ElapsedTimer timer;
 
-      statement.Execute();
+      statement.ExecuteWithoutResult();
 
       measures.push_back(timer.GetElapsedMicroseconds());
     }

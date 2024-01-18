@@ -641,6 +641,16 @@ namespace OrthancDatabases
 
   void DatabaseManager::StandaloneStatement::Execute(const Dictionary& parameters)
   {
+    ExecuteInternal(parameters, true);
+  }
+
+  void DatabaseManager::StandaloneStatement::ExecuteWithoutResult(const Dictionary& parameters)
+  {
+    ExecuteInternal(parameters, false);
+  }
+
+  void DatabaseManager::StandaloneStatement::ExecuteInternal(const Dictionary& parameters, bool withResults)
+  {
     try
     {
       std::unique_ptr<Query> query(ReleaseQuery());
@@ -652,7 +662,14 @@ namespace OrthancDatabases
       statement_.reset(GetManager().GetDatabase().Compile(*query));
       assert(statement_.get() != NULL);
 
-      SetResult(GetTransaction().Execute(*statement_, parameters));
+      if (withResults)
+      {
+        SetResult(GetTransaction().Execute(*statement_, parameters));
+      }
+      else
+      {
+        GetTransaction().Execute(*statement_, parameters);
+      }
     }
     catch (Orthanc::OrthancException& e)
     {
