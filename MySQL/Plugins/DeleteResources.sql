@@ -10,16 +10,6 @@ BEGIN
 		SELECT internalId FROM DeletedResources@
 	DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET done = TRUE@
 	set done=FALSE@	
-    -- Create a CTE to hold the temporary data ???
-    -- WITH DeletedResources AS (
-    --    SELECT internalId, resourceType, publicId
-    --    FROM Resources
-    -- )
-
-	CREATE TEMPORARY TABLE DeletedResources SELECT * FROM (
-		SELECT internalId, resourceType, publicId FROM Resources WHERE internalId=p_id OR parentId=p_id 
-			OR parentId IN (SELECT internalId FROM Resources WHERE parentId=p_id) 
-			OR parentId IN (SELECT internalId FROM Resources WHERE parentId IN (SELECT internalId FROM Resources WHERE parentId=p_id))) AS t@
 
 	OPEN cur1@
 	REPEAT

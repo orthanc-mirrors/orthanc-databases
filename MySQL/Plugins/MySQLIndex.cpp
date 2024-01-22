@@ -473,23 +473,23 @@ namespace OrthancDatabases
       }
     }
 
-    // {
-    //   DatabaseManager::CachedStatement dropTemporaryTable(
-    //     STATEMENT_FROM_HERE, manager,
-    //     "DROP TEMPORARY TABLE IF EXISTS DeletedResources");
-    //   dropTemporaryTable.Execute();
-    // }
+    {
+      DatabaseManager::CachedStatement dropTemporaryTable(
+        STATEMENT_FROM_HERE, manager,
+        "DROP TEMPORARY TABLE IF EXISTS DeletedResources");
+      dropTemporaryTable.Execute();
+    }
 
-    // {
-    //   DatabaseManager::CachedStatement lookupResourcesToDelete(
-    //     STATEMENT_FROM_HERE, manager,
-    //     "CREATE TEMPORARY TABLE DeletedResources SELECT * FROM (SELECT internalId, resourceType, publicId FROM Resources WHERE internalId=${id} OR parentId=${id} OR parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}) OR parentId IN (SELECT internalId FROM Resources WHERE parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}))) AS t");
-    //   lookupResourcesToDelete.SetParameterType("id", ValueType_Integer64);
+    {
+      DatabaseManager::CachedStatement lookupResourcesToDelete(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE DeletedResources SELECT * FROM (SELECT internalId, resourceType, publicId FROM Resources WHERE internalId=${id} OR parentId=${id} OR parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}) OR parentId IN (SELECT internalId FROM Resources WHERE parentId IN (SELECT internalId FROM Resources WHERE parentId=${id}))) AS t");
+      lookupResourcesToDelete.SetParameterType("id", ValueType_Integer64);
 
-    //   Dictionary args;
-    //   args.SetIntegerValue("id", id);
-    //   lookupResourcesToDelete.Execute(args);
-    // }
+      Dictionary args;
+      args.SetIntegerValue("id", id);
+      lookupResourcesToDelete.Execute(args);
+    }
 
     // {
     //   DatabaseManager::CachedStatement deleteHierarchy(
