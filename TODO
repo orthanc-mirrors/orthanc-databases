@@ -22,7 +22,7 @@ Common - Storage area
 
 * Implement the "StoreDicom" option from the default filesystem
   storage area to run MySQL/PostgreSQL storage in index-only mode:
-  https://book.orthanc-server.com/contributing.html
+  https://orthanc.uclouvain.be/book/contributing.html
 
 * Performance: Add a pool of connections to PostgreSQL/MySQL, as
   already done in the database index plugins

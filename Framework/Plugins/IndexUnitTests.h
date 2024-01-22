@@ -57,7 +57,7 @@ namespace Orthanc
   /**
    * Mock enumeration inspired from the source code of Orthanc... only
    * for use in the unit tests!
-   * https://hg.orthanc-server.com/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
+   * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
    **/
   enum MetadataType
   {

@@ -33,6 +33,15 @@ namespace OrthancDatabases
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
 
+  protected:
+    virtual void ClearDeletedFiles(DatabaseManager& manager);
+
+    virtual void ClearDeletedResources(DatabaseManager& manager);
+
+    virtual void ClearRemainingAncestor(DatabaseManager& manager);
+
+    void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
+
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
                     const PostgreSQLParameters& parameters);
@@ -55,8 +64,19 @@ namespace OrthancDatabases
     
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
-                                   OrthancPluginResourceType type)
-      ORTHANC_OVERRIDE;
+                                   OrthancPluginResourceType type) ORTHANC_OVERRIDE;
+
+    virtual void DeleteResource(IDatabaseBackendOutput& output,
+                                DatabaseManager& manager,
+                                int64_t id) ORTHANC_OVERRIDE;
+
+    virtual void SetResourcesContent(DatabaseManager& manager,
+                                     uint32_t countIdentifierTags,
+                                     const OrthancPluginResourcesContentTags* identifierTags,
+                                     uint32_t countMainDicomTags,
+                                     const OrthancPluginResourcesContentTags* mainDicomTags,
+                                     uint32_t countMetadata,
+                                     const OrthancPluginResourcesContentMetadata* metadata) ORTHANC_OVERRIDE;
 
     virtual uint64_t GetTotalCompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
@@ -90,5 +110,29 @@ namespace OrthancDatabases
     {
       return true;
     }
+
+    virtual bool HasAtomicIncrementGlobalProperty() ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) ORTHANC_OVERRIDE;
+
+    virtual bool HasUpdateAndGetStatistics() ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) ORTHANC_OVERRIDE;
+
   };
 }

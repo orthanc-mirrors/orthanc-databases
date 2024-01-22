@@ -77,11 +77,9 @@ endif()
 
 
 EmbedResources(
-  POSTGRESQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
-  POSTGRESQL_CREATE_INSTANCE        ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
-  POSTGRESQL_FAST_TOTAL_SIZE        ${CMAKE_SOURCE_DIR}/Plugins/FastTotalSize.sql
-  POSTGRESQL_FAST_COUNT_RESOURCES   ${CMAKE_SOURCE_DIR}/Plugins/FastCountResources.sql
-  POSTGRESQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
+  POSTGRESQL_PREPARE_INDEX           ${CMAKE_SOURCE_DIR}/Plugins/SQL/PrepareIndex.sql
+  POSTGRESQL_UPGRADE_UNKNOWN_TO_V6_1 ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/UnknownToV6.1.sql
+  POSTGRESQL_UPGRADE_V6_1_TO_V6_2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/V6.1ToV6.2.sql
   )
 
 
@@ -155,6 +153,10 @@ set_target_properties(OrthancPostgreSQLIndex PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=1
   )
 
+DefineSourceBasenameForTarget(OrthancPostgreSQLIndex)
+DefineSourceBasenameForTarget(OrthancPostgreSQLStorage)
+ 
+
 install(
   TARGETS OrthancPostgreSQLIndex OrthancPostgreSQLStorage
   RUNTIME DESTINATION lib    # Destination for Windows
@@ -178,3 +180,5 @@ target_link_libraries(UnitTests ${GOOGLE_TEST_LIBRARIES})
 set_target_properties(UnitTests PROPERTIES
   COMPILE_FLAGS -DORTHANC_ENABLE_LOGGING_PLUGIN=0
   )
+
+DefineSourceBasenameForTarget(UnitTests)

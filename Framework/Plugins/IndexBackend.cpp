@@ -33,6 +33,7 @@
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
+#include <Toolbox.h>
 
 
 namespace OrthancDatabases
@@ -175,6 +176,16 @@ namespace OrthancDatabases
     done = (count < limit ||
             statement.IsDone());
   }
+
+  void IndexBackend::ClearRemainingAncestor(DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM RemainingAncestor");
+
+    statement.Execute();
+  }
+
 
 
   void IndexBackend::ClearDeletedFiles(DatabaseManager& manager)
@@ -433,14 +444,7 @@ namespace OrthancDatabases
   {
     ClearDeletedFiles(manager);
     ClearDeletedResources(manager);
-    
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "DELETE FROM RemainingAncestor");
-
-      statement.Execute();
-    }
+    ClearRemainingAncestor(manager);
       
     {
       DatabaseManager::CachedStatement statement(
@@ -460,7 +464,6 @@ namespace OrthancDatabases
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "SELECT * FROM RemainingAncestor");
-
       statement.Execute();
 
       if (!statement.IsDone())
@@ -473,9 +476,10 @@ namespace OrthancDatabases
         assert((statement.Next(), statement.IsDone()));
       }
     }
-    
+
     SignalDeletedFiles(output, manager);
     SignalDeletedResources(output, manager);
+
   }
 
 
@@ -1204,7 +1208,41 @@ namespace OrthancDatabases
     }
   }
 
-    
+  bool IndexBackend::HasAtomicIncrementGlobalProperty()
+  {
+    return false; // currently only implemented in Postgres
+  }
+
+  int64_t IndexBackend::IncrementGlobalProperty(DatabaseManager& manager,
+                                                const char* serverIdentifier,
+                                                int32_t property,
+                                                int64_t increment)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+  bool IndexBackend::HasUpdateAndGetStatistics()
+  {
+    return false; // currently only implemented in Postgres
+  }
+
+  void IndexBackend::UpdateAndGetStatistics(DatabaseManager& manager,
+                                            int64_t& patientsCount,
+                                            int64_t& studiesCount,
+                                            int64_t& seriesCount,
+                                            int64_t& instancesCount,
+                                            int64_t& compressedSize,
+                                            int64_t& uncompressedSize)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+  bool IndexBackend::HasMeasureLatency()
+  {
+    return true;
+  }
+
+
   void IndexBackend::LookupIdentifier(std::list<int64_t>& target /*out*/,
                                       DatabaseManager& manager,
                                       OrthancPluginResourceType resourceType,
@@ -2036,7 +2074,7 @@ namespace OrthancDatabases
     virtual bool IsEscapeBrackets() const
     {
       // This was initially done at a bad location by the following changeset:
-      // https://hg.orthanc-server.com/orthanc-databases/rev/389c037387ea
+      // https://orthanc.uclouvain.be/hg/orthanc-databases/rev/389c037387ea
       return (dialect_ == Dialect_MSSQL);
     }
 
@@ -2836,6 +2874,28 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
 #  endif
 #endif
+  }
+
+
+  uint64_t IndexBackend::MeasureLatency(DatabaseManager& manager)
+  {
+    // execute 11x the simplest statement and return the median value
+    std::vector<uint64_t> measures;
+
+    for (int i = 0; i < 11; i++)
+    {
+      DatabaseManager::StandaloneStatement statement(manager, "SELECT 1");
+
+      Orthanc::Toolbox::ElapsedTimer timer;
+
+      statement.ExecuteWithoutResult();
+
+      measures.push_back(timer.GetElapsedMicroseconds());
+    }
+    
+    std::sort(measures.begin(), measures.end());
+
+    return measures[measures.size() / 2];
   }
 
 

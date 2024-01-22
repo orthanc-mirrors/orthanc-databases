@@ -42,6 +42,7 @@ namespace OrthancDatabases
     lock_ = true;
     maxConnectionRetries_ = 10;
     connectionRetryInterval_ = 5;
+    isVerboseEnabled_ = false;
   }
 
 
@@ -94,8 +95,28 @@ namespace OrthancDatabases
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
 
+    isVerboseEnabled_ = configuration.GetBooleanValue("EnableVerboseLogs", false);
+
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
+
+    std::string transactionMode = configuration.GetStringValue("TransactionMode", "SERIALIZABLE");
+    if (transactionMode == "DEFAULT")
+    {
+      SetIsolationMode(IsolationMode_DbDefault);
+    }
+    else if (transactionMode == "READ COMMITTED")
+    {
+      SetIsolationMode(IsolationMode_ReadCommited);
+    }
+    else if (transactionMode == "SERIALIZABLE")
+    {
+      SetIsolationMode(IsolationMode_Serializable);
+    }
+    else
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType, std::string("Invalid value for 'TransactionMode': ") + transactionMode);
+    }
   }
 
 

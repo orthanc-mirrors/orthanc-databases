@@ -1,3 +1,19 @@
+Pending changes in the mainline
+===============================
+
+* Experimental debug feature:
+  Introduced a new configuration to select the transaction isolation level
+    "TransactionMode": "SERIALIZABLE"
+  Allowed values: "SERIALIZABLE", "READ COMMITTED", "DEFAULT".
+  The "SERIALIZABLE" mode was the only available value up to now.  It is still the default
+  value now.
+  The "READ COMMITTED" is possible now due to rewrites of SQL queries.
+  The "DEFAULT" value uses the default transaction isolation level defined at the database level.
+* internals:
+  - Added a UNIQUE constraint on Resources.publicId to detect DB inconsistencies
+* New "EnableVerboseLogs" configuration to show SQL statements being executed.
+
+
 Release 5.1 (2023-06-27)
 ========================
 
@@ -22,7 +38,7 @@ Release 4.0 (2021-04-22)
 * Support of multiple readers/writers, by handling retries from Orthanc SDK 1.9.2
 * Support of range reads for the storage area, from Orthanc SDK 1.9.0
 * Fix issue #193 (LSB binaries crash with PostgreSQL + SSL) by changeset
-  in OrthancFramework: https://hg.orthanc-server.com/orthanc/rev/9a9118406484
+  in OrthancFramework: https://orthanc.uclouvain.be/hg/orthanc/rev/9a9118406484
 * Fix issue #151 (Storage failures when running with two instances and PG_LOCK=false)
 
 

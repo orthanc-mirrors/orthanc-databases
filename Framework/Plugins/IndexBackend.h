@@ -46,9 +46,11 @@ namespace OrthancDatabases
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
-    void ClearDeletedFiles(DatabaseManager& manager);
+    virtual void ClearDeletedFiles(DatabaseManager& manager);
 
-    void ClearDeletedResources(DatabaseManager& manager);
+    virtual void ClearDeletedResources(DatabaseManager& manager);
+
+    virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
     void SignalDeletedFiles(IDatabaseBackendOutput& output,
                             DatabaseManager& manager);
@@ -396,6 +398,27 @@ namespace OrthancDatabases
     virtual void ListAllLabels(std::list<std::string>& target,
                                DatabaseManager& manager) ORTHANC_OVERRIDE;
     
+    virtual bool HasAtomicIncrementGlobalProperty() ORTHANC_OVERRIDE;
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) ORTHANC_OVERRIDE;
+
+    virtual bool HasUpdateAndGetStatistics() ORTHANC_OVERRIDE;
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) ORTHANC_OVERRIDE;
+
+    virtual bool HasMeasureLatency() ORTHANC_OVERRIDE;
+
+    virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
     /**
      * "maxDatabaseRetries" is to handle
      * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a

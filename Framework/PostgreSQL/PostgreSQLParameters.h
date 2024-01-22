@@ -30,6 +30,13 @@
 
 namespace OrthancDatabases
 {
+  enum IsolationMode
+  {
+    IsolationMode_DbDefault = 0,
+    IsolationMode_Serializable = 1,
+    IsolationMode_ReadCommited = 2
+  };
+
   class PostgreSQLParameters
   {
   private:
@@ -43,7 +50,8 @@ namespace OrthancDatabases
     bool         lock_;
     unsigned int maxConnectionRetries_;
     unsigned int connectionRetryInterval_;
-
+    bool         isVerboseEnabled_;
+    IsolationMode isolationMode_;
     void Reset();
 
   public:
@@ -124,6 +132,52 @@ namespace OrthancDatabases
     {
       return connectionRetryInterval_;
     }
+
+    void SetIsolationMode(IsolationMode isolationMode)
+    {
+      isolationMode_ = isolationMode;
+    }
+
+    const char* GetReadWriteTransactionStatement() const
+    {
+      switch (isolationMode_)
+      {
+        case IsolationMode_DbDefault:
+          return "";
+        case IsolationMode_ReadCommited:
+          return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ WRITE";
+        case IsolationMode_Serializable:
+          return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE";
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
+
+    const char* GetReadOnlyTransactionStatement() const
+    {
+      switch (isolationMode_)
+      {
+        case IsolationMode_DbDefault:
+          return "";
+        case IsolationMode_ReadCommited:
+          return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY";
+        case IsolationMode_Serializable:
+          return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY";
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
+
+    void SetVerboseEnabled(bool enabled)
+    {
+      isVerboseEnabled_ = enabled;
+    }
+
+    bool IsVerboseEnabled() const
+    {
+      return isVerboseEnabled_;
+    }
+
 
     void Format(std::string& target) const;
   };

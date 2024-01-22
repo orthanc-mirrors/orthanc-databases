@@ -431,6 +431,9 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
         response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
+        response.mutable_get_system_information()->set_supports_increment_global_property(accessor.GetBackend().HasAtomicIncrementGlobalProperty());
+        response.mutable_get_system_information()->set_has_update_and_get_statistics(accessor.GetBackend().HasUpdateAndGetStatistics());
+        response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
         break;
       }
 
@@ -514,7 +517,14 @@ namespace OrthancDatabases
         
         break;
       }
-              
+
+      case Orthanc::DatabasePluginMessages::OPERATION_MEASURE_LATENCY:
+      {
+        IndexConnectionsPool::Accessor accessor(pool);
+        response.mutable_measure_latency()->set_latency_us(accessor.GetBackend().MeasureLatency(accessor.GetManager()));
+        break;
+      }
+
       default:
         LOG(ERROR) << "Not implemented database operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
@@ -941,7 +951,30 @@ namespace OrthancDatabases
         
         break;
       }
-      
+
+      case Orthanc::DatabasePluginMessages::OPERATION_UPDATE_AND_GET_STATISTICS:
+      {
+        int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
+        backend.UpdateAndGetStatistics(manager, patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize);
+
+        response.mutable_update_and_get_statistics()->set_patients_count(patientsCount);
+        response.mutable_update_and_get_statistics()->set_studies_count(studiesCount);
+        response.mutable_update_and_get_statistics()->set_series_count(seriesCount);
+        response.mutable_update_and_get_statistics()->set_instances_count(instancesCount);
+        response.mutable_update_and_get_statistics()->set_total_compressed_size(compressedSize);
+        response.mutable_update_and_get_statistics()->set_total_uncompressed_size(uncompressedSize);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_INCREMENT_GLOBAL_PROPERTY:
+      {
+        int64_t value = backend.IncrementGlobalProperty(manager, request.increment_global_property().server_id().c_str(),
+                                                        request.increment_global_property().property(),
+                                                        request.increment_global_property().increment());
+        response.mutable_increment_global_property()->set_new_value(value);
+        break;
+      }
+
       case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_METADATA:
       {
         std::string value;
@@ -1325,7 +1358,14 @@ namespace OrthancDatabases
     }
     catch (::Orthanc::OrthancException& e)
     {
-      LOG(ERROR) << "Exception in database back-end: " << e.What();
+      if (e.GetErrorCode() == ::Orthanc::ErrorCode_DatabaseCannotSerialize)
+      {
+        LOG(WARNING) << "An SQL transaction failed and will likely be retried: " << e.GetDetails();
+      }
+      else
+      {
+        LOG(ERROR) << "Exception in database back-end: " << e.What();
+      }
       return static_cast<OrthancPluginErrorCode>(e.GetErrorCode());
     }
     catch (::std::runtime_error& e)
