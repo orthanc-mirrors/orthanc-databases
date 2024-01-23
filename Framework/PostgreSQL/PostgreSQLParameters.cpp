@@ -103,14 +103,17 @@ namespace OrthancDatabases
     std::string transactionMode = configuration.GetStringValue("TransactionMode", "SERIALIZABLE");
     if (transactionMode == "DEFAULT")
     {
+      LOG(WARNING) << "PostgreSQL: using DB default transaction mode";
       SetIsolationMode(IsolationMode_DbDefault);
     }
     else if (transactionMode == "READ COMMITTED")
     {
+      LOG(WARNING) << "PostgreSQL: using READ COMMITTED transaction mode";
       SetIsolationMode(IsolationMode_ReadCommited);
     }
     else if (transactionMode == "SERIALIZABLE")
     {
+      LOG(WARNING) << "PostgreSQL: using SERIALIZABLE transaction mode";
       SetIsolationMode(IsolationMode_Serializable);
     }
     else
