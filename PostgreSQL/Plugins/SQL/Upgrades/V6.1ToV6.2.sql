@@ -44,3 +44,5 @@ DROP TABLE IF EXISTS DeletedResources;
 -- These triggers disappears and are not replaced in V6.2
 DROP TRIGGER IF EXISTS CountResourcesTracker ON Resources;
 
+-- The signature has changed so we must delete the function before replacing it.
+DROP FUNCTION CreateInstance;
