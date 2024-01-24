@@ -45,4 +45,4 @@ DROP TABLE IF EXISTS DeletedResources;
 DROP TRIGGER IF EXISTS CountResourcesTracker ON Resources;
 
 -- The signature has changed so we must delete the function before replacing it.
-DROP FUNCTION CreateInstance;
+DROP FUNCTION IF EXISTS CreateInstance;
