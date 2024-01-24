@@ -2,8 +2,8 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2021-2023 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2017-2024 Osimis S.A., Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -40,6 +40,7 @@
 
 #include "DatabaseConstraint.h"
 
+#include <cassert>
 #include <boost/lexical_cast.hpp>
 #include <list>
 
@@ -664,7 +665,6 @@ namespace Orthanc
 
     if (mainDicomTagsComparisons.size() > 0)
     {
-      std::string comparisons;
       for (std::vector<std::string>::const_iterator it = mainDicomTagsComparisons.begin(); it < mainDicomTagsComparisons.end(); ++it)
       {
         sql += (" AND internalId IN (SELECT id FROM MainDicomTags WHERE " + *it + ") ");
