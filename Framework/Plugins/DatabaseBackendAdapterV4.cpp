@@ -431,9 +431,13 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
         response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
         response.mutable_get_system_information()->set_supports_increment_global_property(accessor.GetBackend().HasAtomicIncrementGlobalProperty());
         response.mutable_get_system_information()->set_has_update_and_get_statistics(accessor.GetBackend().HasUpdateAndGetStatistics());
         response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
+#endif
+
         break;
       }
 
@@ -518,12 +522,14 @@ namespace OrthancDatabases
         break;
       }
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
       case Orthanc::DatabasePluginMessages::OPERATION_MEASURE_LATENCY:
       {
         IndexConnectionsPool::Accessor accessor(pool);
         response.mutable_measure_latency()->set_latency_us(accessor.GetBackend().MeasureLatency(accessor.GetManager()));
         break;
       }
+#endif
 
       default:
         LOG(ERROR) << "Not implemented database operation from protobuf: " << request.operation();
@@ -952,6 +958,7 @@ namespace OrthancDatabases
         break;
       }
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
       case Orthanc::DatabasePluginMessages::OPERATION_UPDATE_AND_GET_STATISTICS:
       {
         int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
@@ -965,7 +972,9 @@ namespace OrthancDatabases
         response.mutable_update_and_get_statistics()->set_total_uncompressed_size(uncompressedSize);
         break;
       }
+#endif
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
       case Orthanc::DatabasePluginMessages::OPERATION_INCREMENT_GLOBAL_PROPERTY:
       {
         int64_t value = backend.IncrementGlobalProperty(manager, request.increment_global_property().server_id().c_str(),
@@ -974,6 +983,7 @@ namespace OrthancDatabases
         response.mutable_increment_global_property()->set_new_value(value);
         break;
       }
+#endif
 
       case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_METADATA:
       {
