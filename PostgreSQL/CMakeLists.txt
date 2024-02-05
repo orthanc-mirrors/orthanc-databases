@@ -80,8 +80,8 @@ endif()
 
 EmbedResources(
   POSTGRESQL_PREPARE_INDEX           ${CMAKE_SOURCE_DIR}/Plugins/SQL/PrepareIndex.sql
-  POSTGRESQL_UPGRADE_UNKNOWN_TO_V6_1 ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/UnknownToV6.1.sql
-  POSTGRESQL_UPGRADE_V6_1_TO_V6_2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/V6.1ToV6.2.sql
+  POSTGRESQL_UPGRADE_UNKNOWN_TO_REV1 ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/UnknownToRev1.sql
+  POSTGRESQL_UPGRADE_REV1_TO_REV2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev1ToRev2.sql
   )
 
 

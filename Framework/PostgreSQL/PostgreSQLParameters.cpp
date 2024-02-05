@@ -100,18 +100,13 @@ namespace OrthancDatabases
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
 
-    std::string transactionMode = configuration.GetStringValue("TransactionMode", "SERIALIZABLE");
-    if (transactionMode == "DEFAULT")
-    {
-      LOG(WARNING) << "PostgreSQL: using DB default transaction mode";
-      SetIsolationMode(IsolationMode_DbDefault);
-    }
-    else if (transactionMode == "READ COMMITTED")
+    std::string transactionMode = configuration.GetStringValue("TransactionMode", "Serializable");
+    if (transactionMode == "ReadCommitted")
     {
       LOG(WARNING) << "PostgreSQL: using READ COMMITTED transaction mode";
       SetIsolationMode(IsolationMode_ReadCommited);
     }
-    else if (transactionMode == "SERIALIZABLE")
+    else if (transactionMode == "Serializable")
     {
       LOG(WARNING) << "PostgreSQL: using SERIALIZABLE transaction mode";
       SetIsolationMode(IsolationMode_Serializable);

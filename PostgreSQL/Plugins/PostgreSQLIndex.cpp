@@ -186,7 +186,7 @@ namespace OrthancDatabases
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_V6_1);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_REV1);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
           }
           
@@ -197,7 +197,7 @@ namespace OrthancDatabases
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_V6_1_TO_V6_2);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV1_TO_REV2);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
             // apply all idempotent changes that are in the PrepareIndexV2
