@@ -1,4 +1,4 @@
--- This file contains part of the changes required to upgrade from 6.1 to 6.2 (DB version 6 and revision 2)
+-- This file contains part of the changes required to upgrade from Revision 1 to Revision 2 (DB version 6 and revision 1 or 2)
 -- It actually contains only the changes that:
    -- can not be executed with an idempotent statement in SQL
    -- or would polute the PrepareIndex.sql
@@ -35,13 +35,13 @@ BEGIN
 END $body$ LANGUAGE plpgsql;
 
 
--- In V6.2, we'll now use temporary tables so we need to remove the old tables that might have been used in previous revisions !
+-- In Rev2, we'll now use temporary tables so we need to remove the old tables that might have been used in previous revisions !
 -- these statements, although idempotent, are not part of PrepareIndexV2.sql to keep it clean
 DROP TABLE IF EXISTS DeletedFiles;
 DROP TABLE IF EXISTS RemainingAncestor;
 DROP TABLE IF EXISTS DeletedResources;
 
--- These triggers disappears and are not replaced in V6.2
+-- These triggers disappears and are not replaced in Rev2
 DROP TRIGGER IF EXISTS CountResourcesTracker ON Resources;
 
 -- The signature has changed so we must delete the function before replacing it.

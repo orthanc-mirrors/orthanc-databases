@@ -32,9 +32,8 @@ namespace OrthancDatabases
 {
   enum IsolationMode
   {
-    IsolationMode_DbDefault = 0,
-    IsolationMode_Serializable = 1,
-    IsolationMode_ReadCommited = 2
+    IsolationMode_Serializable = 0,
+    IsolationMode_ReadCommited = 1
   };
 
   class PostgreSQLParameters
@@ -142,8 +141,6 @@ namespace OrthancDatabases
     {
       switch (isolationMode_)
       {
-        case IsolationMode_DbDefault:
-          return "";
         case IsolationMode_ReadCommited:
           return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ WRITE";
         case IsolationMode_Serializable:
@@ -157,8 +154,6 @@ namespace OrthancDatabases
     {
       switch (isolationMode_)
       {
-        case IsolationMode_DbDefault:
-          return "";
         case IsolationMode_ReadCommited:
           return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY";
         case IsolationMode_Serializable:

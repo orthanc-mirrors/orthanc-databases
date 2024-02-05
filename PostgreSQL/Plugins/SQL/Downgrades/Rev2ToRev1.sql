@@ -1,14 +1,14 @@
--- This file contains an SQL procedure to downgrade from schema 6.2 to 6.1 (version = 6, revision = 1).
--- It reinstalls all triggers and temporary tables that have been removed or replaced in 6.2
+-- This file contains an SQL procedure to downgrade from schema Rev2 to Rev1 (version = 6, revision = 1).
+-- It reinstalls all triggers and temporary tables that have been removed or replaced in Rev2
 
 -- note: we don't not remove the unique constraints that have been added - they should not 
 --       create any issues.
 
--- these constraints were introduced in 6.2
+-- these constraints were introduced in Rev2
 ALTER TABLE Resources DROP CONSTRAINT UniquePublicId;
 ALTER TABLE PatientRecyclingOrder DROP CONSTRAINT UniquePatientId;
 
--- the CreateInstance has been replaced in 6.2, reinstall the 6.1
+-- the CreateInstance has been replaced in Rev2, reinstall the Rev1
 DROP FUNCTION CreateInstance;
 CREATE FUNCTION CreateInstance(
   IN patient TEXT,
@@ -108,7 +108,7 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
--- these tables have been deleted in 6.2:
+-- these tables have been deleted in Rev2:
 CREATE TABLE DeletedFiles(
        uuid VARCHAR(64) NOT NULL,      -- 0
        fileType INTEGER,               -- 1
@@ -130,13 +130,13 @@ CREATE TABLE DeletedResources(
        );
 
 
--- these triggers have been introduced in 6.2, remove them
+-- these triggers have been introduced in Rev2, remove them
 DROP TRIGGER IF EXISTS IncrementResourcesTracker on Resources;
 DROP TRIGGER IF EXISTS DecrementResourcesTracker on Resources;
 DROP FUNCTION IF EXISTS IncrementResourcesTrackerFunc;
 DROP FUNCTION IF EXISTS DecrementResourcesTrackerFunc;
 
--- this trigger has been removed in 6.2, reinstall it
+-- this trigger has been removed in Rev2, reinstall it
 CREATE OR REPLACE FUNCTION CountResourcesTrackerFunc()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -155,7 +155,7 @@ AFTER INSERT OR DELETE ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE CountResourcesTrackerFunc();
 
--- this trigger was introduced in 6.2, remove it:
+-- this trigger was introduced in Rev2, remove it:
 DROP FUNCTION IF EXISTS InsertOrUpdateMetadata;
 
 -- reinstall old triggers:
@@ -189,14 +189,14 @@ AFTER DELETE ON AttachedFiles
 FOR EACH ROW
 EXECUTE PROCEDURE AttachedFileDecrementSizeFunc();
 
--- these functions have been introduced in 6.2:
+-- these functions have been introduced in Rev2:
 DROP FUNCTION IF EXISTS UpdateStatistics;
 DROP FUNCTION IF EXISTS UpdateSingleStatistic;
 
--- this table has been introduced in 6.2:
+-- this table has been introduced in Rev2:
 DROP TABLE IF EXISTS GlobalIntegersChanges;
 
--- these functions have been introduced in 6.2:
+-- these functions have been introduced in Rev2:
 DROP FUNCTION IF EXISTS CreateDeletedFilesTemporaryTable;
 DROP FUNCTION IF EXISTS DeleteResource;
 

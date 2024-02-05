@@ -349,19 +349,19 @@ namespace OrthancDatabases
     virtual void ListAllLabels(std::list<std::string>& target,
                                DatabaseManager& manager) = 0;
 
-    // New in Orthanc 1.12.X
+    // New in Orthanc 1.12.3
     virtual bool HasAtomicIncrementGlobalProperty() = 0;
 
-    // New in Orthanc 1.12.X
+    // New in Orthanc 1.12.3
     virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
                                             const char* serverIdentifier,
                                             int32_t property,
                                             int64_t increment) = 0;
 
-    // New in Orthanc 1.12.X
+    // New in Orthanc 1.12.3
     virtual bool HasUpdateAndGetStatistics() = 0;
 
-    // New in Orthanc 1.12.X
+    // New in Orthanc 1.12.3
     virtual void UpdateAndGetStatistics(DatabaseManager& manager,
                                         int64_t& patientsCount,
                                         int64_t& studiesCount,
@@ -370,10 +370,10 @@ namespace OrthancDatabases
                                         int64_t& compressedSize,
                                         int64_t& uncompressedSize) = 0;
 
-    // New in Orthanc 1.12.X
+    // New in Orthanc 1.12.3
     virtual bool HasMeasureLatency() = 0;
 
-    // New in Orthanc 1.12.X
+    // New in Orthanc 1.12.3
     virtual uint64_t MeasureLatency(DatabaseManager& manager) = 0;
 
 
