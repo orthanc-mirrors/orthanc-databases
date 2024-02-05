@@ -1,13 +1,14 @@
 Pending changes in the mainline
 ===============================
 
-* Experimental debug feature:
+* Transaction Mode:
   Introduced a new configuration to select the transaction isolation level
     "TransactionMode": "Serializable"
   Allowed values: "Serializable", "ReadCommitted".
   The "Serializable" mode was the only available value up to now.  It is still the default
   value now.
-  The "ReadCommitted" is possible now due to rewrites of SQL queries.
+  The "ReadCommitted" is possible now due to rewrites of SQL queries and notably improves
+  the Orthanc ability to ingest data from multiple sources in parallel.
 * internals:
   - Added a UNIQUE constraint on Resources.publicId to detect DB inconsistencies
 * New "EnableVerboseLogs" configuration to show SQL statements being executed.
