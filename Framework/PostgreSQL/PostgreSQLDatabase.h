@@ -36,6 +36,7 @@ namespace OrthancDatabases
   private:
     friend class PostgreSQLStatement;
     friend class PostgreSQLLargeObject;
+    friend class PostgreSQLTransaction;
 
     class Factory;
 
@@ -58,6 +59,11 @@ namespace OrthancDatabases
     ~PostgreSQLDatabase();
 
     void Open();
+
+    bool IsVerboseEnabled() const
+    {
+      return parameters_.IsVerboseEnabled();
+    }
 
     bool AcquireAdvisoryLock(int32_t lock);
 
@@ -91,7 +97,9 @@ namespace OrthancDatabases
 
     public:
       TransientAdvisoryLock(PostgreSQLDatabase&  database,
-                            int32_t lock);
+                            int32_t lock,
+                            unsigned int retries = 10,
+                            unsigned int retryInterval = 500);
 
       ~TransientAdvisoryLock();
     };
@@ -99,5 +107,17 @@ namespace OrthancDatabases
     static IDatabaseFactory* CreateDatabaseFactory(const PostgreSQLParameters& parameters);
 
     static PostgreSQLDatabase* CreateDatabaseConnection(const PostgreSQLParameters& parameters);
+
+  protected:
+    const char* GetReadWriteTransactionStatement() const
+    {
+      return parameters_.GetReadWriteTransactionStatement();
+    }
+
+    const char* GetReadOnlyTransactionStatement() const
+    {
+      return parameters_.GetReadOnlyTransactionStatement();
+    }
+
   };
 }

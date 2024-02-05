@@ -84,6 +84,11 @@ namespace OrthancDatabases
     position_(0), 
     database_(statement.GetDatabase())
   {
+    if (database_.IsVerboseEnabled())
+    {
+      LOG(INFO) << "PostgreSQL: " << statement.sql_;
+    }
+    
     result_ = statement.Execute();
     assert(result_ != NULL);   // An exception would have been thrown otherwise
 
@@ -254,6 +259,9 @@ namespace OrthancDatabases
 
       case OIDOID:
         return new LargeObjectResult(database_, GetLargeObjectOid(column));
+
+      case VOIDOID:
+        return NULL;
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);

@@ -187,6 +187,8 @@ namespace OrthancDatabases
 
       std::string ReadString(size_t field) const;
 
+      bool IsNull(size_t field) const;
+
       void PrintResult(std::ostream& stream)
       {
         IResult::Print(stream, GetResult());
@@ -219,6 +221,17 @@ namespace OrthancDatabases
       }
 
       void Execute(const Dictionary& parameters);
+
+      void ExecuteWithoutResult()
+      {
+        Dictionary parameters;
+        ExecuteWithoutResult(parameters);
+      }
+
+      void ExecuteWithoutResult(const Dictionary& parameters);
+
+    private:
+      void ExecuteInternal(const Dictionary& parameters, bool withResults);
     };
 
 
@@ -240,6 +253,17 @@ namespace OrthancDatabases
       }
 
       void Execute(const Dictionary& parameters);
+
+      void ExecuteWithoutResult()
+      {
+        Dictionary parameters;
+        ExecuteWithoutResult(parameters);
+      }
+
+      void ExecuteWithoutResult(const Dictionary& parameters);
+
+    private:
+      void ExecuteInternal(const Dictionary& parameters, bool withResults);
     };
   };
 }

@@ -70,12 +70,22 @@ namespace OrthancDatabases
     switch (type)
     {
       case TransactionType_ReadWrite:
-        database_.ExecuteMultiLines("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
-        break;
+      {
+        const std::string& statement = database_.GetReadWriteTransactionStatement();
+        if (!statement.empty()) // if not defined, will use the default DB transaction isolation level
+        {
+          database_.ExecuteMultiLines(statement);
+        }
+       }; break;
 
       case TransactionType_ReadOnly:
-        database_.ExecuteMultiLines("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY");
-        break;
+      {
+        const std::string& statement = database_.GetReadOnlyTransactionStatement();
+        if (!statement.empty()) // if not defined, will use the default DB transaction isolation level
+        {
+          database_.ExecuteMultiLines(statement);
+        }
+       }; break;
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

@@ -287,7 +287,8 @@ namespace OrthancDatabases
       }
       
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+      std::string errorString(PQresultErrorMessage(result));
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize, errorString, false); // don't log here, it is handled at higher level
 #else
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
 #endif
@@ -308,7 +309,10 @@ namespace OrthancDatabases
     inputs_(new Inputs),
     formatter_(Dialect_PostgreSQL)
   {
-    LOG(TRACE) << "PostgreSQL: " << sql;
+    if (database.IsVerboseEnabled())
+    {
+      LOG(TRACE) << "PostgreSQL: " << sql;
+    }
   }
 
 
@@ -319,7 +323,11 @@ namespace OrthancDatabases
     formatter_(Dialect_PostgreSQL)
   {
     query.Format(sql_, formatter_);
-    LOG(TRACE) << "PostgreSQL: " << sql_;
+    
+    if (database.IsVerboseEnabled())
+    {
+      LOG(TRACE) << "PostgreSQL: " << sql_;
+    }
 
     for (size_t i = 0; i < formatter_.GetParametersCount(); i++)
     {

@@ -492,8 +492,8 @@ namespace OrthancDatabases
           return dynamic_cast<const Integer64Value&>(value).GetValue();
 
         default:
-          //LOG(ERROR) << value.Format();
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          // LOG(ERROR) << value.GetType();
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "The returned field is not of the correct type (Integer64)");
       }
     }
   }
@@ -511,8 +511,7 @@ namespace OrthancDatabases
 
       if (value != static_cast<int64_t>(static_cast<int32_t>(value)))
       {
-        LOG(ERROR) << "Integer overflow";
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Integer overflow");
       }
       else
       {
@@ -521,7 +520,18 @@ namespace OrthancDatabases
     }
   }
 
-    
+  bool DatabaseManager::StatementBase::IsNull(size_t field) const
+  {
+    if (IsDone())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+    else
+    {
+      return GetResultField(field).GetType() == ValueType_Null;
+    }
+  }
+
   std::string DatabaseManager::StatementBase::ReadString(size_t field) const
   {
     const IValue& value = GetResultField(field);
@@ -535,8 +545,7 @@ namespace OrthancDatabases
         return dynamic_cast<const Utf8StringValue&>(value).GetContent();
 
       default:
-        //LOG(ERROR) << value.Format();
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "The returned field is not of the correct type (String)");
     }
   }
   
@@ -560,8 +569,7 @@ namespace OrthancDatabases
     }
   }
 
-      
-  void DatabaseManager::CachedStatement::Execute(const Dictionary& parameters)
+  void DatabaseManager::CachedStatement::ExecuteInternal(const Dictionary& parameters, bool withResults)
   {
     try
     {
@@ -587,7 +595,14 @@ namespace OrthancDatabases
         #endif
       */
 
-      SetResult(GetTransaction().Execute(*statement_, parameters));
+      if (withResults)
+      {
+        SetResult(GetTransaction().Execute(*statement_, parameters));
+      }
+      else
+      {
+        GetTransaction().ExecuteWithoutResult(*statement_, parameters);
+      }
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -595,7 +610,18 @@ namespace OrthancDatabases
       throw;
     }
   }
+
+      
+  void DatabaseManager::CachedStatement::Execute(const Dictionary& parameters)
+  {
+    ExecuteInternal(parameters, true);
+  }
   
+  void DatabaseManager::CachedStatement::ExecuteWithoutResult(const Dictionary& parameters)
+  {
+    ExecuteInternal(parameters, false);
+  }
+
   
   DatabaseManager::StandaloneStatement::StandaloneStatement(DatabaseManager& manager,
                                                             const std::string& sql) :
@@ -615,6 +641,16 @@ namespace OrthancDatabases
 
   void DatabaseManager::StandaloneStatement::Execute(const Dictionary& parameters)
   {
+    ExecuteInternal(parameters, true);
+  }
+
+  void DatabaseManager::StandaloneStatement::ExecuteWithoutResult(const Dictionary& parameters)
+  {
+    ExecuteInternal(parameters, false);
+  }
+
+  void DatabaseManager::StandaloneStatement::ExecuteInternal(const Dictionary& parameters, bool withResults)
+  {
     try
     {
       std::unique_ptr<Query> query(ReleaseQuery());
@@ -626,7 +662,14 @@ namespace OrthancDatabases
       statement_.reset(GetManager().GetDatabase().Compile(*query));
       assert(statement_.get() != NULL);
 
-      SetResult(GetTransaction().Execute(*statement_, parameters));
+      if (withResults)
+      {
+        SetResult(GetTransaction().Execute(*statement_, parameters));
+      }
+      else
+      {
+        GetTransaction().Execute(*statement_, parameters);
+      }
     }
     catch (Orthanc::OrthancException& e)
     {

@@ -48,3 +48,10 @@ static const int32_t POSTGRESQL_LOCK_STORAGE = 43;
  * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
  **/
 static const int32_t POSTGRESQL_LOCK_DATABASE_SETUP = 44;
+
+/**
+ * Transient advisory lock to protect the instance creation,
+ * because it is not 100% resilient to concurrency in, e.g, READ COMIITED 
+ * transaction isolation level.
+ **/
+static const int32_t POSTGRESQL_LOCK_CREATE_INSTANCE = 45;

@@ -159,7 +159,10 @@ namespace OrthancDatabases
 
   void PostgreSQLDatabase::ExecuteMultiLines(const std::string& sql)
   {
-    LOG(TRACE) << "PostgreSQL: " << sql;
+    if (IsVerboseEnabled())
+    {
+      LOG(INFO) << "PostgreSQL: " << sql;
+    }
     Open();
 
     PGresult* result = PQexec(reinterpret_cast<PGconn*>(pg_), sql.c_str());
@@ -318,13 +321,15 @@ namespace OrthancDatabases
 
   PostgreSQLDatabase::TransientAdvisoryLock::TransientAdvisoryLock(
     PostgreSQLDatabase&  database,
-    int32_t lock) :
+    int32_t lock,
+    unsigned int retries,
+    unsigned int retryInterval) :
     database_(database),
     lock_(lock)
   {
     bool locked = true;
     
-    for (unsigned int i = 0; i < 10; i++)
+    for (unsigned int i = 0; i < retries; i++)
     {
       if (database_.AcquireAdvisoryLock(lock_))
       {
@@ -333,7 +338,7 @@ namespace OrthancDatabases
       }
       else
       {
-        boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+        boost::this_thread::sleep(boost::posix_time::milliseconds(retryInterval));
       }
     }
 
