@@ -1,21 +1,29 @@
 Pending changes in the mainline
 ===============================
 
+
+Release 6.0 (2024-02-08)
+========================
+
+DB schema revision: 2
+
+* The DB schema has been updated to Revision 2.  If you need to reinstall the previous
+  version of the plugin, you should run this script:
+  https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Downgrades/Rev2ToRev1.sql
 * Transaction Mode:
-  Introduced a new configuration to select the transaction isolation level
-    "TransactionMode": "Serializable"
+  Introduced a new configuration "TransactionMode" to select the transaction isolation level.
   Allowed values: "Serializable", "ReadCommitted".
   The "Serializable" mode was the only available value up to now.  It is still the default
   value now.
   The "ReadCommitted" is possible now due to rewrites of SQL queries and notably improves
   the Orthanc ability to ingest data from multiple sources in parallel.
-* internals:
-  - Added a UNIQUE constraint on Resources.publicId to detect DB inconsistencies
 * New "EnableVerboseLogs" configuration to show SQL statements being executed.
 
 
 Release 5.1 (2023-06-27)
 ========================
+
+DB schema revision: 1
 
 * Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
 
