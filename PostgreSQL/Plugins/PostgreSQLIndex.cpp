@@ -240,9 +240,8 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT value FROM GlobalIntegers WHERE key = 0");
+        "SELECT * FROM UpdateSingleStatistic(0)");
 
-      statement.SetReadOnly(true);
       statement.Execute();
 
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
@@ -262,9 +261,8 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT value FROM GlobalIntegers WHERE key = 1");
+        "SELECT * FROM UpdateSingleStatistic(1)");
 
-      statement.SetReadOnly(true);
       statement.Execute();
 
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
@@ -622,19 +620,11 @@ namespace OrthancDatabases
     uint64_t result;
     
     {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT value FROM GlobalIntegers WHERE key = ${key}");
+      DatabaseManager::StandaloneStatement statement(
+        manager,
+        std::string("SELECT * FROM UpdateSingleStatistic(") + boost::lexical_cast<std::string>(resourceType + 2) + ")");  // For an explanation of the "+ 2" below, check out "PrepareIndex.sql"
 
-      statement.SetParameterType("key", ValueType_Integer64);
-
-      Dictionary args;
-
-      // For an explanation of the "+ 2" below, check out "FastCountResources.sql"
-      args.SetIntegerValue("key", static_cast<int>(resourceType + 2));
-
-      statement.SetReadOnly(true);
-      statement.Execute(args);
+      statement.Execute();
 
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }

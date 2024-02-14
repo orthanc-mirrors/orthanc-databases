@@ -26,9 +26,8 @@ Common - Storage area
 PostgreSQL
 ----------
 
-* reported issue to validate:  uploading lots of files through HTTP with:
-  - 1 client and IndexConnectionsCount==1 took 100s
-  - 2 client and IndexConnectionsCount==2 took 600s (lots of transaction replayed)
+* Have a separate "thread" to UpdateStatistics to avoid large computations ?
+
 
 * Seems Orthanc might deadlock when there are plenty of conflicting transactions:
   https://groups.google.com/g/orthanc-users/c/xQelEcKqL9U/m/HsvxwlkvAQAJ
