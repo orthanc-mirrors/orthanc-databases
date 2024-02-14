@@ -1,9 +1,9 @@
-Pending changes in the mainline
-===============================
+Release 6.1 (2024-02-14)
+========================
 
 DB schema revision: 2
 
-* Fixed the MaximumStorageSize & MaximumPatientCount.
+* Fixed handling of MaximumStorageSize & MaximumPatientCount.
 
 
 Release 6.0 (2024-02-08)
