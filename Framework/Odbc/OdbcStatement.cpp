@@ -82,6 +82,11 @@ namespace OrthancDatabases
           throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
 #endif
         }
+        else if (state == "08S01")
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
+        }
+
       }
       else
       {
