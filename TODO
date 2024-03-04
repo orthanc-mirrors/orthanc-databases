@@ -26,6 +26,12 @@ Common - Storage area
 PostgreSQL
 ----------
 
+* Check if we can force the schema that is used.  By default, Orthanc
+  is using the 'public' schema but, after a wrong command, we have seen
+  a DB where there was a 'AttachedFiles' table in the public schema and another one in a
+  'MyPacs' schema and Orthanc was actually using the 'MyPacs.AttachedFiles' table !!!
+  Orthanc was then seeing only the most recent attached files !!!
+
 * Have a separate "thread" to UpdateStatistics to avoid large computations ?
 
 
