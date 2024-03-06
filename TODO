@@ -10,6 +10,9 @@ Common - Database index
 * Performance of joins in LookupResources: Create cached statement for
   LookupResources, that are grouped to search up to, say, 10 tags,
   instead of recompiling for each request
+* Check that "MaximumConnectionRetries" is also used when trying to
+  reconnect at the DB when the connection is lost while running.
+  At least with ODBC, this is not happening.
 
 ---------------------
 Common - Storage area
