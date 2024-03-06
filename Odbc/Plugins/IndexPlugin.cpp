@@ -101,7 +101,7 @@ extern "C"
     {
       const std::string connectionString = odbc.GetStringValue("IndexConnectionString", "");
       const unsigned int countConnections = odbc.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
-      const unsigned int maxConnectionRetries = odbc.GetUnsignedIntegerValue("MaxConnectionRetries", 10);
+      const unsigned int maxConnectionRetries = odbc.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
       const unsigned int connectionRetryInterval = odbc.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
 
       if (connectionString.empty())
