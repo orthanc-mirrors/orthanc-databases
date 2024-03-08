@@ -55,3 +55,10 @@ MySQL
     ALTER TABLE table ADD FULLTEXT index_name(column1);
 
   - https://dev.mysql.com/doc/refman/8.0/en/index-btree-hash.html
+
+
+----
+ODBC
+----
+
+* https://orthanc.uclouvain.be/bugs/show_bug.cgi?id=224
