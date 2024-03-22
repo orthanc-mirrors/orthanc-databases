@@ -23,8 +23,17 @@ project(OrthancSQLite)
 
 set(ORTHANC_PLUGIN_VERSION "mainline")
 
+# This is the preferred version of the Orthanc SDK for this plugin
 set(ORTHANC_SDK_DEFAULT_VERSION "1.12.0")
 
+# This is the list of the versions of the Orthanc SDK against which
+# this plugin will compile
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3")
+
+# This is the minimal version of the Orthanc runtime that will provide
+# best performance. If the version of the Orthanc runtime is below
+# this minimal version, a warning message will be printed (but the
+# plugin will still start).
 set(ORTHANC_OPTIMAL_VERSION_MAJOR    1)
 set(ORTHANC_OPTIMAL_VERSION_MINOR    12)
 set(ORTHANC_OPTIMAL_VERSION_REVISION 0)

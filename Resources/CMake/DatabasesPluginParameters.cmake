@@ -26,7 +26,16 @@ set(ORTHANC_FRAMEWORK_ROOT "" CACHE STRING "Path to the Orthanc source directory
 
 # Advanced parameters to fine-tune linking against system libraries
 set(USE_SYSTEM_ORTHANC_SDK ON CACHE BOOL "Use the system version of the Orthanc plugin SDK")
-set(ORTHANC_SDK_VERSION "${ORTHANC_SDK_DEFAULT_VERSION}" CACHE STRING "Version of the Orthanc plugin SDK to use, if not using the system version (can be \"0.9.5\", \"1.4.0\", \"1.5.2\", \"1.5.4\", \"1.9.2\", \"1.12.0\", \"1.12.3\" or \"framework\")")
+
+# Generate the documentation about the "ORTHANC_SDK_VERSION" option
+set(tmp "Version of the Orthanc plugin SDK to use, if not using the system version (can be")
+foreach(version IN LISTS ORTHANC_SDK_COMPATIBLE_VERSIONS)
+  set(tmp "${tmp} ${version},")
+endforeach()
+set(tmp "${tmp} or \"framework\")")
+
+set(ORTHANC_SDK_VERSION "${ORTHANC_SDK_DEFAULT_VERSION}" CACHE STRING "${tmp}")
+
 
 include(${CMAKE_CURRENT_LIST_DIR}/DatabasesFrameworkParameters.cmake)
 
