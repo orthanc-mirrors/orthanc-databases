@@ -59,6 +59,19 @@ namespace OrthancDatabases
     assert(DisplayPerformanceWarning(dbms, isIndex));
 
     /* Check the version of the Orthanc core */
+    if (OrthancPluginCheckVersion(context) == 0)
+    {
+      LOG(ERROR) << "Your version of Orthanc ("
+                 << context->orthancVersion << ") must be above "
+                 << ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER << "."
+                 << ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER << "."
+                 << ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER
+                 << " to run this plugin";
+      return false;
+    }
+
+
+    /* Warn the user if the Orthanc runtime has not an optimal version */
 
     bool useFallback = true;
     bool isOptimal = false;
@@ -88,18 +101,6 @@ namespace OrthancDatabases
     useFallback = false;
 #  endif
 #endif
-
-    if (useFallback &&
-        OrthancPluginCheckVersion(context) == 0)
-    {
-      LOG(ERROR) << "Your version of Orthanc (" 
-                 << context->orthancVersion << ") must be above "
-                 << ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER << "."
-                 << ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER << "."
-                 << ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER
-                 << " to run this plugin";
-      return false;
-    }
 
     if (useFallback)
     {
