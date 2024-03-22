@@ -1,3 +1,14 @@
+Pending changes in the mainline
+===============================
+
+Minimum plugin SDK: 0.9.5
+Optimal plugin SDK: 1.12.0+
+Minimum Orthanc runtime: 0.9.5
+Optimal Orthanc runtime: 1.12.0+
+
+* Fix check of Orthanc runtime version
+
+
 Release 1.2 (2024-03-06)
 ========================
 

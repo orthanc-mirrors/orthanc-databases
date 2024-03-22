@@ -1,10 +1,19 @@
+Pending changes in the mainline
+===============================
+
+DB schema revision: 2
+Minimum plugin SDK: 1.12.3
+Minimum Orthanc runtime: 1.12.3
+
+* Fix check of Orthanc runtime version
+
+
 Release 6.1 (2024-02-14)
 ========================
 
 DB schema revision: 2
 
 * Fix handling of MaximumStorageSize & MaximumPatientCount.
-* Fix check of Orthanc runtime version
 
 
 Release 6.0 (2024-02-08)
