@@ -29,6 +29,8 @@
 
 #include <Logging.h>
 
+#define ORTHANC_PLUGIN_NAME "odbc-storage"
+
 
 namespace OrthancDatabases
 {
@@ -113,7 +115,7 @@ extern "C"
   
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
-    if (!OrthancDatabases::InitializePlugin(context, "ODBC", false))
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "ODBC", false))
     {
       return -1;
     }
@@ -191,7 +193,7 @@ extern "C"
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "odbc-storage";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

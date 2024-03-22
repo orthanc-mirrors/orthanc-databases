@@ -26,11 +26,14 @@
 #include <Logging.h>
 #include <Toolbox.h>
 
+#define ORTHANC_PLUGIN_NAME "postgresql-storage"
+
+
 extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
-    if (!OrthancDatabases::InitializePlugin(context, "PostgreSQL", false))
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "PostgreSQL", false))
     {
       return -1;
     }
@@ -88,7 +91,7 @@ extern "C"
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "postgresql-storage";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

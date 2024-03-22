@@ -28,12 +28,14 @@
 #include <Logging.h>
 #include <Toolbox.h>
 
+#define ORTHANC_PLUGIN_NAME "mysql-storage"
+
 
 extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
-    if (!OrthancDatabases::InitializePlugin(context, "MySQL", false))
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "MySQL", false))
     {
       return -1;
     }
@@ -95,7 +97,7 @@ extern "C"
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "mysql-storage";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

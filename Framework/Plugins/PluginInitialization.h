@@ -29,6 +29,7 @@
 namespace OrthancDatabases
 {
   bool InitializePlugin(OrthancPluginContext* context,
+                        const std::string& pluginName,
                         const std::string& dbms,
                         bool isIndex);
 }

@@ -28,6 +28,8 @@
 
 #include <Logging.h>
 
+#define ORTHANC_PLUGIN_NAME "odbc-index"
+
 
 #if defined(_WIN32)
 #  ifdef _MSC_VER
@@ -59,7 +61,7 @@ extern "C"
   {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (!OrthancDatabases::InitializePlugin(context, "ODBC", true))
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "ODBC", true))
     {
       return -1;
     }
@@ -141,7 +143,7 @@ extern "C"
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "odbc-index";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

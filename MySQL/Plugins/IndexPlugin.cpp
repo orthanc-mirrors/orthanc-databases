@@ -30,6 +30,7 @@
 
 #include <google/protobuf/any.h>
 
+#define ORTHANC_PLUGIN_NAME "mysql-index"
 
 extern "C"
 {
@@ -37,7 +38,7 @@ extern "C"
   {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (!OrthancDatabases::InitializePlugin(context, "MySQL", true))
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "MySQL", true))
     {
       return -1;
     }
@@ -103,7 +104,7 @@ extern "C"
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "mysql-index";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

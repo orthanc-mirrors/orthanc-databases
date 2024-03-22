@@ -28,6 +28,8 @@
 
 #include <google/protobuf/any.h>
 
+#define ORTHANC_PLUGIN_NAME "postgresql-index"
+
 
 extern "C"
 {
@@ -35,7 +37,7 @@ extern "C"
   {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (!OrthancDatabases::InitializePlugin(context, "PostgreSQL", true))
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "PostgreSQL", true))
     {
       return -1;
     }
@@ -97,7 +99,7 @@ extern "C"
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "postgresql-index";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

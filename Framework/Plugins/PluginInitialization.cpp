@@ -43,6 +43,7 @@ namespace OrthancDatabases
 
 
   bool InitializePlugin(OrthancPluginContext* context,
+                        const std::string& pluginName,
                         const std::string& dbms,
                         bool isIndex)
   {
@@ -151,7 +152,7 @@ namespace OrthancDatabases
                                std::string(isIndex ? "index" : "storage area") +
                                " into a " + dbms + " database");
     
-    OrthancPluginSetDescription(context, description.c_str());
+    OrthancPlugins::SetDescription(pluginName, description.c_str());
 
     return true;
   }
