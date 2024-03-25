@@ -21,7 +21,7 @@
 cmake_minimum_required(VERSION 2.8)
 project(OrthancPostgreSQL)
 
-set(ORTHANC_PLUGIN_VERSION "mainline")
+set(ORTHANC_PLUGIN_VERSION "6.2")
 
 # This is the preferred version of the Orthanc SDK for this plugin
 set(ORTHANC_SDK_DEFAULT_VERSION "1.12.3")
