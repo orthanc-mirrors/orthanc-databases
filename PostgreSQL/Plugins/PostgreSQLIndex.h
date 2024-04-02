@@ -34,11 +34,11 @@ namespace OrthancDatabases
     bool                   clearAll_;
 
   protected:
-    virtual void ClearDeletedFiles(DatabaseManager& manager);
+    virtual void ClearDeletedFiles(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-    virtual void ClearDeletedResources(DatabaseManager& manager);
+    virtual void ClearDeletedResources(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-    virtual void ClearRemainingAncestor(DatabaseManager& manager);
+    virtual void ClearRemainingAncestor(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
     void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
 
