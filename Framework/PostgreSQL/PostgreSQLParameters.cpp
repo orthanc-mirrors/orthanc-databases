@@ -199,6 +199,36 @@ namespace OrthancDatabases
     database_ = database;
   }
 
+  const std::string PostgreSQLParameters::GetReadWriteTransactionStatement() const
+  {
+    switch (isolationMode_)
+    {
+      case IsolationMode_ReadCommited:
+        return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ WRITE";
+
+      case IsolationMode_Serializable:
+        return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE";
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+  const std::string PostgreSQLParameters::GetReadOnlyTransactionStatement() const
+  {
+    switch (isolationMode_)
+    {
+      case IsolationMode_ReadCommited:
+        return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY";
+
+      case IsolationMode_Serializable:
+        return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY";
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
   void PostgreSQLParameters::Format(std::string& target) const
   {
     if (uri_.empty())

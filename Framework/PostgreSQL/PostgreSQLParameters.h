@@ -137,31 +137,9 @@ namespace OrthancDatabases
       isolationMode_ = isolationMode;
     }
 
-    const char* GetReadWriteTransactionStatement() const
-    {
-      switch (isolationMode_)
-      {
-        case IsolationMode_ReadCommited:
-          return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ WRITE";
-        case IsolationMode_Serializable:
-          return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE";
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-      }
-    }
+    const std::string GetReadWriteTransactionStatement() const;
 
-    const char* GetReadOnlyTransactionStatement() const
-    {
-      switch (isolationMode_)
-      {
-        case IsolationMode_ReadCommited:
-          return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY";
-        case IsolationMode_Serializable:
-          return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY";
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-      }
-    }
+    const std::string GetReadOnlyTransactionStatement() const;
 
     void SetVerboseEnabled(bool enabled)
     {
