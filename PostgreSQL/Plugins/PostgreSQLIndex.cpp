@@ -146,6 +146,8 @@ namespace OrthancDatabases
           }
           else if (revision == 1)
           {
+            LOG(WARNING) << "DatabasePatchLevel is 1";
+            needToRunUpgradeFromUnknownToV1 = true;
             needToRunUpgradeV1toV2 = true;
           }
 

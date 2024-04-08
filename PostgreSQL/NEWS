@@ -1,8 +1,18 @@
+Pending changes in the mainline
+===============================
+
+DB schema revision: 2
+Minimum plugin SDK (for build): 1.12.3
+Minimum Orthanc runtime: 1.12.3
+
+* Fix updates from version plugin version 3.3 to latest version
+
+
 Release 6.2 (2024-03-25)
 ========================
 
 DB schema revision: 2
-Minimum plugin SDK: 1.12.3
+Minimum plugin SDK (for build): 1.12.3
 Minimum Orthanc runtime: 1.12.3
 
 * Fix check of Orthanc runtime version
