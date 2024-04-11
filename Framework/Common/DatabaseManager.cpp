@@ -78,9 +78,9 @@ namespace OrthancDatabases
   }
 
 
-  IPrecompiledStatement* DatabaseManager::LookupCachedStatement(const StatementLocation& location) const
+  IPrecompiledStatement* DatabaseManager::LookupCachedStatement(const StatementId& statementId) const
   {
-    CachedStatements::const_iterator found = cachedStatements_.find(location);
+    CachedStatements::const_iterator found = cachedStatements_.find(statementId);
 
     if (found == cachedStatements_.end())
     {
@@ -94,10 +94,10 @@ namespace OrthancDatabases
   }
 
     
-  IPrecompiledStatement& DatabaseManager::CacheStatement(const StatementLocation& location,
+  IPrecompiledStatement& DatabaseManager::CacheStatement(const StatementId& statementId,
                                                          const Query& query)
   {
-    LOG(TRACE) << "Caching statement from " << location.GetFile() << ":" << location.GetLine();
+    LOG(TRACE) << "Caching statement from " << statementId.GetFile() << ":" << statementId.GetLine() << "" << statementId.GetDynamicStatement();
       
     std::unique_ptr<IPrecompiledStatement> statement(GetDatabase().Compile(query));
       
@@ -107,8 +107,8 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
 
-    assert(cachedStatements_.find(location) == cachedStatements_.end());
-    cachedStatements_[location] = statement.release();
+    assert(cachedStatements_.find(statementId) == cachedStatements_.end());
+    cachedStatements_[statementId] = statement.release();
 
     return *tmp;
   }
@@ -550,13 +550,13 @@ namespace OrthancDatabases
   }
   
   
-  DatabaseManager::CachedStatement::CachedStatement(const StatementLocation& location,
+  DatabaseManager::CachedStatement::CachedStatement(const StatementId& statementId,
                                                     DatabaseManager& manager,
                                                     const std::string& sql) :
     StatementBase(manager),
-    location_(location)
+    statementId_(statementId)
   {
-    statement_ = GetManager().LookupCachedStatement(location_);
+    statement_ = GetManager().LookupCachedStatement(statementId_);
 
     if (statement_ == NULL)
     {
@@ -565,7 +565,7 @@ namespace OrthancDatabases
     else
     {
       LOG(TRACE) << "Reusing cached statement from "
-                 << location_.GetFile() << ":" << location_.GetLine();
+                 << statementId_.GetFile() << ":" << statementId_.GetLine() << " " << statementId_.GetDynamicStatement();
     }
   }
 
@@ -579,7 +579,7 @@ namespace OrthancDatabases
       {
         // Register the newly-created statement
         assert(statement_ == NULL);
-        statement_ = &GetManager().CacheStatement(location_, *query);
+        statement_ = &GetManager().CacheStatement(statementId_, *query);
       }
         
       assert(statement_ != NULL);

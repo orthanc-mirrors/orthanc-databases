@@ -20,21 +20,57 @@
  **/
 
 
-#include "StatementLocation.h"
+#pragma once
 
-#include <string.h>
+#include <string>
+
+#define STATEMENT_FROM_HERE  ::OrthancDatabases::StatementId(__FILE__, __LINE__)
+#define STATEMENT_FROM_HERE_DYNAMIC(sql)  ::OrthancDatabases::StatementId(__FILE__, __LINE__, sql)
+
 
 namespace OrthancDatabases
 {
-  bool StatementLocation::operator< (const StatementLocation& other) const
+  class StatementId
   {
-    if (line_ != other.line_)
+  private:
+    const char* file_;
+    int line_;
+    std::string statement_;
+
+    StatementId(); // Forbidden
+    
+  public:
+    StatementId(const char* file,
+                int line) :
+      file_(file),
+      line_(line)
     {
-      return line_ < other.line_;
     }
-    else
+
+    StatementId(const char* file,
+                int line,
+                const std::string& statement) :
+      file_(file),
+      line_(line),
+      statement_(statement)
     {
-      return strcmp(file_, other.file_) < 0;
     }
-  }
+
+    const char* GetFile() const
+    {
+      return file_;
+    }
+
+    int GetLine() const
+    {
+      return line_;
+    }
+    
+    const std::string& GetDynamicStatement() const
+    {
+      return statement_;
+    }
+
+    bool operator< (const StatementId& other) const;
+  };
 }

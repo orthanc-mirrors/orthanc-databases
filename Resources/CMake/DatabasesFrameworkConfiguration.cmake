@@ -119,7 +119,7 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ResultFileValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
-  ${ORTHANC_DATABASES_ROOT}/Framework/Common/StatementLocation.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/StatementId.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Utf8StringValue.cpp
   )
 

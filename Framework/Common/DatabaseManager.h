@@ -23,7 +23,7 @@
 #pragma once
 
 #include "IDatabaseFactory.h"
-#include "StatementLocation.h"
+#include "StatementId.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Enumerations.h>
@@ -48,7 +48,7 @@ namespace OrthancDatabases
   class DatabaseManager : public boost::noncopyable
   {
   private:
-    typedef std::map<StatementLocation, IPrecompiledStatement*>  CachedStatements;
+    typedef std::map<StatementId, IPrecompiledStatement*>  CachedStatements;
 
     std::unique_ptr<IDatabaseFactory>  factory_;
     std::unique_ptr<IDatabase>     database_;
@@ -58,9 +58,9 @@ namespace OrthancDatabases
 
     void CloseIfUnavailable(Orthanc::ErrorCode e);
 
-    IPrecompiledStatement* LookupCachedStatement(const StatementLocation& location) const;
+    IPrecompiledStatement* LookupCachedStatement(const StatementId& statementId) const;
 
-    IPrecompiledStatement& CacheStatement(const StatementLocation& location,
+    IPrecompiledStatement& CacheStatement(const StatementId& statementId,
                                           const Query& query);
 
     ITransaction& GetTransaction();
@@ -206,11 +206,11 @@ namespace OrthancDatabases
     class CachedStatement : public StatementBase
     {
     private:
-      StatementLocation       location_;
+      StatementId             statementId_;
       IPrecompiledStatement*  statement_;
 
     public:
-      CachedStatement(const StatementLocation& location,
+      CachedStatement(const StatementId& statementId,
                       DatabaseManager& manager,
                       const std::string& sql);
 

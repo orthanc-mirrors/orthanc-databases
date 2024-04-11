@@ -109,6 +109,14 @@ namespace OrthancDatabases
                             int64_t since,
                             uint32_t limit) = 0;
 
+    virtual void GetChanges2(IDatabaseBackendOutput& output,
+                             bool& done /*out*/,
+                             DatabaseManager& manager,
+                             int64_t since,
+                             int64_t to,
+                             int32_t changeType,
+                             uint32_t limit) = 0;
+
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
                                        int64_t id) = 0;
@@ -376,6 +384,8 @@ namespace OrthancDatabases
     // New in Orthanc 1.12.3
     virtual uint64_t MeasureLatency(DatabaseManager& manager) = 0;
 
+    // New in Orthanc 1.13.0
+    virtual bool HasExtendedApiV1() = 0;
 
   };
 }

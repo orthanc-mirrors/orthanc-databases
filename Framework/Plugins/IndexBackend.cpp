@@ -116,28 +116,60 @@ namespace OrthancDatabases
                                          DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
-                                         uint32_t limit)
+                                         uint32_t limit,
+                                         bool returnFirstResults)
   {
+    struct Change
+    {
+      int64_t       seq_;
+      int32_t       changeType_;
+      OrthancPluginResourceType       resourceType_;
+      std::string   publicId_;
+      std::string   changeDate_;
+
+      Change(int64_t seq, int32_t changeType, OrthancPluginResourceType resourceType, const std::string& publicId, const std::string& changeDate)
+      : seq_(seq), changeType_(changeType), resourceType_(resourceType), publicId_(publicId), changeDate_(changeDate)
+      {
+      }
+    };
+
     statement.Execute(args);
 
-    uint32_t count = 0;
-
-    while (count < limit &&
-           !statement.IsDone())
+    std::list<Change> changes;
+    while (!statement.IsDone())
     {
-      output.AnswerChange(
+      changes.push_back(Change(
         statement.ReadInteger64(0),
         statement.ReadInteger32(1),
         static_cast<OrthancPluginResourceType>(statement.ReadInteger32(2)),
         statement.ReadString(3),
-        statement.ReadString(4));
+        statement.ReadString(4)
+      ));
 
       statement.Next();
-      count++;
+    }
+    
+    done = changes.size() <= limit;  // 'done' means we have returned all requested changes
+
+    // if we have retrieved more changes than requested -> cleanup
+    if (changes.size() > limit)
+    {
+      assert(changes.size() == limit+1); // the statement should only request 1 element more
+
+      if (returnFirstResults)
+      {
+        changes.pop_back();
+      }
+      else
+      {
+        changes.pop_front();
+      }
     }
 
-    done = (count < limit ||
-            statement.IsDone());
+    for (std::list<Change>::const_iterator it = changes.begin(); it != changes.end(); ++it)
+    {
+      output.AnswerChange(it->seq_, it->changeType_, it->resourceType_, it->publicId_, it->changeDate_);
+    }
   }
 
 
@@ -553,39 +585,113 @@ namespace OrthancDatabases
     ReadListOfStrings(target, statement, args);
   }
 
-    
-  /* Use GetOutput().AnswerChange() */
   void IndexBackend::GetChanges(IDatabaseBackendOutput& output,
                                 bool& done /*out*/,
                                 DatabaseManager& manager,
                                 int64_t since,
                                 uint32_t limit)
   {
-    std::string suffix;
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 13, 0)    
+    GetChanges2(output, done, manager, since, -1, _OrthancPluginChangeType_All, limit);
+#else
+    GetChanges2(output, done, manager, since, -1, 65535, limit);
+#endif
+  }
+
+  /* Use GetOutput().AnswerChange() */
+  void IndexBackend::GetChanges2(IDatabaseBackendOutput& output,
+                                 bool& done /*out*/,
+                                 DatabaseManager& manager,
+                                 int64_t since,
+                                 int64_t to,
+                                 int32_t changeType,
+                                 uint32_t limit)
+  {
+    std::string limitSuffix;
     if (manager.GetDialect() == Dialect_MSSQL)
     {
-      suffix = "OFFSET 0 ROWS FETCH FIRST ${limit} ROWS ONLY";
+      limitSuffix = "OFFSET 0 ROWS FETCH FIRST ${limit} ROWS ONLY";
     }
     else
     {
-      suffix = "LIMIT ${limit}";
+      limitSuffix = "LIMIT ${limit}";
     }
     
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, "
-      "Changes.date FROM Changes INNER JOIN Resources "
-      "ON Changes.internalId = Resources.internalId WHERE seq>${since} ORDER BY seq " + suffix);
+    std::vector<std::string> filters;
+    bool hasSince = false;
+    bool hasTo = false;
+    bool hasFilterType = false;    
 
+    if (since > 0)
+    {
+      hasSince = true;
+      filters.push_back("seq>${since}");
+    }
+    if (to != -1)
+    {
+      hasTo = true;
+      filters.push_back("seq<=${to}");
+    }
+    if (changeType != _OrthancPluginChangeType_All)
+    {
+      hasFilterType = true;
+      filters.push_back("changeType=${changeType}");
+    }
+
+    std::string filtersString;
+    if (filters.size() > 0)
+    {
+      Orthanc::Toolbox::JoinStrings(filtersString, filters, " AND ");
+      filtersString = "WHERE " + filtersString;
+    }
+
+    std::string sql;
+    bool returnFirstResults;
+    if (hasTo && !hasSince)
+    {
+      // in this case, we want the largest values but we want them ordered in ascending order
+      sql = "SELECT * FROM (SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, Changes.date "
+            "FROM Changes INNER JOIN Resources "
+            "ON Changes.internalId = Resources.internalId " + filtersString + " ORDER BY seq DESC " + limitSuffix + 
+            ") AS FilteredChanges ORDER BY seq ASC";
+
+      returnFirstResults = false;
+    }
+    else
+    {
+      // default query: we want the smallest values ordered in ascending order
+      sql = "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, "
+            "Changes.date FROM Changes INNER JOIN Resources "
+            "ON Changes.internalId = Resources.internalId " + filtersString + " ORDER BY seq ASC " + limitSuffix;
+      returnFirstResults = true;
+    }
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
     statement.SetReadOnly(true);
-    statement.SetParameterType("limit", ValueType_Integer64);
-    statement.SetParameterType("since", ValueType_Integer64);
-
     Dictionary args;
-    args.SetIntegerValue("limit", limit + 1);
-    args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, statement, args, limit);
+    statement.SetParameterType("limit", ValueType_Integer64);
+    args.SetIntegerValue("limit", limit + 1);  // we take limit+1 because we use the +1 to know if "Done" must be set to true
+
+    if (hasSince)
+    {
+      statement.SetParameterType("since", ValueType_Integer64);
+      args.SetIntegerValue("since", since);
+    }
+
+    if (hasTo)
+    {
+      statement.SetParameterType("to", ValueType_Integer64);
+      args.SetIntegerValue("to", to);
+    }
+
+    if (hasFilterType)
+    {
+      statement.SetParameterType("changeType", ValueType_Integer64);
+      args.SetIntegerValue("changeType", changeType);
+    }
+
+    ReadChangesInternal(output, done, manager, statement, args, limit, returnFirstResults);
   }
 
     
@@ -685,7 +791,7 @@ namespace OrthancDatabases
     Dictionary args;
 
     bool done;  // Ignored
-    ReadChangesInternal(output, done, manager, statement, args, 1);
+    ReadChangesInternal(output, done, manager, statement, args, 1, true);
   }
 
     

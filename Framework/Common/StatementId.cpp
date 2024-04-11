@@ -20,39 +20,24 @@
  **/
 
 
-#pragma once
+#include "StatementId.h"
 
-#define STATEMENT_FROM_HERE  ::OrthancDatabases::StatementLocation(__FILE__, __LINE__)
-
+#include <string.h>
 
 namespace OrthancDatabases
 {
-  class StatementLocation
+  bool StatementId::operator< (const StatementId& other) const
   {
-  private:
-    const char* file_;
-    int line_;
-    
-    StatementLocation(); // Forbidden
-    
-  public:
-    StatementLocation(const char* file,
-                      int line) :
-      file_(file),
-      line_(line)
+    if (line_ != other.line_)
     {
+      return line_ < other.line_;
     }
 
-    const char* GetFile() const
+    if (strcmp(file_, other.file_) < 0)
     {
-      return file_;
+      return true;
     }
 
-    int GetLine() const
-    {
-      return line_;
-    }
-    
-    bool operator< (const StatementLocation& other) const;
-  };
+    return statement_ < other.statement_;
+  }
 }

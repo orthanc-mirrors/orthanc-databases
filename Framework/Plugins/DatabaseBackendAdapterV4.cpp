@@ -438,6 +438,9 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
 #endif
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 13, 0)
+        response.mutable_get_system_information()->set_has_extended_api_v1(accessor.GetBackend().HasExtendedApiV1());
+#endif
         break;
       }
 
@@ -782,7 +785,19 @@ namespace OrthancDatabases
         response.mutable_get_changes()->set_done(done);
         break;
       }
-      
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 13, 0)
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES_2:
+      {
+        Output output(*response.mutable_get_changes());
+
+        bool done;
+        backend.GetChanges2(output, done, manager, request.get_changes2().since(), request.get_changes2().to(), static_cast<OrthancPluginChangeType>(request.get_changes2().change_type()), request.get_changes2().limit());
+
+        response.mutable_get_changes()->set_done(done);
+        break;
+      }
+#endif
+
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_INTERNAL_ID:
       {
         std::list<int64_t>  values;
