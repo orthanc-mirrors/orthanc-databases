@@ -90,6 +90,7 @@ EmbedResources(
   MYSQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
   MYSQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
   MYSQL_CREATE_INSTANCE        ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
+  MYSQL_DELETE_RESOURCES       ${CMAKE_SOURCE_DIR}/Plugins/DeleteResources.sql
   )
 
 if (EXISTS ${ORTHANC_SDK_ROOT}/orthanc/OrthancDatabasePlugin.proto)

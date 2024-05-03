@@ -10,6 +10,11 @@ Common - Database index
 * Performance of joins in LookupResources: Create cached statement for
   LookupResources, that are grouped to search up to, say, 10 tags,
   instead of recompiling for each request
+* Do not log "DatabaseCannotSerialize" errors in the plugin but only
+  in Orthanc after all retries have been made.
+* Try to avoid the use of temporary tables:
+  https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor/3820
+
 
 * Implement "large queries" for:
   - updating all metadata of a resource at once
