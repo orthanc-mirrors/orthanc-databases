@@ -618,7 +618,7 @@ namespace OrthancDatabases
            * "odbc-index" cannot start because it doesn't have
            * exclusive access.
            **/
-          db->ExecuteMultiLines("ALTER DATABASE CURRENT COLLATE LATIN1_GENERAL_100_CI_AS_SC_UTF8");
+          db->ExecuteMultiLines("IF 'Latin1_General_100_CI_AS_SC_UTF8' != (SELECT CONVERT (varchar(256), DATABASEPROPERTYEX(DB_NAME(),'collation'))) ALTER DATABASE CURRENT COLLATE LATIN1_GENERAL_100_CI_AS_SC_UTF8");
         }
         
         return db.release();
