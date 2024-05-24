@@ -139,7 +139,7 @@ namespace OrthancDatabases
 
       if (statement.IsDone())
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "ReadWhole: No content found for storage.");
       }
       else if (statement.GetResultFieldsCount() != 1)
       {
@@ -208,7 +208,7 @@ namespace OrthancDatabases
 
       if (statement.IsDone())
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "ReadRange: No content found for storage.");
       }
       else if (statement.GetResultFieldsCount() != 1)
       {

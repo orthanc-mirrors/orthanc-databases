@@ -760,7 +760,7 @@ namespace OrthancDatabases
 
     if (statement.IsDone())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No public id found for internal id");
     }
     else
     {
@@ -828,7 +828,7 @@ namespace OrthancDatabases
 
     if (statement.IsDone())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No resource type found for internal id.");
     }
     else
     {
