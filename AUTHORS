@@ -30,3 +30,13 @@ Authors
   1348 Ottignies-Louvain-la-Neuve
   Belgium
   https://uclouvain.be/icteam
+
+
+Contributors
+------------
+
+* The Orthanc community
+  https://groups.google.com/forum/#!forum/orthanc-users
+
+* Cédric Simon (https://discourse.orthanc-server.org/u/csimon3/summary)
+  Improved MySQL delete procedure
