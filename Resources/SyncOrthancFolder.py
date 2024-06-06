@@ -17,7 +17,7 @@ else:
 
 TARGET = os.path.join(os.path.dirname(__file__), 'Orthanc')
 PLUGIN_SDK_VERSION_OLD = [ '0.9.5', '1.4.0', '1.5.2', '1.5.4' ]
-PLUGIN_SDK_VERSION_NEW = [ '1.9.2', '1.12.0', '1.12.3' ]
+PLUGIN_SDK_VERSION_NEW = [ '1.9.2', '1.12.0', '1.12.3', '1.12.4' ]
 HAS_PROTOCOL_BUFFERS = [ '1.12.0', '1.12.3' ]
 REPOSITORY = 'https://orthanc.uclouvain.be/hg/orthanc/raw-file'
 

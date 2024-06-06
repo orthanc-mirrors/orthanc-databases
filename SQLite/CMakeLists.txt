@@ -25,11 +25,11 @@ project(OrthancSQLite)
 set(ORTHANC_PLUGIN_VERSION "mainline")
 
 # This is the preferred version of the Orthanc SDK for this plugin
-set(ORTHANC_SDK_DEFAULT_VERSION "1.12.0")
+set(ORTHANC_SDK_DEFAULT_VERSION "1.12.4")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
-set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3")
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3" "1.12.4")
 
 # This is the minimal version of the Orthanc runtime that will provide
 # best performance. If the version of the Orthanc runtime is below
@@ -43,7 +43,7 @@ if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.12.3")
+  set(ORTHANC_FRAMEWORK_VERSION "1.12.4")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
