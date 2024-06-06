@@ -25,7 +25,7 @@ project(OrthancMySQL)
 set(ORTHANC_PLUGIN_VERSION "5.2")
 
 # This is the preferred version of the Orthanc SDK for this plugin
-set(ORTHANC_SDK_DEFAULT_VERSION "1.12.4")
+set(ORTHANC_SDK_DEFAULT_VERSION "1.12.0")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
