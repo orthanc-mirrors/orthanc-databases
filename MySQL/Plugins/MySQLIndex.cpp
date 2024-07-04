@@ -2,7 +2,8 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2024 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
@@ -317,7 +318,27 @@ namespace OrthancDatabases
         t.Commit();
       }
 
-      if (revision != 7)
+      if (revision == 7)
+      {
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+        
+        // Install the "CreateInstance" extension
+        std::string query;
+        
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::MYSQL_DELETE_RESOURCES);
+
+        // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
+        db.ExecuteMultiLines(query, true);
+        
+        revision = 8;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+
+        t.Commit();
+      }
+
+
+      if (revision != 8)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -471,11 +492,25 @@ namespace OrthancDatabases
       lookupResourcesToDelete.Execute(args);
     }
 
+    // {
+    //   DatabaseManager::CachedStatement deleteHierarchy(
+    //     STATEMENT_FROM_HERE, manager,
+    //     "DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM DeletedResources)");
+    //   deleteHierarchy.Execute();
+    // }
+
+
     {
-      DatabaseManager::CachedStatement deleteHierarchy(
+      DatabaseManager::CachedStatement deleteResources(
         STATEMENT_FROM_HERE, manager,
-        "DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM DeletedResources)");
-      deleteHierarchy.Execute();
+        "CALL DeleteResources(${id})");
+
+      deleteResources.SetParameterType("id", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetIntegerValue("id", id);
+    
+      deleteResources.Execute(args);
     }
 
     SignalDeletedResources(output, manager);

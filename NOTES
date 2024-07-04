@@ -212,19 +212,283 @@ Testing the connecions (note: Orthanc and PG server running on the same server)
 1  connection  : test_upload_delete_same_study_from_multiple_threads with 5 workers and 3x repeat (10x): 11.172 s 
 
 
-TODO:
-- have a separate "thread" to UpdateStatistics ?
+LARGE QUERIES
+-------------
 
-- check https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820
+new extended-api-v1/tools/find requirements (note: extended-api-v1 is a code name:-) ):
+- be able to list child-resources like in /studies/.../instances?expand
+  => we need a "ParentStudy" in the query.  Note: a single "Parent" field is not enough since we sometimes want to specify a "Parent"
+  that is 2 or 3 levels higher (e.g /patients/../instances)
+  e.g: {
+    "Level": "Instance",
+    "Query": {
+        "ParentStudy": "orthanc-study-id",
+    },
+  }
+- be able to search on labels like in the current tools/find implementation
+  => we need a "ParentStudy" in the query.  Note: a single "Parent" field is not enough since we sometimes want to specify a "Parent"
+  that is 2 or 3 levels higher (e.g /patients/../instances)
+  e.g: {
+    "Level": "Study",
+    "Query": {
+        "Labels": ["hello"],
+        "LabelsConstraint" : "All",
+    },
+  }
+- be able to select what are the expected fields in the response
+  => we need a "ExpandContent" field in the query.
+     If there are no "ExpandContent", we simply return a list of IDs
+  e.g: {
+    "Level": "Series",
+    "Query": {
+        "ParentStudy": "orthanc-study-id",
+    },
+    "ExpandContent": [
+        "Children",                 // the list of orthanc-ids of the child of the resources (equivalent to e.g /series/../instances)
+        "Parent",                   // the resource parent id (e.g. "ParentStudy" for a series)
+        "Labels",                   // the resources labels (equivalent to e.g /series/../labels)
+        "Metadata",                 // the resources metadata (equivalent to e.g. /series/../metadata?expand)
+        "MainDicomTags",            // the resources MainDicomTags
+        "FileInfo",                 // "FileSize" + "FileUuid", applicable only to instances
+        // TODO: what about "IsStable", "Status", "LastUpdate", "IndexInSeries", "ExpectedNumberOfInstances" ???
+        // TODO: right now, we have a "RequestedTags" option that can list the DICOM TAGS and tools/find can fetch the tags from disk if they are not in the ExtraMainDicomTags
+    ]
+  }
+- be able to filter on DICOM Tags (and compose with a Parent orthanc id)
+  e.g: get all US series from this study
+  {
+    "Level": "Series",
+    "Query": {
+        "ParentStudy": "orthanc-study-id",
+        "DicomTags": {
+            "Modality": "US"
+        }
+    }
+  }
+- be able to filter on a metadata (and compose with a Parent orthanc id) 
+  e.g: to get all PDF instances of a study
+  {
+    "Level": "Instance",
+    "Query": {
+        "ParentStudy": "orthanc-study-id",
+        "Metadata": {
+            "SopClassUid": "1.2.840.10008.5.1.4.1.1.104.1"
+        }
+    }
+  }
+- be able to order results on one or more DicomTags or Metadata + limit results + offset (for pagination)
+  e.g: to get page 5 of all studies from this month
+  {
+    "Level": "Study",
+    "Query": {
+        "DicomTags": {
+            "StudyDate": "20240101-20240131"
+        },
+        "OrderBy": [
+            {
+                "DicomTag": "StudyDate",
+                "Order": "Desc"
+            },
+            {
+                "Metadata": "LastUpdate",
+                "Order": "Desc"
+            }
+        ],
+        "Limit": 1000,
+        "Since": 5000
+    }
+  }
 
-DONE:
-- implement a downgrade script ?  And test it in PotgresUpgrades integ tests
-- test the transfer plugin
-- perf tests: upload generated data (different studies)
-- In Docker images, re-enable MySQL & ODBC plugins + tests
-- reenable PatientRecyclingOrder
-- force the create/update DB transaction to be serializable (not needed: this is handled by POSTGRESQL_LOCK_DATABASE_SETUP)
-- PatientAddedFunc contains an IF  (check if other IF/THEN/ELSE pattern remains)
-- validate upgrade DB from previous Orthanc and from scratch
-- check minimal version of PG (9.5 - 9.6 ? for create index if not exists): seems to work with 9.5 cfr PotgresUpgrades integ tests
-- test events generation StableSeries .... (count the NewSeries, NewInstances event and make sure they match the numb)
+
+current queries - single level:
+------------------------------
+
+Search:
+sql = ("SELECT publicId, internalId "
+           "FROM Resources "
+           "WHERE resourceType = " + formatter.FormatResourceType(queryLevel) 
+            + " ");
+
+if (dicomIdentifiersComparisons.size() > 0)
+    sql += (" AND internalId IN (SELECT id FROM DicomIdentifiers WHERE " + *it + ") ");
+
+if (mainDicomTagsComparisons.size() > 0)
+    sql += (" AND internalId IN (SELECT id FROM MainDicomTags WHERE " + *it + ") ");
+
+if (!labels.empty())
+    sql += (" AND internalId " + inOrNotIn + " (SELECT id"
+                                 " FROM (SELECT id, COUNT(1) AS labelsCount "
+                                        "FROM Labels "
+                                        "WHERE label IN (" + Join(formattedLabels, "", ", ") + ") GROUP BY id"
+                                        ") AS temp "
+                                 " WHERE labelsCount " + condition + ")");
+if (limit != 0)
+    sql += " LIMIT " + boost::lexical_cast<std::string>(limit);
+
+
+Patients:
+"SELECT patients_studies.patients_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT patients.publicId AS patients_public_id, MIN(studies.internalId) AS studies_internal_id "
+                          "FROM (" + sql + 
+                                ") AS patients "
+                                "INNER JOIN Resources studies ON studies.parentId = patients.internalId "
+                                "GROUP BY patients.publicId "
+                          ") AS patients_studies "
+                    "INNER JOIN Resources series ON series.parentId = patients_studies.studies_internal_id "
+                    "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                    "GROUP BY patients_studies.patients_public_id"
+
+Studies:
+"SELECT studies_series.studies_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT studies.publicId AS studies_public_id, MIN(series.internalId) AS series_internal_id "
+                          "FROM (" + sql + 
+                                ") AS studies "
+                                "INNER JOIN Resources series ON series.parentId = studies.internalId "
+                                "GROUP BY studies.publicId "
+                          ") AS studies_series "
+                    "INNER JOIN Resources instances ON instances.parentId = studies_series.series_internal_id "
+                    "GROUP BY studies_series.studies_public_id"
+
+Series:
+"SELECT series.publicId AS series_public_id, MIN(instances.publicId) AS instances_public_id "
+                          "FROM (" + sql + 
+                                ") AS series "
+                                "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                                "GROUP BY series.publicId "
+
+Instances:
+"SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances"
+
+
+current queries - multi level:
+------------------------------
+Search: ISqlLookupFormatter::Apply
+
+
+
+New queries:
+-----------
+
+- Get all series ids where PatientID (16, 32)="ID-DYL-WAL-00000008"
+                           StudyDescription (8, 4144) %LIKE% "000000"
+                      order by StudyDate(8, 32) DESC
+
+  Current:  curl http://localhost:8044/tools/find -d '{"Level": "Series", "Query": {"StudyDescription": "*000000*", "PatientID": "ID-DYL-WAL-00000008"}}'
+    SELECT series.publicId, MIN(instances.publicId) 
+        FROM (SELECT series.publicId, series.internalId 
+                FROM Resources AS series 
+                    INNER JOIN Resources studies ON studies.internalId=series.parentId 
+                    INNER JOIN DicomIdentifiers t0 ON t0.id = studies.internalId AND t0.tagGroup = 16 AND t0.tagElement = 32      -- Patient tags are copied at study level !
+                    INNER JOIN DicomIdentifiers t1 ON t1.id = studies.internalId AND t1.tagGroup = 8 AND t1.tagElement = 4144 
+                    WHERE series.resourceType = 2 AND t0.value = 'ID-DYL-WAL-00000008' AND t1.value like '%000000%' ESCAPE '\' LIMIT 101) series 
+            INNER JOIN Resources instances ON instances.parentId = series.internalId GROUP BY series.publicId
+
+
+  With order by, we must not retrieve the instance anymore:
+    SELECT series.publicId, series.internalId
+        FROM Resources AS series 
+            INNER JOIN Resources studies ON studies.internalId=series.parentId 
+            INNER JOIN DicomIdentifiers t0 ON t0.id = studies.internalId AND t0.tagGroup = 16 AND t0.tagElement = 32      -- Patient tags are copied at study level !
+            INNER JOIN DicomIdentifiers t1 ON t1.id = studies.internalId AND t1.tagGroup = 8 AND t1.tagElement = 4144 
+            INNER JOIN DicomIdentifiers t2 ON t2.id = studies.internalId AND t2.tagGroup = 8 AND t2.tagElement = 32 
+            WHERE series.resourceType = 2 AND t0.value = 'ID-DYL-WAL-00000008' AND t1.value like '%000000%' ESCAPE '\' 
+                ORDER BY t2 DESC
+                LIMIT 101
+
+  Combine multiple search criteria:
+    Search studies with a label constraints + a Metadata filter + a DICOM Tag filter + a ParentPatient filter
+  
+    SELECT studies.publicId, studies.internalId 
+        FROM Resources AS studies
+            INNER JOIN 
+        
+        WHERE resourceType = 1  AND internalId IN (SELECT id FROM DicomIdentifiers WHERE tagGroup = 16 AND tagElement = 32 AND value = $1)  AND internalId IN (SELECT id FROM DicomIdentifiers WHERE tagGroup = 8 AND tagElement = 32 AND value >= $2)  AND internalId IN (SELECT id FROM DicomIdentifiers WHERE tagGroup = 8 AND tagElement = 4144 AND value LIKE $3 ESCAPE '\')  LIMIT 101) AS studies INNER JOIN Resources series ON series.parentId = studies.internalId GROUP BY studies.publicId ) AS studies_series INNER JOIN Resources instances ON instances.parentId = studies_series.series_internal_id GROUP BY studies_series.studies_public_id
+
+
+    -- current search at study level (single level -> we use IN instead of INNER JOIN)
+    SELECT publicId, internalId 
+        FROM Resources 
+        WHERE resourceType = 1  
+            AND internalId IN (SELECT id 
+                                    FROM DicomIdentifiers WHERE tagGroup = 16 AND tagElement = 32 AND value = 'ID-DYL-WAL-00000008')  
+            AND internalId IN (SELECT id 
+                                    FROM DicomIdentifiers WHERE tagGroup = 8 AND tagElement = 32 AND value >= '19700101')  
+            AND internalId IN (SELECT id 
+                                    FROM DicomIdentifiers WHERE tagGroup = 8 AND tagElement = 4144 AND value LIKE '%000000%' ESCAPE '\')
+            AND internalId IN (SELECT id
+                                    FROM (SELECT id, COUNT(1) AS labelsCount FROM Labels WHERE label IN ('Label2', 'Label3') GROUP BY id) AS temp
+                                        WHERE labelsCount >= 1)
+            AND internalId IN (SELECT id
+                                    FROM Metadata WHERE type=7 AND value >= '20240415T120000')
+        LIMIT 101
+
+
+    -- same query with INNER JOIN to compare performance
+    SELECT studies.publicId, studies.internalId 
+        FROM Resources AS studies
+            INNER JOIN DicomIdentifiers t0 ON t0.id = studies.internalId AND t0.tagGroup = 16 AND t0.tagElement = 32 AND t0.value = 'ID-DYL-WAL-00000008'     -- Patient tags are copied at study level !
+            INNER JOIN DicomIdentifiers t1 ON t1.id = studies.internalId AND t1.tagGroup = 8 AND t1.tagElement = 4144 AND t1.value like '%000000%' ESCAPE '\'
+            INNER JOIN DicomIdentifiers t2 ON t2.id = studies.internalId AND t2.tagGroup = 8 AND t2.tagElement = 32 AND t2.value >= '19700101'
+            INNER JOIN Metadata m ON m.id = studies.internalId AND m.type = 7 AND m.value >= '20240415T120000'
+            WHERE studies.resourceType = 1 
+--                AND studies.internalId IN (SELECT id FROM (SELECT id, COUNT(1) AS labelsCount FROM labels WHERE label IN ('Label2', 'Label6') GROUP BY id) AS temp  WHERE labelsCount = 2)  -- All labels
+--                AND studies.internalId IN (SELECT id FROM (SELECT id, COUNT(1) AS labelsCount FROM labels WHERE label IN ('Label2', 'Label6') GROUP BY id) AS temp  WHERE labelsCount >= 1)  -- Any labels
+                AND studies.internalId NOT IN (SELECT id FROM (SELECT id, COUNT(1) AS labelsCount FROM labels WHERE label IN ('Label2', 'Label6') GROUP BY id) AS temp  WHERE labelsCount >= 1)  -- None of labels
+            ORDER BY t2.value DESC, m.value ASC
+            LIMIT 100 OFFSET 0
+
+
+  We may store this in a temporary table that we can reuse e.g to retrieve, the labels, the metadata, the MainDicomTags ...
+    CREATE TEMPORARY TABLE FilteredResourcesIds AS
+        SELECT series.publicId, series.internalId 
+            FROM Resources AS series 
+                INNER JOIN Resources studies ON studies.internalId=series.parentId 
+                INNER JOIN DicomIdentifiers t0 ON t0.id = studies.internalId AND t0.tagGroup = 16 AND t0.tagElement = 32      -- Patient tags are copied at study level !
+                INNER JOIN DicomIdentifiers t1 ON t1.id = studies.internalId AND t1.tagGroup = 8 AND t1.tagElement = 4144 
+                INNER JOIN DicomIdentifiers t2 ON t2.id = studies.internalId AND t2.tagGroup = 8 AND t2.tagElement = 32 
+                WHERE series.resourceType = 2 AND t0.value = 'ID-DYL-WAL-00000008' AND t1.value like '%000000%' ESCAPE '\' 
+                    ORDER BY t2 DESC
+                    LIMIT 101;
+  
+  Note: we can probably only retrieve the internalId as the key -> since it is an integer, it is more efficient than a uuid to populate the responses
+  Retrieve all MainDicomTags at the series level
+    SELECT internalId, publicId, tagGroup, tagElement, value FROM MainDicomTags AS tags
+        INNER JOIN FilteredResourcesIds  ON tags.id = FilteredResourcesIds.internalId;
+
+  Retrieve all MainDicomTags at the study level too but attach them to the series ids
+    SELECT series.internalId, series.publicId, tagGroup, tagElement, value 
+        FROM Resources as series
+            INNER JOIN Resources studies ON studies.internalId=series.parentId 
+            INNER JOIN FilteredResourcesIds filtered ON filtered.internalId = series.internalId
+            INNER JOIN MainDicomTags tags ON tags.id=studies.internalId
+
+  Retrieve all Metadata from all the series
+    SELECT metadata.id, series.publicId, metadata.type, metadata.value, metadata.revision
+        FROM Metadata
+            INNER JOIN FilteredResourcesIds filtered ON filtered.internalId = Metadata.id
+
+  Retrieve all Labels from all the series (not tested yet)
+    SELECT labels.id, series.publicId, label
+        FROM Labels
+            INNER JOIN FilteredResourcesIds filtered ON filtered.internalId = Labels.id
+
+  Retrieve all parents from all the series
+    SELECT filtered.internalId, filtered.publicId, parentLevel.internalId as parentInternalId, parentLevel.publicId as parentPublicId
+        FROM Resources as currentLevel
+            INNER JOIN FilteredResourcesIds filtered ON filtered.internalId = currentLevel.internalId
+            INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId
+
+  Retrieve all children from all the series
+    SELECT filtered.internalId, filtered.publicId, childLevel.internalId as childInternalId, childLevel.publicId as childPublicId
+        FROM Resources as currentLevel
+            INNER JOIN FilteredResourcesIds filtered ON filtered.internalId = currentLevel.internalId
+            INNER JOIN Resources childLevel ON childLevel.parentId = currentLevel.internalId
+
+  Retrieve one instanceId by series
+    SELECT filtered.internalId, filtered.publicId, MIN(c0.publicId) as instancePublicId
+        FROM Resources as currentLevel
+            INNER JOIN FilteredResourcesIds filtered ON filtered.internalId = currentLevel.internalId
+            INNER JOIN Resources c0 ON c0.parentId = currentLevel.internalId
+            GROUP BY filtered.internalId, filtered.publicId
+
+  TODO Retrieve all attachments from all the series

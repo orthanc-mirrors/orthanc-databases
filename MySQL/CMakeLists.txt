@@ -1,7 +1,8 @@
 # Orthanc - A Lightweight, RESTful DICOM Store
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
-# Copyright (C) 2017-2024 Osimis S.A., Belgium
+# Copyright (C) 2017-2023 Osimis S.A., Belgium
+# Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
 # Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
@@ -28,7 +29,7 @@ set(ORTHANC_SDK_DEFAULT_VERSION "1.12.0")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
-set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3")
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3" "1.12.4")
 
 # This is the minimal version of the Orthanc runtime that will provide
 # best performance. If the version of the Orthanc runtime is below
@@ -42,7 +43,7 @@ if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.12.3")
+  set(ORTHANC_FRAMEWORK_VERSION "1.12.4")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
@@ -90,6 +91,7 @@ EmbedResources(
   MYSQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
   MYSQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
   MYSQL_CREATE_INSTANCE        ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
+  MYSQL_DELETE_RESOURCES       ${CMAKE_SOURCE_DIR}/Plugins/DeleteResources.sql
   )
 
 if (EXISTS ${ORTHANC_SDK_ROOT}/orthanc/OrthancDatabasePlugin.proto)
