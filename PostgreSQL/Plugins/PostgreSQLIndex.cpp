@@ -552,13 +552,17 @@ namespace OrthancDatabases
     
     for (uint32_t i = 0; i < count; i++)
     {
-      std::string argName = "m" + boost::lexical_cast<std::string>(i);
+      std::string resourceArgName = "r" + boost::lexical_cast<std::string>(i);
+      std::string typeArgName = "t" + boost::lexical_cast<std::string>(i);
+      std::string valueArgName = "v" + boost::lexical_cast<std::string>(i);
 
-      args.SetUtf8Value(argName, metadata[i].value);
+      args.SetIntegerValue(resourceArgName, metadata[i].resource);
+      args.SetInteger32Value(typeArgName, metadata[i].metadata);
+      args.SetUtf8Value(valueArgName, metadata[i].value);
 
-      resourceIds.push_back(boost::lexical_cast<std::string>(metadata[i].resource));
-      metadataTypes.push_back(boost::lexical_cast<std::string>(metadata[i].metadata));
-      metadataValues.push_back("${" + argName + "}");
+      resourceIds.push_back("${" + resourceArgName + "}");
+      metadataTypes.push_back("${" + typeArgName + "}");
+      metadataValues.push_back("${" + valueArgName + "}");
       revisions.push_back("0");
     }
 
@@ -578,12 +582,16 @@ namespace OrthancDatabases
                                   joinedMetadataValues + "], ARRAY[" + 
                                   joinedRevisions + "])";
 
-    DatabaseManager::StandaloneStatement statement(manager, sql);
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
 
     for (uint32_t i = 0; i < count; i++)
     {
-      statement.SetParameterType("m" + boost::lexical_cast<std::string>(i),
+      statement.SetParameterType("v" + boost::lexical_cast<std::string>(i),
                                   ValueType_Utf8String);
+      statement.SetParameterType("r" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Integer64);
+      statement.SetParameterType("t" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Integer32);
     }
 
     statement.Execute(args);

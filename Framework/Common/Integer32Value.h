@@ -25,54 +25,33 @@
 
 #include "IValue.h"
 
-#include <map>
+#include <Compatibility.h>
+
 #include <stdint.h>
 
 namespace OrthancDatabases
 {
-  class Dictionary : public boost::noncopyable
+  class Integer32Value : public IValue
   {
   private:
-    typedef std::map<std::string, IValue*>   Values;
-
-    Values  values_;
+    int32_t  value_;
 
   public:
-    ~Dictionary()
+    explicit Integer32Value(int32_t value) :
+    value_(value)
     {
-      Clear();
     }
 
-    void Clear();
+    int32_t GetValue() const
+    {
+      return value_;
+    }
 
-    bool HasKey(const std::string& key) const;
-
-    void Remove(const std::string& key);
-
-    void SetValue(const std::string& key,
-                  IValue* value);   // Takes ownership
-
-    void SetUtf8Value(const std::string& key,
-                      const std::string& utf8);
-
-    void SetBinaryValue(const std::string& key,
-                        const std::string& binary);
-
-    void SetFileValue(const std::string& key,
-                      const std::string& file);
-
-    void SetFileValue(const std::string& key,
-                      const void* content,
-                      size_t size);
-
-    void SetIntegerValue(const std::string& key,
-                         int64_t value);
-
-    void SetInteger32Value(const std::string& key,
-                           int32_t value);
-
-    void SetNullValue(const std::string& key);
-
-    const IValue& GetValue(const std::string& key) const;
+    virtual ValueType GetType() const ORTHANC_OVERRIDE
+    {
+      return ValueType_Integer32;
+    }
+    
+    virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
   };
 }

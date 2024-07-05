@@ -21,37 +21,35 @@
  **/
 
 
-#pragma once
+#include "Integer32Value.h"
 
+#include "BinaryStringValue.h"
+#include "NullValue.h"
+#include "Utf8StringValue.h"
+
+#include <OrthancException.h>
+
+#include <boost/lexical_cast.hpp>
 
 namespace OrthancDatabases
 {
-  enum ValueType
+  IValue* Integer32Value::Convert(ValueType target) const
   {
-    ValueType_BinaryString,
-    ValueType_InputFile,
-    ValueType_Integer64,
-    ValueType_Integer32,
-    ValueType_Null,
-    ValueType_ResultFile,
-    ValueType_Utf8String
-  };
+    std::string s = boost::lexical_cast<std::string>(value_);
+            
+    switch (target)
+    {
+      case ValueType_Null:
+        return new NullValue;
 
-  enum Dialect
-  {
-    Dialect_MySQL,
-    Dialect_PostgreSQL,
-    Dialect_SQLite,
-    Dialect_MSSQL,
-    Dialect_Unknown
-  };
+      case ValueType_BinaryString:
+        return new BinaryStringValue(s);
 
-  enum TransactionType
-  {
-    TransactionType_ReadWrite,
-    TransactionType_ReadOnly,  // Should only arise with Orthanc SDK >= 1.9.2 in the index plugin
-    TransactionType_Implicit   // Should only arise with Orthanc SDK <= 1.9.1
-  };
+      case ValueType_Utf8String:
+        return new Utf8StringValue(s);
 
-  const char* EnumerationToString(ValueType type);
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
 }

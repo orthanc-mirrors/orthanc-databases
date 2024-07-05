@@ -113,6 +113,7 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/IResult.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ImplicitTransaction.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/InputFileValue.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/Integer32Value.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Integer64Value.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/NullValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Query.cpp
