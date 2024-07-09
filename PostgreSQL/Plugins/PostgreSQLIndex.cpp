@@ -487,23 +487,34 @@ namespace OrthancDatabases
   static void ExecuteSetResourcesContentTags(
     DatabaseManager& manager,
     const std::string& table,
-    const std::string& variablePrefix,
     uint32_t count,
     const OrthancPluginResourcesContentTags* tags)
   {
     std::string sql;
+
+    std::vector<std::string> resourceIds;
+    std::vector<std::string> groups;
+    std::vector<std::string> elements;
+    std::vector<std::string> values;
+
     Dictionary args;
     
     for (uint32_t i = 0; i < count; i++)
     {
-      std::string name = variablePrefix + boost::lexical_cast<std::string>(i);
+      std::string resourceArgName = "r" + boost::lexical_cast<std::string>(i);
+      std::string groupArgName = "g" + boost::lexical_cast<std::string>(i);
+      std::string elementArgName = "e" + boost::lexical_cast<std::string>(i);
+      std::string valueArgName = "v" + boost::lexical_cast<std::string>(i);
 
-      args.SetUtf8Value(name, tags[i].value);
-      
-      std::string insert = ("(" + boost::lexical_cast<std::string>(tags[i].resource) + ", " +
-                            boost::lexical_cast<std::string>(tags[i].group) + ", " +
-                            boost::lexical_cast<std::string>(tags[i].element) + ", " +
-                            "${" + name + "})");
+      args.SetIntegerValue(resourceArgName, tags[i].resource);
+      args.SetInteger32Value(elementArgName, tags[i].element);
+      args.SetInteger32Value(groupArgName, tags[i].group);
+      args.SetUtf8Value(valueArgName, tags[i].value);
+
+      std::string insert = ("(${" + resourceArgName + "}, ${" +
+                            groupArgName + "}, ${" +
+                            elementArgName + "}, " +
+                            "${" + valueArgName + "})");
 
       if (sql.empty())
       {
@@ -517,11 +528,17 @@ namespace OrthancDatabases
 
     if (!sql.empty())
     {
-      DatabaseManager::StandaloneStatement statement(manager, sql);
-
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+      
       for (uint32_t i = 0; i < count; i++)
       {
-        statement.SetParameterType(variablePrefix + boost::lexical_cast<std::string>(i),
+        statement.SetParameterType("r" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer64);
+        statement.SetParameterType("g" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer32);
+        statement.SetParameterType("e" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer32);
+        statement.SetParameterType("v" + boost::lexical_cast<std::string>(i),
                                    ValueType_Utf8String);
       }
 
@@ -607,11 +624,9 @@ namespace OrthancDatabases
                                      uint32_t countMetadata,
                                      const OrthancPluginResourcesContentMetadata* metadata)
   {
-    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", "i",
-                                   countIdentifierTags, identifierTags);
+    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", countIdentifierTags, identifierTags);
 
-    ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",
-                                   countMainDicomTags, mainDicomTags);
+    ExecuteSetResourcesContentTags(manager, "MainDicomTags", countMainDicomTags, mainDicomTags);
     
     ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);
 

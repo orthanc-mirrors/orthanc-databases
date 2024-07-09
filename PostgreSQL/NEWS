@@ -11,8 +11,9 @@ Minimum Orthanc runtime: 1.12.3
 * Performance optimizations (to be summarized before release):
   - using more prepared SQL statements:
     - InsertOrUpdateMetadata
+    - ExecuteSetResourcesContentTags
   - reduced the number of round-trips between Orthanc and the PostgreSQL server:
-    - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 12 (to be continued)
+    - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 10 (to be continued)
 
 
 Release 6.2 (2024-03-25)
