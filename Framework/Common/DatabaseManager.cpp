@@ -663,13 +663,11 @@ namespace OrthancDatabases
       statement_.reset(GetManager().GetDatabase().Compile(*query));
       assert(statement_.get() != NULL);
 
+      std::unique_ptr<IResult> result(GetTransaction().Execute(*statement_, parameters));
+
       if (withResults)
       {
-        SetResult(GetTransaction().Execute(*statement_, parameters));
-      }
-      else
-      {
-        GetTransaction().Execute(*statement_, parameters);
+        SetResult(result.release());
       }
     }
     catch (Orthanc::OrthancException& e)
