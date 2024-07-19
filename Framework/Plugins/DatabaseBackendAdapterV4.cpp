@@ -439,6 +439,10 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
 #endif
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+        response.mutable_get_system_information()->set_supports_find(accessor.GetBackend().HasFindSupport());
+#endif
+
         break;
       }
 
@@ -1298,6 +1302,12 @@ namespace OrthancDatabases
         break;
       }
       
+      case Orthanc::DatabasePluginMessages::OPERATION_FIND:
+      {
+        backend.ExecuteFind(response, manager, request.find());
+        break;
+      }
+
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

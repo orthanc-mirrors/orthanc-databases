@@ -32,6 +32,14 @@
 
 #include <list>
 
+#include <orthanc/OrthancCPlugin.h>
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+#    include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages for "Find()"
+#  endif
+#endif
+
 namespace OrthancDatabases
 {
   class IDatabaseBackend : public boost::noncopyable
@@ -377,6 +385,15 @@ namespace OrthancDatabases
     // New in Orthanc 1.12.3
     virtual uint64_t MeasureLatency(DatabaseManager& manager) = 0;
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const = 0;
+#endif
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    // New in Orthanc 1.12.5
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
+#endif
   };
 }

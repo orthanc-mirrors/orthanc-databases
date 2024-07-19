@@ -659,4 +659,24 @@ namespace OrthancDatabases
     // backward compatibility is necessary
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool PostgreSQLIndex::HasFindSupport() const
+  {
+    // TODO-FIND
+    return false;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  void PostgreSQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                    DatabaseManager& manager,
+                                    const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // TODO-FIND
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+#endif
 }
