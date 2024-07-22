@@ -6,6 +6,7 @@ Minimum plugin SDK (for build): 1.12.3
 Minimum Orthanc runtime: 1.12.3
 
 * Fix updates from plugin version 3.3 to latest version
+* Fixed a memory leak when executing non cached SQL statements (rarely used)
 
 
 Release 6.2 (2024-03-25)

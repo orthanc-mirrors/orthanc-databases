@@ -1,3 +1,6 @@
+* Fixed a memory leak when executing non cached SQL statements (rarely used)
+
+
 Release 5.2 (2024-06-06)
 ========================
 
