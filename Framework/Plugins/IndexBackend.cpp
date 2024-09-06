@@ -592,21 +592,21 @@ namespace OrthancDatabases
                                 int64_t since,
                                 uint32_t limit)
   {
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 13, 0)    
-    GetChanges2(output, done, manager, since, -1, _OrthancPluginChangeType_All, limit);
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)    
+    GetChangesExtended(output, done, manager, since, -1, _OrthancPluginChangeType_All, limit);
 #else
-    GetChanges2(output, done, manager, since, -1, 65535, limit);
+    GetChangesExtended(output, done, manager, since, -1, 65535, limit);
 #endif
   }
 
   /* Use GetOutput().AnswerChange() */
-  void IndexBackend::GetChanges2(IDatabaseBackendOutput& output,
-                                 bool& done /*out*/,
-                                 DatabaseManager& manager,
-                                 int64_t since,
-                                 int64_t to,
-                                 int32_t changeType,
-                                 uint32_t limit)
+  void IndexBackend::GetChangesExtended(IDatabaseBackendOutput& output,
+                                        bool& done /*out*/,
+                                        DatabaseManager& manager,
+                                        int64_t since,
+                                        int64_t to,
+                                        int32_t changeType,
+                                        uint32_t limit)
   {
     std::string limitSuffix;
     if (manager.GetDialect() == Dialect_MSSQL)

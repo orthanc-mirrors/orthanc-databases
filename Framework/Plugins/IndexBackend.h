@@ -132,13 +132,13 @@ namespace OrthancDatabases
                             int64_t since,
                             uint32_t limit) ORTHANC_OVERRIDE;
 
-    virtual void GetChanges2(IDatabaseBackendOutput& output,
-                             bool& done /*out*/,
-                             DatabaseManager& manager,
-                             int64_t since,
-                             int64_t to,
-                             int32_t changeType,
-                             uint32_t limit) ORTHANC_OVERRIDE;
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    int32_t changeType,
+                                    uint32_t limit) ORTHANC_OVERRIDE;
 
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
@@ -429,8 +429,8 @@ namespace OrthancDatabases
 
     virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-    // New primitive since Orthanc 1.13.0
-    virtual bool HasExtendedApiV1() ORTHANC_OVERRIDE
+    // New primitive since Orthanc 1.12.5
+    virtual bool HasExtendedChanges() const ORTHANC_OVERRIDE
     {
       return true;
     }
