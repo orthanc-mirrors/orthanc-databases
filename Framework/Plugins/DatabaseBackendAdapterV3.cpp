@@ -1640,12 +1640,11 @@ namespace OrthancDatabases
     {
       t->GetOutput().Clear();
 
-      std::vector<Orthanc::DatabaseConstraint> lookup;
-      lookup.reserve(constraintsCount);
+      Orthanc::DatabaseConstraints lookup;
 
       for (uint32_t i = 0; i < constraintsCount; i++)
       {
-        lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
+        lookup.AddConstraint(new Orthanc::DatabaseConstraint(constraints[i]));
       }
         
       std::set<std::string> noLabel;

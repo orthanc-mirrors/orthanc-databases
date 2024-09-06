@@ -119,6 +119,7 @@ namespace OrthancDatabases
     Orthanc::DatabasePluginMessages::DeleteAttachment::Response*         deleteAttachment_;
     Orthanc::DatabasePluginMessages::DeleteResource::Response*           deleteResource_;
     Orthanc::DatabasePluginMessages::GetChanges::Response*               getChanges_;
+    Orthanc::DatabasePluginMessages::GetChangesExtended::Response*       getChangesExtended_;
     Orthanc::DatabasePluginMessages::GetExportedResources::Response*     getExportedResources_;
     Orthanc::DatabasePluginMessages::GetLastChange::Response*            getLastChange_;
     Orthanc::DatabasePluginMessages::GetLastExportedResource::Response*  getLastExportedResource_;
@@ -131,6 +132,7 @@ namespace OrthancDatabases
       deleteAttachment_ = NULL;
       deleteResource_ = NULL;
       getChanges_ = NULL;
+      getChangesExtended_ = NULL;
       getExportedResources_ = NULL;
       getLastChange_ = NULL;
       getLastExportedResource_ = NULL;
@@ -157,7 +159,13 @@ namespace OrthancDatabases
       Clear();
       getChanges_ = &getChanges;
     }
-    
+
+    Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
+    {
+      Clear();
+      getChangesExtended_ = &getChangesExtended;
+    }
+
     Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
     {
       Clear();
@@ -309,6 +317,10 @@ namespace OrthancDatabases
       if (getChanges_ != NULL)
       {
         change = getChanges_->add_changes();
+      }
+      else if (getChangesExtended_ != NULL)
+      {
+        change = getChangesExtended_->add_changes();
       }
       else if (getLastChange_ != NULL)
       {
@@ -549,8 +561,7 @@ namespace OrthancDatabases
                                    IndexBackend& backend,
                                    DatabaseManager& manager)
   {
-    std::vector<Orthanc::DatabaseConstraint> lookup;
-    lookup.reserve(request.lookup().size());
+    Orthanc::DatabaseConstraints lookup;
 
     size_t countValues = 0;
 
@@ -624,7 +635,7 @@ namespace OrthancDatabases
         }
       }
 
-      lookup.push_back(Orthanc::DatabaseConstraint(c));
+      lookup.AddConstraint(new Orthanc::DatabaseConstraint(c));
     }
 
     assert(values.size() == countValues);
@@ -791,7 +802,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES_EXTENDED:
       {
-        Output output(*response.mutable_get_changes());
+        Output output(*response.mutable_get_changes_extended());
 
         bool done;
         backend.GetChangesExtended(output, done, manager, request.get_changes_extended().since(), request.get_changes_extended().to(), static_cast<OrthancPluginChangeType>(request.get_changes_extended().change_type()), request.get_changes_extended().limit());

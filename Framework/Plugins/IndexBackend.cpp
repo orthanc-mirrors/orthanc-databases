@@ -2178,6 +2178,43 @@ namespace OrthancDatabases
       }
     }
 
+    virtual std::string FormatLimits(uint64_t since, uint64_t count)
+    {
+      std::string sql;
+
+      switch (dialect_)
+      {
+        case Dialect_MSSQL:
+        {
+          if (since > 0)
+          {
+            sql += " OFFSET " + boost::lexical_cast<std::string>(since) + " ROWS ";
+          }
+          if (count > 0)
+          {
+            sql += " FETCH NEXT " + boost::lexical_cast<std::string>(count) + " ROWS ONLY ";
+          }
+        }; break;
+        case Dialect_SQLite:
+        case Dialect_PostgreSQL:
+        case Dialect_MySQL:
+        {
+          if (count > 0)
+          {
+            sql += " LIMIT " + boost::lexical_cast<std::string>(count);
+          }
+          if (since > 0)
+          {
+            sql += " OFFSET " + boost::lexical_cast<std::string>(since);
+          }
+        }; break;
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+      
+      return sql;
+    }
+
     virtual bool IsEscapeBrackets() const
     {
       // This was initially done at a bad location by the following changeset:
@@ -2207,7 +2244,7 @@ namespace OrthancDatabases
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
-                                     const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                     Orthanc::DatabaseConstraints& lookup,
                                      OrthancPluginResourceType queryLevel_,
                                      const std::set<std::string>& labels,
                                      Orthanc::LabelsConstraint labelsConstraint,
