@@ -65,7 +65,8 @@ namespace OrthancDatabases
                              DatabaseManager& manager,
                              DatabaseManager::CachedStatement& statement,
                              const Dictionary& args,
-                             uint32_t limit);
+                             uint32_t limit,
+                             bool returnFirstResults);
 
     void ReadExportedResourcesInternal(IDatabaseBackendOutput& output,
                                        bool& done,
@@ -130,7 +131,15 @@ namespace OrthancDatabases
                             DatabaseManager& manager,
                             int64_t since,
                             uint32_t limit) ORTHANC_OVERRIDE;
-    
+
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    int32_t changeType,
+                                    uint32_t limit) ORTHANC_OVERRIDE;
+
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
                                        int64_t id) ORTHANC_OVERRIDE;
@@ -419,6 +428,13 @@ namespace OrthancDatabases
     virtual bool HasMeasureLatency() ORTHANC_OVERRIDE;
 
     virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
+    // New primitive since Orthanc 1.12.5
+    virtual bool HasExtendedChanges() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
 
     /**
      * "maxDatabaseRetries" is to handle

@@ -118,6 +118,14 @@ namespace OrthancDatabases
                             int64_t since,
                             uint32_t limit) = 0;
 
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    int32_t changeType,
+                                    uint32_t limit) = 0;
+
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
                                        int64_t id) = 0;
@@ -387,6 +395,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
     virtual bool HasFindSupport() const = 0;
+    virtual bool HasExtendedChanges() const = 0;
 #endif
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)

@@ -23,35 +23,55 @@
 
 #pragma once
 
+#include <string>
+
+#define STATEMENT_FROM_HERE  ::OrthancDatabases::StatementId(__FILE__, __LINE__)
+#define STATEMENT_FROM_HERE_DYNAMIC(sql)  ::OrthancDatabases::StatementId(__FILE__, __LINE__, sql)
+
 
 namespace OrthancDatabases
 {
-  enum ValueType
+  class StatementId
   {
-    ValueType_BinaryString,
-    ValueType_InputFile,
-    ValueType_Integer64,
-    ValueType_Integer32,
-    ValueType_Null,
-    ValueType_ResultFile,
-    ValueType_Utf8String
-  };
+  private:
+    const char* file_;
+    int line_;
+    std::string statement_;
 
-  enum Dialect
-  {
-    Dialect_MySQL,
-    Dialect_PostgreSQL,
-    Dialect_SQLite,
-    Dialect_MSSQL,
-    Dialect_Unknown
-  };
+    StatementId(); // Forbidden
+    
+  public:
+    StatementId(const char* file,
+                int line) :
+      file_(file),
+      line_(line)
+    {
+    }
 
-  enum TransactionType
-  {
-    TransactionType_ReadWrite,
-    TransactionType_ReadOnly,  // Should only arise with Orthanc SDK >= 1.9.2 in the index plugin
-    TransactionType_Implicit   // Should only arise with Orthanc SDK <= 1.9.1
-  };
+    StatementId(const char* file,
+                int line,
+                const std::string& statement) :
+      file_(file),
+      line_(line),
+      statement_(statement)
+    {
+    }
 
-  const char* EnumerationToString(ValueType type);
+    const char* GetFile() const
+    {
+      return file_;
+    }
+
+    int GetLine() const
+    {
+      return line_;
+    }
+    
+    const std::string& GetDynamicStatement() const
+    {
+      return statement_;
+    }
+
+    bool operator< (const StatementId& other) const;
+  };
 }

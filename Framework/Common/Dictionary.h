@@ -68,6 +68,9 @@ namespace OrthancDatabases
     void SetIntegerValue(const std::string& key,
                          int64_t value);
 
+    void SetInteger32Value(const std::string& key,
+                           int32_t value);
+
     void SetNullValue(const std::string& key);
 
     const IValue& GetValue(const std::string& key) const;

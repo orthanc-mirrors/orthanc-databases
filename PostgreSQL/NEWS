@@ -6,6 +6,15 @@ Minimum plugin SDK (for build): 1.12.3
 Minimum Orthanc runtime: 1.12.3
 
 * Fix updates from plugin version 3.3 to latest version
+* Added support for ExtendedApiV1:
+  - changes?type=...&to=...
+* Performance optimizations (to be summarized before release):
+  - using more prepared SQL statements:
+    - InsertOrUpdateMetadata
+    - ExecuteSetResourcesContentTags
+  - merged BEGIN and SET TRANSACTION statements
+  - reduced the number of round-trips between Orthanc and the PostgreSQL server:
+    - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 9 (to be continued)
 
 
 Release 6.2 (2024-03-25)

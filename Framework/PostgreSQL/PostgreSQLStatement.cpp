@@ -26,6 +26,7 @@
 
 #include "../Common/BinaryStringValue.h"
 #include "../Common/InputFileValue.h"
+#include "../Common/Integer32Value.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/NullValue.h"
 #include "../Common/ResultBase.h"
@@ -338,6 +339,10 @@ namespace OrthancDatabases
           DeclareInputInteger64(i);
           break;
 
+        case ValueType_Integer32:
+          DeclareInputInteger(i);
+          break;
+
         case ValueType_Utf8String:
           DeclareInputString(i);
           break;
@@ -527,6 +532,10 @@ namespace OrthancDatabases
       {
         case ValueType_Integer64:
           BindInteger64(i, dynamic_cast<const Integer64Value&>(parameters.GetValue(name)).GetValue());
+          break;
+
+        case ValueType_Integer32:
+          BindInteger(i, dynamic_cast<const Integer32Value&>(parameters.GetValue(name)).GetValue());
           break;
 
         case ValueType_Null:

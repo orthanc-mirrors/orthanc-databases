@@ -21,37 +21,24 @@
  **/
 
 
-#pragma once
+#include "StatementId.h"
 
+#include <string.h>
 
 namespace OrthancDatabases
 {
-  enum ValueType
+  bool StatementId::operator< (const StatementId& other) const
   {
-    ValueType_BinaryString,
-    ValueType_InputFile,
-    ValueType_Integer64,
-    ValueType_Integer32,
-    ValueType_Null,
-    ValueType_ResultFile,
-    ValueType_Utf8String
-  };
+    if (line_ != other.line_)
+    {
+      return line_ < other.line_;
+    }
 
-  enum Dialect
-  {
-    Dialect_MySQL,
-    Dialect_PostgreSQL,
-    Dialect_SQLite,
-    Dialect_MSSQL,
-    Dialect_Unknown
-  };
+    if (strcmp(file_, other.file_) < 0)
+    {
+      return true;
+    }
 
-  enum TransactionType
-  {
-    TransactionType_ReadWrite,
-    TransactionType_ReadOnly,  // Should only arise with Orthanc SDK >= 1.9.2 in the index plugin
-    TransactionType_Implicit   // Should only arise with Orthanc SDK <= 1.9.1
-  };
-
-  const char* EnumerationToString(ValueType type);
+    return statement_ < other.statement_;
+  }
 }

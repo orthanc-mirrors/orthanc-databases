@@ -1,3 +1,10 @@
+Pending changes in the mainline
+===============================
+
+* Added support for ExtendedApiV1:
+  - changes?type=...&to=...
+
+
 Release 5.2 (2024-06-06)
 ========================
 
