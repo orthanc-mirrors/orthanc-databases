@@ -46,7 +46,6 @@ namespace Orthanc
     LabelsConstraint_None
   };
 
-  // This class is also used by the "orthanc-databases" project
   class ISqlLookupFormatter : public boost::noncopyable
   {
   public:

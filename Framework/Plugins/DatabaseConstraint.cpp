@@ -39,7 +39,6 @@ namespace Orthanc
 {
   namespace Plugins
   {
-#if ORTHANC_ENABLE_PLUGINS == 1
     OrthancPluginResourceType Convert(ResourceType type)
     {
       switch (type)
@@ -60,10 +59,8 @@ namespace Orthanc
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
     }
-#endif
 
 
-#if ORTHANC_ENABLE_PLUGINS == 1
     ResourceType Convert(OrthancPluginResourceType type)
     {
       switch (type)
@@ -84,7 +81,6 @@ namespace Orthanc
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
     }
-#endif
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
