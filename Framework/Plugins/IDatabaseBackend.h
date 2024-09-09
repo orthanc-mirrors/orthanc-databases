@@ -293,7 +293,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void LookupResources(IDatabaseBackendOutput& output,
                                  DatabaseManager& manager,
-                                 Orthanc::DatabaseConstraints& lookup,
+                                 const Orthanc::DatabaseConstraints& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  const std::set<std::string>& labels,         // New in Orthanc 1.12.0
                                  Orthanc::LabelsConstraint labelsConstraint,  // New in Orthanc 1.12.0

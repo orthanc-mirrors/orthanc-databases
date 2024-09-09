@@ -58,6 +58,7 @@ MySQL
 
 * MySQL performance => implement GlobalProperty_GetTotalSizeIsFast:
   https://groups.google.com/d/msg/orthanc-users/kSR4a110zDo/D7e4ITR8BwAJ
+  https://discourse.orthanc-server.org/t/when-running-housekeeping-mysqld-exe-searching-and-dicom-transfer-is-slow/4921/9
 
 * Add index to speed up wildcard search, as already done in PostgreSQL:
 

@@ -3,6 +3,7 @@ Pending changes in the mainline
 
 * Added support for ExtendedChanges:
   - changes?type=...&to=...
+* Fixed a memory leak when executing non cached SQL statements (rarely used)
 
 
 Release 5.2 (2024-06-06)
