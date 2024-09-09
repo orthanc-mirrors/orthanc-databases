@@ -2021,7 +2021,7 @@ namespace OrthancDatabases
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-  class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
+  class IndexBackend::LookupFormatter : public ISqlLookupFormatter
   {
   private:
     Dialect     dialect_;
@@ -2052,7 +2052,7 @@ namespace OrthancDatabases
 
     virtual std::string FormatResourceType(Orthanc::ResourceType level)
     {
-      return boost::lexical_cast<std::string>(Orthanc::Plugins::Convert(level));
+      return boost::lexical_cast<std::string>(Plugins::Convert(level));
     }
 
     virtual std::string FormatWildcardEscape()
@@ -2101,24 +2101,24 @@ namespace OrthancDatabases
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
-                                     const Orthanc::DatabaseConstraints& lookup,
+                                     const DatabaseConstraints& lookup,
                                      OrthancPluginResourceType queryLevel_,
                                      const std::set<std::string>& labels,
-                                     Orthanc::LabelsConstraint labelsConstraint,
+                                     LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
-    Orthanc::ResourceType queryLevel = Orthanc::Plugins::Convert(queryLevel_);
+    Orthanc::ResourceType queryLevel = Plugins::Convert(queryLevel_);
     Orthanc::ResourceType lowerLevel, upperLevel;
-    Orthanc::ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
+    ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
     bool enableNewStudyCode = true;
 
     if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
     {
-      Orthanc::ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
+      ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
       if (requestSomeInstance)
       {
@@ -2167,7 +2167,7 @@ namespace OrthancDatabases
     }
     else
     {
-      Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);      
+      ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
       if (requestSomeInstance)
       {

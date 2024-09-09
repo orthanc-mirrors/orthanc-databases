@@ -555,7 +555,7 @@ namespace OrthancDatabases
     std::vector<const char*> values;
     values.reserve(countValues);
 
-    Orthanc::DatabaseConstraints lookup;
+    DatabaseConstraints lookup;
 
     for (int i = 0; i < request.lookup().size(); i++)
     {
@@ -618,7 +618,7 @@ namespace OrthancDatabases
         }
       }
 
-      lookup.AddConstraint(new Orthanc::DatabaseConstraint(c));
+      lookup.AddConstraint(new DatabaseConstraint(c));
     }
 
     assert(values.size() == countValues);
@@ -630,19 +630,19 @@ namespace OrthancDatabases
       labels.insert(request.labels(i));
     }
 
-    Orthanc::LabelsConstraint labelsConstraint;
+    LabelsConstraint labelsConstraint;
     switch (request.labels_constraint())
     {
       case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ALL:
-        labelsConstraint = Orthanc::LabelsConstraint_All;
+        labelsConstraint = LabelsConstraint_All;
         break;
             
       case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ANY:
-        labelsConstraint = Orthanc::LabelsConstraint_Any;
+        labelsConstraint = LabelsConstraint_Any;
         break;
             
       case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE:
-        labelsConstraint = Orthanc::LabelsConstraint_None;
+        labelsConstraint = LabelsConstraint_None;
         break;
             
       default:
