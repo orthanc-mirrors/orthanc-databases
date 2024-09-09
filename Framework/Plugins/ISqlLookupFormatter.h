@@ -35,7 +35,7 @@
 #include <boost/noncopyable.hpp>
 #include <vector>
 
-namespace Orthanc
+namespace OrthancDatabases
 {
   class DatabaseConstraints;
   class FindRequest;
@@ -56,7 +56,7 @@ namespace Orthanc
 
     virtual std::string GenerateParameter(const std::string& value) = 0;
 
-    virtual std::string FormatResourceType(ResourceType level) = 0;
+    virtual std::string FormatResourceType(Orthanc::ResourceType level) = 0;
 
     virtual std::string FormatWildcardEscape() = 0;
 
@@ -69,15 +69,15 @@ namespace Orthanc
      **/
     virtual bool IsEscapeBrackets() const = 0;
 
-    static void GetLookupLevels(ResourceType& lowerLevel,
-                                ResourceType& upperLevel,
-                                const ResourceType& queryLevel,
+    static void GetLookupLevels(Orthanc::ResourceType& lowerLevel,
+                                Orthanc::ResourceType& upperLevel,
+                                const Orthanc::ResourceType& queryLevel,
                                 const DatabaseConstraints& lookup);
 
     static void Apply(std::string& sql,
                       ISqlLookupFormatter& formatter,
                       const DatabaseConstraints& lookup,
-                      ResourceType queryLevel,
+                      Orthanc::ResourceType queryLevel,
                       const std::set<std::string>& labels,  // New in Orthanc 1.12.0
                       LabelsConstraint labelsConstraint,    // New in Orthanc 1.12.0
                       size_t limit);
@@ -85,7 +85,7 @@ namespace Orthanc
     static void ApplySingleLevel(std::string& sql,
                                  ISqlLookupFormatter& formatter,
                                  const DatabaseConstraints& lookup,
-                                 ResourceType queryLevel,
+                                 Orthanc::ResourceType queryLevel,
                                  const std::set<std::string>& labels,  // New in Orthanc 1.12.0
                                  LabelsConstraint labelsConstraint,    // New in Orthanc 1.12.0
                                  size_t limit);

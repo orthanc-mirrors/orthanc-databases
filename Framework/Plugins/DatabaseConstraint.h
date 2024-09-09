@@ -36,7 +36,7 @@
 
 #include <deque>
 
-namespace Orthanc
+namespace OrthancDatabases
 {
   enum ConstraintType
   {
@@ -49,9 +49,9 @@ namespace Orthanc
 
   namespace Plugins
   {
-    OrthancPluginResourceType Convert(ResourceType type);
+    OrthancPluginResourceType Convert(Orthanc::ResourceType type);
 
-    ResourceType Convert(OrthancPluginResourceType type);
+    Orthanc::ResourceType Convert(OrthancPluginResourceType type);
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     OrthancPluginConstraintType Convert(ConstraintType constraint);
@@ -66,8 +66,8 @@ namespace Orthanc
   class DatabaseConstraint : public boost::noncopyable
   {
   private:
-    ResourceType              level_;
-    DicomTag                  tag_;
+    Orthanc::ResourceType     level_;
+    Orthanc::DicomTag         tag_;
     bool                      isIdentifier_;
     ConstraintType            constraintType_;
     std::vector<std::string>  values_;
@@ -75,8 +75,8 @@ namespace Orthanc
     bool                      mandatory_;
 
   public:
-    DatabaseConstraint(ResourceType level,
-                       const DicomTag& tag,
+    DatabaseConstraint(Orthanc::ResourceType level,
+                       const Orthanc::DicomTag& tag,
                        bool isIdentifier,
                        ConstraintType type,
                        const std::vector<std::string>& values,
@@ -91,12 +91,12 @@ namespace Orthanc
     explicit DatabaseConstraint(const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint);
 #endif
 
-    ResourceType GetLevel() const
+    Orthanc::ResourceType GetLevel() const
     {
       return level_;
     }
 
-    const DicomTag& GetTag() const
+    const Orthanc::DicomTag& GetTag() const
     {
       return tag_;
     }
@@ -130,7 +130,7 @@ namespace Orthanc
       return mandatory_;
     }
 
-    bool IsMatch(const DicomMap& dicom) const;
+    bool IsMatch(const Orthanc::DicomMap& dicom) const;
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     void EncodeForPlugins(OrthancPluginDatabaseConstraint& constraint,

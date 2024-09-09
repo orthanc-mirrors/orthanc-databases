@@ -1413,16 +1413,16 @@ namespace OrthancDatabases
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
 
-      Orthanc::DatabaseConstraints lookup;
+      DatabaseConstraints lookup;
 
       for (uint32_t i = 0; i < constraintsCount; i++)
       {
-        lookup.AddConstraint(new Orthanc::DatabaseConstraint(constraints[i]));
+        lookup.AddConstraint(new DatabaseConstraint(constraints[i]));
       }
         
       std::set<std::string> noLabel;
       adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, noLabel,
-                                            Orthanc::LabelsConstraint_All, limit, (requestSomeInstance != 0));
+                                            LabelsConstraint_All, limit, (requestSomeInstance != 0));
       
       return OrthancPluginErrorCode_Success;
     }

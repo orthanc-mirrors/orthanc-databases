@@ -36,50 +36,50 @@
 #include <cassert>
 
 
-namespace Orthanc
+namespace OrthancDatabases
 {
   namespace Plugins
   {
-    OrthancPluginResourceType Convert(ResourceType type)
+    OrthancPluginResourceType Convert(Orthanc::ResourceType type)
     {
       switch (type)
       {
-        case ResourceType_Patient:
+        case Orthanc::ResourceType_Patient:
           return OrthancPluginResourceType_Patient;
 
-        case ResourceType_Study:
+        case Orthanc::ResourceType_Study:
           return OrthancPluginResourceType_Study;
 
-        case ResourceType_Series:
+        case Orthanc::ResourceType_Series:
           return OrthancPluginResourceType_Series;
 
-        case ResourceType_Instance:
+        case Orthanc::ResourceType_Instance:
           return OrthancPluginResourceType_Instance;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
     }
 
 
-    ResourceType Convert(OrthancPluginResourceType type)
+    Orthanc::ResourceType Convert(OrthancPluginResourceType type)
     {
       switch (type)
       {
         case OrthancPluginResourceType_Patient:
-          return ResourceType_Patient;
+          return Orthanc::ResourceType_Patient;
 
         case OrthancPluginResourceType_Study:
-          return ResourceType_Study;
+          return Orthanc::ResourceType_Study;
 
         case OrthancPluginResourceType_Series:
-          return ResourceType_Series;
+          return Orthanc::ResourceType_Series;
 
         case OrthancPluginResourceType_Instance:
-          return ResourceType_Instance;
+          return Orthanc::ResourceType_Instance;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
     }
 
@@ -105,7 +105,7 @@ namespace Orthanc
           return OrthancPluginConstraintType_List;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
     }
 #endif
@@ -132,14 +132,14 @@ namespace Orthanc
           return ConstraintType_List;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
     }
 #endif
   }
 
-  DatabaseConstraint::DatabaseConstraint(ResourceType level,
-                                         const DicomTag& tag,
+  DatabaseConstraint::DatabaseConstraint(Orthanc::ResourceType level,
+                                         const Orthanc::DicomTag& tag,
                                          bool isIdentifier,
                                          ConstraintType type,
                                          const std::vector<std::string>& values,
@@ -156,7 +156,7 @@ namespace Orthanc
     if (type != ConstraintType_List &&
         values_.size() != 1)
     {
-      throw OrthancException(ErrorCode_ParameterOutOfRange);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
 
@@ -173,7 +173,7 @@ namespace Orthanc
     if (constraintType_ != ConstraintType_List &&
         constraint.valuesCount != 1)
     {
-      throw OrthancException(ErrorCode_ParameterOutOfRange);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
 
     values_.resize(constraint.valuesCount);
@@ -198,23 +198,23 @@ namespace Orthanc
     switch (constraint.type())
     {
       case Orthanc::DatabasePluginMessages::CONSTRAINT_EQUAL:
-        constraintType_ = Orthanc::ConstraintType_Equal;
+        constraintType_ = ConstraintType_Equal;
         break;
 
       case Orthanc::DatabasePluginMessages::CONSTRAINT_SMALLER_OR_EQUAL:
-        constraintType_ = Orthanc::ConstraintType_SmallerOrEqual;
+        constraintType_ = ConstraintType_SmallerOrEqual;
         break;
 
       case Orthanc::DatabasePluginMessages::CONSTRAINT_GREATER_OR_EQUAL:
-        constraintType_ = Orthanc::ConstraintType_GreaterOrEqual;
+        constraintType_ = ConstraintType_GreaterOrEqual;
         break;
 
       case Orthanc::DatabasePluginMessages::CONSTRAINT_WILDCARD:
-        constraintType_ = Orthanc::ConstraintType_Wildcard;
+        constraintType_ = ConstraintType_Wildcard;
         break;
 
       case Orthanc::DatabasePluginMessages::CONSTRAINT_LIST:
-        constraintType_ = Orthanc::ConstraintType_List;
+        constraintType_ = ConstraintType_List;
         break;
 
       default:
@@ -224,7 +224,7 @@ namespace Orthanc
     if (constraintType_ != ConstraintType_List &&
         constraint.values().size() != 1)
     {
-      throw OrthancException(ErrorCode_ParameterOutOfRange);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
 
     values_.resize(constraint.values().size());
@@ -241,7 +241,7 @@ namespace Orthanc
   {
     if (index >= values_.size())
     {
-      throw OrthancException(ErrorCode_ParameterOutOfRange);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
     else
     {
@@ -254,7 +254,7 @@ namespace Orthanc
   {
     if (values_.size() != 1)
     {
-      throw OrthancException(ErrorCode_BadSequenceOfCalls);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
     else
     {
@@ -305,7 +305,7 @@ namespace Orthanc
   {
     if (constraint == NULL)
     {
-      throw OrthancException(ErrorCode_NullPointer);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     else
     {
@@ -318,7 +318,7 @@ namespace Orthanc
   {
     if (index >= constraints_.size())
     {
-      throw OrthancException(ErrorCode_ParameterOutOfRange);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
     else
     {
@@ -378,7 +378,7 @@ namespace Orthanc
         }
 
         default:
-          throw OrthancException(ErrorCode_InternalError);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
 
       s += "\n";

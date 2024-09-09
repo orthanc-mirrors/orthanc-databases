@@ -2127,7 +2127,7 @@ namespace OrthancDatabases
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-  class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
+  class IndexBackend::LookupFormatter : public ISqlLookupFormatter
   {
   private:
     Dialect     dialect_;
@@ -2158,7 +2158,7 @@ namespace OrthancDatabases
 
     virtual std::string FormatResourceType(Orthanc::ResourceType level)
     {
-      return boost::lexical_cast<std::string>(Orthanc::Plugins::Convert(level));
+      return boost::lexical_cast<std::string>(Plugins::Convert(level));
     }
 
     virtual std::string FormatWildcardEscape()
@@ -2244,24 +2244,24 @@ namespace OrthancDatabases
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
-                                     const Orthanc::DatabaseConstraints& lookup,
+                                     const DatabaseConstraints& lookup,
                                      OrthancPluginResourceType queryLevel_,
                                      const std::set<std::string>& labels,
-                                     Orthanc::LabelsConstraint labelsConstraint,
+                                     LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
-    Orthanc::ResourceType queryLevel = Orthanc::Plugins::Convert(queryLevel_);
+    Orthanc::ResourceType queryLevel = Plugins::Convert(queryLevel_);
     Orthanc::ResourceType lowerLevel, upperLevel;
-    Orthanc::ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
+    ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
     bool enableNewStudyCode = true;
 
     if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
     {
-      Orthanc::ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
+      ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
       if (requestSomeInstance)
       {
@@ -2310,7 +2310,7 @@ namespace OrthancDatabases
     }
     else
     {
-      Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);      
+      ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
       if (requestSomeInstance)
       {
@@ -2945,7 +2945,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
       return;
     }
 #  endif
@@ -2955,14 +2955,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
+      DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
       return;
     }
 #  endif
 #endif
 
     LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
-    OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
+    DatabaseBackendAdapterV2::Register(backend);
   }
 
 
@@ -3005,17 +3005,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   void IndexBackend::Finalize()
   {
-    OrthancDatabases::DatabaseBackendAdapterV2::Finalize();
+    DatabaseBackendAdapterV2::Finalize();
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
+    DatabaseBackendAdapterV3::Finalize();
 #  endif
 #endif
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
-    OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
+    DatabaseBackendAdapterV4::Finalize();
 #  endif
 #endif
   }

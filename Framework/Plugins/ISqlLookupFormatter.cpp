@@ -40,26 +40,26 @@
 #include <list>
 
 
-namespace Orthanc
+namespace OrthancDatabases
 {
-  static std::string FormatLevel(ResourceType level)
+  static std::string FormatLevel(Orthanc::ResourceType level)
   {
     switch (level)
     {
-      case ResourceType_Patient:
+      case Orthanc::ResourceType_Patient:
         return "patients";
 
-      case ResourceType_Study:
+      case Orthanc::ResourceType_Study:
         return "studies";
 
-      case ResourceType_Series:
+      case Orthanc::ResourceType_Series:
         return "series";
 
-      case ResourceType_Instance:
+      case Orthanc::ResourceType_Instance:
         return "instances";
 
       default:
-        throw OrthancException(ErrorCode_InternalError);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
   }
 
@@ -96,7 +96,7 @@ namespace Orthanc
             break;
 
           default:
-            throw OrthancException(ErrorCode_InternalError);
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
         }
 
         std::string parameter = formatter.GenerateParameter(constraint.GetSingleValue());
@@ -331,7 +331,7 @@ namespace Orthanc
             break;
 
           default:
-            throw OrthancException(ErrorCode_InternalError);
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
         }
 
         std::string parameter = formatter.GenerateParameter(constraint.GetSingleValue());
@@ -366,7 +366,7 @@ namespace Orthanc
         }
 
         std::string values;
-        Toolbox::JoinStrings(values, comparisonValues, ", ");
+        Orthanc::Toolbox::JoinStrings(values, comparisonValues, ", ");
 
         if (constraint.IsCaseSensitive())
         {
@@ -469,21 +469,21 @@ namespace Orthanc
   }
 
 
-  void ISqlLookupFormatter::GetLookupLevels(ResourceType& lowerLevel,
-                                            ResourceType& upperLevel,
-                                            const ResourceType& queryLevel,
+  void ISqlLookupFormatter::GetLookupLevels(Orthanc::ResourceType& lowerLevel,
+                                            Orthanc::ResourceType& upperLevel,
+                                            const Orthanc::ResourceType& queryLevel,
                                             const DatabaseConstraints& lookup)
   {
-    assert(ResourceType_Patient < ResourceType_Study &&
-           ResourceType_Study < ResourceType_Series &&
-           ResourceType_Series < ResourceType_Instance);
+    assert(Orthanc::ResourceType_Patient < Orthanc::ResourceType_Study &&
+           Orthanc::ResourceType_Study < Orthanc::ResourceType_Series &&
+           Orthanc::ResourceType_Series < Orthanc::ResourceType_Instance);
 
     lowerLevel = queryLevel;
     upperLevel = queryLevel;
 
     for (size_t i = 0; i < lookup.GetSize(); i++)
     {
-      ResourceType level = lookup.GetConstraint(i).GetLevel();
+      Orthanc::ResourceType level = lookup.GetConstraint(i).GetLevel();
 
       if (level < upperLevel)
       {
@@ -501,12 +501,12 @@ namespace Orthanc
   void ISqlLookupFormatter::Apply(std::string& sql,
                                   ISqlLookupFormatter& formatter,
                                   const DatabaseConstraints& lookup,
-                                  ResourceType queryLevel,
+                                  Orthanc::ResourceType queryLevel,
                                   const std::set<std::string>& labels,
                                   LabelsConstraint labelsConstraint,
                                   size_t limit)
   {
-    ResourceType lowerLevel, upperLevel;
+    Orthanc::ResourceType lowerLevel, upperLevel;
     GetLookupLevels(lowerLevel, upperLevel, queryLevel, lookup);
 
     assert(upperLevel <= queryLevel &&
@@ -547,17 +547,17 @@ namespace Orthanc
     for (int level = queryLevel - 1; level >= upperLevel; level--)
     {
       sql += (" INNER JOIN Resources " +
-              FormatLevel(static_cast<ResourceType>(level)) + " ON " +
-              FormatLevel(static_cast<ResourceType>(level)) + ".internalId=" +
-              FormatLevel(static_cast<ResourceType>(level + 1)) + ".parentId");
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + " ON " +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".internalId=" +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level + 1)) + ".parentId");
     }
 
     for (int level = queryLevel + 1; level <= lowerLevel; level++)
     {
       sql += (" INNER JOIN Resources " +
-              FormatLevel(static_cast<ResourceType>(level)) + " ON " +
-              FormatLevel(static_cast<ResourceType>(level - 1)) + ".internalId=" +
-              FormatLevel(static_cast<ResourceType>(level)) + ".parentId");
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + " ON " +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level - 1)) + ".internalId=" +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".parentId");
     }
 
     std::list<std::string> where;
@@ -595,7 +595,7 @@ namespace Orthanc
           break;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
 
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + FormatLevel(queryLevel) +
@@ -612,7 +612,7 @@ namespace Orthanc
 
 
 #if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
-  static ResourceType DetectLevel(const Orthanc::DatabasePluginMessages::Find_Request& request)
+  static Orthanc::ResourceType DetectLevel(const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
     // This corresponds to "Orthanc::OrthancIdentifiers()::DetectLevel()" in the Orthanc core
     if (!request.orthanc_id_patient().empty() &&
@@ -620,26 +620,26 @@ namespace Orthanc
         request.orthanc_id_series().empty() &&
         request.orthanc_id_instance().empty())
     {
-      return ResourceType_Patient;
+      return Orthanc::ResourceType_Patient;
     }
     else if (!request.orthanc_id_study().empty() &&
              request.orthanc_id_series().empty() &&
              request.orthanc_id_instance().empty())
     {
-      return ResourceType_Study;
+      return Orthanc::ResourceType_Study;
     }
     else if (!request.orthanc_id_series().empty() &&
              request.orthanc_id_instance().empty())
     {
-      return ResourceType_Series;
+      return Orthanc::ResourceType_Series;
     }
     else if (!request.orthanc_id_instance().empty())
     {
-      return ResourceType_Instance;
+      return Orthanc::ResourceType_Instance;
     }
     else
     {
-      throw OrthancException(ErrorCode_InternalError);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
   }
 
@@ -648,7 +648,7 @@ namespace Orthanc
                                   const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    ResourceType queryLevel = OrthancDatabases::MessagesToolbox::Convert(request.level());
+    Orthanc::ResourceType queryLevel = OrthancDatabases::MessagesToolbox::Convert(request.level());
     const std::string& strQueryLevel = FormatLevel(queryLevel);
 
     DatabaseConstraints constraints;
@@ -658,7 +658,7 @@ namespace Orthanc
       constraints.AddConstraint(new DatabaseConstraint(request.dicom_tag_constraints(i)));
     }
 
-    ResourceType lowerLevel, upperLevel;
+    Orthanc::ResourceType lowerLevel, upperLevel;
     GetLookupLevels(lowerLevel, upperLevel, queryLevel, constraints);
 
     assert(upperLevel <= queryLevel &&
@@ -689,35 +689,35 @@ namespace Orthanc
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
       }
 
-      ResourceType topParentLevel = DetectLevel(request);
+      Orthanc::ResourceType topParentLevel = DetectLevel(request);
       const std::string& strTopParentLevel = FormatLevel(topParentLevel);
 
       std::string publicId;
       switch (topParentLevel)
       {
-        case ResourceType_Patient:
+        case Orthanc::ResourceType_Patient:
           publicId = request.orthanc_id_patient();
           break;
 
-        case ResourceType_Study:
+        case Orthanc::ResourceType_Study:
           publicId = request.orthanc_id_study();
           break;
 
-        case ResourceType_Series:
+        case Orthanc::ResourceType_Series:
           publicId = request.orthanc_id_series();
           break;
 
-        case ResourceType_Instance:
+        case Orthanc::ResourceType_Instance:
           publicId = request.orthanc_id_instance();
           break;
 
         default:
-          throw OrthancException(ErrorCode_InternalError);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
 
       if (publicId.empty())
       {
-        throw OrthancException(ErrorCode_InternalError);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
 
       comparisons = " AND " + strTopParentLevel + ".publicId = " + formatter.GenerateParameter(publicId);
@@ -725,9 +725,9 @@ namespace Orthanc
       for (int level = queryLevel; level > topParentLevel; level--)
       {
         sql += (" INNER JOIN Resources " +
-                FormatLevel(static_cast<ResourceType>(level - 1)) + " ON " +
-                FormatLevel(static_cast<ResourceType>(level - 1)) + ".internalId=" +
-                FormatLevel(static_cast<ResourceType>(level)) + ".parentId");
+                FormatLevel(static_cast<Orthanc::ResourceType>(level - 1)) + " ON " +
+                FormatLevel(static_cast<Orthanc::ResourceType>(level - 1)) + ".internalId=" +
+                FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".parentId");
       }
     }
     else
@@ -759,17 +759,17 @@ namespace Orthanc
     for (int level = queryLevel - 1; level >= upperLevel; level--)
     {
       sql += (" INNER JOIN Resources " +
-              FormatLevel(static_cast<ResourceType>(level)) + " ON " +
-              FormatLevel(static_cast<ResourceType>(level)) + ".internalId=" +
-              FormatLevel(static_cast<ResourceType>(level + 1)) + ".parentId");
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + " ON " +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".internalId=" +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level + 1)) + ".parentId");
     }
 
     for (int level = queryLevel + 1; level <= lowerLevel; level++)
     {
       sql += (" INNER JOIN Resources " +
-              FormatLevel(static_cast<ResourceType>(level)) + " ON " +
-              FormatLevel(static_cast<ResourceType>(level - 1)) + ".internalId=" +
-              FormatLevel(static_cast<ResourceType>(level)) + ".parentId");
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + " ON " +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level - 1)) + ".internalId=" +
+              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".parentId");
     }
 
     std::list<std::string> where;
@@ -808,7 +808,7 @@ namespace Orthanc
           break;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
 
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + strQueryLevel +
@@ -829,13 +829,13 @@ namespace Orthanc
   void ISqlLookupFormatter::ApplySingleLevel(std::string& sql,
                                              ISqlLookupFormatter& formatter,
                                              const DatabaseConstraints& lookup,
-                                             ResourceType queryLevel,
+                                             Orthanc::ResourceType queryLevel,
                                              const std::set<std::string>& labels,
                                              LabelsConstraint labelsConstraint,
                                              size_t limit
                                              )
   {
-    ResourceType lowerLevel, upperLevel;
+    Orthanc::ResourceType lowerLevel, upperLevel;
     GetLookupLevels(lowerLevel, upperLevel, queryLevel, lookup);
 
     assert(upperLevel == queryLevel &&
@@ -923,7 +923,7 @@ namespace Orthanc
           break;
 
         default:
-          throw OrthancException(ErrorCode_ParameterOutOfRange);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
 
       sql += (" AND internalId " + inOrNotIn + " (SELECT id"

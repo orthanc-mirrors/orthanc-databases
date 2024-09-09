@@ -1640,16 +1640,16 @@ namespace OrthancDatabases
     {
       t->GetOutput().Clear();
 
-      Orthanc::DatabaseConstraints lookup;
+      DatabaseConstraints lookup;
 
       for (uint32_t i = 0; i < constraintsCount; i++)
       {
-        lookup.AddConstraint(new Orthanc::DatabaseConstraint(constraints[i]));
+        lookup.AddConstraint(new DatabaseConstraint(constraints[i]));
       }
         
       std::set<std::string> noLabel;
       t->GetBackend().LookupResources(t->GetOutput(), t->GetManager(), lookup, queryLevel, noLabel,
-                                      Orthanc::LabelsConstraint_All, limit, (requestSomeInstanceId != 0));
+                                      LabelsConstraint_All, limit, (requestSomeInstanceId != 0));
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
