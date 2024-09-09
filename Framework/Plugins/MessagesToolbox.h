@@ -60,8 +60,29 @@
 
 namespace OrthancDatabases
 {
+  enum ConstraintType
+  {
+    ConstraintType_Equal,
+    ConstraintType_SmallerOrEqual,
+    ConstraintType_GreaterOrEqual,
+    ConstraintType_Wildcard,
+    ConstraintType_List
+  };
+
   namespace MessagesToolbox
   {
     Orthanc::ResourceType Convert(Orthanc::DatabasePluginMessages::ResourceType resourceType);
+
+    OrthancPluginResourceType ConvertToPlainC(Orthanc::ResourceType type);
+
+    Orthanc::ResourceType Convert(OrthancPluginResourceType type);
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    OrthancPluginConstraintType ConvertToPlainC(ConstraintType constraint);
+#endif
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    ConstraintType Convert(OrthancPluginConstraintType constraint);
+#endif
   }
 }

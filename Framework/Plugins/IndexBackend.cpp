@@ -2158,7 +2158,7 @@ namespace OrthancDatabases
 
     virtual std::string FormatResourceType(Orthanc::ResourceType level)
     {
-      return boost::lexical_cast<std::string>(Plugins::Convert(level));
+      return boost::lexical_cast<std::string>(MessagesToolbox::ConvertToPlainC(level));
     }
 
     virtual std::string FormatWildcardEscape()
@@ -2252,7 +2252,7 @@ namespace OrthancDatabases
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
-    Orthanc::ResourceType queryLevel = Plugins::Convert(queryLevel_);
+    Orthanc::ResourceType queryLevel = MessagesToolbox::Convert(queryLevel_);
     Orthanc::ResourceType lowerLevel, upperLevel;
     ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 

@@ -38,31 +38,6 @@
 
 namespace OrthancDatabases
 {
-  enum ConstraintType
-  {
-    ConstraintType_Equal,
-    ConstraintType_SmallerOrEqual,
-    ConstraintType_GreaterOrEqual,
-    ConstraintType_Wildcard,
-    ConstraintType_List
-  };
-
-  namespace Plugins
-  {
-    OrthancPluginResourceType Convert(Orthanc::ResourceType type);
-
-    Orthanc::ResourceType Convert(OrthancPluginResourceType type);
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    OrthancPluginConstraintType Convert(ConstraintType constraint);
-#endif
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    ConstraintType Convert(OrthancPluginConstraintType constraint);
-#endif
-  }
-
-
   class DatabaseConstraint : public boost::noncopyable
   {
   private:

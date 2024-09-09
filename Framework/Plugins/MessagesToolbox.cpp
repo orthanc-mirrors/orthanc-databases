@@ -48,5 +48,125 @@ namespace OrthancDatabases
           throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
       }
     }
+
+
+    OrthancPluginResourceType ConvertToPlainC(Orthanc::ResourceType type)
+    {
+      switch (type)
+      {
+        case Orthanc::ResourceType_Patient:
+          return OrthancPluginResourceType_Patient;
+
+        case Orthanc::ResourceType_Study:
+          return OrthancPluginResourceType_Study;
+
+        case Orthanc::ResourceType_Series:
+          return OrthancPluginResourceType_Series;
+
+        case Orthanc::ResourceType_Instance:
+          return OrthancPluginResourceType_Instance;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+    }
+
+
+    Orthanc::ResourceType Convert(OrthancPluginResourceType type)
+    {
+      switch (type)
+      {
+        case OrthancPluginResourceType_Patient:
+          return Orthanc::ResourceType_Patient;
+
+        case OrthancPluginResourceType_Study:
+          return Orthanc::ResourceType_Study;
+
+        case OrthancPluginResourceType_Series:
+          return Orthanc::ResourceType_Series;
+
+        case OrthancPluginResourceType_Instance:
+          return Orthanc::ResourceType_Instance;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+    }
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    OrthancPluginConstraintType ConvertToPlainC(ConstraintType constraint)
+    {
+      switch (constraint)
+      {
+        case ConstraintType_Equal:
+          return OrthancPluginConstraintType_Equal;
+
+        case ConstraintType_GreaterOrEqual:
+          return OrthancPluginConstraintType_GreaterOrEqual;
+
+        case ConstraintType_SmallerOrEqual:
+          return OrthancPluginConstraintType_SmallerOrEqual;
+
+        case ConstraintType_Wildcard:
+          return OrthancPluginConstraintType_Wildcard;
+
+        case ConstraintType_List:
+          return OrthancPluginConstraintType_List;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+    }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    ConstraintType Convert(OrthancPluginConstraintType constraint)
+    {
+      switch (constraint)
+      {
+        case OrthancPluginConstraintType_Equal:
+          return ConstraintType_Equal;
+
+        case OrthancPluginConstraintType_GreaterOrEqual:
+          return ConstraintType_GreaterOrEqual;
+
+        case OrthancPluginConstraintType_SmallerOrEqual:
+          return ConstraintType_SmallerOrEqual;
+
+        case OrthancPluginConstraintType_Wildcard:
+          return ConstraintType_Wildcard;
+
+        case OrthancPluginConstraintType_List:
+          return ConstraintType_List;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+    }
+#endif
+
+
+    Orthanc::DatabasePluginMessages::ResourceType ConvertToProtobuf(OrthancPluginResourceType resourceType)
+    {
+      switch (resourceType)
+      {
+        case OrthancPluginResourceType_Patient:
+          return Orthanc::DatabasePluginMessages::RESOURCE_PATIENT;
+
+        case OrthancPluginResourceType_Study:
+          return Orthanc::DatabasePluginMessages::RESOURCE_STUDY;
+
+        case OrthancPluginResourceType_Series:
+          return Orthanc::DatabasePluginMessages::RESOURCE_SERIES;
+
+        case OrthancPluginResourceType_Instance:
+          return Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+    }
   }
 }

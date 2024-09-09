@@ -38,106 +38,6 @@
 
 namespace OrthancDatabases
 {
-  namespace Plugins
-  {
-    OrthancPluginResourceType Convert(Orthanc::ResourceType type)
-    {
-      switch (type)
-      {
-        case Orthanc::ResourceType_Patient:
-          return OrthancPluginResourceType_Patient;
-
-        case Orthanc::ResourceType_Study:
-          return OrthancPluginResourceType_Study;
-
-        case Orthanc::ResourceType_Series:
-          return OrthancPluginResourceType_Series;
-
-        case Orthanc::ResourceType_Instance:
-          return OrthancPluginResourceType_Instance;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-      }
-    }
-
-
-    Orthanc::ResourceType Convert(OrthancPluginResourceType type)
-    {
-      switch (type)
-      {
-        case OrthancPluginResourceType_Patient:
-          return Orthanc::ResourceType_Patient;
-
-        case OrthancPluginResourceType_Study:
-          return Orthanc::ResourceType_Study;
-
-        case OrthancPluginResourceType_Series:
-          return Orthanc::ResourceType_Series;
-
-        case OrthancPluginResourceType_Instance:
-          return Orthanc::ResourceType_Instance;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-      }
-    }
-
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    OrthancPluginConstraintType Convert(ConstraintType constraint)
-    {
-      switch (constraint)
-      {
-        case ConstraintType_Equal:
-          return OrthancPluginConstraintType_Equal;
-
-        case ConstraintType_GreaterOrEqual:
-          return OrthancPluginConstraintType_GreaterOrEqual;
-
-        case ConstraintType_SmallerOrEqual:
-          return OrthancPluginConstraintType_SmallerOrEqual;
-
-        case ConstraintType_Wildcard:
-          return OrthancPluginConstraintType_Wildcard;
-
-        case ConstraintType_List:
-          return OrthancPluginConstraintType_List;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-      }
-    }
-#endif
-
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    ConstraintType Convert(OrthancPluginConstraintType constraint)
-    {
-      switch (constraint)
-      {
-        case OrthancPluginConstraintType_Equal:
-          return ConstraintType_Equal;
-
-        case OrthancPluginConstraintType_GreaterOrEqual:
-          return ConstraintType_GreaterOrEqual;
-
-        case OrthancPluginConstraintType_SmallerOrEqual:
-          return ConstraintType_SmallerOrEqual;
-
-        case OrthancPluginConstraintType_Wildcard:
-          return ConstraintType_Wildcard;
-
-        case OrthancPluginConstraintType_List:
-          return ConstraintType_List;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-      }
-    }
-#endif
-  }
-
   DatabaseConstraint::DatabaseConstraint(Orthanc::ResourceType level,
                                          const Orthanc::DicomTag& tag,
                                          bool isIdentifier,
@@ -163,10 +63,10 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   DatabaseConstraint::DatabaseConstraint(const OrthancPluginDatabaseConstraint& constraint) :
-    level_(Plugins::Convert(constraint.level)),
+    level_(MessagesToolbox::Convert(constraint.level)),
     tag_(constraint.tagGroup, constraint.tagElement),
     isIdentifier_(constraint.isIdentifierTag),
-    constraintType_(Plugins::Convert(constraint.type)),
+    constraintType_(MessagesToolbox::Convert(constraint.type)),
     caseSensitive_(constraint.isCaseSensitive),
     mandatory_(constraint.isMandatory)
   {
@@ -189,7 +89,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
   DatabaseConstraint::DatabaseConstraint(const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint) :
-    level_(OrthancDatabases::MessagesToolbox::Convert(constraint.level())),
+    level_(MessagesToolbox::Convert(constraint.level())),
     tag_(constraint.tag_group(), constraint.tag_element()),
     isIdentifier_(constraint.is_identifier_tag()),
     caseSensitive_(constraint.is_case_sensitive()),
@@ -276,13 +176,13 @@ namespace OrthancDatabases
       tmpValues[i] = values_[i].c_str();
     }
 
-    constraint.level = Plugins::Convert(level_);
+    constraint.level = MessagesToolbox::ConvertToPlainC(level_);
     constraint.tagGroup = tag_.GetGroup();
     constraint.tagElement = tag_.GetElement();
     constraint.isIdentifierTag = isIdentifier_;
     constraint.isCaseSensitive = caseSensitive_;
     constraint.isMandatory = mandatory_;
-    constraint.type = Plugins::Convert(constraintType_);
+    constraint.type = MessagesToolbox::ConvertToPlainC(constraintType_);
     constraint.valuesCount = values_.size();
     constraint.values = (tmpValues.empty() ? NULL : &tmpValues[0]);
   }

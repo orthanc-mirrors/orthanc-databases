@@ -648,7 +648,7 @@ namespace OrthancDatabases
                                   const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    Orthanc::ResourceType queryLevel = OrthancDatabases::MessagesToolbox::Convert(request.level());
+    Orthanc::ResourceType queryLevel = MessagesToolbox::Convert(request.level());
     const std::string& strQueryLevel = FormatLevel(queryLevel);
 
     DatabaseConstraints constraints;
