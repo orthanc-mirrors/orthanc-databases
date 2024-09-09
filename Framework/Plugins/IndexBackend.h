@@ -303,7 +303,7 @@ namespace OrthancDatabases
     // New primitive since Orthanc 1.5.2
     virtual void LookupResources(IDatabaseBackendOutput& output,
                                  DatabaseManager& manager,
-                                 const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 const Orthanc::DatabaseConstraints& lookup,
                                  OrthancPluginResourceType queryLevel,
                                  const std::set<std::string>& labels,
                                  Orthanc::LabelsConstraint labelsConstraint,

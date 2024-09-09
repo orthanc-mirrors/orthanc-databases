@@ -2101,7 +2101,7 @@ namespace OrthancDatabases
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
-                                     const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                     const Orthanc::DatabaseConstraints& lookup,
                                      OrthancPluginResourceType queryLevel_,
                                      const std::set<std::string>& labels,
                                      Orthanc::LabelsConstraint labelsConstraint,

@@ -544,9 +544,6 @@ namespace OrthancDatabases
                                    IndexBackend& backend,
                                    DatabaseManager& manager)
   {
-    std::vector<Orthanc::DatabaseConstraint> lookup;
-    lookup.reserve(request.lookup().size());
-
     size_t countValues = 0;
 
     for (int i = 0; i < request.lookup().size(); i++)
@@ -557,6 +554,8 @@ namespace OrthancDatabases
 
     std::vector<const char*> values;
     values.reserve(countValues);
+
+    Orthanc::DatabaseConstraints lookup;
 
     for (int i = 0; i < request.lookup().size(); i++)
     {
@@ -619,7 +618,7 @@ namespace OrthancDatabases
         }
       }
 
-      lookup.push_back(Orthanc::DatabaseConstraint(c));
+      lookup.AddConstraint(new Orthanc::DatabaseConstraint(c));
     }
 
     assert(values.size() == countValues);
