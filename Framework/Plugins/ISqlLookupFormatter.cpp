@@ -28,25 +28,12 @@
  **/
 
 
-#if !defined(ORTHANC_BUILDING_SERVER_LIBRARY)
-#  error Macro ORTHANC_BUILDING_SERVER_LIBRARY must be defined
-#endif
-
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../PrecompiledHeadersServer.h"
-#endif
-
 #include "ISqlLookupFormatter.h"
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../../../OrthancFramework/Sources/OrthancException.h"
-#  include "../../../OrthancFramework/Sources/Toolbox.h"
-#else
-#  include <OrthancException.h>
-#  include <Toolbox.h>
-#endif
-
 #include "DatabaseConstraint.h"
+
+#include <OrthancException.h>
+#include <Toolbox.h>
 
 #include <cassert>
 #include <boost/lexical_cast.hpp>

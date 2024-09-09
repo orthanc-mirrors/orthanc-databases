@@ -30,17 +30,6 @@
 
 #pragma once
 
-#if !defined(ORTHANC_BUILDING_SERVER_LIBRARY)
-#  error Macro ORTHANC_BUILDING_SERVER_LIBRARY must be defined
-#endif
-
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../../../OrthancFramework/Sources/DicomFormat/DicomMap.h"
-#else
-// This is for the "orthanc-databases" project to reuse this file
-#  include <DicomFormat/DicomMap.h>
-#endif
-
 #define ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT 0
 
 #if ORTHANC_ENABLE_PLUGINS == 1
@@ -52,6 +41,8 @@
 #    endif
 #  endif
 #endif
+
+#include <DicomFormat/DicomMap.h>
 
 #include <deque>
 
