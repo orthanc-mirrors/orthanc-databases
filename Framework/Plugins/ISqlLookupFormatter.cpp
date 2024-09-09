@@ -7,17 +7,24 @@
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ **/
+
+
+/**
+ * NB: Until 2024-09-09, this file was synchronized with the following
+ * folder from the Orthanc main project:
+ * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/Search/
  **/
 
 
@@ -54,21 +61,21 @@ namespace Orthanc
     {
       case ResourceType_Patient:
         return "patients";
-        
+
       case ResourceType_Study:
         return "studies";
-        
+
       case ResourceType_Series:
         return "series";
-        
+
       case ResourceType_Instance:
         return "instances";
 
       default:
         throw OrthancException(ErrorCode_InternalError);
     }
-  }      
-  
+  }
+
 
   static bool FormatComparison(std::string& target,
                                ISqlLookupFormatter& formatter,
@@ -79,7 +86,7 @@ namespace Orthanc
     std::string tag = "t" + boost::lexical_cast<std::string>(index);
 
     std::string comparison;
-    
+
     switch (constraint.GetConstraintType())
     {
       case ConstraintType_Equal:
@@ -92,15 +99,15 @@ namespace Orthanc
           case ConstraintType_Equal:
             op = "=";
             break;
-          
+
           case ConstraintType_SmallerOrEqual:
             op = "<=";
             break;
-          
+
           case ConstraintType_GreaterOrEqual:
             op = ">=";
             break;
-          
+
           default:
             throw OrthancException(ErrorCode_InternalError);
         }
@@ -127,7 +134,7 @@ namespace Orthanc
           {
             comparison += ", ";
           }
-            
+
           std::string parameter = formatter.GenerateParameter(constraint.GetValue(i));
 
           if (constraint.IsCaseSensitive())
@@ -148,7 +155,7 @@ namespace Orthanc
         {
           comparison = "lower(" +  tag + ".value) IN (" + comparison + ")";
         }
-            
+
         break;
       }
 
@@ -202,7 +209,7 @@ namespace Orthanc
             else
             {
               escaped += value[i];
-            }               
+            }
           }
 
           std::string parameter = formatter.GenerateParameter(escaped);
@@ -218,7 +225,7 @@ namespace Orthanc
                           parameter + ") " + formatter.FormatWildcardEscape());
           }
         }
-          
+
         break;
       }
 
@@ -327,15 +334,15 @@ namespace Orthanc
           case ConstraintType_Equal:
             op = "=";
             break;
-          
+
           case ConstraintType_SmallerOrEqual:
             op = "<=";
             break;
-          
+
           case ConstraintType_GreaterOrEqual:
             op = ">=";
             break;
-          
+
           default:
             throw OrthancException(ErrorCode_InternalError);
         }
@@ -382,7 +389,7 @@ namespace Orthanc
         {
           comparison = " AND lower(value) IN (" + values + ")";
         }
-            
+
         break;
       }
 
@@ -436,7 +443,7 @@ namespace Orthanc
             else
             {
               escaped += value[i];
-            }               
+            }
           }
 
           std::string parameter = formatter.GenerateParameter(escaped);
@@ -450,7 +457,7 @@ namespace Orthanc
             comparison = " AND lower(value) LIKE lower(" + parameter + ") " + formatter.FormatWildcardEscape();
           }
         }
-          
+
         break;
       }
 
@@ -483,7 +490,7 @@ namespace Orthanc
     assert(ResourceType_Patient < ResourceType_Study &&
            ResourceType_Study < ResourceType_Series &&
            ResourceType_Series < ResourceType_Instance);
-    
+
     lowerLevel = queryLevel;
     upperLevel = queryLevel;
 
@@ -502,7 +509,7 @@ namespace Orthanc
       }
     }
   }
-  
+
 
   void ISqlLookupFormatter::Apply(std::string& sql,
                                   ISqlLookupFormatter& formatter,
@@ -519,17 +526,17 @@ namespace Orthanc
            queryLevel <= lowerLevel);
 
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    
+
     std::string joins, comparisons;
 
     size_t count = 0;
-    
+
     for (size_t i = 0; i < lookup.GetSize(); i++)
     {
       const DatabaseConstraint& constraint = lookup.GetConstraint(i);
 
       std::string comparison;
-      
+
       if (FormatComparison(comparison, formatter, constraint, count, escapeBrackets))
       {
         std::string join;
@@ -540,7 +547,7 @@ namespace Orthanc
         {
           comparisons += " AND " + comparison;
         }
-        
+
         count ++;
       }
     }
@@ -557,7 +564,7 @@ namespace Orthanc
               FormatLevel(static_cast<ResourceType>(level)) + ".internalId=" +
               FormatLevel(static_cast<ResourceType>(level + 1)) + ".parentId");
     }
-      
+
     for (int level = queryLevel + 1; level <= lowerLevel; level++)
     {
       sql += (" INNER JOIN Resources " +
@@ -591,19 +598,19 @@ namespace Orthanc
         case LabelsConstraint_Any:
           condition = "> 0";
           break;
-          
+
         case LabelsConstraint_All:
           condition = "= " + boost::lexical_cast<std::string>(labels.size());
           break;
-          
+
         case LabelsConstraint_None:
           condition = "= 0";
           break;
-          
+
         default:
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
-      
+
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + FormatLevel(queryLevel) +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
@@ -628,12 +635,12 @@ namespace Orthanc
   {
     ResourceType lowerLevel, upperLevel;
     GetLookupLevels(lowerLevel, upperLevel, queryLevel, lookup);
-    
+
     assert(upperLevel == queryLevel &&
            queryLevel == lowerLevel);
 
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    
+
     std::vector<std::string> mainDicomTagsComparisons, dicomIdentifiersComparisons;
 
     for (size_t i = 0; i < lookup.GetSize(); i++)
@@ -641,7 +648,7 @@ namespace Orthanc
       const DatabaseConstraint& constraint = lookup.GetConstraint(i);
 
       std::string comparison;
-      
+
       if (FormatComparison2(comparison, formatter, constraint, escapeBrackets))
       {
         if (!comparison.empty())
@@ -660,7 +667,7 @@ namespace Orthanc
 
     sql = ("SELECT publicId, internalId "
            "FROM Resources "
-           "WHERE resourceType = " + formatter.FormatResourceType(queryLevel) 
+           "WHERE resourceType = " + formatter.FormatResourceType(queryLevel)
             + " ");
 
     if (dicomIdentifiersComparisons.size() > 0)
@@ -702,21 +709,21 @@ namespace Orthanc
           condition = "> 0";
           inOrNotIn = "IN";
           break;
-          
+
         case LabelsConstraint_All:
           condition = "= " + boost::lexical_cast<std::string>(labels.size());
           inOrNotIn = "IN";
           break;
-          
+
         case LabelsConstraint_None:
           condition = "> 0";
           inOrNotIn = "NOT IN";
           break;
-          
+
         default:
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
-      
+
       sql += (" AND internalId " + inOrNotIn + " (SELECT id"
                                  " FROM (SELECT id, COUNT(1) AS labelsCount "
                                         "FROM Labels "

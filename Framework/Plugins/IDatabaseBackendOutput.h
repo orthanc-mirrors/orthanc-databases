@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "../../Resources/Orthanc/Databases/DatabaseConstraint.h"
+#include "DatabaseConstraint.h"
 
 namespace OrthancDatabases
 {

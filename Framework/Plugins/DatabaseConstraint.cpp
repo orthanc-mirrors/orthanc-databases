@@ -7,17 +7,24 @@
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ **/
+
+
+/**
+ * NB: Until 2024-09-09, this file was synchronized with the following
+ * folder from the Orthanc main project:
+ * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/Search/
  **/
 
 
@@ -116,9 +123,9 @@ namespace Orthanc
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
     }
-#endif    
+#endif
 
-    
+
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     ConstraintType Convert(OrthancPluginConstraintType constraint)
     {
@@ -166,9 +173,9 @@ namespace Orthanc
     {
       throw OrthancException(ErrorCode_ParameterOutOfRange);
     }
-  }      
+  }
 
-    
+
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   DatabaseConstraint::DatabaseConstraint(const OrthancPluginDatabaseConstraint& constraint) :
     level_(Plugins::Convert(constraint.level)),
@@ -193,7 +200,7 @@ namespace Orthanc
     }
   }
 #endif
-    
+
 
   const std::string& DatabaseConstraint::GetValue(size_t index) const
   {
@@ -226,7 +233,7 @@ namespace Orthanc
                                             std::vector<const char*>& tmpValues) const
   {
     memset(&constraint, 0, sizeof(constraint));
-    
+
     tmpValues.resize(values_.size());
 
     for (size_t i = 0; i < values_.size(); i++)
@@ -244,7 +251,7 @@ namespace Orthanc
     constraint.valuesCount = values_.size();
     constraint.values = (tmpValues.empty() ? NULL : &tmpValues[0]);
   }
-#endif    
+#endif
 
 
   void DatabaseConstraints::Clear()

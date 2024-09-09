@@ -40,10 +40,6 @@ FILES = [
     ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginException.h', 'Plugins'),
     ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginsExports.cmake', 'Plugins'),
     ('default', 'OrthancServer/Plugins/Samples/Common/VersionScriptPlugins.map', 'Plugins'),
-    ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.cpp', 'Databases'),
-    ('default', 'OrthancServer/Sources/Search/DatabaseConstraint.h', 'Databases'),
-    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.cpp', 'Databases'),
-    ('default', 'OrthancServer/Sources/Search/ISqlLookupFormatter.h', 'Databases'),
 ]
 
 SDK = [

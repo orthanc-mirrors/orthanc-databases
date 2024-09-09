@@ -24,10 +24,10 @@
 
 #pragma once
 
-#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/DatabaseManager.h"
 #include "../Common/DatabasesEnumerations.h"
 #include "IDatabaseBackendOutput.h"
+#include "ISqlLookupFormatter.h"
 #include "IdentifierTag.h"
 
 #include <list>
