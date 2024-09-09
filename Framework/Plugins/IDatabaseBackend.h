@@ -24,21 +24,13 @@
 
 #pragma once
 
-#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/DatabaseManager.h"
 #include "../Common/DatabasesEnumerations.h"
 #include "IDatabaseBackendOutput.h"
+#include "ISqlLookupFormatter.h"
 #include "IdentifierTag.h"
 
 #include <list>
-
-#include <orthanc/OrthancCPlugin.h>
-
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-#    include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages for "Find()"
-#  endif
-#endif
 
 namespace OrthancDatabases
 {

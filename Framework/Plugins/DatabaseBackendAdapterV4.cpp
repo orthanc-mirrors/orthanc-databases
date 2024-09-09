@@ -91,28 +91,6 @@ namespace OrthancDatabases
   }
 
 
-  static Orthanc::ResourceType Convert2(Orthanc::DatabasePluginMessages::ResourceType resourceType)
-  {
-    switch (resourceType)
-    {
-      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
-        return Orthanc::ResourceType_Patient;
-
-      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
-        return Orthanc::ResourceType_Study;
-
-      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
-        return Orthanc::ResourceType_Series;
-
-      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
-        return Orthanc::ResourceType_Instance;
-
-      default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-    }
-  }
-
-
   class Output : public IDatabaseBackendOutput
   {
   private:
@@ -472,7 +450,7 @@ namespace OrthancDatabases
         for (int i = 0; i < request.open().identifier_tags().size(); i++)
         {
           const Orthanc::DatabasePluginMessages::Open_Request_IdentifierTag& tag = request.open().identifier_tags(i);
-          identifierTags.push_back(IdentifierTag(Convert2(tag.level()),
+          identifierTags.push_back(IdentifierTag(MessagesToolbox::Convert(tag.level()),
                                                  Orthanc::DicomTag(tag.group(), tag.element()),
                                                  tag.name()));
         }

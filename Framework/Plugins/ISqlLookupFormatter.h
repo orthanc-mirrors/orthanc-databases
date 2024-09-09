@@ -7,27 +7,30 @@
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ **/
+
+
+/**
+ * NB: Until 2024-09-09, this file was synchronized with the following
+ * folder from the Orthanc main project:
+ * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/Search/
  **/
 
 
 #pragma once
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../../../OrthancFramework/Sources/Enumerations.h"
-#else
-#  include <Enumerations.h>
-#endif
+#include "MessagesToolbox.h"
 
 #include <boost/noncopyable.hpp>
 #include <vector>
@@ -44,7 +47,6 @@ namespace Orthanc
     LabelsConstraint_None
   };
 
-  // This class is also used by the "orthanc-databases" project
   class ISqlLookupFormatter : public boost::noncopyable
   {
   public:
@@ -88,10 +90,10 @@ namespace Orthanc
                                  LabelsConstraint labelsConstraint,    // New in Orthanc 1.12.0
                                  size_t limit);
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
     static void Apply(std::string& sql,
                       ISqlLookupFormatter& formatter,
-                      const FindRequest& request);
+                      const Orthanc::DatabasePluginMessages::Find_Request& request);
 #endif
   };
 }

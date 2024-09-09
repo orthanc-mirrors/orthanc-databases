@@ -7,44 +7,32 @@
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ **/
+
+
+/**
+ * NB: Until 2024-09-09, this file was synchronized with the following
+ * folder from the Orthanc main project:
+ * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/Search/
  **/
 
 
 #pragma once
 
-#if !defined(ORTHANC_BUILDING_SERVER_LIBRARY)
-#  error Macro ORTHANC_BUILDING_SERVER_LIBRARY must be defined
-#endif
+#include "MessagesToolbox.h"
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../../../OrthancFramework/Sources/DicomFormat/DicomMap.h"
-#else
-// This is for the "orthanc-databases" project to reuse this file
-#  include <DicomFormat/DicomMap.h>
-#endif
-
-#define ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT 0
-
-#if ORTHANC_ENABLE_PLUGINS == 1
-#  include <orthanc/OrthancCDatabasePlugin.h>
-#  if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#    if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
-#      undef  ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT
-#      define ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT 1
-#    endif
-#  endif
-#endif
+#include <DicomFormat/DicomMap.h>
 
 #include <deque>
 
@@ -61,13 +49,9 @@ namespace Orthanc
 
   namespace Plugins
   {
-#if ORTHANC_ENABLE_PLUGINS == 1
     OrthancPluginResourceType Convert(ResourceType type);
-#endif
 
-#if ORTHANC_ENABLE_PLUGINS == 1
     ResourceType Convert(OrthancPluginResourceType type);
-#endif
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     OrthancPluginConstraintType Convert(ConstraintType constraint);
@@ -79,7 +63,6 @@ namespace Orthanc
   }
 
 
-  // This class is also used by the "orthanc-databases" project
   class DatabaseConstraint : public boost::noncopyable
   {
   private:
@@ -103,7 +86,11 @@ namespace Orthanc
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     explicit DatabaseConstraint(const OrthancPluginDatabaseConstraint& constraint);
 #endif
-    
+
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+    explicit DatabaseConstraint(const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint);
+#endif
+
     ResourceType GetLevel() const
     {
       return level_;
@@ -148,7 +135,7 @@ namespace Orthanc
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     void EncodeForPlugins(OrthancPluginDatabaseConstraint& constraint,
                           std::vector<const char*>& tmpValues) const;
-#endif    
+#endif
   };
 
 

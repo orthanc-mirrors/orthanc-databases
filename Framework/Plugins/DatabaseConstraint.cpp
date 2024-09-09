@@ -7,35 +7,30 @@
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  **/
 
 
-#if !defined(ORTHANC_BUILDING_SERVER_LIBRARY)
-#  error Macro ORTHANC_BUILDING_SERVER_LIBRARY must be defined
-#endif
+/**
+ * NB: Until 2024-09-09, this file was synchronized with the following
+ * folder from the Orthanc main project:
+ * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/Search/
+ **/
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../PrecompiledHeadersServer.h"
-#endif
 
 #include "DatabaseConstraint.h"
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../../../OrthancFramework/Sources/OrthancException.h"
-#else
-#  include <OrthancException.h>
-#endif
+#include <OrthancException.h>
 
 #include <boost/lexical_cast.hpp>
 #include <cassert>
@@ -45,7 +40,6 @@ namespace Orthanc
 {
   namespace Plugins
   {
-#if ORTHANC_ENABLE_PLUGINS == 1
     OrthancPluginResourceType Convert(ResourceType type)
     {
       switch (type)
@@ -66,10 +60,8 @@ namespace Orthanc
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
     }
-#endif
 
 
-#if ORTHANC_ENABLE_PLUGINS == 1
     ResourceType Convert(OrthancPluginResourceType type)
     {
       switch (type)
@@ -90,7 +82,6 @@ namespace Orthanc
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
     }
-#endif
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
@@ -117,9 +108,9 @@ namespace Orthanc
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
     }
-#endif    
+#endif
 
-    
+
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     ConstraintType Convert(OrthancPluginConstraintType constraint)
     {
@@ -167,9 +158,9 @@ namespace Orthanc
     {
       throw OrthancException(ErrorCode_ParameterOutOfRange);
     }
-  }      
+  }
 
-    
+
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
   DatabaseConstraint::DatabaseConstraint(const OrthancPluginDatabaseConstraint& constraint) :
     level_(Plugins::Convert(constraint.level)),
@@ -194,7 +185,57 @@ namespace Orthanc
     }
   }
 #endif
-    
+
+
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+  DatabaseConstraint::DatabaseConstraint(const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint) :
+    level_(OrthancDatabases::MessagesToolbox::Convert(constraint.level())),
+    tag_(constraint.tag_group(), constraint.tag_element()),
+    isIdentifier_(constraint.is_identifier_tag()),
+    caseSensitive_(constraint.is_case_sensitive()),
+    mandatory_(constraint.is_mandatory())
+  {
+    switch (constraint.type())
+    {
+      case Orthanc::DatabasePluginMessages::CONSTRAINT_EQUAL:
+        constraintType_ = Orthanc::ConstraintType_Equal;
+        break;
+
+      case Orthanc::DatabasePluginMessages::CONSTRAINT_SMALLER_OR_EQUAL:
+        constraintType_ = Orthanc::ConstraintType_SmallerOrEqual;
+        break;
+
+      case Orthanc::DatabasePluginMessages::CONSTRAINT_GREATER_OR_EQUAL:
+        constraintType_ = Orthanc::ConstraintType_GreaterOrEqual;
+        break;
+
+      case Orthanc::DatabasePluginMessages::CONSTRAINT_WILDCARD:
+        constraintType_ = Orthanc::ConstraintType_Wildcard;
+        break;
+
+      case Orthanc::DatabasePluginMessages::CONSTRAINT_LIST:
+        constraintType_ = Orthanc::ConstraintType_List;
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+
+    if (constraintType_ != ConstraintType_List &&
+        constraint.values().size() != 1)
+    {
+      throw OrthancException(ErrorCode_ParameterOutOfRange);
+    }
+
+    values_.resize(constraint.values().size());
+
+    for (int i = 0; i < constraint.values().size(); i++)
+    {
+      values_[i] = constraint.values(i);
+    }
+  }
+#endif
+
 
   const std::string& DatabaseConstraint::GetValue(size_t index) const
   {
@@ -227,7 +268,7 @@ namespace Orthanc
                                             std::vector<const char*>& tmpValues) const
   {
     memset(&constraint, 0, sizeof(constraint));
-    
+
     tmpValues.resize(values_.size());
 
     for (size_t i = 0; i < values_.size(); i++)
@@ -245,7 +286,7 @@ namespace Orthanc
     constraint.valuesCount = values_.size();
     constraint.values = (tmpValues.empty() ? NULL : &tmpValues[0]);
   }
-#endif    
+#endif
 
 
   void DatabaseConstraints::Clear()

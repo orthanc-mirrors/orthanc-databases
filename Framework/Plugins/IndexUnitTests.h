@@ -29,8 +29,6 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 
-#include <orthanc/OrthancCDatabasePlugin.h>
-
 #include <gtest/gtest.h>
 #include <list>
 

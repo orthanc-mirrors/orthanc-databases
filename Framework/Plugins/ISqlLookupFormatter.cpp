@@ -7,40 +7,33 @@
  * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- * 
+ * modify it under the terms of the GNU Affero General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
  * This program is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Affero General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  **/
 
 
-#if !defined(ORTHANC_BUILDING_SERVER_LIBRARY)
-#  error Macro ORTHANC_BUILDING_SERVER_LIBRARY must be defined
-#endif
+/**
+ * NB: Until 2024-09-09, this file was synchronized with the following
+ * folder from the Orthanc main project:
+ * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/Search/
+ **/
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../PrecompiledHeadersServer.h"
-#endif
 
 #include "ISqlLookupFormatter.h"
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
-#  include "../../../OrthancFramework/Sources/OrthancException.h"
-#  include "../../../OrthancFramework/Sources/Toolbox.h"
-#  include "../Database/FindRequest.h"
-#else
-#  include <OrthancException.h>
-#  include <Toolbox.h>
-#endif
-
 #include "DatabaseConstraint.h"
+
+#include <OrthancException.h>
+#include <Toolbox.h>
 
 #include <cassert>
 #include <boost/lexical_cast.hpp>
@@ -55,21 +48,21 @@ namespace Orthanc
     {
       case ResourceType_Patient:
         return "patients";
-        
+
       case ResourceType_Study:
         return "studies";
-        
+
       case ResourceType_Series:
         return "series";
-        
+
       case ResourceType_Instance:
         return "instances";
 
       default:
         throw OrthancException(ErrorCode_InternalError);
     }
-  }      
-  
+  }
+
 
   static bool FormatComparison(std::string& target,
                                ISqlLookupFormatter& formatter,
@@ -80,7 +73,7 @@ namespace Orthanc
     std::string tag = "t" + boost::lexical_cast<std::string>(index);
 
     std::string comparison;
-    
+
     switch (constraint.GetConstraintType())
     {
       case ConstraintType_Equal:
@@ -93,15 +86,15 @@ namespace Orthanc
           case ConstraintType_Equal:
             op = "=";
             break;
-          
+
           case ConstraintType_SmallerOrEqual:
             op = "<=";
             break;
-          
+
           case ConstraintType_GreaterOrEqual:
             op = ">=";
             break;
-          
+
           default:
             throw OrthancException(ErrorCode_InternalError);
         }
@@ -128,7 +121,7 @@ namespace Orthanc
           {
             comparison += ", ";
           }
-            
+
           std::string parameter = formatter.GenerateParameter(constraint.GetValue(i));
 
           if (constraint.IsCaseSensitive())
@@ -149,7 +142,7 @@ namespace Orthanc
         {
           comparison = "lower(" +  tag + ".value) IN (" + comparison + ")";
         }
-            
+
         break;
       }
 
@@ -203,7 +196,7 @@ namespace Orthanc
             else
             {
               escaped += value[i];
-            }               
+            }
           }
 
           std::string parameter = formatter.GenerateParameter(escaped);
@@ -219,7 +212,7 @@ namespace Orthanc
                           parameter + ") " + formatter.FormatWildcardEscape());
           }
         }
-          
+
         break;
       }
 
@@ -328,15 +321,15 @@ namespace Orthanc
           case ConstraintType_Equal:
             op = "=";
             break;
-          
+
           case ConstraintType_SmallerOrEqual:
             op = "<=";
             break;
-          
+
           case ConstraintType_GreaterOrEqual:
             op = ">=";
             break;
-          
+
           default:
             throw OrthancException(ErrorCode_InternalError);
         }
@@ -383,7 +376,7 @@ namespace Orthanc
         {
           comparison = " AND lower(value) IN (" + values + ")";
         }
-            
+
         break;
       }
 
@@ -437,7 +430,7 @@ namespace Orthanc
             else
             {
               escaped += value[i];
-            }               
+            }
           }
 
           std::string parameter = formatter.GenerateParameter(escaped);
@@ -451,7 +444,7 @@ namespace Orthanc
             comparison = " AND lower(value) LIKE lower(" + parameter + ") " + formatter.FormatWildcardEscape();
           }
         }
-          
+
         break;
       }
 
@@ -484,7 +477,7 @@ namespace Orthanc
     assert(ResourceType_Patient < ResourceType_Study &&
            ResourceType_Study < ResourceType_Series &&
            ResourceType_Series < ResourceType_Instance);
-    
+
     lowerLevel = queryLevel;
     upperLevel = queryLevel;
 
@@ -503,7 +496,7 @@ namespace Orthanc
       }
     }
   }
-  
+
 
   void ISqlLookupFormatter::Apply(std::string& sql,
                                   ISqlLookupFormatter& formatter,
@@ -520,17 +513,17 @@ namespace Orthanc
            queryLevel <= lowerLevel);
 
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    
+
     std::string joins, comparisons;
 
     size_t count = 0;
-    
+
     for (size_t i = 0; i < lookup.GetSize(); i++)
     {
       const DatabaseConstraint& constraint = lookup.GetConstraint(i);
 
       std::string comparison;
-      
+
       if (FormatComparison(comparison, formatter, constraint, count, escapeBrackets))
       {
         std::string join;
@@ -541,7 +534,7 @@ namespace Orthanc
         {
           comparisons += " AND " + comparison;
         }
-        
+
         count ++;
       }
     }
@@ -558,7 +551,7 @@ namespace Orthanc
               FormatLevel(static_cast<ResourceType>(level)) + ".internalId=" +
               FormatLevel(static_cast<ResourceType>(level + 1)) + ".parentId");
     }
-      
+
     for (int level = queryLevel + 1; level <= lowerLevel; level++)
     {
       sql += (" INNER JOIN Resources " +
@@ -592,19 +585,19 @@ namespace Orthanc
         case LabelsConstraint_Any:
           condition = "> 0";
           break;
-          
+
         case LabelsConstraint_All:
           condition = "= " + boost::lexical_cast<std::string>(labels.size());
           break;
-          
+
         case LabelsConstraint_None:
           condition = "= 0";
           break;
-          
+
         default:
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
-      
+
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + FormatLevel(queryLevel) +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
@@ -617,17 +610,56 @@ namespace Orthanc
     }
   }
 
-#if ORTHANC_BUILDING_SERVER_LIBRARY == 1
+
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+  static ResourceType DetectLevel(const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // This corresponds to "Orthanc::OrthancIdentifiers()::DetectLevel()" in the Orthanc core
+    if (!request.orthanc_id_patient().empty() &&
+        request.orthanc_id_study().empty() &&
+        request.orthanc_id_series().empty() &&
+        request.orthanc_id_instance().empty())
+    {
+      return ResourceType_Patient;
+    }
+    else if (!request.orthanc_id_study().empty() &&
+             request.orthanc_id_series().empty() &&
+             request.orthanc_id_instance().empty())
+    {
+      return ResourceType_Study;
+    }
+    else if (!request.orthanc_id_series().empty() &&
+             request.orthanc_id_instance().empty())
+    {
+      return ResourceType_Series;
+    }
+    else if (!request.orthanc_id_instance().empty())
+    {
+      return ResourceType_Instance;
+    }
+    else
+    {
+      throw OrthancException(ErrorCode_InternalError);
+    }
+  }
+
   void ISqlLookupFormatter::Apply(std::string& sql,
                                   ISqlLookupFormatter& formatter,
-                                  const FindRequest& request)
+                                  const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    ResourceType queryLevel = request.GetLevel();
+    ResourceType queryLevel = OrthancDatabases::MessagesToolbox::Convert(request.level());
     const std::string& strQueryLevel = FormatLevel(queryLevel);
 
+    DatabaseConstraints constraints;
+
+    for (int i = 0; i < request.dicom_tag_constraints().size(); i++)
+    {
+      constraints.AddConstraint(new DatabaseConstraint(request.dicom_tag_constraints(i)));
+    }
+
     ResourceType lowerLevel, upperLevel;
-    GetLookupLevels(lowerLevel, upperLevel, queryLevel, request.GetDicomTagConstraints());
+    GetLookupLevels(lowerLevel, upperLevel, queryLevel, constraints);
 
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
@@ -641,17 +673,54 @@ namespace Orthanc
 
     std::string joins, comparisons;
 
-    if (request.GetOrthancIdentifiers().IsDefined() && request.GetOrthancIdentifiers().DetectLevel() <= queryLevel)
+    const bool isOrthancIdentifiersDefined = (!request.orthanc_id_patient().empty() ||
+                                              !request.orthanc_id_study().empty() ||
+                                              !request.orthanc_id_series().empty() ||
+                                              !request.orthanc_id_instance().empty());
+
+    if (isOrthancIdentifiersDefined &&
+        Orthanc::IsResourceLevelAboveOrEqual(DetectLevel(request), queryLevel))
     {
       // single child resource matching, there should not be other constraints (at least for now)
-      assert(request.GetDicomTagConstraints().GetSize() == 0);
-      assert(request.GetLabels().size() == 0);
-      assert(request.HasLimits() == false);
+      if (request.dicom_tag_constraints().size() != 0 ||
+          request.labels().size() != 0 ||
+          request.has_limits())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
 
-      ResourceType topParentLevel = request.GetOrthancIdentifiers().DetectLevel();
+      ResourceType topParentLevel = DetectLevel(request);
       const std::string& strTopParentLevel = FormatLevel(topParentLevel);
 
-      comparisons = " AND " + strTopParentLevel + ".publicId = " + formatter.GenerateParameter(request.GetOrthancIdentifiers().GetLevel(topParentLevel));
+      std::string publicId;
+      switch (topParentLevel)
+      {
+        case ResourceType_Patient:
+          publicId = request.orthanc_id_patient();
+          break;
+
+        case ResourceType_Study:
+          publicId = request.orthanc_id_study();
+          break;
+
+        case ResourceType_Series:
+          publicId = request.orthanc_id_series();
+          break;
+
+        case ResourceType_Instance:
+          publicId = request.orthanc_id_instance();
+          break;
+
+        default:
+          throw OrthancException(ErrorCode_InternalError);
+      }
+
+      if (publicId.empty())
+      {
+        throw OrthancException(ErrorCode_InternalError);
+      }
+
+      comparisons = " AND " + strTopParentLevel + ".publicId = " + formatter.GenerateParameter(publicId);
 
       for (int level = queryLevel; level > topParentLevel; level--)
       {
@@ -664,14 +733,13 @@ namespace Orthanc
     else
     {
       size_t count = 0;
-      
-      const DatabaseConstraints& dicomTagsConstraints = request.GetDicomTagConstraints();
-      for (size_t i = 0; i < dicomTagsConstraints.GetSize(); i++)
+
+      for (size_t i = 0; i < constraints.GetSize(); i++)
       {
-        const DatabaseConstraint& constraint = dicomTagsConstraints.GetConstraint(i);
+        const DatabaseConstraint& constraint = constraints.GetConstraint(i);
 
         std::string comparison;
-        
+
         if (FormatComparison(comparison, formatter, constraint, count, escapeBrackets))
         {
           std::string join;
@@ -682,7 +750,7 @@ namespace Orthanc
           {
             comparisons += " AND " + comparison;
           }
-          
+
           count ++;
         }
       }
@@ -695,7 +763,7 @@ namespace Orthanc
               FormatLevel(static_cast<ResourceType>(level)) + ".internalId=" +
               FormatLevel(static_cast<ResourceType>(level + 1)) + ".parentId");
     }
-      
+
     for (int level = queryLevel + 1; level <= lowerLevel; level++)
     {
       sql += (" INNER JOIN Resources " +
@@ -709,7 +777,7 @@ namespace Orthanc
                     formatter.FormatResourceType(queryLevel) + comparisons);
 
 
-    if (!request.GetLabels().empty())
+    if (!request.labels().empty())
     {
       /**
        * "In SQL Server, NOT EXISTS and NOT IN predicates are the best
@@ -718,41 +786,40 @@ namespace Orthanc
        * https://explainextended.com/2009/09/15/not-in-vs-not-exists-vs-left-join-is-null-sql-server/
        **/
 
-      const std::set<std::string>& labels = request.GetLabels();
       std::list<std::string> formattedLabels;
-      for (std::set<std::string>::const_iterator it = labels.begin(); it != labels.end(); ++it)
+      for (int i = 0; i < request.labels().size(); i++)
       {
-        formattedLabels.push_back(formatter.GenerateParameter(*it));
+        formattedLabels.push_back(formatter.GenerateParameter(request.labels(i)));
       }
 
       std::string condition;
-      switch (request.GetLabelsConstraint())
+      switch (request.labels_constraint())
       {
-        case LabelsConstraint_Any:
+        case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ANY:
           condition = "> 0";
           break;
-          
-        case LabelsConstraint_All:
-          condition = "= " + boost::lexical_cast<std::string>(labels.size());
+
+        case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ALL:
+          condition = "= " + boost::lexical_cast<std::string>(request.labels().size());
           break;
-          
-        case LabelsConstraint_None:
+
+        case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE:
           condition = "= 0";
           break;
-          
+
         default:
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
-      
+
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + strQueryLevel +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
 
     sql += joins + Join(where, " WHERE ", " AND ");
 
-    if (request.HasLimits())
+    if (request.has_limits())
     {
-      sql += formatter.FormatLimits(request.GetLimitsSince(), request.GetLimitsCount());
+      sql += formatter.FormatLimits(request.limits().since(), request.limits().count());
     }
 
   }
@@ -770,12 +837,12 @@ namespace Orthanc
   {
     ResourceType lowerLevel, upperLevel;
     GetLookupLevels(lowerLevel, upperLevel, queryLevel, lookup);
-    
+
     assert(upperLevel == queryLevel &&
            queryLevel == lowerLevel);
 
     const bool escapeBrackets = formatter.IsEscapeBrackets();
-    
+
     std::vector<std::string> mainDicomTagsComparisons, dicomIdentifiersComparisons;
 
     for (size_t i = 0; i < lookup.GetSize(); i++)
@@ -783,7 +850,7 @@ namespace Orthanc
       const DatabaseConstraint& constraint = lookup.GetConstraint(i);
 
       std::string comparison;
-      
+
       if (FormatComparison2(comparison, formatter, constraint, escapeBrackets))
       {
         if (!comparison.empty())
@@ -802,7 +869,7 @@ namespace Orthanc
 
     sql = ("SELECT publicId, internalId "
            "FROM Resources "
-           "WHERE resourceType = " + formatter.FormatResourceType(queryLevel) 
+           "WHERE resourceType = " + formatter.FormatResourceType(queryLevel)
             + " ");
 
     if (dicomIdentifiersComparisons.size() > 0)
@@ -844,21 +911,21 @@ namespace Orthanc
           condition = "> 0";
           inOrNotIn = "IN";
           break;
-          
+
         case LabelsConstraint_All:
           condition = "= " + boost::lexical_cast<std::string>(labels.size());
           inOrNotIn = "IN";
           break;
-          
+
         case LabelsConstraint_None:
           condition = "> 0";
           inOrNotIn = "NOT IN";
           break;
-          
+
         default:
           throw OrthancException(ErrorCode_ParameterOutOfRange);
       }
-      
+
       sql += (" AND internalId " + inOrNotIn + " (SELECT id"
                                  " FROM (SELECT id, COUNT(1) AS labelsCount "
                                         "FROM Labels "
@@ -872,5 +939,4 @@ namespace Orthanc
       sql += " LIMIT " + boost::lexical_cast<std::string>(limit);
     }
   }
-
 }
