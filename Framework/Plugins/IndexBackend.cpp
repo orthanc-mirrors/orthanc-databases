@@ -2802,7 +2802,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
       return;
     }
 #  endif
@@ -2812,14 +2812,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
+      DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
       return;
     }
 #  endif
 #endif
 
     LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
-    OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
+    DatabaseBackendAdapterV2::Register(backend);
   }
 
 
@@ -2862,17 +2862,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   void IndexBackend::Finalize()
   {
-    OrthancDatabases::DatabaseBackendAdapterV2::Finalize();
+    DatabaseBackendAdapterV2::Finalize();
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
+    DatabaseBackendAdapterV3::Finalize();
 #  endif
 #endif
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
-    OrthancDatabases::DatabaseBackendAdapterV4::Finalize();
+    DatabaseBackendAdapterV4::Finalize();
 #  endif
 #endif
   }
