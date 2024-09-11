@@ -563,25 +563,30 @@ namespace OrthancDatabases
     {
       suffix = "OFFSET ${since} ROWS FETCH FIRST ${limit} ROWS ONLY";
     }
-    else
+    else if (limit > 0)
     {
       suffix = "LIMIT ${limit} OFFSET ${since}";
     }
     
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT publicId FROM (SELECT publicId FROM Resources "
-      "WHERE resourceType=${type}) AS tmp ORDER BY tmp.publicId " + suffix);
+    std::string sql = "SELECT publicId FROM (SELECT publicId FROM Resources "
+      "WHERE resourceType=${type}) AS tmp ORDER BY tmp.publicId " + suffix;
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
       
     statement.SetReadOnly(true);
-    statement.SetParameterType("type", ValueType_Integer64);
-    statement.SetParameterType("limit", ValueType_Integer64);
-    statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
+
+    statement.SetParameterType("type", ValueType_Integer64);
     args.SetIntegerValue("type", static_cast<int>(resourceType));
-    args.SetIntegerValue("limit", limit);
-    args.SetIntegerValue("since", since);
+    
+    if (limit > 0)
+    {
+      statement.SetParameterType("limit", ValueType_Integer64);
+      statement.SetParameterType("since", ValueType_Integer64);
+      args.SetIntegerValue("limit", limit);
+      args.SetIntegerValue("since", since);
+    }
 
     ReadListOfStrings(target, statement, args);
   }
