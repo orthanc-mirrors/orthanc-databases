@@ -3067,6 +3067,55 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* GetResourceContent(
+                              Orthanc::DatabasePluginMessages::Find_Response* response,
+                              Orthanc::DatabasePluginMessages::ResourceType level)
+  {
+    Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = NULL;  // the protobuf response will be the owner
+    
+    switch (level)
+    {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        content = response->mutable_patient_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        content = response->mutable_study_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        content =response->mutable_series_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        content = response->mutable_instance_content();
+        break;
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    return content;
+  }
+
+  Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* GetChildrenContent(
+                              Orthanc::DatabasePluginMessages::Find_Response* response,
+                              Orthanc::DatabasePluginMessages::ResourceType childrenLevel)
+  {
+    Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = NULL;  // the protobuf response will be the owner
+    
+    switch (childrenLevel)
+    {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        content = response->mutable_children_studies_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        content =response->mutable_children_series_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        content = response->mutable_children_instances_content();
+        break;
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    return content;
+  }
+
 
 #define C0_QUERY_ID 0
 #define C1_INTERNAL_ID 1
@@ -3082,6 +3131,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define QUERY_LOOKUP 1
 #define QUERY_MAIN_DICOM_TAGS 2
 #define QUERY_ATTACHMENTS 3
+#define QUERY_METADATA 4
+#define QUERY_PARENT_MAIN_DICOM_TAGS 5
+#define QUERY_PARENT_IDENTIFIER 6
+#define QUERY_CHILDREN_IDENTIFIERS 7
+#define QUERY_CHILDREN_MAIN_DICOM_TAGS 8
+#define QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS 9
+
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
@@ -3140,6 +3196,25 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           "FROM MainDicomTags "
           "INNER JOIN Lookup ON MainDicomTags.id = Lookup.internalId ";
     }
+    
+    // need resource metadata ?
+    if (request.retrieve_metadata())
+    {
+      sql += 
+          "UNION SELECT "
+          "  " TOSTRING(QUERY_METADATA) " AS c0_queryId, "
+          "  Lookup.internalId AS c1_internalId, "
+          "  NULL::BIGINT AS c2_rowNumber, "
+          "  value AS c3_string1, "
+          "  NULL::TEXT AS c4_string2, "
+          "  NULL::TEXT AS c5_string3, "
+          "  type AS c6_int1, "
+          "  NULL::INT AS c7_int2, "
+          "  NULL::BIGINT AS c8_big_int1, "
+          "  NULL::BIGINT AS c9_big_int2 "
+          "FROM Metadata "
+          "INNER JOIN Lookup ON Metadata.id = Lookup.internalId ";
+    }
 
     // need resource attachments ?
     if (request.retrieve_attachments())
@@ -3160,6 +3235,207 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           "INNER JOIN Lookup ON AttachedFiles.id = Lookup.internalId ";
     }
 
+    // need MainDicomTags from parent ?
+    if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
+    {
+      const Orthanc::DatabasePluginMessages::Find_Request_ParentSpecification* parentSpec = NULL;
+      switch (request.level())
+      {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        parentSpec = &(request.parent_patient());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        parentSpec = &(request.parent_study());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        parentSpec = &(request.parent_series());
+        break;
+      
+      default:
+        break;
+      }
+
+      if (parentSpec->retrieve_main_dicom_tags())
+      {
+        sql += 
+            "UNION SELECT "
+            "  " TOSTRING(QUERY_PARENT_MAIN_DICOM_TAGS) " AS c0_queryId, "
+            "  Lookup.internalId AS c1_internalId, "
+            "  NULL::BIGINT AS c2_rowNumber, "
+            "  value AS c3_string1, "
+            "  NULL::TEXT AS c4_string2, "
+            "  NULL::TEXT AS c5_string3, "
+            "  tagGroup AS c6_int1, "
+            "  tagElement AS c7_int2, "
+            "  NULL::BIGINT AS c8_big_int1, "
+            "  NULL::BIGINT AS c9_big_int2 "
+            "FROM MainDicomTags "
+            "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+            "INNER JOIN Lookup ON MainDicomTags.id = currentLevel.parentId";
+      }
+
+      // need MainDicomTags from grandparent ?
+      if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
+      {
+        const Orthanc::DatabasePluginMessages::Find_Request_ParentSpecification* grandparentSpec = NULL;
+        switch (request.level())
+        {
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+          grandparentSpec = &(request.parent_patient());
+          break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+          grandparentSpec = &(request.parent_study());
+          break;
+        
+        default:
+          break;
+        }
+
+        if (grandparentSpec->retrieve_main_dicom_tags())
+        {
+          sql += "TODO";
+        }
+      }
+    }
+
+    // need MainDicomTags from children ?
+    if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES)
+    {
+      const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec = NULL;
+      switch (request.level())
+      {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        childrenSpec = &(request.children_studies());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        childrenSpec = &(request.children_series());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        childrenSpec = &(request.children_instances());
+        break;
+      
+      default:
+        break;
+      }
+
+      if (childrenSpec->retrieve_main_dicom_tags_size() > 0)   // TODO: retrieve only the requested tags ?
+      {
+        sql += 
+          "UNION SELECT "
+          "  " TOSTRING(QUERY_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
+          "  Lookup.internalId AS c1_internalId, "
+          "  NULL::BIGINT AS c2_rowNumber, "
+          "  value AS c3_string1, "
+          "  NULL::TEXT AS c4_string2, "
+          "  NULL::TEXT AS c5_string3, "
+          "  tagGroup AS c6_int1, "
+          "  tagElement AS c7_int2, "
+          "  NULL::BIGINT AS c8_big_int1, "
+          "  NULL::BIGINT AS c9_big_int2 "
+          "FROM MainDicomTags "
+          "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+          "  INNER JOIN Lookup ON MainDicomTags.id = childLevel.internalId ";
+      }
+
+      // need children identifiers ?
+      if (childrenSpec->retrieve_identifiers())
+      {
+        sql += 
+            "UNION SELECT "
+            "  " TOSTRING(QUERY_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+            "  Lookup.internalId AS c1_internalId, "
+            "  NULL::BIGINT AS c2_rowNumber, "
+            "  childLevel.publicId AS c3_string1, "
+            "  NULL::TEXT AS c4_string2, "
+            "  NULL::TEXT AS c5_string3, "
+            "  NULL::INT AS c6_int1, "
+            "  NULL::INT AS c7_int2, "
+            "  NULL::BIGINT AS c8_big_int1, "
+            "  NULL::BIGINT AS c9_big_int2 "
+            "FROM Resources AS currentLevel "
+            "  INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
+            "  INNER JOIN Resources childLevel ON currentLevel.internalId = childLevel.parentId ";
+      }
+
+      if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
+      {
+        const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandchildrenSpec = NULL;
+        switch (request.level())
+        {
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+          grandchildrenSpec = &(request.children_series());
+          break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+          grandchildrenSpec = &(request.children_instances());
+          break;
+        
+        default:
+          break;
+        }
+
+        if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)   // TODO: retrieve only the requested tags ?
+        {
+          sql += 
+            "UNION SELECT "
+            "  " TOSTRING(QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
+            "  Lookup.internalId AS c1_internalId, "
+            "  NULL::BIGINT AS c2_rowNumber, "
+            "  value AS c3_string1, "
+            "  NULL::TEXT AS c4_string2, "
+            "  NULL::TEXT AS c5_string3, "
+            "  tagGroup AS c6_int1, "
+            "  tagElement AS c7_int2, "
+            "  NULL::BIGINT AS c8_big_int1, "
+            "  NULL::BIGINT AS c9_big_int2 "
+            "FROM MainDicomTags "
+            "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+            "  INNER JOIN Resources grandChildLevel ON childLevel.parentId = Lookup.internalId "
+            "  INNER JOIN Lookup ON MainDicomTags.id = grandChildLevel.internalId ";
+        }
+      }
+    }
+
+    // need parent identifier ?
+    if (request.retrieve_parent_identifier())
+    {
+        sql += 
+            "UNION SELECT "
+            "  " TOSTRING(QUERY_PARENT_IDENTIFIER) " AS c0_queryId, "
+            "  Lookup.internalId AS c1_internalId, "
+            "  NULL::BIGINT AS c2_rowNumber, "
+            "  parentLevel.publicId AS c3_string1, "
+            "  NULL::TEXT AS c4_string2, "
+            "  NULL::TEXT AS c5_string3, "
+            "  NULL::INT AS c6_int1, "
+            "  NULL::INT AS c7_int2, "
+            "  NULL::BIGINT AS c8_big_int1, "
+            "  NULL::BIGINT AS c9_big_int2 "
+            "FROM Resources AS currentLevel "
+            "  INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
+            "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
+    }
+
+
+//      Find_Request_ParentSpecification Patient.parent_patient)
+// 
+    
+//     if (requestLevel > ResourceType_Patient && request.GetParentSpecification(static_cast<ResourceType>(requestLevel - 1)).IsRetrieveMainDicomTags())
+//     {
+//       sql = "SELECT currentLevel.internalId, tagGroup, tagElement, value "
+//             "FROM MainDicomTags "
+//             "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+//             "INNER JOIN Lookup ON MainDicomTags.id = currentLevel.parentId";
+
+//       SQLite::Statement s(db_, SQLITE_FROM_HERE, sql);
+//       while (s.Step())
+//       {
+//         FindResponse::Resource& res = response.GetResourceByInternalId(s.ColumnInt64(0));
+//         res.AddStringDicomTag(static_cast<ResourceType>(requestLevel - 1), 
+//                               static_cast<uint16_t>(s.ColumnInt(1)),
+//                               static_cast<uint16_t>(s.ColumnInt(2)),
+//                               s.ColumnString(3));
+//       }
+//     }
 
     // TODO-FIND: other requests
 
@@ -3167,7 +3443,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     DatabaseManager::StandaloneStatement statement(manager, sql);  // TODO-FIND: cache dynamic statement ?  Probably worth it since it can be very complex queries !
     formatter.PrepareStatement(statement);
-    statement.Execute();
+    statement.Execute(formatter.GetDictionary());
     
 
     std::map<int64_t, Orthanc::DatabasePluginMessages::Find_Response*> responses;
@@ -3189,31 +3465,49 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         case QUERY_MAIN_DICOM_TAGS:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = NULL;  // the protobuf response will be the owner
-          
-          switch (request.level())
-          {
-            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
-              content = responses[internalId]->mutable_patient_content();
-              break;
-            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
-              content = responses[internalId]->mutable_study_content();
-              break;
-            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
-              content = responses[internalId]->mutable_series_content();
-              break;
-            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
-              content = responses[internalId]->mutable_instance_content();
-              break;
-            default:
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-          }
-
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());  // the protobuf response will be the owner
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+
           tag->set_value(statement.ReadString(C3_STRING_1));
           tag->set_group(statement.ReadInteger32(C6_INT_1));
           tag->set_element(statement.ReadInteger32(C7_INT_2));
           }; break;
+
+        case QUERY_PARENT_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 1));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+
+          tag->set_value(statement.ReadString(C3_STRING_1));
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_CHILDREN_IDENTIFIERS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));  // the protobuf response will be the owner
+          content->add_identifiers(statement.ReadString(C3_STRING_1));
+        }; break;
+
+        case QUERY_CHILDREN_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
+
+          tag->set_values(0, statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
+
+          tag->set_values(0, statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
 
         case QUERY_ATTACHMENTS:
         {
@@ -3226,6 +3520,20 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_compression_type(statement.ReadInteger32(C7_INT_2));
           attachment->set_compressed_size(statement.ReadInteger64(C8_BIG_INT_1));
           attachment->set_uncompressed_size(statement.ReadInteger64(C9_BIG_INT_2));
+        }; break;
+
+        case QUERY_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_PARENT_IDENTIFIER:
+        {
+          responses[internalId]->set_parent_public_id(statement.ReadString(C3_STRING_1));
         }; break;
 
         default:
