@@ -3056,4 +3056,184 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     backend.ConfigureDatabase(*manager, hasIdentifierTags, identifierTags);
     return manager.release();
   }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool IndexBackend::HasFindSupport() const
+  {
+    // TODO-FIND  move to child plugins ?
+    return true;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+
+#define C0_QUERY_ID 0
+#define C1_INTERNAL_ID 1
+#define C2_ROW_NUMBER 2
+#define C3_STRING_1 3
+#define C4_STRING_2 4
+#define C5_STRING_3 5
+#define C6_INT_1 6
+#define C7_INT_2 7
+#define C8_BIG_INT_1 8
+#define C9_BIG_INT_2 9
+
+#define QUERY_LOOKUP 1
+#define QUERY_MAIN_DICOM_TAGS 2
+#define QUERY_ATTACHMENTS 3
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+  void IndexBackend::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                    DatabaseManager& manager,
+                                    const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // TODO-FIND move to child plugins ?
+
+
+    // If we want the Find to use a read-only transaction, we can not create temporary tables with
+    // the lookup results.  So we must use a CTE (Common Table Expression).  
+    // However, a CTE can only be used in a single query -> we must unionize all the following 
+    // queries to retrieve values from various tables.
+    // However, to use UNION, all tables must have the same columns (numbers and types).  That's
+    // why we have generic column names.
+    // So, at the end we'll have only one very big query !
+
+    std::string sql;
+
+    // extract the resource id of interest by executing the lookup in a CTE
+    LookupFormatter formatter(manager.GetDialect());
+    std::string lookupSql;
+    ISqlLookupFormatter::Apply(lookupSql, formatter, request);
+
+    // base query, retrieve the ordered internalId and publicId of the selected resources
+    sql = "WITH Lookup AS (" + lookupSql + ") "
+          "SELECT "
+          "  " TOSTRING(QUERY_LOOKUP) " AS c0_queryId, "
+          "  Lookup.internalId AS c1_internalId, "
+          "  Lookup.rowNumber AS c2_rowNumber, "
+          "  Lookup.publicId AS c3_string1, "
+          "  NULL::TEXT AS c4_string2, "
+          "  NULL::TEXT AS c5_string3, "
+          "  NULL::INT AS c6_int1, "
+          "  NULL::INT AS c7_int2, "
+          "  NULL::BIGINT AS c8_big_int1, "
+          "  NULL::BIGINT AS c9_big_int2 "
+          "  FROM Lookup ";
+
+    // need MainDicomTags from resource ?
+    if (request.retrieve_main_dicom_tags())
+    {
+      sql += 
+          "UNION SELECT "
+          "  " TOSTRING(QUERY_MAIN_DICOM_TAGS) " AS c0_queryId, "
+          "  Lookup.internalId AS c1_internalId, "
+          "  NULL::BIGINT AS c2_rowNumber, "
+          "  value AS c3_string1, "
+          "  NULL::TEXT AS c4_string2, "
+          "  NULL::TEXT AS c5_string3, "
+          "  tagGroup AS c6_int1, "
+          "  tagElement AS c7_int2, "
+          "  NULL::BIGINT AS c8_big_int1, "
+          "  NULL::BIGINT AS c9_big_int2 "
+          "FROM MainDicomTags "
+          "INNER JOIN Lookup ON MainDicomTags.id = Lookup.internalId ";
+    }
+
+    // need resource attachments ?
+    if (request.retrieve_attachments())
+    {
+      sql += 
+          "UNION SELECT "
+          "  " TOSTRING(QUERY_ATTACHMENTS) " AS c0_queryId, "
+          "  Lookup.internalId AS c1_internalId, "
+          "  NULL::BIGINT AS c2_rowNumber, "
+          "  uuid AS c3_string1, "
+          "  uncompressedHash AS c4_string2, "
+          "  compressedHash AS c5_string3, "
+          "  fileType AS c6_int1, "
+          "  compressionType AS c7_int2, "
+          "  compressedSize AS c8_big_int1, "
+          "  uncompressedSize AS c9_big_int2 "
+          "FROM AttachedFiles "
+          "INNER JOIN Lookup ON AttachedFiles.id = Lookup.internalId ";
+    }
+
+
+    // TODO-FIND: other requests
+
+    sql += "ORDER BY c0_queryId, c2_rowNumber";  // this is really important to make sure that the Lookup query is the first one to provide results since we use it to create the responses element !
+
+    DatabaseManager::StandaloneStatement statement(manager, sql);  // TODO-FIND: cache dynamic statement ?  Probably worth it since it can be very complex queries !
+    formatter.PrepareStatement(statement);
+    statement.Execute();
+    
+
+    std::map<int64_t, Orthanc::DatabasePluginMessages::Find_Response*> responses;
+
+    while (!statement.IsDone())
+    {
+      int32_t queryId = statement.ReadInteger32(C0_QUERY_ID);
+      int64_t internalId = statement.ReadInteger64(C1_INTERNAL_ID);
+      
+      assert(queryId == QUERY_LOOKUP || responses.find(internalId) != responses.end()); // the QUERY_LOOKUP must be read first and must create the response before any other query tries to populate the fields
+
+      switch (queryId)
+      {
+        case QUERY_LOOKUP:
+          responses[internalId] = response.add_find();  // the protobuf message is the owner of the response
+          responses[internalId]->set_public_id(statement.ReadString(C3_STRING_1));
+          responses[internalId]->set_internal_id(internalId);
+          break;
+
+        case QUERY_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = NULL;  // the protobuf response will be the owner
+          
+          switch (request.level())
+          {
+            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+              content = responses[internalId]->mutable_patient_content();
+              break;
+            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+              content = responses[internalId]->mutable_study_content();
+              break;
+            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+              content = responses[internalId]->mutable_series_content();
+              break;
+            case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+              content = responses[internalId]->mutable_instance_content();
+              break;
+            default:
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          }
+
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+          tag->set_value(statement.ReadString(C3_STRING_1));
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+          }; break;
+
+        case QUERY_ATTACHMENTS:
+        {
+          Orthanc::DatabasePluginMessages::FileInfo* attachment = responses[internalId]->add_attachments();  // the protobuf response is the owner
+
+          attachment->set_uuid(statement.ReadString(C3_STRING_1));
+          attachment->set_uncompressed_hash(statement.ReadString(C4_STRING_2));
+          attachment->set_compressed_hash(statement.ReadString(C5_STRING_3));
+          attachment->set_content_type(statement.ReadInteger32(C6_INT_1));
+          attachment->set_compression_type(statement.ReadInteger32(C7_INT_2));
+          attachment->set_compressed_size(statement.ReadInteger64(C8_BIG_INT_1));
+          attachment->set_uncompressed_size(statement.ReadInteger64(C9_BIG_INT_2));
+        }; break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+      statement.Next();
+    }    
+  }
+#endif
+
 }

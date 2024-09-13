@@ -664,10 +664,12 @@ namespace OrthancDatabases
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
 
+    std::string ordering = "NULL::BIGINT AS rowNumber"; // "row_number() over (order by publicId) as rn";  // default ordering for now
 
     sql = ("SELECT " +
            strQueryLevel + ".publicId, " +
-           strQueryLevel + ".internalId" +
+           strQueryLevel + ".internalId, " +
+           ordering +
            " FROM Resources AS " + strQueryLevel);
 
 
