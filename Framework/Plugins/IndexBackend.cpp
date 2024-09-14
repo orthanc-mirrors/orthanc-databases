@@ -3132,11 +3132,20 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define QUERY_MAIN_DICOM_TAGS 2
 #define QUERY_ATTACHMENTS 3
 #define QUERY_METADATA 4
-#define QUERY_PARENT_MAIN_DICOM_TAGS 5
-#define QUERY_PARENT_IDENTIFIER 6
-#define QUERY_CHILDREN_IDENTIFIERS 7
-#define QUERY_CHILDREN_MAIN_DICOM_TAGS 8
-#define QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS 9
+#define QUERY_LABELS 5
+#define QUERY_PARENT_MAIN_DICOM_TAGS 10
+#define QUERY_PARENT_IDENTIFIER 11
+#define QUERY_GRAND_PARENT_MAIN_DICOM_TAGS 15
+#define QUERY_CHILDREN_IDENTIFIERS 20
+#define QUERY_CHILDREN_MAIN_DICOM_TAGS 21
+#define QUERY_CHILDREN_METADATA 22
+#define QUERY_GRAND_CHILDREN_IDENTIFIERS 30
+#define QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS 31
+#define QUERY_GRAND_CHILDREN_METADATA 32
+#define QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS 40
+#define QUERY_ONE_INSTANCE_IDENTIFIER 50
+#define QUERY_ONE_INSTANCE_METADATA 51
+#define QUERY_ONE_INSTANCE_ATTACHMENTS 52
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -3181,58 +3190,73 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // need MainDicomTags from resource ?
     if (request.retrieve_main_dicom_tags())
     {
-      sql += 
-          "UNION SELECT "
-          "  " TOSTRING(QUERY_MAIN_DICOM_TAGS) " AS c0_queryId, "
-          "  Lookup.internalId AS c1_internalId, "
-          "  NULL::BIGINT AS c2_rowNumber, "
-          "  value AS c3_string1, "
-          "  NULL::TEXT AS c4_string2, "
-          "  NULL::TEXT AS c5_string3, "
-          "  tagGroup AS c6_int1, "
-          "  tagElement AS c7_int2, "
-          "  NULL::BIGINT AS c8_big_int1, "
-          "  NULL::BIGINT AS c9_big_int2 "
-          "FROM MainDicomTags "
-          "INNER JOIN Lookup ON MainDicomTags.id = Lookup.internalId ";
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_MAIN_DICOM_TAGS) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  value AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  tagGroup AS c6_int1, "
+             "  tagElement AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM MainDicomTags "
+             "INNER JOIN Lookup ON MainDicomTags.id = Lookup.internalId ";
     }
     
     // need resource metadata ?
     if (request.retrieve_metadata())
     {
-      sql += 
-          "UNION SELECT "
-          "  " TOSTRING(QUERY_METADATA) " AS c0_queryId, "
-          "  Lookup.internalId AS c1_internalId, "
-          "  NULL::BIGINT AS c2_rowNumber, "
-          "  value AS c3_string1, "
-          "  NULL::TEXT AS c4_string2, "
-          "  NULL::TEXT AS c5_string3, "
-          "  type AS c6_int1, "
-          "  NULL::INT AS c7_int2, "
-          "  NULL::BIGINT AS c8_big_int1, "
-          "  NULL::BIGINT AS c9_big_int2 "
-          "FROM Metadata "
-          "INNER JOIN Lookup ON Metadata.id = Lookup.internalId ";
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_METADATA) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  value AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  type AS c6_int1, "
+             "  NULL::INT AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Metadata "
+             "INNER JOIN Lookup ON Metadata.id = Lookup.internalId ";
     }
 
     // need resource attachments ?
     if (request.retrieve_attachments())
     {
-      sql += 
-          "UNION SELECT "
-          "  " TOSTRING(QUERY_ATTACHMENTS) " AS c0_queryId, "
-          "  Lookup.internalId AS c1_internalId, "
-          "  NULL::BIGINT AS c2_rowNumber, "
-          "  uuid AS c3_string1, "
-          "  uncompressedHash AS c4_string2, "
-          "  compressedHash AS c5_string3, "
-          "  fileType AS c6_int1, "
-          "  compressionType AS c7_int2, "
-          "  compressedSize AS c8_big_int1, "
-          "  uncompressedSize AS c9_big_int2 "
-          "FROM AttachedFiles "
-          "INNER JOIN Lookup ON AttachedFiles.id = Lookup.internalId ";
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_ATTACHMENTS) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  uuid AS c3_string1, "
+             "  uncompressedHash AS c4_string2, "
+             "  compressedHash AS c5_string3, "
+             "  fileType AS c6_int1, "
+             "  compressionType AS c7_int2, "
+             "  compressedSize AS c8_big_int1, "
+             "  uncompressedSize AS c9_big_int2 "
+             "FROM AttachedFiles "
+             "INNER JOIN Lookup ON AttachedFiles.id = Lookup.internalId ";
+    }
+
+    // need resource labels ?
+    if (request.retrieve_labels())
+    {
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_LABELS) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  label AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  NULL::INT AS c6_int1, "
+             "  NULL::INT AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Labels "
+             "INNER JOIN Lookup ON Labels.id = Lookup.internalId ";
     }
 
     // need MainDicomTags from parent ?
@@ -3257,21 +3281,20 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       if (parentSpec->retrieve_main_dicom_tags())
       {
-        sql += 
-            "UNION SELECT "
-            "  " TOSTRING(QUERY_PARENT_MAIN_DICOM_TAGS) " AS c0_queryId, "
-            "  Lookup.internalId AS c1_internalId, "
-            "  NULL::BIGINT AS c2_rowNumber, "
-            "  value AS c3_string1, "
-            "  NULL::TEXT AS c4_string2, "
-            "  NULL::TEXT AS c5_string3, "
-            "  tagGroup AS c6_int1, "
-            "  tagElement AS c7_int2, "
-            "  NULL::BIGINT AS c8_big_int1, "
-            "  NULL::BIGINT AS c9_big_int2 "
-            "FROM MainDicomTags "
-            "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
-            "INNER JOIN Lookup ON MainDicomTags.id = currentLevel.parentId";
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_PARENT_MAIN_DICOM_TAGS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  tagGroup AS c6_int1, "
+               "  tagElement AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+               "INNER JOIN MainDicomTags ON MainDicomTags.id = currentLevel.parentId ";
       }
 
       // need MainDicomTags from grandparent ?
@@ -3293,7 +3316,21 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         if (grandparentSpec->retrieve_main_dicom_tags())
         {
-          sql += "TODO";
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_GRAND_PARENT_MAIN_DICOM_TAGS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  tagGroup AS c6_int1, "
+               "  tagElement AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+               "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
+               "INNER JOIN MainDicomTags ON MainDicomTags.id = parentLevel.parentId ";
         }
       }
     }
@@ -3320,41 +3357,57 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       if (childrenSpec->retrieve_main_dicom_tags_size() > 0)   // TODO: retrieve only the requested tags ?
       {
-        sql += 
-          "UNION SELECT "
-          "  " TOSTRING(QUERY_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
-          "  Lookup.internalId AS c1_internalId, "
-          "  NULL::BIGINT AS c2_rowNumber, "
-          "  value AS c3_string1, "
-          "  NULL::TEXT AS c4_string2, "
-          "  NULL::TEXT AS c5_string3, "
-          "  tagGroup AS c6_int1, "
-          "  tagElement AS c7_int2, "
-          "  NULL::BIGINT AS c8_big_int1, "
-          "  NULL::BIGINT AS c9_big_int2 "
-          "FROM MainDicomTags "
-          "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
-          "  INNER JOIN Lookup ON MainDicomTags.id = childLevel.internalId ";
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  tagGroup AS c6_int1, "
+               "  tagElement AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+               "  INNER JOIN MainDicomTags ON MainDicomTags.id = childLevel.internalId ";
       }
 
       // need children identifiers ?
-      if (childrenSpec->retrieve_identifiers())
+      if (childrenSpec->retrieve_identifiers())  
       {
-        sql += 
-            "UNION SELECT "
-            "  " TOSTRING(QUERY_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
-            "  Lookup.internalId AS c1_internalId, "
-            "  NULL::BIGINT AS c2_rowNumber, "
-            "  childLevel.publicId AS c3_string1, "
-            "  NULL::TEXT AS c4_string2, "
-            "  NULL::TEXT AS c5_string3, "
-            "  NULL::INT AS c6_int1, "
-            "  NULL::INT AS c7_int2, "
-            "  NULL::BIGINT AS c8_big_int1, "
-            "  NULL::BIGINT AS c9_big_int2 "
-            "FROM Resources AS currentLevel "
-            "  INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
-            "  INNER JOIN Resources childLevel ON currentLevel.internalId = childLevel.parentId ";
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  childLevel.publicId AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  NULL::INT AS c6_int1, "
+               "  NULL::INT AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Resources AS currentLevel "
+               "  INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
+               "  INNER JOIN Resources childLevel ON currentLevel.internalId = childLevel.parentId ";
+      }
+
+      if (childrenSpec->retrieve_metadata_size() > 0)   // TODO-FIND: retrieve only the requested metadata ?
+      {
+        sql += "UNION SELECT "
+                "  " TOSTRING(QUERY_CHILDREN_METADATA) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  NULL::BIGINT AS c2_rowNumber, "
+                "  value AS c3_string1, "
+                "  NULL::TEXT AS c4_string2, "
+                "  NULL::TEXT AS c5_string3, "
+                "  type AS c6_int1, "
+                "  NULL::INT AS c7_int2, "
+                "  NULL::BIGINT AS c8_big_int1, "
+                "  NULL::BIGINT AS c9_big_int2 "
+                "FROM Lookup "
+                "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+                "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId ";
       }
 
       if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
@@ -3373,24 +3426,88 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           break;
         }
 
-        if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)   // TODO: retrieve only the requested tags ?
+        // need grand children identifiers ?
+        if (grandchildrenSpec->retrieve_identifiers())  
         {
-          sql += 
-            "UNION SELECT "
-            "  " TOSTRING(QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
-            "  Lookup.internalId AS c1_internalId, "
-            "  NULL::BIGINT AS c2_rowNumber, "
-            "  value AS c3_string1, "
-            "  NULL::TEXT AS c4_string2, "
-            "  NULL::TEXT AS c5_string3, "
-            "  tagGroup AS c6_int1, "
-            "  tagElement AS c7_int2, "
-            "  NULL::BIGINT AS c8_big_int1, "
-            "  NULL::BIGINT AS c9_big_int2 "
-            "FROM MainDicomTags "
-            "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
-            "  INNER JOIN Resources grandChildLevel ON childLevel.parentId = Lookup.internalId "
-            "  INNER JOIN Lookup ON MainDicomTags.id = grandChildLevel.internalId ";
+          sql += "UNION SELECT "
+                "  " TOSTRING(QUERY_GRAND_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  NULL::BIGINT AS c2_rowNumber, "
+                "  grandChildLevel.publicId AS c3_string1, "
+                "  NULL::TEXT AS c4_string2, "
+                "  NULL::TEXT AS c5_string3, "
+                "  NULL::INT AS c6_int1, "
+                "  NULL::INT AS c7_int2, "
+                "  NULL::BIGINT AS c8_big_int1, "
+                "  NULL::BIGINT AS c9_big_int2 "
+                "FROM Resources AS currentLevel "
+                "INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
+                "INNER JOIN Resources childLevel ON currentLevel.internalId = childLevel.parentId "
+                "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId ";
+        }
+
+        if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)   // TODO-FIND: retrieve only the requested tags ?
+        {
+          sql += "UNION SELECT "
+                 "  " TOSTRING(QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
+                 "  Lookup.internalId AS c1_internalId, "
+                 "  NULL::BIGINT AS c2_rowNumber, "
+                 "  value AS c3_string1, "
+                 "  NULL::TEXT AS c4_string2, "
+                 "  NULL::TEXT AS c5_string3, "
+                 "  tagGroup AS c6_int1, "
+                 "  tagElement AS c7_int2, "
+                 "  NULL::BIGINT AS c8_big_int1, "
+                 "  NULL::BIGINT AS c9_big_int2 "
+                 "FROM Lookup "
+                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+                 "  INNER JOIN Resources grandChildLevel ON childLevel.parentId = Lookup.internalId "
+                 "  INNER JOIN MainDicomTags ON MainDicomTags.id = grandChildLevel.internalId ";
+        }
+
+        if (grandchildrenSpec->retrieve_metadata_size() > 0)   // TODO-FIND: retrieve only the requested metadata ?
+        {
+          sql += "UNION SELECT "
+                 "  " TOSTRING(QUERY_GRAND_CHILDREN_METADATA) " AS c0_queryId, "
+                 "  Lookup.internalId AS c1_internalId, "
+                 "  NULL::BIGINT AS c2_rowNumber, "
+                 "  value AS c3_string1, "
+                 "  NULL::TEXT AS c4_string2, "
+                 "  NULL::TEXT AS c5_string3, "
+                 "  type AS c6_int1, "
+                 "  NULL::INT AS c7_int2, "
+                 "  NULL::BIGINT AS c8_big_int1, "
+                 "  NULL::BIGINT AS c9_big_int2 "
+                 "FROM Lookup "
+                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+                 "  INNER JOIN Resources grandChildLevel ON childLevel.parentId = Lookup.internalId "
+                 "  INNER JOIN Metadata ON Metadata.id = grandChildLevel.internalId ";
+        }
+
+        if (request.level() == Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
+        {
+          const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandgrandchildrenSpec = &(request.children_instances());
+
+          // need grand children identifiers ?
+          if (grandgrandchildrenSpec->retrieve_identifiers())  
+          {
+            sql += "UNION SELECT "
+                  "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+                  "  Lookup.internalId AS c1_internalId, "
+                  "  NULL::BIGINT AS c2_rowNumber, "
+                  "  grandGrandChildLevel.publicId AS c3_string1, "
+                  "  NULL::TEXT AS c4_string2, "
+                  "  NULL::TEXT AS c5_string3, "
+                  "  NULL::INT AS c6_int1, "
+                  "  NULL::INT AS c7_int2, "
+                  "  NULL::BIGINT AS c8_big_int1, "
+                  "  NULL::BIGINT AS c9_big_int2 "
+                  "FROM Resources AS currentLevel "
+                  "INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
+                  "INNER JOIN Resources childLevel ON currentLevel.internalId = childLevel.parentId "
+                  "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
+                  "INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId ";
+          }
         }
       }
     }
@@ -3398,48 +3515,103 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // need parent identifier ?
     if (request.retrieve_parent_identifier())
     {
-        sql += 
-            "UNION SELECT "
-            "  " TOSTRING(QUERY_PARENT_IDENTIFIER) " AS c0_queryId, "
-            "  Lookup.internalId AS c1_internalId, "
-            "  NULL::BIGINT AS c2_rowNumber, "
-            "  parentLevel.publicId AS c3_string1, "
-            "  NULL::TEXT AS c4_string2, "
-            "  NULL::TEXT AS c5_string3, "
-            "  NULL::INT AS c6_int1, "
-            "  NULL::INT AS c7_int2, "
-            "  NULL::BIGINT AS c8_big_int1, "
-            "  NULL::BIGINT AS c9_big_int2 "
-            "FROM Resources AS currentLevel "
-            "  INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
-            "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_PARENT_IDENTIFIER) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  parentLevel.publicId AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  NULL::INT AS c6_int1, "
+             "  NULL::INT AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Resources AS currentLevel "
+             "  INNER JOIN Lookup ON currentLevel.internalId = Lookup.internalId "
+             "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
     }
 
+    // need one instance info ?
+    if (request.level() != Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE &&
+        request.retrieve_one_instance_metadata_and_attachments())
+    {
+      // Here, we create a nested CTE 'OneInstance' with one instance ID to join with metadata and main
+      sql += "UNION"
+             "  (WITH OneInstance AS";
+      
+      switch (request.level())
+      {
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        {
+          sql+= "  (SELECT DISTINCT ON (Lookup.internalId) Lookup.internalId AS parentInternalId, childLevel.publicId AS instancePublicId, childLevel.internalId AS instanceInternalId"
+                "   FROM Resources AS childLevel "
+                "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId) ";
+        }; break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        {
+          sql+= "  (SELECT DISTINCT ON (Lookup.internalId) Lookup.internalId AS parentInternalId, grandChildLevel.publicId AS instancePublicId, grandChildLevel.internalId AS instanceInternalId"
+                "   FROM Resources AS grandChildLevel "
+                "   INNER JOIN Resources childLevel ON grandChildLevel.parentId = childLevel.internalId "
+                "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId) ";
+        }; break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        {
+          sql+= "  (SELECT DISTINCT ON (Lookup.internalId) Lookup.internalId AS parentInternalId, grandGrandChildLevel.publicId AS instancePublicId, grandGrandChildLevel.internalId AS instanceInternalId"
+                "   FROM Resources AS grandGrandChildLevel "
+                "   INNER JOIN Resources grandChildLevel ON grandGrandChildLevel.parentId = grandChildLevel.internalId "
+                "   INNER JOIN Resources childLevel ON grandChildLevel.parentId = childLevel.internalId "
+                "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId) ";
+        }; break;
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
 
-//      Find_Request_ParentSpecification Patient.parent_patient)
-// 
-    
-//     if (requestLevel > ResourceType_Patient && request.GetParentSpecification(static_cast<ResourceType>(requestLevel - 1)).IsRetrieveMainDicomTags())
-//     {
-//       sql = "SELECT currentLevel.internalId, tagGroup, tagElement, value "
-//             "FROM MainDicomTags "
-//             "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
-//             "INNER JOIN Lookup ON MainDicomTags.id = currentLevel.parentId";
+      sql += "   SELECT"
+             "    " TOSTRING(QUERY_ONE_INSTANCE_IDENTIFIER) " AS c0_queryId, "
+             "    parentInternalId AS c1_internalId, "
+             "    NULL::BIGINT AS c2_rowNumber, "
+             "    instancePublicId AS c3_string1, "
+             "    NULL::TEXT AS c4_string2, "
+             "    NULL::TEXT AS c5_string3, "
+             "    NULL::INT AS c6_int1, "
+             "    NULL::INT AS c7_int2, "
+             "    instanceInternalId AS c8_big_int1, "
+             "    NULL::BIGINT AS c9_big_int2 "
+             "   FROM OneInstance ";
 
-//       SQLite::Statement s(db_, SQLITE_FROM_HERE, sql);
-//       while (s.Step())
-//       {
-//         FindResponse::Resource& res = response.GetResourceByInternalId(s.ColumnInt64(0));
-//         res.AddStringDicomTag(static_cast<ResourceType>(requestLevel - 1), 
-//                               static_cast<uint16_t>(s.ColumnInt(1)),
-//                               static_cast<uint16_t>(s.ColumnInt(2)),
-//                               s.ColumnString(3));
-//       }
-//     }
+      sql += "   UNION SELECT"
+             "    " TOSTRING(QUERY_ONE_INSTANCE_METADATA) " AS c0_queryId, "
+             "    parentInternalId AS c1_internalId, "
+             "    NULL::BIGINT AS c2_rowNumber, "
+             "    Metadata.value AS c3_string1, "
+             "    NULL::TEXT AS c4_string2, "
+             "    NULL::TEXT AS c5_string3, "
+             "    Metadata.type AS c6_int1, "
+             "    NULL::INT AS c7_int2, "
+             "    NULL::BIGINT AS c8_big_int1, "
+             "    NULL::BIGINT AS c9_big_int2 "
+             "   FROM Metadata "
+             "   INNER JOIN OneInstance ON Metadata.id = OneInstance.instanceInternalId";
+             
+      sql += "   UNION SELECT"
+             "    " TOSTRING(QUERY_ONE_INSTANCE_ATTACHMENTS) " AS c0_queryId, "
+             "    parentInternalId AS c1_internalId, "
+             "    NULL::BIGINT AS c2_rowNumber, "
+             "    uuid AS c3_string1, "
+             "    uncompressedHash AS c4_string2, "
+             "    compressedHash AS c5_string3, "
+             "    fileType AS c6_int1, "
+             "    compressionType AS c7_int2, "
+             "    compressedSize AS c8_big_int1, "
+             "    uncompressedSize AS c9_big_int2 "
+             "   FROM AttachedFiles "
+             "   INNER JOIN OneInstance ON AttachedFiles.id = OneInstance.instanceInternalId";
 
-    // TODO-FIND: other requests
+      sql += "  ) ";
 
-    sql += "ORDER BY c0_queryId, c2_rowNumber";  // this is really important to make sure that the Lookup query is the first one to provide results since we use it to create the responses element !
+    }
+
+    sql += " ORDER BY c0_queryId, c2_rowNumber";  // this is really important to make sure that the Lookup query is the first one to provide results since we use it to create the responses element !
 
     DatabaseManager::StandaloneStatement statement(manager, sql);  // TODO-FIND: cache dynamic statement ?  Probably worth it since it can be very complex queries !
     formatter.PrepareStatement(statement);
@@ -3458,14 +3630,18 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       switch (queryId)
       {
         case QUERY_LOOKUP:
-          responses[internalId] = response.add_find();  // the protobuf message is the owner of the response
+          responses[internalId] = response.add_find();
           responses[internalId]->set_public_id(statement.ReadString(C3_STRING_1));
           responses[internalId]->set_internal_id(internalId);
           break;
 
+        case QUERY_LABELS:
+          responses[internalId]->add_labels(statement.ReadString(C3_STRING_1));
+          break;
+
         case QUERY_MAIN_DICOM_TAGS:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
           tag->set_value(statement.ReadString(C3_STRING_1));
@@ -3475,7 +3651,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         case QUERY_PARENT_MAIN_DICOM_TAGS:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 1));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 1));
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+
+          tag->set_value(statement.ReadString(C3_STRING_1));
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_GRAND_PARENT_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 2));
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
           tag->set_value(statement.ReadString(C3_STRING_1));
@@ -3485,33 +3671,62 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         case QUERY_CHILDREN_IDENTIFIERS:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
           content->add_identifiers(statement.ReadString(C3_STRING_1));
         }; break;
 
         case QUERY_CHILDREN_MAIN_DICOM_TAGS:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
           Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
-
-          tag->set_values(0, statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->add_values(statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
           tag->set_group(statement.ReadInteger32(C6_INT_1));
           tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_CHILDREN_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleMetadata* metadata = content->add_metadata();
+
+          metadata->add_values(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_GRAND_CHILDREN_IDENTIFIERS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
+          content->add_identifiers(statement.ReadString(C3_STRING_1));
         }; break;
 
         case QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
           Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
 
-          tag->set_values(0, statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->add_values(statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
           tag->set_group(statement.ReadInteger32(C6_INT_1));
           tag->set_element(statement.ReadInteger32(C7_INT_2));
         }; break;
 
+        case QUERY_GRAND_CHILDREN_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleMetadata* metadata = content->add_metadata();
+
+          metadata->add_values(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 3));
+          content->add_identifiers(statement.ReadString(C3_STRING_1));
+        }; break;
+
         case QUERY_ATTACHMENTS:
         {
-          Orthanc::DatabasePluginMessages::FileInfo* attachment = responses[internalId]->add_attachments();  // the protobuf response is the owner
+          Orthanc::DatabasePluginMessages::FileInfo* attachment = responses[internalId]->add_attachments();
 
           attachment->set_uuid(statement.ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement.ReadString(C4_STRING_2));
@@ -3524,7 +3739,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         case QUERY_METADATA:
         {
-          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());  // the protobuf response will be the owner
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement.ReadString(C3_STRING_1));
@@ -3534,6 +3749,30 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_PARENT_IDENTIFIER:
         {
           responses[internalId]->set_parent_public_id(statement.ReadString(C3_STRING_1));
+        }; break;
+
+        case QUERY_ONE_INSTANCE_IDENTIFIER:
+        {
+          responses[internalId]->set_one_instance_public_id(statement.ReadString(C3_STRING_1));
+        }; break;
+        case QUERY_ONE_INSTANCE_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = responses[internalId]->add_one_instance_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+        case QUERY_ONE_INSTANCE_ATTACHMENTS:
+        {
+          Orthanc::DatabasePluginMessages::FileInfo* attachment = responses[internalId]->add_one_instance_attachments();
+          
+          attachment->set_uuid(statement.ReadString(C3_STRING_1));
+          attachment->set_uncompressed_hash(statement.ReadString(C4_STRING_2));
+          attachment->set_compressed_hash(statement.ReadString(C5_STRING_3));
+          attachment->set_content_type(statement.ReadInteger32(C6_INT_1));
+          attachment->set_compression_type(statement.ReadInteger32(C7_INT_2));
+          attachment->set_compressed_size(statement.ReadInteger64(C8_BIG_INT_1));
+          attachment->set_uncompressed_size(statement.ReadInteger64(C9_BIG_INT_2));
         }; break;
 
         default:

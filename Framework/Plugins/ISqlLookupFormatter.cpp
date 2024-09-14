@@ -664,7 +664,7 @@ namespace OrthancDatabases
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
 
-    std::string ordering = "NULL::BIGINT AS rowNumber"; // "row_number() over (order by publicId) as rn";  // default ordering for now
+    std::string ordering = "row_number() over (order by " + strQueryLevel + ".publicId) as rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
 
     sql = ("SELECT " +
            strQueryLevel + ".publicId, " +
