@@ -3116,6 +3116,33 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     return content;
   }
 
+  std::string JoinRequestedMetadata(const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec)
+  {
+    std::set<std::string> metadataTypes;
+    for (int i = 0; i < childrenSpec->retrieve_metadata_size(); ++i)
+    {
+      metadataTypes.insert(boost::lexical_cast<std::string>(childrenSpec->retrieve_metadata(i)));
+    }
+    std::string joinedMetadataTypes;
+    Orthanc::Toolbox::JoinStrings(joinedMetadataTypes, metadataTypes, ", ");
+
+    return joinedMetadataTypes;
+  }
+
+  std::string JoinRequestedTags(const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec)
+  {
+    std::set<std::string> tags;
+    for (int i = 0; i < childrenSpec->retrieve_main_dicom_tags_size(); ++i)
+    {
+      tags.insert("(" + boost::lexical_cast<std::string>(childrenSpec->retrieve_main_dicom_tags(i).group()) 
+                  + ", " + boost::lexical_cast<std::string>(childrenSpec->retrieve_main_dicom_tags(i).element()) + ")");
+    }
+    std::string joinedTags;
+    Orthanc::Toolbox::JoinStrings(joinedTags, tags, ", ");
+
+    return joinedTags;
+  }
+
 
 #define C0_QUERY_ID 0
 #define C1_INTERNAL_ID 1
@@ -3370,7 +3397,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  NULL::BIGINT AS c9_big_int2 "
                "FROM Lookup "
                "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
-               "  INNER JOIN MainDicomTags ON MainDicomTags.id = childLevel.internalId ";
+               "  INNER JOIN MainDicomTags ON MainDicomTags.id = childLevel.internalId AND (tagGroup, tagElement) IN (" + JoinRequestedTags(childrenSpec) + ")";
       }
 
       // need children identifiers ?
@@ -3392,7 +3419,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  INNER JOIN Resources childLevel ON currentLevel.internalId = childLevel.parentId ";
       }
 
-      if (childrenSpec->retrieve_metadata_size() > 0)   // TODO-FIND: retrieve only the requested metadata ?
+      if (childrenSpec->retrieve_metadata_size() > 0)
       {
         sql += "UNION SELECT "
                 "  " TOSTRING(QUERY_CHILDREN_METADATA) " AS c0_queryId, "
@@ -3407,7 +3434,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  NULL::BIGINT AS c9_big_int2 "
                 "FROM Lookup "
                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
-                "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId ";
+                "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(childrenSpec) + ") ";
       }
 
       if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
@@ -3446,7 +3473,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId ";
         }
 
-        if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)   // TODO-FIND: retrieve only the requested tags ?
+        if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)
         {
           sql += "UNION SELECT "
                  "  " TOSTRING(QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
@@ -3462,10 +3489,10 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "FROM Lookup "
                  "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                  "  INNER JOIN Resources grandChildLevel ON childLevel.parentId = Lookup.internalId "
-                 "  INNER JOIN MainDicomTags ON MainDicomTags.id = grandChildLevel.internalId ";
+                 "  INNER JOIN MainDicomTags ON MainDicomTags.id = grandChildLevel.internalId AND (tagGroup, tagElement) IN (" + JoinRequestedTags(grandchildrenSpec) + ")";
         }
 
-        if (grandchildrenSpec->retrieve_metadata_size() > 0)   // TODO-FIND: retrieve only the requested metadata ?
+        if (grandchildrenSpec->retrieve_metadata_size() > 0)
         {
           sql += "UNION SELECT "
                  "  " TOSTRING(QUERY_GRAND_CHILDREN_METADATA) " AS c0_queryId, "
@@ -3481,7 +3508,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "FROM Lookup "
                  "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                  "  INNER JOIN Resources grandChildLevel ON childLevel.parentId = Lookup.internalId "
-                 "  INNER JOIN Metadata ON Metadata.id = grandChildLevel.internalId ";
+                 "  INNER JOIN Metadata ON Metadata.id = grandChildLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(grandchildrenSpec) + ") ";
         }
 
         if (request.level() == Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
