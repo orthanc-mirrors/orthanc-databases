@@ -3162,7 +3162,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define QUERY_LABELS 5
 #define QUERY_PARENT_MAIN_DICOM_TAGS 10
 #define QUERY_PARENT_IDENTIFIER 11
+#define QUERY_PARENT_METADATA 12
 #define QUERY_GRAND_PARENT_MAIN_DICOM_TAGS 15
+#define QUERY_GRAND_PARENT_METADATA 16
 #define QUERY_CHILDREN_IDENTIFIERS 20
 #define QUERY_CHILDREN_MAIN_DICOM_TAGS 21
 #define QUERY_CHILDREN_METADATA 22
@@ -3324,6 +3326,24 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "INNER JOIN MainDicomTags ON MainDicomTags.id = currentLevel.parentId ";
       }
 
+      if (parentSpec->retrieve_metadata())
+      {
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_PARENT_METADATA) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  type AS c6_int1, "
+               "  NULL::INT AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+               "INNER JOIN Metadata ON Metadata.id = currentLevel.parentId ";
+      }
+
       // need MainDicomTags from grandparent ?
       if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
       {
@@ -3358,6 +3378,25 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
                "INNER JOIN MainDicomTags ON MainDicomTags.id = parentLevel.parentId ";
+        }
+
+        if (grandparentSpec->retrieve_metadata())
+        {
+          sql += "UNION SELECT "
+                "  " TOSTRING(QUERY_GRAND_PARENT_METADATA) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  NULL::BIGINT AS c2_rowNumber, "
+                "  value AS c3_string1, "
+                "  NULL::TEXT AS c4_string2, "
+                "  NULL::TEXT AS c5_string3, "
+                "  type AS c6_int1, "
+                "  NULL::INT AS c7_int2, "
+                "  NULL::BIGINT AS c8_big_int1, "
+                "  NULL::BIGINT AS c9_big_int2 "
+                "FROM Lookup "
+                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+                "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
+                "INNER JOIN Metadata ON Metadata.id = currentLevel.parentId ";
         }
       }
     }
@@ -3767,6 +3806,24 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_METADATA:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_PARENT_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 1));
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_GRAND_PARENT_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 2));
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement.ReadString(C3_STRING_1));
