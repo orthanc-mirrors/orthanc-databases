@@ -3396,7 +3396,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "FROM Lookup "
                 "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                 "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
-                "INNER JOIN Metadata ON Metadata.id = currentLevel.parentId ";
+                "INNER JOIN Metadata ON Metadata.id = parentLevel.parentId ";
         }
       }
     }
