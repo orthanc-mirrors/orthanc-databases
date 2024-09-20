@@ -3590,8 +3590,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  NULL::BIGINT AS c8_big_int1, "
              "  NULL::BIGINT AS c9_big_int2 "
              "FROM Lookup "
-             "  INNER JOIN Resources ON currentLevel.internalId = Lookup.internalId "
-             "  INNER JOIN Resources parentLevel ON Lookup.parentId = parentLevel.internalId ";
+             "  INNER JOIN Resources currentLevel ON currentLevel.internalId = Lookup.internalId "
+             "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
     }
 
     // need one instance info ?
