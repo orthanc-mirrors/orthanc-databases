@@ -112,13 +112,7 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
-                                         bool& done,
-                                         DatabaseManager& manager,
-                                         DatabaseManager::CachedStatement& statement,
-                                         const Dictionary& args,
-                                         uint32_t limit,
-                                         bool returnFirstResults)
+  namespace  // Anonymous namespace to avoid clashes between compilation modules
   {
     struct Change
     {
@@ -133,7 +127,17 @@ namespace OrthancDatabases
       {
       }
     };
+  }
 
+
+  void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
+                                         bool& done,
+                                         DatabaseManager& manager,
+                                         DatabaseManager::CachedStatement& statement,
+                                         const Dictionary& args,
+                                         uint32_t limit,
+                                         bool returnFirstResults)
+  {
     statement.Execute(args);
 
     std::list<Change> changes;
