@@ -638,11 +638,14 @@ namespace OrthancDatabases
       hasTo = true;
       filters.push_back("seq<=${to}");
     }
+
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
     if (changeType != _OrthancPluginChangeType_All)
     {
       hasFilterType = true;
       filters.push_back("changeType=${changeType}");
     }
+#endif
 
     std::string filtersString;
     if (filters.size() > 0)
