@@ -27,6 +27,7 @@
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 
 #include "IndexConnectionsPool.h"
+#include "MessagesToolbox.h"
 
 #include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages
 
@@ -97,7 +98,6 @@ namespace OrthancDatabases
     Orthanc::DatabasePluginMessages::DeleteAttachment::Response*         deleteAttachment_;
     Orthanc::DatabasePluginMessages::DeleteResource::Response*           deleteResource_;
     Orthanc::DatabasePluginMessages::GetChanges::Response*               getChanges_;
-    Orthanc::DatabasePluginMessages::GetChangesExtended::Response*       getChangesExtended_;
     Orthanc::DatabasePluginMessages::GetExportedResources::Response*     getExportedResources_;
     Orthanc::DatabasePluginMessages::GetLastChange::Response*            getLastChange_;
     Orthanc::DatabasePluginMessages::GetLastExportedResource::Response*  getLastExportedResource_;
@@ -105,18 +105,25 @@ namespace OrthancDatabases
     Orthanc::DatabasePluginMessages::LookupAttachment::Response*         lookupAttachment_;
     Orthanc::DatabasePluginMessages::LookupResources::Response*          lookupResources_;
 
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+    Orthanc::DatabasePluginMessages::GetChangesExtended::Response*       getChangesExtended_;
+#endif
+
     void Clear()
     {
       deleteAttachment_ = NULL;
       deleteResource_ = NULL;
       getChanges_ = NULL;
-      getChangesExtended_ = NULL;
       getExportedResources_ = NULL;
       getLastChange_ = NULL;
       getLastExportedResource_ = NULL;
       getMainDicomTags_ = NULL;
       lookupAttachment_ = NULL;
       lookupResources_ = NULL;
+
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      getChangesExtended_ = NULL;
+#endif
     }
     
   public:
@@ -138,11 +145,13 @@ namespace OrthancDatabases
       getChanges_ = &getChanges;
     }
 
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
     Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
     {
       Clear();
       getChangesExtended_ = &getChangesExtended;
     }
+#endif
 
     Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
     {
@@ -296,10 +305,12 @@ namespace OrthancDatabases
       {
         change = getChanges_->add_changes();
       }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
       else if (getChangesExtended_ != NULL)
       {
         change = getChangesExtended_->add_changes();
       }
+#endif
       else if (getLastChange_ != NULL)
       {
         if (getLastChange_->found())
@@ -429,7 +440,7 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
 #endif
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
         response.mutable_get_system_information()->set_supports_find(accessor.GetBackend().HasFindSupport());
         response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
 #endif
@@ -777,7 +788,7 @@ namespace OrthancDatabases
         response.mutable_get_changes()->set_done(done);
         break;
       }
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES_EXTENDED:
       {
         Output output(*response.mutable_get_changes_extended());
@@ -1310,11 +1321,13 @@ namespace OrthancDatabases
         break;
       }
       
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
       case Orthanc::DatabasePluginMessages::OPERATION_FIND:
       {
         backend.ExecuteFind(response, manager, request.find());
         break;
       }
+#endif
 
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();

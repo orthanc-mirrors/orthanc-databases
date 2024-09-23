@@ -429,11 +429,13 @@ namespace OrthancDatabases
 
     virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
     // New primitive since Orthanc 1.12.5
     virtual bool HasExtendedChanges() const ORTHANC_OVERRIDE
     {
       return true;
     }
+#endif
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
     virtual bool HasFindSupport() const ORTHANC_OVERRIDE;

@@ -24,16 +24,10 @@
 #pragma once
 
 #include <orthanc/OrthancCDatabasePlugin.h>
+#include <OrthancDatabasePlugin.pb.h>
 
 // Ensure that "ORTHANC_PLUGINS_VERSION_IS_ABOVE" is defined
 #include "../../Resources/Orthanc/Plugins/OrthancPluginCppWrapper.h"
-
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-#    include <OrthancDatabasePlugin.pb.h>
-#  endif
-#endif
-
 
 #define ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT 0
 
@@ -51,6 +45,16 @@
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
 #    undef  ORTHANC_PLUGINS_HAS_INTEGRATED_FIND
 #    define ORTHANC_PLUGINS_HAS_INTEGRATED_FIND 1
+#  endif
+#endif
+
+
+#define ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED 0
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+#    undef  ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED
+#    define ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED 1
 #  endif
 #endif
 

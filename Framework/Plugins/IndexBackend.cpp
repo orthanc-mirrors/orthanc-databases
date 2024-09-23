@@ -125,13 +125,7 @@ namespace OrthancDatabases
   }
 
 
-  void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
-                                         bool& done,
-                                         DatabaseManager& manager,
-                                         DatabaseManager::CachedStatement& statement,
-                                         const Dictionary& args,
-                                         uint32_t limit,
-                                         bool returnFirstResults)
+  namespace  // Anonymous namespace to avoid clashes between compilation modules
   {
     struct Change
     {
@@ -146,7 +140,17 @@ namespace OrthancDatabases
       {
       }
     };
+  }
 
+
+  void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
+                                         bool& done,
+                                         DatabaseManager& manager,
+                                         DatabaseManager::CachedStatement& statement,
+                                         const Dictionary& args,
+                                         uint32_t limit,
+                                         bool returnFirstResults)
+  {
     statement.Execute(args);
 
     std::list<Change> changes;
@@ -647,10 +651,12 @@ namespace OrthancDatabases
       hasTo = true;
       filters.push_back("seq<=${to}");
     }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
     if (changeTypes.size() > 0)
     {
       filters.push_back("changeType IN (" + JoinChanges(changeTypes) + ") ");
     }
+#endif
 
     std::string filtersString;
     if (filters.size() > 0)
