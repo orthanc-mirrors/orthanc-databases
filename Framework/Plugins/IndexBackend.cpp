@@ -60,6 +60,19 @@ namespace OrthancDatabases
     return s;
   }
 
+  static std::string JoinChanges(const std::set<uint32_t>& changeTypes)
+  {
+    std::set<std::string> changeTypesString;
+    for (std::set<uint32_t>::const_iterator it = changeTypes.begin(); it != changeTypes.end(); ++it)
+    {
+      changeTypesString.insert(boost::lexical_cast<std::string>(*it));
+    }
+
+    std::string joinedChangesTypes;
+    Orthanc::Toolbox::JoinStrings(joinedChangesTypes, changeTypesString, ", ");
+
+    return joinedChangesTypes;
+  }
   
   template <typename T>
   static void ReadListOfIntegers(std::list<T>& target,
@@ -597,11 +610,8 @@ namespace OrthancDatabases
                                 int64_t since,
                                 uint32_t limit)
   {
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)    
-    GetChangesExtended(output, done, manager, since, -1, _OrthancPluginChangeType_All, limit);
-#else
-    GetChangesExtended(output, done, manager, since, -1, 65535, limit);
-#endif
+    std::set<uint32_t> changeTypes;
+    GetChangesExtended(output, done, manager, since, -1, changeTypes, limit);
   }
 
   /* Use GetOutput().AnswerChange() */
@@ -610,7 +620,7 @@ namespace OrthancDatabases
                                         DatabaseManager& manager,
                                         int64_t since,
                                         int64_t to,
-                                        int32_t changeType,
+                                        const std::set<uint32_t>& changeTypes,
                                         uint32_t limit)
   {
     std::string limitSuffix;
@@ -626,7 +636,6 @@ namespace OrthancDatabases
     std::vector<std::string> filters;
     bool hasSince = false;
     bool hasTo = false;
-    bool hasFilterType = false;    
 
     if (since > 0)
     {
@@ -638,10 +647,9 @@ namespace OrthancDatabases
       hasTo = true;
       filters.push_back("seq<=${to}");
     }
-    if (changeType != _OrthancPluginChangeType_All)
+    if (changeTypes.size() > 0)
     {
-      hasFilterType = true;
-      filters.push_back("changeType=${changeType}");
+      filters.push_back("changeType IN (" + JoinChanges(changeTypes) + ") ");
     }
 
     std::string filtersString;
@@ -689,12 +697,6 @@ namespace OrthancDatabases
     {
       statement.SetParameterType("to", ValueType_Integer64);
       args.SetIntegerValue("to", to);
-    }
-
-    if (hasFilterType)
-    {
-      statement.SetParameterType("changeType", ValueType_Integer64);
-      args.SetIntegerValue("changeType", changeType);
     }
 
     ReadChangesInternal(output, done, manager, statement, args, limit, returnFirstResults);

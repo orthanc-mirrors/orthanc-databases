@@ -783,7 +783,13 @@ namespace OrthancDatabases
         Output output(*response.mutable_get_changes_extended());
 
         bool done;
-        backend.GetChangesExtended(output, done, manager, request.get_changes_extended().since(), request.get_changes_extended().to(), static_cast<OrthancPluginChangeType>(request.get_changes_extended().change_type()), request.get_changes_extended().limit());
+        std::set<uint32_t> changeTypes;
+        for (int i = 0; i < request.get_changes_extended().change_type_size(); ++i)
+        {
+          changeTypes.insert(request.get_changes_extended().change_type(i));
+        }
+
+        backend.GetChangesExtended(output, done, manager, request.get_changes_extended().since(), request.get_changes_extended().to(), changeTypes, request.get_changes_extended().limit());
 
         response.mutable_get_changes_extended()->set_done(done);
         break;

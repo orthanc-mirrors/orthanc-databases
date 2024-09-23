@@ -115,7 +115,7 @@ namespace OrthancDatabases
                                     DatabaseManager& manager,
                                     int64_t since,
                                     int64_t to,
-                                    int32_t changeType,
+                                    const std::set<uint32_t>& changeTypes,
                                     uint32_t limit) = 0;
 
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
