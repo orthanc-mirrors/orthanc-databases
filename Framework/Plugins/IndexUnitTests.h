@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -26,8 +28,6 @@
 #include "GlobalProperties.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
-
-#include <orthanc/OrthancCDatabasePlugin.h>
 
 #include <gtest/gtest.h>
 #include <list>
@@ -56,7 +56,7 @@ namespace Orthanc
   /**
    * Mock enumeration inspired from the source code of Orthanc... only
    * for use in the unit tests!
-   * https://hg.orthanc-server.com/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
+   * https://orthanc.uclouvain.be/hg/orthanc/file/default/OrthancServer/Sources/ServerEnumerations.h
    **/
   enum MetadataType
   {
@@ -245,7 +245,8 @@ TEST(IndexBackend, Basic)
 
   db.SetOutputFactory(new DatabaseBackendAdapterV2::Factory(&context, NULL));
 
-  std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db));
+  std::list<IdentifierTag> identifierTags;
+  std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db, false, identifierTags));
   
   std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());
 
@@ -509,20 +510,19 @@ TEST(IndexBackend, Basic)
   ASSERT_EQ(0u, ci.size());
 
 
-  OrthancPluginExportedResource exp;
-  exp.seq = -1;
-  exp.resourceType = OrthancPluginResourceType_Study;
-  exp.publicId = "id";
-  exp.modality = "remote";
-  exp.date = "date";
-  exp.patientId = "patient";
-  exp.studyInstanceUid = "study";
-  exp.seriesInstanceUid = "series";
-  exp.sopInstanceUid = "instance";
-  db.LogExportedResource(*manager, exp);
+  db.LogExportedResource(*manager, OrthancPluginResourceType_Study, "id", "remote", "date",
+                         "patient", "study", "series", "instance");
 
   expectedExported.reset(new OrthancPluginExportedResource());
-  *expectedExported = exp;
+  expectedExported->seq = -1;
+  expectedExported->resourceType = OrthancPluginResourceType_Study;
+  expectedExported->publicId = "id";
+  expectedExported->modality = "remote";
+  expectedExported->date = "date";
+  expectedExported->patientId = "patient";
+  expectedExported->studyInstanceUid = "study";
+  expectedExported->seriesInstanceUid = "series";
+  expectedExported->sopInstanceUid = "instance";
 
   bool done;
   db.GetExportedResources(*output, done, *manager, 0, 10);

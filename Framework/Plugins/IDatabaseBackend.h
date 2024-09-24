@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -22,9 +24,11 @@
 
 #pragma once
 
-#include "IDatabaseBackendOutput.h"
-#include "../Common/DatabasesEnumerations.h"
 #include "../Common/DatabaseManager.h"
+#include "../Common/DatabasesEnumerations.h"
+#include "IDatabaseBackendOutput.h"
+#include "ISqlLookupFormatter.h"
+#include "IdentifierTag.h"
 
 #include <list>
 
@@ -41,8 +45,13 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() = 0;
 
-    // This function is invoked once, even if multiple connections are open
-    virtual void ConfigureDatabase(DatabaseManager& database) = 0;
+    /**
+     * This function is invoked once, even if multiple connections are
+     * open. It is notably used to update the schema of the database.
+     **/
+    virtual void ConfigureDatabase(DatabaseManager& database,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) = 0;
 
     virtual void SetOutputFactory(IDatabaseBackendOutput::IFactory* factory) = 0;
                         
@@ -101,15 +110,23 @@ namespace OrthancDatabases
     virtual void GetAllPublicIds(std::list<std::string>& target,
                                  DatabaseManager& manager,
                                  OrthancPluginResourceType resourceType,
-                                 uint64_t since,
-                                 uint64_t limit) = 0;
+                                 int64_t since,
+                                 uint32_t limit) = 0;
 
     /* Use GetOutput().AnswerChange() */
     virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
                             DatabaseManager& manager,
                             int64_t since,
-                            uint32_t maxResults) = 0;
+                            uint32_t limit) = 0;
+
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    const std::set<uint32_t>& changeTypes,
+                                    uint32_t limit) = 0;
 
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
@@ -124,7 +141,7 @@ namespace OrthancDatabases
                                       bool& done /*out*/,
                                       DatabaseManager& manager,
                                       int64_t since,
-                                      uint32_t maxResults) = 0;
+                                      uint32_t limit) = 0;
 
     /* Use GetOutput().AnswerChange() */
     virtual void GetLastChange(IDatabaseBackendOutput& output,
@@ -173,7 +190,14 @@ namespace OrthancDatabases
                            const char* date) = 0;
     
     virtual void LogExportedResource(DatabaseManager& manager,
-                                     const OrthancPluginExportedResource& resource) = 0;
+                                     OrthancPluginResourceType resourceType,
+                                     const char* publicId,
+                                     const char* modality,
+                                     const char* date,
+                                     const char* patientId,
+                                     const char* studyInstanceUid,
+                                     const char* seriesInstanceUid,
+                                     const char* sopInstanceUid) = 0;
     
     /* Use GetOutput().AnswerAttachment() */
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
@@ -271,8 +295,10 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     virtual void LookupResources(IDatabaseBackendOutput& output,
                                  DatabaseManager& manager,
-                                 const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 const DatabaseConstraints& lookup,
                                  OrthancPluginResourceType queryLevel,
+                                 const std::set<std::string>& labels,     // New in Orthanc 1.12.0
+                                 LabelsConstraint labelsConstraint,       // New in Orthanc 1.12.0
                                  uint32_t limit,
                                  bool requestSomeInstance) = 0;
 #endif
@@ -309,23 +335,76 @@ namespace OrthancDatabases
     virtual void TagMostRecentPatient(DatabaseManager& manager,
                                       int64_t patientId) = 0;
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     // NB: "parentPublicId" must be cleared if the resource has no parent
     virtual bool LookupResourceAndParent(int64_t& id,
                                          OrthancPluginResourceType& type,
                                          std::string& parentPublicId,
                                          DatabaseManager& manager,
                                          const char* publicId) = 0;
-#  endif
-#endif
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
                                 DatabaseManager& manager,
                                 int64_t id) = 0;
-#  endif
+
+    // New in Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void AddLabel(DatabaseManager& manager,
+                          int64_t resource,
+                          const std::string& label) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void RemoveLabel(DatabaseManager& manager,
+                             int64_t resource,
+                             const std::string& label) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void ListLabels(std::list<std::string>& target,
+                            DatabaseManager& manager,
+                            int64_t resource) = 0;
+
+    // New in Orthanc 1.12.0
+    virtual void ListAllLabels(std::list<std::string>& target,
+                               DatabaseManager& manager) = 0;
+
+    // New in Orthanc 1.12.3
+    virtual bool HasAtomicIncrementGlobalProperty() = 0;
+
+    // New in Orthanc 1.12.3
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) = 0;
+
+    // New in Orthanc 1.12.3
+    virtual bool HasUpdateAndGetStatistics() = 0;
+
+    // New in Orthanc 1.12.3
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) = 0;
+
+    // New in Orthanc 1.12.3
+    virtual bool HasMeasureLatency() = 0;
+
+    // New in Orthanc 1.12.3
+    virtual uint64_t MeasureLatency(DatabaseManager& manager) = 0;
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const = 0;
+    virtual bool HasExtendedChanges() const = 0;
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    // New in Orthanc 1.12.5
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
 #endif
   };
 }

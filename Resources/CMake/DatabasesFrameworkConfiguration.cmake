@@ -1,7 +1,9 @@
 # Orthanc - A Lightweight, RESTful DICOM Store
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
-# Copyright (C) 2017-2021 Osimis S.A., Belgium
+# Copyright (C) 2017-2023 Osimis S.A., Belgium
+# Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+# Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -29,10 +31,7 @@ endif()
 if (ENABLE_POSTGRESQL_BACKEND)
   set(ENABLE_CRYPTO_OPTIONS ON)
   set(ENABLE_ZLIB ON)
-
-  if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(ENABLE_OPENSSL_ENGINES ON)
-  endif()
+  set(ENABLE_OPENSSL_ENGINES ON)
 endif()
 
 if (ENABLE_MYSQL_BACKEND)
@@ -41,10 +40,7 @@ if (ENABLE_MYSQL_BACKEND)
   set(ENABLE_ZLIB ON)
   set(ENABLE_LOCALE ON)      # iconv is needed
   set(ENABLE_WEB_CLIENT ON)  # libcurl is needed
-
-  if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    set(ENABLE_OPENSSL_ENGINES ON)
-  endif()
+  set(ENABLE_OPENSSL_ENGINES ON)
 endif()
 
 if (ENABLE_ODBC_BACKEND)
@@ -73,11 +69,21 @@ if (ORTHANC_FRAMEWORK_SOURCE STREQUAL "system")
   if (ENABLE_SQLITE_BACKEND)
     add_definitions(-DORTHANC_ENABLE_SQLITE=1)
   endif()
-  
+
+  # These parameters should *NOT* be modified by the user: System-wide
+  # installations expect only dynamic linking
   set(USE_SYSTEM_GOOGLE_TEST ON CACHE BOOL "Use the system version of Google Test")
+  set(USE_SYSTEM_OPENSSL ON CACHE BOOL "Use the system version of OpenSSL")
+  set(USE_SYSTEM_PROTOBUF ON CACHE BOOL "Use the system version of Google Protocol Buffers")
+
   set(USE_GOOGLE_TEST_DEBIAN_PACKAGE OFF CACHE BOOL "Use the sources of Google Test shipped with libgtest-dev (Debian only)")
   mark_as_advanced(USE_GOOGLE_TEST_DEBIAN_PACKAGE)
+
+  set(ENABLE_OPENSSL_ENGINES ON CACHE INTERNAL "")
+
   include(${CMAKE_CURRENT_LIST_DIR}/../Orthanc/CMake/GoogleTestConfiguration.cmake)
+  include(${CMAKE_CURRENT_LIST_DIR}/../Orthanc/CMake/OpenSslConfiguration.cmake)
+  include(${CMAKE_CURRENT_LIST_DIR}/../Orthanc/CMake/ProtobufConfiguration.cmake)
   
 else()
   # Those modules of the Orthanc framework are not needed when dealing
@@ -107,6 +113,7 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/IResult.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ImplicitTransaction.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/InputFileValue.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/Integer32Value.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Integer64Value.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/NullValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Query.cpp
@@ -114,7 +121,7 @@ set(DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/ResultFileValue.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/RetryDatabaseFactory.cpp
-  ${ORTHANC_DATABASES_ROOT}/Framework/Common/StatementLocation.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Common/StatementId.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Common/Utf8StringValue.cpp
   )
 

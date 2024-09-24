@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -62,7 +64,9 @@ namespace OrthancDatabases
   }
   
 
-  void MySQLIndex::ConfigureDatabase(DatabaseManager& manager)
+  void MySQLIndex::ConfigureDatabase(DatabaseManager& manager,
+                                     bool hasIdentifierTags,
+                                     const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
 
@@ -234,7 +238,7 @@ namespace OrthancDatabases
         // to the LONGTEXT type (up to 4GB). This might be important
         // for applications such as the Osimis Web viewer that stores
         // large amount of metadata.
-        // http://book.orthanc-server.com/faq/features.html#central-registry-of-metadata-and-attachments
+        // https://orthanc.uclouvain.be/book/faq/features.html#central-registry-of-metadata-and-attachments
         t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Metadata MODIFY value LONGTEXT");
         
         revision = 4;
@@ -294,7 +298,46 @@ namespace OrthancDatabases
         t.Commit();
       }
 
-      if (revision == 6)      
+      if (revision == 6)
+      {
+        // Added new table "Labels" since release 5.0 to deal with
+        // labels that were introduced in Orthanc 1.12.0
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+        t.GetDatabaseTransaction().ExecuteMultiLines(
+          "CREATE TABLE Labels(id BIGINT NOT NULL,"
+          "label VARCHAR(64) NOT NULL,"
+          "PRIMARY KEY(id, label),"
+          "CONSTRAINT Labels1 FOREIGN KEY (id) REFERENCES Resources(internalId) ON DELETE CASCADE);"
+          "CREATE INDEX LabelsIndex1 ON Labels(id);"
+          "CREATE INDEX LabelsIndex2 ON Labels(label);");
+
+        revision = 7;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+
+        t.Commit();
+      }
+
+      if (revision == 7)
+      {
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+        
+        // Install the "CreateInstance" extension
+        std::string query;
+        
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::MYSQL_DELETE_RESOURCES);
+
+        // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
+        db.ExecuteMultiLines(query, true);
+        
+        revision = 8;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+
+        t.Commit();
+      }
+
+      if (revision == 8)
       {
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
         
@@ -307,13 +350,13 @@ namespace OrthancDatabases
         // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
         db.ExecuteMultiLines(query, true);
         
-        revision = 7;
+        revision = 9;
         SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
 
         t.Commit();
       }
 
-      if (revision != 7)
+      if (revision != 9)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
@@ -467,11 +510,25 @@ namespace OrthancDatabases
       lookupResourcesToDelete.Execute(args);
     }
 
+    // {
+    //   DatabaseManager::CachedStatement deleteHierarchy(
+    //     STATEMENT_FROM_HERE, manager,
+    //     "DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM DeletedResources)");
+    //   deleteHierarchy.Execute();
+    // }
+
+
     {
-      DatabaseManager::CachedStatement deleteHierarchy(
+      DatabaseManager::CachedStatement deleteResources(
         STATEMENT_FROM_HERE, manager,
-        "DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM DeletedResources)");
-      deleteHierarchy.Execute();
+        "CALL DeleteResources(${id})");
+
+      deleteResources.SetParameterType("id", ValueType_Integer64);
+
+      Dictionary args;
+      args.SetIntegerValue("id", id);
+    
+      deleteResources.Execute(args);
     }
 
     SignalDeletedResources(output, manager);
@@ -552,6 +609,26 @@ namespace OrthancDatabases
         result.seriesId = statement.ReadInteger64(6);
       }
     }   
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool MySQLIndex::HasFindSupport() const
+  {
+    // TODO-FIND
+    return false;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  void MySQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                               DatabaseManager& manager,
+                               const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // TODO-FIND
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
 #endif
 }

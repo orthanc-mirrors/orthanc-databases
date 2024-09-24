@@ -1,7 +1,9 @@
 # Orthanc - A Lightweight, RESTful DICOM Store
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
-# Copyright (C) 2017-2021 Osimis S.A., Belgium
+# Copyright (C) 2017-2023 Osimis S.A., Belgium
+# Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+# Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -25,7 +27,16 @@ set(ORTHANC_FRAMEWORK_ROOT "" CACHE STRING "Path to the Orthanc source directory
 
 # Advanced parameters to fine-tune linking against system libraries
 set(USE_SYSTEM_ORTHANC_SDK ON CACHE BOOL "Use the system version of the Orthanc plugin SDK")
-set(ORTHANC_SDK_VERSION "1.9.2" CACHE STRING "Version of the Orthanc plugin SDK to use, if not using the system version (can be \"0.9.5\", \"1.4.0\", \"1.5.2\", \"1.5.4\", \"1.9.2\" or \"framework\")")
+
+# Generate the documentation about the "ORTHANC_SDK_VERSION" option
+set(tmp "Version of the Orthanc plugin SDK to use, if not using the system version (can be")
+foreach(version IN LISTS ORTHANC_SDK_COMPATIBLE_VERSIONS)
+  set(tmp "${tmp} ${version},")
+endforeach()
+set(tmp "${tmp} or \"framework\")")
+
+set(ORTHANC_SDK_VERSION "${ORTHANC_SDK_DEFAULT_VERSION}" CACHE STRING "${tmp}")
+
 
 include(${CMAKE_CURRENT_LIST_DIR}/DatabasesFrameworkParameters.cmake)
 

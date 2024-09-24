@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -29,6 +31,12 @@
 
 namespace OrthancDatabases
 {
+  enum IsolationMode
+  {
+    IsolationMode_Serializable = 0,
+    IsolationMode_ReadCommited = 1
+  };
+
   class PostgreSQLParameters
   {
   private:
@@ -42,7 +50,8 @@ namespace OrthancDatabases
     bool         lock_;
     unsigned int maxConnectionRetries_;
     unsigned int connectionRetryInterval_;
-
+    bool         isVerboseEnabled_;
+    IsolationMode isolationMode_;
     void Reset();
 
   public:
@@ -123,6 +132,26 @@ namespace OrthancDatabases
     {
       return connectionRetryInterval_;
     }
+
+    void SetIsolationMode(IsolationMode isolationMode)
+    {
+      isolationMode_ = isolationMode;
+    }
+
+    const std::string GetReadWriteTransactionStatement() const;
+
+    const std::string GetReadOnlyTransactionStatement() const;
+
+    void SetVerboseEnabled(bool enabled)
+    {
+      isVerboseEnabled_ = enabled;
+    }
+
+    bool IsVerboseEnabled() const
+    {
+      return isVerboseEnabled_;
+    }
+
 
     void Format(std::string& target) const;
   };

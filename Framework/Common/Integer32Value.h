@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -21,37 +23,35 @@
 
 #pragma once
 
-#define STATEMENT_FROM_HERE  ::OrthancDatabases::StatementLocation(__FILE__, __LINE__)
+#include "IValue.h"
 
+#include <Compatibility.h>
+
+#include <stdint.h>
 
 namespace OrthancDatabases
 {
-  class StatementLocation
+  class Integer32Value : public IValue
   {
   private:
-    const char* file_;
-    int line_;
-    
-    StatementLocation(); // Forbidden
-    
+    int32_t  value_;
+
   public:
-    StatementLocation(const char* file,
-                      int line) :
-      file_(file),
-      line_(line)
+    explicit Integer32Value(int32_t value) :
+    value_(value)
     {
     }
 
-    const char* GetFile() const
+    int32_t GetValue() const
     {
-      return file_;
+      return value_;
     }
 
-    int GetLine() const
+    virtual ValueType GetType() const ORTHANC_OVERRIDE
     {
-      return line_;
+      return ValueType_Integer32;
     }
     
-    bool operator< (const StatementLocation& other) const;
+    virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
   };
 }

@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -47,3 +49,10 @@ static const int32_t POSTGRESQL_LOCK_STORAGE = 43;
  * https://groups.google.com/d/msg/orthanc-users/yV3LSTh_TjI/h3PRApJFBAAJ
  **/
 static const int32_t POSTGRESQL_LOCK_DATABASE_SETUP = 44;
+
+/**
+ * Transient advisory lock to protect the instance creation,
+ * because it is not 100% resilient to concurrency in, e.g, READ COMIITED 
+ * transaction isolation level.
+ **/
+static const int32_t POSTGRESQL_LOCK_CREATE_INSTANCE = 45;

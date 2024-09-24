@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -617,7 +619,7 @@ namespace OrthancDatabases
            * "odbc-index" cannot start because it doesn't have
            * exclusive access.
            **/
-          db->ExecuteMultiLines("ALTER DATABASE CURRENT COLLATE LATIN1_GENERAL_100_CI_AS_SC_UTF8");
+          db->ExecuteMultiLines("IF 'Latin1_General_100_CI_AS_SC_UTF8' != (SELECT CONVERT (varchar(256), DATABASEPROPERTYEX(DB_NAME(),'collation'))) ALTER DATABASE CURRENT COLLATE LATIN1_GENERAL_100_CI_AS_SC_UTF8");
         }
         
         return db.release();

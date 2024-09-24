@@ -3,6 +3,37 @@ Pending changes in the mainline
 
 * Added support for customData in AttachedFiles
 * Added support for revision in AttachedFiles & Metadata
+* Added support for ExtendedChanges:
+  - changes?type=...&to=...
+* Fixed a memory leak when executing non cached SQL statements (rarely used)
+
+
+Release 5.2 (2024-06-06)
+========================
+
+Minimum plugin SDK: 0.9.5
+Optimal plugin SDK: 1.12.0+
+Minimum Orthanc runtime: 0.9.5
+Optimal Orthanc runtime: 1.12.0+
+
+* Fix check of Orthanc runtime version
+* Optimized resources deletion (https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor-when-using-mysql-mariadb/3820/19)
+
+
+Release 5.1 (2023-06-27)
+========================
+
+* Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
+
+
+Release 5.0 (2023-04-16)
+========================
+
+* Added support for labels
+* Compatibility with Orthanc SDK 1.12.0 (communications between the
+  Orthanc core and the database plugin using Google Protocol Buffers)
+* Upgraded dependencies for static builds (notably on Windows and LSB):
+  - openssl 3.1.0
 
 
 Release 4.3 (2021-07-22)

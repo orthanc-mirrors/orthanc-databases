@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -21,7 +23,6 @@
 
 #include "IndexBackend.h"
 
-#include "../../Resources/Orthanc/Databases/ISqlLookupFormatter.h"
 #include "../Common/BinaryStringValue.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
@@ -33,6 +34,7 @@
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
 #include <OrthancException.h>
+#include <Toolbox.h>
 
 
 namespace OrthancDatabases
@@ -58,6 +60,19 @@ namespace OrthancDatabases
     return s;
   }
 
+  static std::string JoinChanges(const std::set<uint32_t>& changeTypes)
+  {
+    std::set<std::string> changeTypesString;
+    for (std::set<uint32_t>::const_iterator it = changeTypes.begin(); it != changeTypes.end(); ++it)
+    {
+      changeTypesString.insert(boost::lexical_cast<std::string>(*it));
+    }
+
+    std::string joinedChangesTypes;
+    Orthanc::Toolbox::JoinStrings(joinedChangesTypes, changeTypesString, ", ");
+
+    return joinedChangesTypes;
+  }
   
   template <typename T>
   static void ReadListOfIntegers(std::list<T>& target,
@@ -110,33 +125,69 @@ namespace OrthancDatabases
   }
 
 
+  namespace  // Anonymous namespace to avoid clashes between compilation modules
+  {
+    struct Change
+    {
+      int64_t       seq_;
+      int32_t       changeType_;
+      OrthancPluginResourceType       resourceType_;
+      std::string   publicId_;
+      std::string   changeDate_;
+
+      Change(int64_t seq, int32_t changeType, OrthancPluginResourceType resourceType, const std::string& publicId, const std::string& changeDate)
+      : seq_(seq), changeType_(changeType), resourceType_(resourceType), publicId_(publicId), changeDate_(changeDate)
+      {
+      }
+    };
+  }
+
+
   void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
                                          bool& done,
                                          DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
-                                         uint32_t maxResults)
+                                         uint32_t limit,
+                                         bool returnFirstResults)
   {
     statement.Execute(args);
 
-    uint32_t count = 0;
-
-    while (count < maxResults &&
-           !statement.IsDone())
+    std::list<Change> changes;
+    while (!statement.IsDone())
     {
-      output.AnswerChange(
+      changes.push_back(Change(
         statement.ReadInteger64(0),
         statement.ReadInteger32(1),
         static_cast<OrthancPluginResourceType>(statement.ReadInteger32(2)),
         statement.ReadString(3),
-        statement.ReadString(4));
+        statement.ReadString(4)
+      ));
 
       statement.Next();
-      count++;
+    }
+    
+    done = changes.size() <= limit;  // 'done' means we have returned all requested changes
+
+    // if we have retrieved more changes than requested -> cleanup
+    if (changes.size() > limit)
+    {
+      assert(changes.size() == limit+1); // the statement should only request 1 element more
+
+      if (returnFirstResults)
+      {
+        changes.pop_back();
+      }
+      else
+      {
+        changes.pop_front();
+      }
     }
 
-    done = (count < maxResults ||
-            statement.IsDone());
+    for (std::list<Change>::const_iterator it = changes.begin(); it != changes.end(); ++it)
+    {
+      output.AnswerChange(it->seq_, it->changeType_, it->resourceType_, it->publicId_, it->changeDate_);
+    }
   }
 
 
@@ -144,13 +195,13 @@ namespace OrthancDatabases
                                                    bool& done,
                                                    DatabaseManager::CachedStatement& statement,
                                                    const Dictionary& args,
-                                                   uint32_t maxResults)
+                                                   uint32_t limit)
   {
     statement.Execute(args);
 
     uint32_t count = 0;
 
-    while (count < maxResults &&
+    while (count < limit &&
            !statement.IsDone())
     {
       int64_t seq = statement.ReadInteger64(0);
@@ -172,9 +223,19 @@ namespace OrthancDatabases
       count++;
     }
 
-    done = (count < maxResults ||
+    done = (count < limit ||
             statement.IsDone());
   }
+
+  void IndexBackend::ClearRemainingAncestor(DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM RemainingAncestor");
+
+    statement.Execute();
+  }
+
 
 
   void IndexBackend::ClearDeletedFiles(DatabaseManager& manager)
@@ -217,7 +278,7 @@ namespace OrthancDatabases
                                      statement.ReadInteger32(4),
                                      statement.ReadInteger64(5),
                                      statement.ReadString(6),
-                                     statement.ReadString(8));
+                                     statement.ReadStringOrNull(8));
       
       statement.Next();
     }
@@ -441,14 +502,7 @@ namespace OrthancDatabases
   {
     ClearDeletedFiles(manager);
     ClearDeletedResources(manager);
-    
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "DELETE FROM RemainingAncestor");
-
-      statement.Execute();
-    }
+    ClearRemainingAncestor(manager);
       
     {
       DatabaseManager::CachedStatement statement(
@@ -468,7 +522,6 @@ namespace OrthancDatabases
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "SELECT * FROM RemainingAncestor");
-
       statement.Execute();
 
       if (!statement.IsDone())
@@ -481,9 +534,10 @@ namespace OrthancDatabases
         assert((statement.Next(), statement.IsDone()));
       }
     }
-    
+
     SignalDeletedFiles(output, manager);
     SignalDeletedResources(output, manager);
+
   }
 
 
@@ -526,70 +580,140 @@ namespace OrthancDatabases
   void IndexBackend::GetAllPublicIds(std::list<std::string>& target,
                                      DatabaseManager& manager,
                                      OrthancPluginResourceType resourceType,
-                                     uint64_t since,
-                                     uint64_t limit)
+                                     int64_t since,
+                                     uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
     {
       suffix = "OFFSET ${since} ROWS FETCH FIRST ${limit} ROWS ONLY";
     }
-    else
+    else if (limit > 0)
     {
       suffix = "LIMIT ${limit} OFFSET ${since}";
     }
     
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT publicId FROM (SELECT publicId FROM Resources "
-      "WHERE resourceType=${type}) AS tmp ORDER BY tmp.publicId " + suffix);
+    std::string sql = "SELECT publicId FROM (SELECT publicId FROM Resources "
+      "WHERE resourceType=${type}) AS tmp ORDER BY tmp.publicId " + suffix;
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
       
     statement.SetReadOnly(true);
-    statement.SetParameterType("type", ValueType_Integer64);
-    statement.SetParameterType("limit", ValueType_Integer64);
-    statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
+
+    statement.SetParameterType("type", ValueType_Integer64);
     args.SetIntegerValue("type", static_cast<int>(resourceType));
-    args.SetIntegerValue("limit", limit);
-    args.SetIntegerValue("since", since);
+    
+    if (limit > 0)
+    {
+      statement.SetParameterType("limit", ValueType_Integer64);
+      statement.SetParameterType("since", ValueType_Integer64);
+      args.SetIntegerValue("limit", limit);
+      args.SetIntegerValue("since", since);
+    }
 
     ReadListOfStrings(target, statement, args);
   }
 
-    
-  /* Use GetOutput().AnswerChange() */
   void IndexBackend::GetChanges(IDatabaseBackendOutput& output,
                                 bool& done /*out*/,
                                 DatabaseManager& manager,
                                 int64_t since,
-                                uint32_t maxResults)
+                                uint32_t limit)
   {
-    std::string suffix;
+    std::set<uint32_t> changeTypes;
+    GetChangesExtended(output, done, manager, since, -1, changeTypes, limit);
+  }
+
+  /* Use GetOutput().AnswerChange() */
+  void IndexBackend::GetChangesExtended(IDatabaseBackendOutput& output,
+                                        bool& done /*out*/,
+                                        DatabaseManager& manager,
+                                        int64_t since,
+                                        int64_t to,
+                                        const std::set<uint32_t>& changeTypes,
+                                        uint32_t limit)
+  {
+    std::string limitSuffix;
     if (manager.GetDialect() == Dialect_MSSQL)
     {
-      suffix = "OFFSET 0 ROWS FETCH FIRST ${limit} ROWS ONLY";
+      limitSuffix = "OFFSET 0 ROWS FETCH FIRST ${limit} ROWS ONLY";
     }
     else
     {
-      suffix = "LIMIT ${limit}";
+      limitSuffix = "LIMIT ${limit}";
     }
     
-    DatabaseManager::CachedStatement statement(
-      STATEMENT_FROM_HERE, manager,
-      "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, "
-      "Changes.date FROM Changes INNER JOIN Resources "
-      "ON Changes.internalId = Resources.internalId WHERE seq>${since} ORDER BY seq " + suffix);
+    std::vector<std::string> filters;
+    bool hasSince = false;
+    bool hasTo = false;
 
+    if (since > 0)
+    {
+      hasSince = true;
+      filters.push_back("seq>${since}");
+    }
+    if (to != -1)
+    {
+      hasTo = true;
+      filters.push_back("seq<=${to}");
+    }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+    if (changeTypes.size() > 0)
+    {
+      filters.push_back("changeType IN (" + JoinChanges(changeTypes) + ") ");
+    }
+#endif
+
+    std::string filtersString;
+    if (filters.size() > 0)
+    {
+      Orthanc::Toolbox::JoinStrings(filtersString, filters, " AND ");
+      filtersString = "WHERE " + filtersString;
+    }
+
+    std::string sql;
+    bool returnFirstResults;
+    if (hasTo && !hasSince)
+    {
+      // in this case, we want the largest values but we want them ordered in ascending order
+      sql = "SELECT * FROM (SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, Changes.date "
+            "FROM Changes INNER JOIN Resources "
+            "ON Changes.internalId = Resources.internalId " + filtersString + " ORDER BY seq DESC " + limitSuffix + 
+            ") AS FilteredChanges ORDER BY seq ASC";
+
+      returnFirstResults = false;
+    }
+    else
+    {
+      // default query: we want the smallest values ordered in ascending order
+      sql = "SELECT Changes.seq, Changes.changeType, Changes.resourceType, Resources.publicId, "
+            "Changes.date FROM Changes INNER JOIN Resources "
+            "ON Changes.internalId = Resources.internalId " + filtersString + " ORDER BY seq ASC " + limitSuffix;
+      returnFirstResults = true;
+    }
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
     statement.SetReadOnly(true);
-    statement.SetParameterType("limit", ValueType_Integer64);
-    statement.SetParameterType("since", ValueType_Integer64);
-
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
-    args.SetIntegerValue("since", since);
 
-    ReadChangesInternal(output, done, manager, statement, args, maxResults);
+    statement.SetParameterType("limit", ValueType_Integer64);
+    args.SetIntegerValue("limit", limit + 1);  // we take limit+1 because we use the +1 to know if "Done" must be set to true
+
+    if (hasSince)
+    {
+      statement.SetParameterType("since", ValueType_Integer64);
+      args.SetIntegerValue("since", since);
+    }
+
+    if (hasTo)
+    {
+      statement.SetParameterType("to", ValueType_Integer64);
+      args.SetIntegerValue("to", to);
+    }
+
+    ReadChangesInternal(output, done, manager, statement, args, limit, returnFirstResults);
   }
 
     
@@ -636,7 +760,7 @@ namespace OrthancDatabases
                                           bool& done /*out*/,
                                           DatabaseManager& manager,
                                           int64_t since,
-                                          uint32_t maxResults)
+                                          uint32_t limit)
   {
     std::string suffix;
     if (manager.GetDialect() == Dialect_MSSQL)
@@ -657,10 +781,10 @@ namespace OrthancDatabases
     statement.SetParameterType("since", ValueType_Integer64);
 
     Dictionary args;
-    args.SetIntegerValue("limit", maxResults + 1);
+    args.SetIntegerValue("limit", limit + 1);
     args.SetIntegerValue("since", since);
 
-    ReadExportedResourcesInternal(output, done, statement, args, maxResults);
+    ReadExportedResourcesInternal(output, done, statement, args, limit);
   }
 
     
@@ -689,7 +813,7 @@ namespace OrthancDatabases
     Dictionary args;
 
     bool done;  // Ignored
-    ReadChangesInternal(output, done, manager, statement, args, 1);
+    ReadChangesInternal(output, done, manager, statement, args, 1, true);
   }
 
     
@@ -764,7 +888,7 @@ namespace OrthancDatabases
 
     if (statement.IsDone())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No public id found for internal id");
     }
     else
     {
@@ -832,7 +956,7 @@ namespace OrthancDatabases
 
     if (statement.IsDone())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No resource type found for internal id.");
     }
     else
     {
@@ -1017,7 +1141,14 @@ namespace OrthancDatabases
 
     
   void IndexBackend::LogExportedResource(DatabaseManager& manager,
-                                         const OrthancPluginExportedResource& resource)
+                                         OrthancPluginResourceType resourceType,
+                                         const char* publicId,
+                                         const char* modality,
+                                         const char* date,
+                                         const char* patientId,
+                                         const char* studyInstanceUid,
+                                         const char* seriesInstanceUid,
+                                         const char* sopInstanceUid)
   {
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
@@ -1034,14 +1165,14 @@ namespace OrthancDatabases
     statement.SetParameterType("date", ValueType_Utf8String);
 
     Dictionary args;
-    args.SetIntegerValue("type", resource.resourceType);
-    args.SetUtf8Value("publicId", resource.publicId);
-    args.SetUtf8Value("modality", resource.modality);
-    args.SetUtf8Value("patient", resource.patientId);
-    args.SetUtf8Value("study", resource.studyInstanceUid);
-    args.SetUtf8Value("series", resource.seriesInstanceUid);
-    args.SetUtf8Value("instance", resource.sopInstanceUid);
-    args.SetUtf8Value("date", resource.date);
+    args.SetIntegerValue("type", resourceType);
+    args.SetUtf8Value("publicId", publicId);
+    args.SetUtf8Value("modality", modality);
+    args.SetUtf8Value("patient", patientId);
+    args.SetUtf8Value("study", studyInstanceUid);
+    args.SetUtf8Value("series", seriesInstanceUid);
+    args.SetUtf8Value("instance", sopInstanceUid);
+    args.SetUtf8Value("date", date);
 
     statement.Execute(args);
   }
@@ -1185,7 +1316,41 @@ namespace OrthancDatabases
     }
   }
 
-    
+  bool IndexBackend::HasAtomicIncrementGlobalProperty()
+  {
+    return false; // currently only implemented in Postgres
+  }
+
+  int64_t IndexBackend::IncrementGlobalProperty(DatabaseManager& manager,
+                                                const char* serverIdentifier,
+                                                int32_t property,
+                                                int64_t increment)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+  bool IndexBackend::HasUpdateAndGetStatistics()
+  {
+    return false; // currently only implemented in Postgres
+  }
+
+  void IndexBackend::UpdateAndGetStatistics(DatabaseManager& manager,
+                                            int64_t& patientsCount,
+                                            int64_t& studiesCount,
+                                            int64_t& seriesCount,
+                                            int64_t& instancesCount,
+                                            int64_t& compressedSize,
+                                            int64_t& uncompressedSize)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+  bool IndexBackend::HasMeasureLatency()
+  {
+    return true;
+  }
+
+
   void IndexBackend::LookupIdentifier(std::list<int64_t>& target /*out*/,
                                       DatabaseManager& manager,
                                       OrthancPluginResourceType resourceType,
@@ -1963,7 +2128,7 @@ namespace OrthancDatabases
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-  class IndexBackend::LookupFormatter : public Orthanc::ISqlLookupFormatter
+  class IndexBackend::LookupFormatter : public ISqlLookupFormatter
   {
   private:
     Dialect     dialect_;
@@ -1994,7 +2159,7 @@ namespace OrthancDatabases
 
     virtual std::string FormatResourceType(Orthanc::ResourceType level)
     {
-      return boost::lexical_cast<std::string>(Orthanc::Plugins::Convert(level));
+      return boost::lexical_cast<std::string>(MessagesToolbox::ConvertToPlainC(level));
     }
 
     virtual std::string FormatWildcardEscape()
@@ -2014,10 +2179,47 @@ namespace OrthancDatabases
       }
     }
 
+    virtual std::string FormatLimits(uint64_t since, uint64_t count)
+    {
+      std::string sql;
+
+      switch (dialect_)
+      {
+        case Dialect_MSSQL:
+        {
+          if (since > 0)
+          {
+            sql += " OFFSET " + boost::lexical_cast<std::string>(since) + " ROWS ";
+          }
+          if (count > 0)
+          {
+            sql += " FETCH NEXT " + boost::lexical_cast<std::string>(count) + " ROWS ONLY ";
+          }
+        }; break;
+        case Dialect_SQLite:
+        case Dialect_PostgreSQL:
+        case Dialect_MySQL:
+        {
+          if (count > 0)
+          {
+            sql += " LIMIT " + boost::lexical_cast<std::string>(count);
+          }
+          if (since > 0)
+          {
+            sql += " OFFSET " + boost::lexical_cast<std::string>(since);
+          }
+        }; break;
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+      
+      return sql;
+    }
+
     virtual bool IsEscapeBrackets() const
     {
       // This was initially done at a bad location by the following changeset:
-      // https://hg.orthanc-server.com/orthanc-databases/rev/389c037387ea
+      // https://orthanc.uclouvain.be/hg/orthanc-databases/rev/389c037387ea
       return (dialect_ == Dialect_MSSQL);
     }
 
@@ -2043,49 +2245,106 @@ namespace OrthancDatabases
   // New primitive since Orthanc 1.5.2
   void IndexBackend::LookupResources(IDatabaseBackendOutput& output,
                                      DatabaseManager& manager,
-                                     const std::vector<Orthanc::DatabaseConstraint>& lookup,
-                                     OrthancPluginResourceType queryLevel,
+                                     const DatabaseConstraints& lookup,
+                                     OrthancPluginResourceType queryLevel_,
+                                     const std::set<std::string>& labels,
+                                     LabelsConstraint labelsConstraint,
                                      uint32_t limit,
                                      bool requestSomeInstance)
   {
     LookupFormatter formatter(manager.GetDialect());
+    Orthanc::ResourceType queryLevel = MessagesToolbox::Convert(queryLevel_);
+    Orthanc::ResourceType lowerLevel, upperLevel;
+    ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
-    Orthanc::ISqlLookupFormatter::Apply(sql, formatter, lookup,
-                                        Orthanc::Plugins::Convert(queryLevel), limit);
+    bool enableNewStudyCode = true;
 
-    if (requestSomeInstance)
+    if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
     {
-      // Composite query to find some instance if requested
-      switch (queryLevel)
+      ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
+
+      if (requestSomeInstance)
       {
-        case OrthancPluginResourceType_Patient:
-          sql = ("SELECT patients.publicId, MIN(instances.publicId) FROM (" + sql + ") patients "
-                 "INNER JOIN Resources studies   ON studies.parentId   = patients.internalId "
-                 "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
-                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
-                 "GROUP BY patients.publicId");
-          break;
+        // Composite query to find some instance if requested
+        switch (queryLevel)
+        {
+          case Orthanc::ResourceType_Patient:
+            sql = ("SELECT patients_studies.patients_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT patients.publicId AS patients_public_id, MIN(studies.internalId) AS studies_internal_id "
+                          "FROM (" + sql + 
+                                ") AS patients "
+                                "INNER JOIN Resources studies ON studies.parentId = patients.internalId "
+                                "GROUP BY patients.publicId "
+                          ") AS patients_studies "
+                    "INNER JOIN Resources series ON series.parentId = patients_studies.studies_internal_id "
+                    "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                    "GROUP BY patients_studies.patients_public_id");
+            break;
+          case Orthanc::ResourceType_Study:
+            sql = ("SELECT studies_series.studies_public_id, MIN(instances.publicId) AS instances_public_id "
+                    "FROM (SELECT studies.publicId AS studies_public_id, MIN(series.internalId) AS series_internal_id "
+                          "FROM (" + sql + 
+                                ") AS studies "
+                                "INNER JOIN Resources series ON series.parentId = studies.internalId "
+                                "GROUP BY studies.publicId "
+                          ") AS studies_series "
+                    "INNER JOIN Resources instances ON instances.parentId = studies_series.series_internal_id "
+                    "GROUP BY studies_series.studies_public_id");
+            break;
+          case Orthanc::ResourceType_Series:
+            sql = ("SELECT series.publicId AS series_public_id, MIN(instances.publicId) AS instances_public_id "
+                          "FROM (" + sql + 
+                                ") AS series "
+                                "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                                "GROUP BY series.publicId ");
+            break;
 
-        case OrthancPluginResourceType_Study:
-          sql = ("SELECT studies.publicId, MIN(instances.publicId) FROM (" + sql + ") studies "
-                 "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
-                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
-                 "GROUP BY studies.publicId");                 
-          break;
+          case Orthanc::ResourceType_Instance:
+            sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
+            break;
 
-        case OrthancPluginResourceType_Series:
-          sql = ("SELECT series.publicId, MIN(instances.publicId) FROM (" + sql + ") series "
-                 "INNER JOIN Resources instances ON instances.parentId = series.internalId "
-                 "GROUP BY series.publicId");
-          break;
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+      }
+    }
+    else
+    {
+      ISqlLookupFormatter::Apply(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
-        case OrthancPluginResourceType_Instance:
-          sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
-          break;
+      if (requestSomeInstance)
+      {
+        // Composite query to find some instance if requested
+        switch (queryLevel)
+        {
+          case Orthanc::ResourceType_Patient:
+            sql = ("SELECT patients.publicId, MIN(instances.publicId) FROM (" + sql + ") patients "
+                  "INNER JOIN Resources studies   ON studies.parentId   = patients.internalId "
+                  "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
+                  "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                  "GROUP BY patients.publicId");
+            break;
 
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          case Orthanc::ResourceType_Study:
+            sql = ("SELECT studies.publicId, MIN(instances.publicId) FROM (" + sql + ") studies "
+                  "INNER JOIN Resources series    ON series.parentId    = studies.internalId "
+                  "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                  "GROUP BY studies.publicId");                 
+            break;
+          case Orthanc::ResourceType_Series:
+            sql = ("SELECT series.publicId, MIN(instances.publicId) FROM (" + sql + ") series "
+                  "INNER JOIN Resources instances ON instances.parentId = series.internalId "
+                  "GROUP BY series.publicId");
+            break;
+
+          case Orthanc::ResourceType_Instance:
+            sql = ("SELECT instances.publicId, instances.publicId FROM (" + sql + ") instances");
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
       }
     }
 
@@ -2363,9 +2622,7 @@ namespace OrthancDatabases
   }
 
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
-  // New primitive since Orthanc 1.5.4
+// New primitive since Orthanc 1.5.4
 bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                            OrthancPluginResourceType& type,
                                            std::string& parentPublicId,
@@ -2423,12 +2680,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     return true;
   }
 }
-#  endif
-#endif
   
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
   // New primitive since Orthanc 1.5.4
   void IndexBackend::GetAllMetadata(std::map<int32_t, std::string>& result,
                                     DatabaseManager& manager,
@@ -2465,8 +2718,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
     }
   }
-#  endif
-#endif
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
@@ -2589,6 +2840,96 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #endif
 
 
+  void IndexBackend::AddLabel(DatabaseManager& manager,
+                              int64_t resource,
+                              const std::string& label)
+  {
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+    switch (manager.GetDialect())
+    {
+      case Dialect_PostgreSQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT INTO Labels VALUES(${id}, ${label}) ON CONFLICT DO NOTHING"));
+        break;
+
+      case Dialect_SQLite:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT OR IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
+      case Dialect_MySQL:
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "INSERT IGNORE INTO Labels VALUES(${id}, ${label})"));
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    
+    statement->SetParameterType("id", ValueType_Integer64);
+    statement->SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement->Execute(args);
+  }
+
+
+  void IndexBackend::RemoveLabel(DatabaseManager& manager,
+                                 int64_t resource,
+                                 const std::string& label)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "DELETE FROM Labels WHERE id=${id} AND label=${label}");
+
+    statement.SetParameterType("id", ValueType_Integer64);
+    statement.SetParameterType("label", ValueType_Utf8String);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+    args.SetUtf8Value("label", label);
+
+    statement.Execute(args);
+  }
+
+
+  void IndexBackend::ListLabels(std::list<std::string>& target,
+                                DatabaseManager& manager,
+                                int64_t resource)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT label FROM Labels WHERE id=${id}");
+      
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", resource);
+
+    ReadListOfStrings(target, statement, args);
+  }
+  
+
+  void IndexBackend::ListAllLabels(std::list<std::string>& target,
+                                   DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT DISTINCT label FROM Labels");
+      
+    Dictionary args;
+    ReadListOfStrings(target, statement, args);
+  }
+
+  
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
                               unsigned int maxDatabaseRetries)
@@ -2598,35 +2939,31 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
     
-    bool hasLoadedV3OrAbove = false;
+    LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
+                 << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
       
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
-                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
-      
-      OrthancDatabases::DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
-      hasLoadedV3OrAbove = true;
-    }
-#  elif ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
-    {
-      LOG(WARNING) << "The index plugin will use " << countConnections << " connection(s) to the database, "
-                   << "and will retry up to " << maxDatabaseRetries << " time(s) in the case of a collision";
-      
-      OrthancDatabases::DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
-      hasLoadedV3OrAbove = true;
+      DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries);
+      return;
     }
 #  endif
 #endif
 
-    if (!hasLoadedV3OrAbove)
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
+    if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 9, 2) == 1)
     {
-      LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
-      OrthancDatabases::DatabaseBackendAdapterV2::Register(backend);
+      DatabaseBackendAdapterV3::Register(backend, countConnections, maxDatabaseRetries);
+      return;
     }
+#  endif
+#endif
+
+    LOG(WARNING) << "Performance warning: Your version of the Orthanc core or SDK doesn't support multiple readers/writers";
+    DatabaseBackendAdapterV2::Register(backend);
   }
 
 
@@ -2646,7 +2983,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       catch (boost::bad_lexical_cast&)
       {
-        LOG(ERROR) << "Corrupted PostgreSQL database";
+        LOG(ERROR) << "Corrupted database";
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }      
     }
@@ -2669,20 +3006,858 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   void IndexBackend::Finalize()
   {
-    OrthancDatabases::DatabaseBackendAdapterV2::Finalize();
+    DatabaseBackendAdapterV2::Finalize();
 
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-    OrthancDatabases::DatabaseBackendAdapterV3::Finalize();
+    DatabaseBackendAdapterV3::Finalize();
+#  endif
+#endif
+
+#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
+#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+    DatabaseBackendAdapterV4::Finalize();
 #  endif
 #endif
   }
 
 
-  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend)
+  uint64_t IndexBackend::MeasureLatency(DatabaseManager& manager)
+  {
+    // execute 11x the simplest statement and return the median value
+    std::vector<uint64_t> measures;
+
+    for (int i = 0; i < 11; i++)
+    {
+      DatabaseManager::StandaloneStatement statement(manager, "SELECT 1");
+
+      Orthanc::Toolbox::ElapsedTimer timer;
+
+      statement.ExecuteWithoutResult();
+
+      measures.push_back(timer.GetElapsedMicroseconds());
+    }
+    
+    std::sort(measures.begin(), measures.end());
+
+    return measures[measures.size() / 2];
+  }
+
+
+  DatabaseManager* IndexBackend::CreateSingleDatabaseManager(IDatabaseBackend& backend,
+                                                             bool hasIdentifierTags,
+                                                             const std::list<IdentifierTag>& identifierTags)
   {
     std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend.CreateDatabaseFactory()));
-    backend.ConfigureDatabase(*manager);
+    backend.ConfigureDatabase(*manager, hasIdentifierTags, identifierTags);
     return manager.release();
   }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool IndexBackend::HasFindSupport() const
+  {
+    // TODO-FIND  move to child plugins ?
+    return true;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* GetResourceContent(
+                              Orthanc::DatabasePluginMessages::Find_Response* response,
+                              Orthanc::DatabasePluginMessages::ResourceType level)
+  {
+    Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = NULL;  // the protobuf response will be the owner
+    
+    switch (level)
+    {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        content = response->mutable_patient_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        content = response->mutable_study_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        content =response->mutable_series_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        content = response->mutable_instance_content();
+        break;
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    return content;
+  }
+
+  Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* GetChildrenContent(
+                              Orthanc::DatabasePluginMessages::Find_Response* response,
+                              Orthanc::DatabasePluginMessages::ResourceType childrenLevel)
+  {
+    Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = NULL;  // the protobuf response will be the owner
+    
+    switch (childrenLevel)
+    {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        content = response->mutable_children_studies_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        content =response->mutable_children_series_content();
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        content = response->mutable_children_instances_content();
+        break;
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+    return content;
+  }
+
+  std::string JoinRequestedMetadata(const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec)
+  {
+    std::set<std::string> metadataTypes;
+    for (int i = 0; i < childrenSpec->retrieve_metadata_size(); ++i)
+    {
+      metadataTypes.insert(boost::lexical_cast<std::string>(childrenSpec->retrieve_metadata(i)));
+    }
+    std::string joinedMetadataTypes;
+    Orthanc::Toolbox::JoinStrings(joinedMetadataTypes, metadataTypes, ", ");
+
+    return joinedMetadataTypes;
+  }
+
+  std::string JoinRequestedTags(const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec)
+  {
+    std::set<std::string> tags;
+    for (int i = 0; i < childrenSpec->retrieve_main_dicom_tags_size(); ++i)
+    {
+      tags.insert("(" + boost::lexical_cast<std::string>(childrenSpec->retrieve_main_dicom_tags(i).group()) 
+                  + ", " + boost::lexical_cast<std::string>(childrenSpec->retrieve_main_dicom_tags(i).element()) + ")");
+    }
+    std::string joinedTags;
+    Orthanc::Toolbox::JoinStrings(joinedTags, tags, ", ");
+
+    return joinedTags;
+  }
+
+
+#define C0_QUERY_ID 0
+#define C1_INTERNAL_ID 1
+#define C2_ROW_NUMBER 2
+#define C3_STRING_1 3
+#define C4_STRING_2 4
+#define C5_STRING_3 5
+#define C6_INT_1 6
+#define C7_INT_2 7
+#define C8_BIG_INT_1 8
+#define C9_BIG_INT_2 9
+
+#define QUERY_LOOKUP 1
+#define QUERY_MAIN_DICOM_TAGS 2
+#define QUERY_ATTACHMENTS 3
+#define QUERY_METADATA 4
+#define QUERY_LABELS 5
+#define QUERY_PARENT_MAIN_DICOM_TAGS 10
+#define QUERY_PARENT_IDENTIFIER 11
+#define QUERY_PARENT_METADATA 12
+#define QUERY_GRAND_PARENT_MAIN_DICOM_TAGS 15
+#define QUERY_GRAND_PARENT_METADATA 16
+#define QUERY_CHILDREN_IDENTIFIERS 20
+#define QUERY_CHILDREN_MAIN_DICOM_TAGS 21
+#define QUERY_CHILDREN_METADATA 22
+#define QUERY_GRAND_CHILDREN_IDENTIFIERS 30
+#define QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS 31
+#define QUERY_GRAND_CHILDREN_METADATA 32
+#define QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS 40
+#define QUERY_ONE_INSTANCE_IDENTIFIER 50
+#define QUERY_ONE_INSTANCE_METADATA 51
+#define QUERY_ONE_INSTANCE_ATTACHMENTS 52
+
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+
+  void IndexBackend::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                    DatabaseManager& manager,
+                                    const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // TODO-FIND move to child plugins ?
+
+
+    // If we want the Find to use a read-only transaction, we can not create temporary tables with
+    // the lookup results.  So we must use a CTE (Common Table Expression).  
+    // However, a CTE can only be used in a single query -> we must unionize all the following 
+    // queries to retrieve values from various tables.
+    // However, to use UNION, all tables must have the same columns (numbers and types).  That's
+    // why we have generic column names.
+    // So, at the end we'll have only one very big query !
+
+    std::string sql;
+
+    // extract the resource id of interest by executing the lookup in a CTE
+    LookupFormatter formatter(manager.GetDialect());
+    std::string lookupSql;
+    ISqlLookupFormatter::Apply(lookupSql, formatter, request);
+
+    // base query, retrieve the ordered internalId and publicId of the selected resources
+    sql = "WITH Lookup AS (" + lookupSql + ") "
+          "SELECT "
+          "  " TOSTRING(QUERY_LOOKUP) " AS c0_queryId, "
+          "  Lookup.internalId AS c1_internalId, "
+          "  Lookup.rowNumber AS c2_rowNumber, "
+          "  Lookup.publicId AS c3_string1, "
+          "  NULL::TEXT AS c4_string2, "
+          "  NULL::TEXT AS c5_string3, "
+          "  NULL::INT AS c6_int1, "
+          "  NULL::INT AS c7_int2, "
+          "  NULL::BIGINT AS c8_big_int1, "
+          "  NULL::BIGINT AS c9_big_int2 "
+          "  FROM Lookup ";
+
+    // need MainDicomTags from resource ?
+    if (request.retrieve_main_dicom_tags())
+    {
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_MAIN_DICOM_TAGS) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  value AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  tagGroup AS c6_int1, "
+             "  tagElement AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Lookup "
+             "INNER JOIN MainDicomTags ON MainDicomTags.id = Lookup.internalId ";
+    }
+    
+    // need resource metadata ?
+    if (request.retrieve_metadata())
+    {
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_METADATA) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  value AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  type AS c6_int1, "
+             "  NULL::INT AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Lookup "
+             "INNER JOIN Metadata ON Metadata.id = Lookup.internalId ";
+    }
+
+    // need resource attachments ?
+    if (request.retrieve_attachments())
+    {
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_ATTACHMENTS) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  uuid AS c3_string1, "
+             "  uncompressedHash AS c4_string2, "
+             "  compressedHash AS c5_string3, "
+             "  fileType AS c6_int1, "
+             "  compressionType AS c7_int2, "
+             "  compressedSize AS c8_big_int1, "
+             "  uncompressedSize AS c9_big_int2 "
+             "FROM Lookup "
+             "INNER JOIN AttachedFiles ON AttachedFiles.id = Lookup.internalId ";
+    }
+
+    // need resource labels ?
+    if (request.retrieve_labels())
+    {
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_LABELS) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  label AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  NULL::INT AS c6_int1, "
+             "  NULL::INT AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Lookup "
+             "INNER JOIN Labels ON Labels.id = Lookup.internalId ";
+    }
+
+    // need MainDicomTags from parent ?
+    if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
+    {
+      const Orthanc::DatabasePluginMessages::Find_Request_ParentSpecification* parentSpec = NULL;
+      switch (request.level())
+      {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        parentSpec = &(request.parent_patient());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        parentSpec = &(request.parent_study());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        parentSpec = &(request.parent_series());
+        break;
+      
+      default:
+        break;
+      }
+
+      if (parentSpec->retrieve_main_dicom_tags())
+      {
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_PARENT_MAIN_DICOM_TAGS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  tagGroup AS c6_int1, "
+               "  tagElement AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+               "INNER JOIN MainDicomTags ON MainDicomTags.id = currentLevel.parentId ";
+      }
+
+      if (parentSpec->retrieve_metadata())
+      {
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_PARENT_METADATA) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  type AS c6_int1, "
+               "  NULL::INT AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+               "INNER JOIN Metadata ON Metadata.id = currentLevel.parentId ";
+      }
+
+      // need MainDicomTags from grandparent ?
+      if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
+      {
+        const Orthanc::DatabasePluginMessages::Find_Request_ParentSpecification* grandparentSpec = NULL;
+        switch (request.level())
+        {
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+          grandparentSpec = &(request.parent_patient());
+          break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+          grandparentSpec = &(request.parent_study());
+          break;
+        
+        default:
+          break;
+        }
+
+        if (grandparentSpec->retrieve_main_dicom_tags())
+        {
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_GRAND_PARENT_MAIN_DICOM_TAGS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  tagGroup AS c6_int1, "
+               "  tagElement AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+               "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
+               "INNER JOIN MainDicomTags ON MainDicomTags.id = parentLevel.parentId ";
+        }
+
+        if (grandparentSpec->retrieve_metadata())
+        {
+          sql += "UNION SELECT "
+                "  " TOSTRING(QUERY_GRAND_PARENT_METADATA) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  NULL::BIGINT AS c2_rowNumber, "
+                "  value AS c3_string1, "
+                "  NULL::TEXT AS c4_string2, "
+                "  NULL::TEXT AS c5_string3, "
+                "  type AS c6_int1, "
+                "  NULL::INT AS c7_int2, "
+                "  NULL::BIGINT AS c8_big_int1, "
+                "  NULL::BIGINT AS c9_big_int2 "
+                "FROM Lookup "
+                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
+                "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
+                "INNER JOIN Metadata ON Metadata.id = parentLevel.parentId ";
+        }
+      }
+    }
+
+    // need MainDicomTags from children ?
+    if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES)
+    {
+      const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec = NULL;
+      switch (request.level())
+      {
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        childrenSpec = &(request.children_studies());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        childrenSpec = &(request.children_series());
+        break;
+      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        childrenSpec = &(request.children_instances());
+        break;
+      
+      default:
+        break;
+      }
+
+      if (childrenSpec->retrieve_main_dicom_tags_size() > 0)
+      {
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  value AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  tagGroup AS c6_int1, "
+               "  tagElement AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+               "  INNER JOIN MainDicomTags ON MainDicomTags.id = childLevel.internalId AND (tagGroup, tagElement) IN (" + JoinRequestedTags(childrenSpec) + ")";
+      }
+
+      // need children identifiers ?
+      if (childrenSpec->retrieve_identifiers())  
+      {
+        sql += "UNION SELECT "
+               "  " TOSTRING(QUERY_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  NULL::BIGINT AS c2_rowNumber, "
+               "  childLevel.publicId AS c3_string1, "
+               "  NULL::TEXT AS c4_string2, "
+               "  NULL::TEXT AS c5_string3, "
+               "  NULL::INT AS c6_int1, "
+               "  NULL::INT AS c7_int2, "
+               "  NULL::BIGINT AS c8_big_int1, "
+               "  NULL::BIGINT AS c9_big_int2 "
+               "FROM Lookup "
+               "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId ";
+      }
+
+      if (childrenSpec->retrieve_metadata_size() > 0)
+      {
+        sql += "UNION SELECT "
+                "  " TOSTRING(QUERY_CHILDREN_METADATA) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  NULL::BIGINT AS c2_rowNumber, "
+                "  value AS c3_string1, "
+                "  NULL::TEXT AS c4_string2, "
+                "  NULL::TEXT AS c5_string3, "
+                "  type AS c6_int1, "
+                "  NULL::INT AS c7_int2, "
+                "  NULL::BIGINT AS c8_big_int1, "
+                "  NULL::BIGINT AS c9_big_int2 "
+                "FROM Lookup "
+                "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+                "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(childrenSpec) + ") ";
+      }
+
+      if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
+      {
+        const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandchildrenSpec = NULL;
+        switch (request.level())
+        {
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+          grandchildrenSpec = &(request.children_series());
+          break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+          grandchildrenSpec = &(request.children_instances());
+          break;
+        
+        default:
+          break;
+        }
+
+        // need grand children identifiers ?
+        if (grandchildrenSpec->retrieve_identifiers())  
+        {
+          sql += "UNION SELECT "
+                "  " TOSTRING(QUERY_GRAND_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  NULL::BIGINT AS c2_rowNumber, "
+                "  grandChildLevel.publicId AS c3_string1, "
+                "  NULL::TEXT AS c4_string2, "
+                "  NULL::TEXT AS c5_string3, "
+                "  NULL::INT AS c6_int1, "
+                "  NULL::INT AS c7_int2, "
+                "  NULL::BIGINT AS c8_big_int1, "
+                "  NULL::BIGINT AS c9_big_int2 "
+                "FROM Lookup "
+                "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
+                "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId ";
+        }
+
+        if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)
+        {
+          sql += "UNION SELECT "
+                 "  " TOSTRING(QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS) " AS c0_queryId, "
+                 "  Lookup.internalId AS c1_internalId, "
+                 "  NULL::BIGINT AS c2_rowNumber, "
+                 "  value AS c3_string1, "
+                 "  NULL::TEXT AS c4_string2, "
+                 "  NULL::TEXT AS c5_string3, "
+                 "  tagGroup AS c6_int1, "
+                 "  tagElement AS c7_int2, "
+                 "  NULL::BIGINT AS c8_big_int1, "
+                 "  NULL::BIGINT AS c9_big_int2 "
+                 "FROM Lookup "
+                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+                 "  INNER JOIN Resources grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
+                 "  INNER JOIN MainDicomTags ON MainDicomTags.id = grandChildLevel.internalId AND (tagGroup, tagElement) IN (" + JoinRequestedTags(grandchildrenSpec) + ")";
+        }
+
+        if (grandchildrenSpec->retrieve_metadata_size() > 0)
+        {
+          sql += "UNION SELECT "
+                 "  " TOSTRING(QUERY_GRAND_CHILDREN_METADATA) " AS c0_queryId, "
+                 "  Lookup.internalId AS c1_internalId, "
+                 "  NULL::BIGINT AS c2_rowNumber, "
+                 "  value AS c3_string1, "
+                 "  NULL::TEXT AS c4_string2, "
+                 "  NULL::TEXT AS c5_string3, "
+                 "  type AS c6_int1, "
+                 "  NULL::INT AS c7_int2, "
+                 "  NULL::BIGINT AS c8_big_int1, "
+                 "  NULL::BIGINT AS c9_big_int2 "
+                 "FROM Lookup "
+                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
+                 "  INNER JOIN Resources grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
+                 "  INNER JOIN Metadata ON Metadata.id = grandChildLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(grandchildrenSpec) + ") ";
+        }
+
+        if (request.level() == Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
+        {
+          const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandgrandchildrenSpec = &(request.children_instances());
+
+          // need grand children identifiers ?
+          if (grandgrandchildrenSpec->retrieve_identifiers())  
+          {
+            sql += "UNION SELECT "
+                  "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS) " AS c0_queryId, "
+                  "  Lookup.internalId AS c1_internalId, "
+                  "  NULL::BIGINT AS c2_rowNumber, "
+                  "  grandGrandChildLevel.publicId AS c3_string1, "
+                  "  NULL::TEXT AS c4_string2, "
+                  "  NULL::TEXT AS c5_string3, "
+                  "  NULL::INT AS c6_int1, "
+                  "  NULL::INT AS c7_int2, "
+                  "  NULL::BIGINT AS c8_big_int1, "
+                  "  NULL::BIGINT AS c9_big_int2 "
+                  "FROM Lookup "
+                  "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
+                  "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
+                  "INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId ";
+          }
+        }
+      }
+    }
+
+    // need parent identifier ?
+    if (request.retrieve_parent_identifier())
+    {
+      sql += "UNION SELECT "
+             "  " TOSTRING(QUERY_PARENT_IDENTIFIER) " AS c0_queryId, "
+             "  Lookup.internalId AS c1_internalId, "
+             "  NULL::BIGINT AS c2_rowNumber, "
+             "  parentLevel.publicId AS c3_string1, "
+             "  NULL::TEXT AS c4_string2, "
+             "  NULL::TEXT AS c5_string3, "
+             "  NULL::INT AS c6_int1, "
+             "  NULL::INT AS c7_int2, "
+             "  NULL::BIGINT AS c8_big_int1, "
+             "  NULL::BIGINT AS c9_big_int2 "
+             "FROM Lookup "
+             "  INNER JOIN Resources currentLevel ON currentLevel.internalId = Lookup.internalId "
+             "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
+    }
+
+    // need one instance info ?
+    if (request.level() != Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE &&
+        request.retrieve_one_instance_metadata_and_attachments())
+    {
+      // Here, we create a nested CTE 'OneInstance' with one instance ID to join with metadata and main
+      sql += "UNION"
+             "  (WITH OneInstance AS";
+      
+      switch (request.level())
+      {
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        {
+          sql+= "  (SELECT DISTINCT ON (Lookup.internalId) Lookup.internalId AS parentInternalId, childLevel.publicId AS instancePublicId, childLevel.internalId AS instanceInternalId"
+                "   FROM Resources AS childLevel "
+                "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId) ";
+        }; break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        {
+          sql+= "  (SELECT DISTINCT ON (Lookup.internalId) Lookup.internalId AS parentInternalId, grandChildLevel.publicId AS instancePublicId, grandChildLevel.internalId AS instanceInternalId"
+                "   FROM Resources AS grandChildLevel "
+                "   INNER JOIN Resources childLevel ON grandChildLevel.parentId = childLevel.internalId "
+                "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId) ";
+        }; break;
+        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        {
+          sql+= "  (SELECT DISTINCT ON (Lookup.internalId) Lookup.internalId AS parentInternalId, grandGrandChildLevel.publicId AS instancePublicId, grandGrandChildLevel.internalId AS instanceInternalId"
+                "   FROM Resources AS grandGrandChildLevel "
+                "   INNER JOIN Resources grandChildLevel ON grandGrandChildLevel.parentId = grandChildLevel.internalId "
+                "   INNER JOIN Resources childLevel ON grandChildLevel.parentId = childLevel.internalId "
+                "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId) ";
+        }; break;
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+
+      sql += "   SELECT"
+             "    " TOSTRING(QUERY_ONE_INSTANCE_IDENTIFIER) " AS c0_queryId, "
+             "    parentInternalId AS c1_internalId, "
+             "    NULL::BIGINT AS c2_rowNumber, "
+             "    instancePublicId AS c3_string1, "
+             "    NULL::TEXT AS c4_string2, "
+             "    NULL::TEXT AS c5_string3, "
+             "    NULL::INT AS c6_int1, "
+             "    NULL::INT AS c7_int2, "
+             "    instanceInternalId AS c8_big_int1, "
+             "    NULL::BIGINT AS c9_big_int2 "
+             "   FROM OneInstance ";
+
+      sql += "   UNION SELECT"
+             "    " TOSTRING(QUERY_ONE_INSTANCE_METADATA) " AS c0_queryId, "
+             "    parentInternalId AS c1_internalId, "
+             "    NULL::BIGINT AS c2_rowNumber, "
+             "    Metadata.value AS c3_string1, "
+             "    NULL::TEXT AS c4_string2, "
+             "    NULL::TEXT AS c5_string3, "
+             "    Metadata.type AS c6_int1, "
+             "    NULL::INT AS c7_int2, "
+             "    NULL::BIGINT AS c8_big_int1, "
+             "    NULL::BIGINT AS c9_big_int2 "
+             "   FROM Metadata "
+             "   INNER JOIN OneInstance ON Metadata.id = OneInstance.instanceInternalId";
+             
+      sql += "   UNION SELECT"
+             "    " TOSTRING(QUERY_ONE_INSTANCE_ATTACHMENTS) " AS c0_queryId, "
+             "    parentInternalId AS c1_internalId, "
+             "    NULL::BIGINT AS c2_rowNumber, "
+             "    uuid AS c3_string1, "
+             "    uncompressedHash AS c4_string2, "
+             "    compressedHash AS c5_string3, "
+             "    fileType AS c6_int1, "
+             "    compressionType AS c7_int2, "
+             "    compressedSize AS c8_big_int1, "
+             "    uncompressedSize AS c9_big_int2 "
+             "   FROM AttachedFiles "
+             "   INNER JOIN OneInstance ON AttachedFiles.id = OneInstance.instanceInternalId";
+
+      sql += "  ) ";
+
+    }
+
+    sql += " ORDER BY c0_queryId, c2_rowNumber";  // this is really important to make sure that the Lookup query is the first one to provide results since we use it to create the responses element !
+
+    DatabaseManager::StandaloneStatement statement(manager, sql);  // TODO-FIND: cache dynamic statement ?  Probably worth it since it can be very complex queries !
+    formatter.PrepareStatement(statement);
+    statement.Execute(formatter.GetDictionary());
+    
+
+    std::map<int64_t, Orthanc::DatabasePluginMessages::Find_Response*> responses;
+
+    while (!statement.IsDone())
+    {
+      int32_t queryId = statement.ReadInteger32(C0_QUERY_ID);
+      int64_t internalId = statement.ReadInteger64(C1_INTERNAL_ID);
+      
+      assert(queryId == QUERY_LOOKUP || responses.find(internalId) != responses.end()); // the QUERY_LOOKUP must be read first and must create the response before any other query tries to populate the fields
+
+      switch (queryId)
+      {
+        case QUERY_LOOKUP:
+          responses[internalId] = response.add_find();
+          responses[internalId]->set_public_id(statement.ReadString(C3_STRING_1));
+          responses[internalId]->set_internal_id(internalId);
+          break;
+
+        case QUERY_LABELS:
+          responses[internalId]->add_labels(statement.ReadString(C3_STRING_1));
+          break;
+
+        case QUERY_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+
+          tag->set_value(statement.ReadString(C3_STRING_1));
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+          }; break;
+
+        case QUERY_PARENT_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 1));
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+
+          tag->set_value(statement.ReadString(C3_STRING_1));
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_GRAND_PARENT_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 2));
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+
+          tag->set_value(statement.ReadString(C3_STRING_1));
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_CHILDREN_IDENTIFIERS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
+          content->add_identifiers(statement.ReadString(C3_STRING_1));
+        }; break;
+
+        case QUERY_CHILDREN_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
+          tag->add_values(statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_CHILDREN_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleMetadata* metadata = content->add_metadata();
+
+          metadata->add_values(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_GRAND_CHILDREN_IDENTIFIERS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
+          content->add_identifiers(statement.ReadString(C3_STRING_1));
+        }; break;
+
+        case QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
+
+          tag->add_values(statement.ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->set_group(statement.ReadInteger32(C6_INT_1));
+          tag->set_element(statement.ReadInteger32(C7_INT_2));
+        }; break;
+
+        case QUERY_GRAND_CHILDREN_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
+          Orthanc::DatabasePluginMessages::Find_Response_MultipleMetadata* metadata = content->add_metadata();
+
+          metadata->add_values(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 3));
+          content->add_identifiers(statement.ReadString(C3_STRING_1));
+        }; break;
+
+        case QUERY_ATTACHMENTS:
+        {
+          Orthanc::DatabasePluginMessages::FileInfo* attachment = responses[internalId]->add_attachments();
+
+          attachment->set_uuid(statement.ReadString(C3_STRING_1));
+          attachment->set_uncompressed_hash(statement.ReadString(C4_STRING_2));
+          attachment->set_compressed_hash(statement.ReadString(C5_STRING_3));
+          attachment->set_content_type(statement.ReadInteger32(C6_INT_1));
+          attachment->set_compression_type(statement.ReadInteger32(C7_INT_2));
+          attachment->set_compressed_size(statement.ReadInteger64(C8_BIG_INT_1));
+          attachment->set_uncompressed_size(statement.ReadInteger64(C9_BIG_INT_2));
+        }; break;
+
+        case QUERY_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], request.level());
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_PARENT_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 1));
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_GRAND_PARENT_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ResourceContent* content = GetResourceContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() - 2));
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+
+        case QUERY_PARENT_IDENTIFIER:
+        {
+          responses[internalId]->set_parent_public_id(statement.ReadString(C3_STRING_1));
+        }; break;
+
+        case QUERY_ONE_INSTANCE_IDENTIFIER:
+        {
+          responses[internalId]->set_one_instance_public_id(statement.ReadString(C3_STRING_1));
+        }; break;
+        case QUERY_ONE_INSTANCE_METADATA:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = responses[internalId]->add_one_instance_metadata();
+
+          metadata->set_value(statement.ReadString(C3_STRING_1));
+          metadata->set_key(statement.ReadInteger32(C6_INT_1));
+        }; break;
+        case QUERY_ONE_INSTANCE_ATTACHMENTS:
+        {
+          Orthanc::DatabasePluginMessages::FileInfo* attachment = responses[internalId]->add_one_instance_attachments();
+          
+          attachment->set_uuid(statement.ReadString(C3_STRING_1));
+          attachment->set_uncompressed_hash(statement.ReadString(C4_STRING_2));
+          attachment->set_compressed_hash(statement.ReadString(C5_STRING_3));
+          attachment->set_content_type(statement.ReadInteger32(C6_INT_1));
+          attachment->set_compression_type(statement.ReadInteger32(C7_INT_2));
+          attachment->set_compressed_size(statement.ReadInteger64(C8_BIG_INT_1));
+          attachment->set_uncompressed_size(statement.ReadInteger64(C9_BIG_INT_2));
+        }; break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+      statement.Next();
+    }    
+  }
+#endif
+
 }

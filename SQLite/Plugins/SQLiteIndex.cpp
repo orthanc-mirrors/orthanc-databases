@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -84,7 +86,9 @@ namespace OrthancDatabases
   }
 
 
-  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager)
+  void SQLiteIndex::ConfigureDatabase(DatabaseManager& manager,
+                                      bool hasIdentifierTags,
+                                      const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
 
@@ -180,6 +184,23 @@ namespace OrthancDatabases
 
       t.Commit();
     }    
+
+    {
+      DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+
+      if (!t.GetDatabaseTransaction().DoesTableExist("Labels"))
+      {
+        t.GetDatabaseTransaction().ExecuteMultiLines(
+          "CREATE TABLE Labels("
+          "  id INTEGER REFERENCES Resources(internalId) ON DELETE CASCADE,"
+          "  label TEXT NOT NULL,"
+          "  PRIMARY KEY(id, label));"
+          "CREATE INDEX LabelsIndex1 ON Labels(id);"
+          "CREATE INDEX LabelsIndex2 ON Labels(label);");
+      }
+
+      t.Commit();
+    }    
   }
 
 
@@ -253,4 +274,24 @@ namespace OrthancDatabases
       }
     }
   }
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool SQLiteIndex::HasFindSupport() const
+  {
+    // TODO-FIND
+    return false;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  void SQLiteIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                DatabaseManager& manager,
+                                const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // TODO-FIND
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+#endif
 }

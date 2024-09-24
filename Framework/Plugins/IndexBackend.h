@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -45,9 +47,11 @@ namespace OrthancDatabases
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
-    void ClearDeletedFiles(DatabaseManager& manager);
+    virtual void ClearDeletedFiles(DatabaseManager& manager);
 
-    void ClearDeletedResources(DatabaseManager& manager);
+    virtual void ClearDeletedResources(DatabaseManager& manager);
+
+    virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
     void SignalDeletedFiles(IDatabaseBackendOutput& output,
                             DatabaseManager& manager);
@@ -61,13 +65,14 @@ namespace OrthancDatabases
                              DatabaseManager& manager,
                              DatabaseManager::CachedStatement& statement,
                              const Dictionary& args,
-                             uint32_t maxResults);
+                             uint32_t limit,
+                             bool returnFirstResults);
 
     void ReadExportedResourcesInternal(IDatabaseBackendOutput& output,
                                        bool& done,
                                        DatabaseManager::CachedStatement& statement,
                                        const Dictionary& args,
-                                       uint32_t maxResults);
+                                       uint32_t limit);
 
   public:
     explicit IndexBackend(OrthancPluginContext* context);
@@ -127,15 +132,23 @@ namespace OrthancDatabases
     virtual void GetAllPublicIds(std::list<std::string>& target,
                                  DatabaseManager& manager,
                                  OrthancPluginResourceType resourceType,
-                                 uint64_t since,
-                                 uint64_t limit) ORTHANC_OVERRIDE;
+                                 int64_t since,
+                                 uint32_t limit) ORTHANC_OVERRIDE;
     
     virtual void GetChanges(IDatabaseBackendOutput& output,
                             bool& done /*out*/,
                             DatabaseManager& manager,
                             int64_t since,
-                            uint32_t maxResults) ORTHANC_OVERRIDE;
-    
+                            uint32_t limit) ORTHANC_OVERRIDE;
+
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    const std::set<uint32_t>& changeTypes,
+                                    uint32_t limit) ORTHANC_OVERRIDE;
+
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
                                        int64_t id) ORTHANC_OVERRIDE;
@@ -148,7 +161,7 @@ namespace OrthancDatabases
                                       bool& done /*out*/,
                                       DatabaseManager& manager,
                                       int64_t since,
-                                      uint32_t maxResults) ORTHANC_OVERRIDE;
+                                      uint32_t limit) ORTHANC_OVERRIDE;
     
     virtual void GetLastChange(IDatabaseBackendOutput& output,
                                DatabaseManager& manager) ORTHANC_OVERRIDE;
@@ -194,7 +207,14 @@ namespace OrthancDatabases
                            const char* date) ORTHANC_OVERRIDE;
     
     virtual void LogExportedResource(DatabaseManager& manager,
-                                     const OrthancPluginExportedResource& resource) ORTHANC_OVERRIDE;
+                                     OrthancPluginResourceType resourceType,
+                                     const char* publicId,
+                                     const char* modality,
+                                     const char* date,
+                                     const char* patientId,
+                                     const char* studyInstanceUid,
+                                     const char* seriesInstanceUid,
+                                     const char* sopInstanceUid) ORTHANC_OVERRIDE;
     
     virtual bool LookupAttachment(IDatabaseBackendOutput& output,
                                   int64_t& revision /*out*/,
@@ -301,8 +321,10 @@ namespace OrthancDatabases
     // New primitive since Orthanc 1.5.2
     virtual void LookupResources(IDatabaseBackendOutput& output,
                                  DatabaseManager& manager,
-                                 const std::vector<Orthanc::DatabaseConstraint>& lookup,
+                                 const DatabaseConstraints& lookup,
                                  OrthancPluginResourceType queryLevel,
+                                 const std::set<std::string>& labels,
+                                 LabelsConstraint labelsConstraint,
                                  uint32_t limit,
                                  bool requestSomeInstance) ORTHANC_OVERRIDE;
 #endif
@@ -328,25 +350,17 @@ namespace OrthancDatabases
     virtual void TagMostRecentPatient(DatabaseManager& manager,
                                       int64_t patient) ORTHANC_OVERRIDE;
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     // New primitive since Orthanc 1.5.4
     virtual bool LookupResourceAndParent(int64_t& id,
                                          OrthancPluginResourceType& type,
                                          std::string& parentPublicId,
                                          DatabaseManager& manager,
                                          const char* publicId) ORTHANC_OVERRIDE;
-#  endif
-#endif
 
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 4)
     // New primitive since Orthanc 1.5.4
     virtual void GetAllMetadata(std::map<int32_t, std::string>& result,
                                 DatabaseManager& manager,
                                 int64_t id) ORTHANC_OVERRIDE;
-#  endif
-#endif
 
     virtual bool HasCreateInstance() const ORTHANC_OVERRIDE
     {
@@ -388,6 +402,61 @@ namespace OrthancDatabases
                                   int32_t property,
                                   int value);
 
+    virtual void AddLabel(DatabaseManager& manager,
+                          int64_t resource,
+                          const std::string& label) ORTHANC_OVERRIDE;
+
+    virtual void RemoveLabel(DatabaseManager& manager,
+                             int64_t resource,
+                             const std::string& label) ORTHANC_OVERRIDE;
+
+    virtual void ListLabels(std::list<std::string>& target,
+                            DatabaseManager& manager,
+                            int64_t resource) ORTHANC_OVERRIDE;
+
+    virtual void ListAllLabels(std::list<std::string>& target,
+                               DatabaseManager& manager) ORTHANC_OVERRIDE;
+    
+    virtual bool HasAtomicIncrementGlobalProperty() ORTHANC_OVERRIDE;
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) ORTHANC_OVERRIDE;
+
+    virtual bool HasUpdateAndGetStatistics() ORTHANC_OVERRIDE;
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) ORTHANC_OVERRIDE;
+
+    virtual bool HasMeasureLatency() ORTHANC_OVERRIDE;
+
+    virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    // New primitive since Orthanc 1.12.5
+    virtual bool HasExtendedChanges() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+
     /**
      * "maxDatabaseRetries" is to handle
      * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a
@@ -400,6 +469,8 @@ namespace OrthancDatabases
 
     static void Finalize();
 
-    static DatabaseManager* CreateSingleDatabaseManager(IDatabaseBackend& backend);
+    static DatabaseManager* CreateSingleDatabaseManager(IDatabaseBackend& backend,
+                                                        bool hasIdentifierTags,
+                                                        const std::list<IdentifierTag>& identifierTags);
   };
 }

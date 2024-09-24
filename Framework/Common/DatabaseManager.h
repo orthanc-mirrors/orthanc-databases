@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -22,7 +24,7 @@
 #pragma once
 
 #include "IDatabaseFactory.h"
-#include "StatementLocation.h"
+#include "StatementId.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Enumerations.h>
@@ -47,7 +49,7 @@ namespace OrthancDatabases
   class DatabaseManager : public boost::noncopyable
   {
   private:
-    typedef std::map<StatementLocation, IPrecompiledStatement*>  CachedStatements;
+    typedef std::map<StatementId, IPrecompiledStatement*>  CachedStatements;
 
     std::unique_ptr<IDatabaseFactory>  factory_;
     std::unique_ptr<IDatabase>     database_;
@@ -57,9 +59,9 @@ namespace OrthancDatabases
 
     void CloseIfUnavailable(Orthanc::ErrorCode e);
 
-    IPrecompiledStatement* LookupCachedStatement(const StatementLocation& location) const;
+    IPrecompiledStatement* LookupCachedStatement(const StatementId& statementId) const;
 
-    IPrecompiledStatement& CacheStatement(const StatementLocation& location,
+    IPrecompiledStatement& CacheStatement(const StatementId& statementId,
                                           const Query& query);
 
     ITransaction& GetTransaction();
@@ -186,6 +188,10 @@ namespace OrthancDatabases
 
       std::string ReadString(size_t field) const;
 
+      std::string ReadStringOrNull(size_t field) const;
+
+      bool IsNull(size_t field) const;
+
       void PrintResult(std::ostream& stream)
       {
         IResult::Print(stream, GetResult());
@@ -203,11 +209,11 @@ namespace OrthancDatabases
     class CachedStatement : public StatementBase
     {
     private:
-      StatementLocation       location_;
+      StatementId             statementId_;
       IPrecompiledStatement*  statement_;
 
     public:
-      CachedStatement(const StatementLocation& location,
+      CachedStatement(const StatementId& statementId,
                       DatabaseManager& manager,
                       const std::string& sql);
 
@@ -218,6 +224,17 @@ namespace OrthancDatabases
       }
 
       void Execute(const Dictionary& parameters);
+
+      void ExecuteWithoutResult()
+      {
+        Dictionary parameters;
+        ExecuteWithoutResult(parameters);
+      }
+
+      void ExecuteWithoutResult(const Dictionary& parameters);
+
+    private:
+      void ExecuteInternal(const Dictionary& parameters, bool withResults);
     };
 
 
@@ -239,6 +256,17 @@ namespace OrthancDatabases
       }
 
       void Execute(const Dictionary& parameters);
+
+      void ExecuteWithoutResult()
+      {
+        Dictionary parameters;
+        ExecuteWithoutResult(parameters);
+      }
+
+      void ExecuteWithoutResult(const Dictionary& parameters);
+
+    private:
+      void ExecuteInternal(const Dictionary& parameters, bool withResults);
     };
   };
 }

@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -24,8 +26,12 @@
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 
+#include "IndexConnectionsPool.h"
+#include "MessagesToolbox.h"
+
+#include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages
+
 #include <Logging.h>
-#include <MultiThreading/SharedMessageQueue.h>
 #include <OrthancException.h>
 
 #include <stdexcept>
@@ -34,550 +40,155 @@
 #include <cassert>
 
 
-#define ORTHANC_PLUGINS_DATABASE_CATCH(context)                         \
-  catch (::Orthanc::OrthancException& e)                                \
-  {                                                                     \
-    return static_cast<OrthancPluginErrorCode>(e.GetErrorCode());       \
-  }                                                                     \
-  catch (::std::runtime_error& e)                                       \
-  {                                                                     \
-    const std::string message = "Exception in database back-end: " + std::string(e.what()); \
-    OrthancPluginLogError(context, message.c_str());                    \
-    return OrthancPluginErrorCode_DatabasePlugin;                       \
-  }                                                                     \
-  catch (...)                                                           \
-  {                                                                     \
-    OrthancPluginLogError(context, "Native exception");                 \
-    return OrthancPluginErrorCode_DatabasePlugin;                       \
-  }
+#define ORTHANC_PLUGINS_DATABASE_CATCH(context) \
 
 
 namespace OrthancDatabases
 {
   static bool isBackendInUse_ = false;  // Only for sanity checks
 
-  
-  template <typename T>
-  static void CopyListToVector(std::vector<T>& target,
-                               const std::list<T>& source)
+
+  static Orthanc::DatabasePluginMessages::ResourceType Convert(OrthancPluginResourceType resourceType)
   {
-    /**
-     * This has the the same effect as:
-     *
-     *   target.reserve(source.size());
-     *   std::copy(std::begin(source), std::end(source), std::back_inserter(target));
-     *
-     * However, this implementation is compatible with C++03 (Linux
-     * Standard Base), whereas "std::back_inserter" requires C++11.
-     **/
-
-    target.clear();
-    target.reserve(source.size());
-
-    for (typename std::list<T>::const_iterator it = source.begin(); it != source.end(); ++it)
+    switch (resourceType)
     {
-      target.push_back(*it);
+      case OrthancPluginResourceType_Patient:
+        return Orthanc::DatabasePluginMessages::RESOURCE_PATIENT;
+
+      case OrthancPluginResourceType_Study:
+        return Orthanc::DatabasePluginMessages::RESOURCE_STUDY;
+
+      case OrthancPluginResourceType_Series:
+        return Orthanc::DatabasePluginMessages::RESOURCE_SERIES;
+
+      case OrthancPluginResourceType_Instance:
+        return Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
-    
-    
-  class DatabaseBackendAdapterV4::Adapter : public boost::noncopyable
+
+
+  static OrthancPluginResourceType Convert(Orthanc::DatabasePluginMessages::ResourceType resourceType)
+  {
+    switch (resourceType)
+    {
+      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
+        return OrthancPluginResourceType_Patient;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
+        return OrthancPluginResourceType_Study;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
+        return OrthancPluginResourceType_Series;
+
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
+        return OrthancPluginResourceType_Instance;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+
+  class Output : public IDatabaseBackendOutput
   {
   private:
-    class ManagerReference : public Orthanc::IDynamicObject
-    {
-    private:
-      DatabaseManager*  manager_;
+    Orthanc::DatabasePluginMessages::DeleteAttachment::Response*         deleteAttachment_;
+    Orthanc::DatabasePluginMessages::DeleteResource::Response*           deleteResource_;
+    Orthanc::DatabasePluginMessages::GetChanges::Response*               getChanges_;
+    Orthanc::DatabasePluginMessages::GetExportedResources::Response*     getExportedResources_;
+    Orthanc::DatabasePluginMessages::GetLastChange::Response*            getLastChange_;
+    Orthanc::DatabasePluginMessages::GetLastExportedResource::Response*  getLastExportedResource_;
+    Orthanc::DatabasePluginMessages::GetMainDicomTags::Response*         getMainDicomTags_;
+    Orthanc::DatabasePluginMessages::LookupAttachment::Response*         lookupAttachment_;
+    Orthanc::DatabasePluginMessages::LookupResources::Response*          lookupResources_;
 
-    public:
-      ManagerReference(DatabaseManager& manager) :
-        manager_(&manager)
-      {
-      }
-
-      DatabaseManager& GetManager()
-      {
-        assert(manager_ != NULL);
-        return *manager_;
-      }
-    };
-    
-    std::unique_ptr<IndexBackend>  backend_;
-    OrthancPluginContext*          context_;
-    boost::shared_mutex            connectionsMutex_;
-    size_t                         countConnections_;
-    std::list<DatabaseManager*>    connections_;
-    Orthanc::SharedMessageQueue    availableConnections_;
-
-  public:
-    Adapter(IndexBackend* backend,
-            size_t countConnections) :
-      backend_(backend),
-      countConnections_(countConnections)
-    {
-      if (countConnections == 0)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange,
-                                        "There must be a non-zero number of connections to the database");
-      }
-      else if (backend == NULL)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-      }
-      else
-      {
-        context_ = backend_->GetContext();
-      }
-    }
-
-    ~Adapter()
-    {
-      for (std::list<DatabaseManager*>::iterator
-             it = connections_.begin(); it != connections_.end(); ++it)
-      {
-        assert(*it != NULL);
-        delete *it;
-      }
-    }
-
-    OrthancPluginContext* GetContext() const
-    {
-      return context_;
-    }
-
-    void OpenConnections()
-    {
-      boost::unique_lock<boost::shared_mutex>  lock(connectionsMutex_);
-
-      if (connections_.size() == 0)
-      {
-        assert(backend_.get() != NULL);
-
-        {
-          std::unique_ptr<DatabaseManager> manager(new DatabaseManager(backend_->CreateDatabaseFactory()));
-          manager->GetDatabase();  // Make sure to open the database connection
-          
-          backend_->ConfigureDatabase(*manager);
-          connections_.push_back(manager.release());
-        }
-
-        for (size_t i = 1; i < countConnections_; i++)
-        {
-          connections_.push_back(new DatabaseManager(backend_->CreateDatabaseFactory()));
-          connections_.back()->GetDatabase();  // Make sure to open the database connection
-        }
-
-        for (std::list<DatabaseManager*>::iterator
-               it = connections_.begin(); it != connections_.end(); ++it)
-        {
-          assert(*it != NULL);
-          availableConnections_.Enqueue(new ManagerReference(**it));
-        }        
-      }
-      else
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-      }
-    }
-
-    void CloseConnections()
-    {
-      boost::unique_lock<boost::shared_mutex>  lock(connectionsMutex_);
-
-      if (connections_.size() != countConnections_)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-      }
-      else if (availableConnections_.GetSize() != countConnections_)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Some connections are still in use, bug in the Orthanc core");
-      }
-      else
-      {
-        for (std::list<DatabaseManager*>::iterator
-               it = connections_.begin(); it != connections_.end(); ++it)
-        {
-          assert(*it != NULL);
-          (*it)->Close();
-        }
-      }
-    }
-
-    class DatabaseAccessor : public boost::noncopyable
-    {
-    private:
-      boost::shared_lock<boost::shared_mutex>  lock_;
-      Adapter&                                 adapter_;
-      DatabaseManager*                         manager_;
-      
-    public:
-      DatabaseAccessor(Adapter& adapter) :
-        lock_(adapter.connectionsMutex_),
-        adapter_(adapter),
-        manager_(NULL)
-      {
-        for (;;)
-        {
-          std::unique_ptr<Orthanc::IDynamicObject> manager(adapter.availableConnections_.Dequeue(100));
-          if (manager.get() != NULL)
-          {
-            manager_ = &dynamic_cast<ManagerReference&>(*manager).GetManager();
-            return;
-          }
-        }
-      }
-
-      ~DatabaseAccessor()
-      {
-        assert(manager_ != NULL);
-        adapter_.availableConnections_.Enqueue(new ManagerReference(*manager_));
-      }
-
-      IndexBackend& GetBackend() const
-      {
-        return *adapter_.backend_;
-      }
-
-      DatabaseManager& GetManager() const
-      {
-        assert(manager_ != NULL);
-        return *manager_;
-      }
-    };
-  };
-
-
-  class DatabaseBackendAdapterV4::Output : public IDatabaseBackendOutput
-  {
-  private:
-    struct Metadata
-    {
-      int32_t      metadata;
-      const char*  value;
-    };
-    
-    _OrthancPluginDatabaseAnswerType            answerType_;
-    std::list<std::string>                      stringsStore_;
-    
-    std::vector<OrthancPluginAttachment2>       attachments_;
-    std::vector<OrthancPluginChange>            changes_;
-    std::vector<OrthancPluginDicomTag>          tags_;
-    std::vector<OrthancPluginExportedResource>  exported_;
-    std::vector<OrthancPluginDatabaseEvent2>    events_;
-    std::vector<int32_t>                        integers32_;
-    std::vector<int64_t>                        integers64_;
-    std::vector<OrthancPluginMatchingResource>  matches_;
-    std::vector<Metadata>                       metadata_;
-    std::vector<std::string>                    stringAnswers_;
-    
-    const char* StoreString(const std::string& s)
-    {
-      stringsStore_.push_back(s);
-      return stringsStore_.back().c_str();
-    }
-
-    void SetupAnswerType(_OrthancPluginDatabaseAnswerType type)
-    {
-      if (answerType_ == _OrthancPluginDatabaseAnswerType_None)
-      {
-        answerType_ = type;
-      }
-      else if (answerType_ != type)
-      {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-      }
-    }
-    
-  public:
-    Output() :
-      answerType_(_OrthancPluginDatabaseAnswerType_None)
-    {
-    }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+    Orthanc::DatabasePluginMessages::GetChangesExtended::Response*       getChangesExtended_;
+#endif
 
     void Clear()
     {
-      // We don't systematically clear all the vectors, in order to
-      // avoid spending unnecessary time
-      
-      switch (answerType_)
-      {
-        case _OrthancPluginDatabaseAnswerType_None:
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Attachment:
-          attachments_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Change:
-          changes_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_DicomTag:
-          tags_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_ExportedResource:
-          exported_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Int32:
-          integers32_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Int64:
-          integers64_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_MatchingResource:
-          matches_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Metadata:
-          metadata_.clear();
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_String:
-          stringAnswers_.clear();
-          break;
-        
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-      }
-      
-      answerType_ = _OrthancPluginDatabaseAnswerType_None;
-      stringsStore_.clear();
-      events_.clear();
-      
-      assert(attachments_.empty());
-      assert(changes_.empty());
-      assert(tags_.empty());
-      assert(exported_.empty());
-      assert(events_.empty());
-      assert(integers32_.empty());
-      assert(integers64_.empty());
-      assert(matches_.empty());
-      assert(metadata_.empty());
-      assert(stringAnswers_.empty());
+      deleteAttachment_ = NULL;
+      deleteResource_ = NULL;
+      getChanges_ = NULL;
+      getExportedResources_ = NULL;
+      getLastChange_ = NULL;
+      getLastExportedResource_ = NULL;
+      getMainDicomTags_ = NULL;
+      lookupAttachment_ = NULL;
+      lookupResources_ = NULL;
+
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      getChangesExtended_ = NULL;
+#endif
     }
-
-
-    OrthancPluginErrorCode ReadAnswersCount(uint32_t& target) const
-    {
-      switch (answerType_)
-      {
-        case _OrthancPluginDatabaseAnswerType_None:
-          target = static_cast<uint32_t>(0);
-          break;
-          
-        case _OrthancPluginDatabaseAnswerType_Attachment:
-          target = static_cast<uint32_t>(attachments_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Change:
-          target = static_cast<uint32_t>(changes_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_DicomTag:
-          target = static_cast<uint32_t>(tags_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_ExportedResource:
-          target = static_cast<uint32_t>(exported_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Int32:
-          target = static_cast<uint32_t>(integers32_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Int64:
-          target = static_cast<uint32_t>(integers64_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_MatchingResource:
-          target = static_cast<uint32_t>(matches_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_Metadata:
-          target = static_cast<uint32_t>(metadata_.size());
-          break;
-        
-        case _OrthancPluginDatabaseAnswerType_String:
-          target = static_cast<uint32_t>(stringAnswers_.size());
-          break;
-        
-        default:
-          return OrthancPluginErrorCode_InternalError;
-      }
-
-      return OrthancPluginErrorCode_Success;
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerAttachment2(OrthancPluginAttachment2& target /* out */,
-                                                 uint32_t index) const
-    {
-      if (index < attachments_.size())
-      {
-        target = attachments_[index];
-        return OrthancPluginErrorCode_Success;
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerChange(OrthancPluginChange& target /* out */,
-                                            uint32_t index) const
-    {
-      if (index < changes_.size())
-      {
-        target = changes_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerDicomTag(uint16_t& group,
-                                              uint16_t& element,
-                                              const char*& value,
-                                              uint32_t index) const
-    {
-      if (index < tags_.size())
-      {
-        const OrthancPluginDicomTag& tag = tags_[index];
-        group = tag.group;
-        element = tag.element;
-        value = tag.value;
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerExportedResource(OrthancPluginExportedResource& target /* out */,
-                                                      uint32_t index) const
-    {
-      if (index < exported_.size())
-      {
-        target = exported_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerInt32(int32_t& target,
-                                           uint32_t index) const
-    {
-      if (index < integers32_.size())
-      {
-        target = integers32_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerInt64(int64_t& target,
-                                           uint32_t index) const
-    {
-      if (index < integers64_.size())
-      {
-        target = integers64_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerMatchingResource(OrthancPluginMatchingResource& target,
-                                                      uint32_t index) const
-    {
-      if (index < matches_.size())
-      {
-        target = matches_[index];
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerMetadata(int32_t& metadata,
-                                              const char*& value,
-                                              uint32_t index) const
-    {
-      if (index < metadata_.size())
-      {
-        const Metadata& tmp = metadata_[index];
-        metadata = tmp.metadata;
-        value = tmp.value;
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadAnswerString(const char*& target,
-                                            uint32_t index) const
-    {
-      if (index < stringAnswers_.size())
-      {
-        target = stringAnswers_[index].c_str();
-        return OrthancPluginErrorCode_Success;        
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;        
-      }
-    }
-
-
-    OrthancPluginErrorCode ReadEventsCount(uint32_t& target /* out */) const
-    {
-      target = static_cast<uint32_t>(events_.size());
-      return OrthancPluginErrorCode_Success;
-    }
-
     
-    OrthancPluginErrorCode ReadEvent2(OrthancPluginDatabaseEvent2& event /* out */,
-                                      uint32_t index) const
+  public:
+    Output(Orthanc::DatabasePluginMessages::DeleteAttachment::Response& deleteAttachment)
     {
-      if (index < events_.size())
-      {
-        event = events_[index];
-        return OrthancPluginErrorCode_Success;
-      }
-      else
-      {
-        return OrthancPluginErrorCode_ParameterOutOfRange;
-      }
+      Clear();
+      deleteAttachment_ = &deleteAttachment;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::DeleteResource::Response& deleteResource)
+    {
+      Clear();
+      deleteResource_ = &deleteResource;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetChanges::Response& getChanges)
+    {
+      Clear();
+      getChanges_ = &getChanges;
     }
 
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+    Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
+    {
+      Clear();
+      getChangesExtended_ = &getChangesExtended;
+    }
+#endif
 
+    Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
+    {
+      Clear();
+      getExportedResources_ = &getExportedResources;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetLastChange::Response& getLastChange)
+    {
+      Clear();
+      getLastChange_ = &getLastChange;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetLastExportedResource::Response& getLastExportedResource)
+    {
+      Clear();
+      getLastExportedResource_ = &getLastExportedResource;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::GetMainDicomTags::Response& getMainDicomTags)
+    {
+      Clear();
+      getMainDicomTags_ = &getMainDicomTags;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::LookupAttachment::Response& lookupAttachment)
+    {
+      Clear();
+      lookupAttachment_ = &lookupAttachment;
+    }
+    
+    Output(Orthanc::DatabasePluginMessages::LookupResources::Response& lookupResources)
+    {
+      Clear();
+      lookupResources_ = &lookupResources;
+    }
+    
     virtual void SignalDeletedAttachment(const std::string& uuid,
                                          int32_t            contentType,
                                          uint64_t           uncompressedSize,
@@ -587,44 +198,71 @@ namespace OrthancDatabases
                                          const std::string& compressedHash,
                                          const std::string& customData) ORTHANC_OVERRIDE
     {
-      OrthancPluginDatabaseEvent2 event;
-      event.type = OrthancPluginDatabaseEventType_DeletedAttachment;
-      event.content.attachment.uuid = StoreString(uuid);
-      event.content.attachment.contentType = contentType;
-      event.content.attachment.uncompressedSize = uncompressedSize;
-      event.content.attachment.uncompressedHash = StoreString(uncompressedHash);
-      event.content.attachment.compressionType = compressionType;
-      event.content.attachment.compressedSize = compressedSize;
-      event.content.attachment.compressedHash = StoreString(compressedHash);
-      event.content.attachment.customData = StoreString(customData);
+      Orthanc::DatabasePluginMessages::FileInfo* attachment;
+
+      if (deleteAttachment_ != NULL)
+      {
+        if (deleteAttachment_->has_deleted_attachment())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
         
-      events_.push_back(event);
+        attachment = deleteAttachment_->mutable_deleted_attachment();
+      }
+      else if (deleteResource_ != NULL)
+      {
+        attachment = deleteResource_->add_deleted_attachments();
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      
+      attachment->set_uuid(uuid);
+      attachment->set_content_type(contentType);
+      attachment->set_uncompressed_size(uncompressedSize);
+      attachment->set_uncompressed_hash(uncompressedHash);
+      attachment->set_compression_type(compressionType);
+      attachment->set_compressed_size(compressedSize);
+      attachment->set_compressed_hash(compressedHash);
     }
-    
-    
+
     virtual void SignalDeletedResource(const std::string& publicId,
                                        OrthancPluginResourceType resourceType) ORTHANC_OVERRIDE
     {
-      OrthancPluginDatabaseEvent2 event;
-      event.type = OrthancPluginDatabaseEventType_DeletedResource;
-      event.content.resource.level = resourceType;
-      event.content.resource.publicId = StoreString(publicId);
-        
-      events_.push_back(event);
+      if (deleteResource_ != NULL)
+      {
+        Orthanc::DatabasePluginMessages::DeleteResource_Response_Resource* resource = deleteResource_->add_deleted_resources();
+        resource->set_level(Convert(resourceType));
+        resource->set_public_id(publicId);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
-    
 
     virtual void SignalRemainingAncestor(const std::string& ancestorId,
                                          OrthancPluginResourceType ancestorType) ORTHANC_OVERRIDE
     {
-      OrthancPluginDatabaseEvent2 event;
-      event.type = OrthancPluginDatabaseEventType_RemainingAncestor;
-      event.content.resource.level = ancestorType;
-      event.content.resource.publicId = StoreString(ancestorId);
-        
-      events_.push_back(event);
+      if (deleteResource_ != NULL)
+      {
+        if (deleteResource_->is_remaining_ancestor())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+        else
+        {
+          deleteResource_->set_is_remaining_ancestor(true);
+          deleteResource_->mutable_remaining_ancestor()->set_level(Convert(ancestorType));
+          deleteResource_->mutable_remaining_ancestor()->set_public_id(ancestorId);
+        }
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
-    
     
     virtual void AnswerAttachment(const std::string& uuid,
                                   int32_t            contentType,
@@ -635,21 +273,27 @@ namespace OrthancDatabases
                                   const std::string& compressedHash,
                                   const std::string& customData) ORTHANC_OVERRIDE
     {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Attachment);
+      if (lookupAttachment_ != NULL)
+      {
+        if (lookupAttachment_->found())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
 
-      OrthancPluginAttachment2 attachment;
-      attachment.uuid = StoreString(uuid);
-      attachment.contentType = contentType;
-      attachment.uncompressedSize = uncompressedSize;
-      attachment.uncompressedHash = StoreString(uncompressedHash);
-      attachment.compressionType = compressionType;
-      attachment.compressedSize = compressedSize;
-      attachment.compressedHash = StoreString(compressedHash);
-      attachment.customData = StoreString(customData);
-
-      attachments_.push_back(attachment);
+        lookupAttachment_->set_found(true);
+        lookupAttachment_->mutable_attachment()->set_uuid(uuid);
+        lookupAttachment_->mutable_attachment()->set_content_type(contentType);
+        lookupAttachment_->mutable_attachment()->set_uncompressed_size(uncompressedSize);
+        lookupAttachment_->mutable_attachment()->set_uncompressed_hash(uncompressedHash);
+        lookupAttachment_->mutable_attachment()->set_compression_type(compressionType);
+        lookupAttachment_->mutable_attachment()->set_compressed_size(compressedSize);
+        lookupAttachment_->mutable_attachment()->set_compressed_hash(compressedHash);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
-    
 
     virtual void AnswerChange(int64_t                    seq,
                               int32_t                    changeType,
@@ -657,33 +301,56 @@ namespace OrthancDatabases
                               const std::string&         publicId,
                               const std::string&         date) ORTHANC_OVERRIDE
     {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Change);
+      Orthanc::DatabasePluginMessages::ServerIndexChange* change;
+      
+      if (getChanges_ != NULL)
+      {
+        change = getChanges_->add_changes();
+      }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      else if (getChangesExtended_ != NULL)
+      {
+        change = getChangesExtended_->add_changes();
+      }
+#endif
+      else if (getLastChange_ != NULL)
+      {
+        if (getLastChange_->found())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
 
-      OrthancPluginChange change;
-      change.seq = seq;
-      change.changeType = changeType;
-      change.resourceType = resourceType;
-      change.publicId = StoreString(publicId);
-      change.date = StoreString(date);
+        getLastChange_->set_found(true);
+        change = getLastChange_->mutable_change();
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
 
-      changes_.push_back(change);
+      change->set_seq(seq);
+      change->set_change_type(changeType);
+      change->set_resource_type(Convert(resourceType));
+      change->set_public_id(publicId);
+      change->set_date(date);
     }
-    
 
     virtual void AnswerDicomTag(uint16_t group,
                                 uint16_t element,
                                 const std::string& value) ORTHANC_OVERRIDE
     {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_DicomTag);
-
-      OrthancPluginDicomTag tag;
-      tag.group = group;
-      tag.element = element;
-      tag.value = StoreString(value);
-
-      tags_.push_back(tag);      
+      if (getMainDicomTags_ != NULL)
+      {
+        Orthanc::DatabasePluginMessages::GetMainDicomTags_Response_Tag* tag = getMainDicomTags_->add_tags();
+        tag->set_group(group);
+        tag->set_element(element);
+        tag->set_value(value);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
-    
 
     virtual void AnswerExportedResource(int64_t                    seq,
                                         OrthancPluginResourceType  resourceType,
@@ -695,98 +362,57 @@ namespace OrthancDatabases
                                         const std::string&         seriesInstanceUid,
                                         const std::string&         sopInstanceUid) ORTHANC_OVERRIDE
     {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_ExportedResource);
+      Orthanc::DatabasePluginMessages::ExportedResource* resource;
 
-      OrthancPluginExportedResource exported;
-      exported.seq = seq;
-      exported.resourceType = resourceType;
-      exported.publicId = StoreString(publicId);
-      exported.modality = StoreString(modality);
-      exported.date = StoreString(date);
-      exported.patientId = StoreString(patientId);
-      exported.studyInstanceUid = StoreString(studyInstanceUid);
-      exported.seriesInstanceUid = StoreString(seriesInstanceUid);
-      exported.sopInstanceUid = StoreString(sopInstanceUid);
-  
-      exported_.push_back(exported);
+      if (getExportedResources_ != NULL)
+      {
+        resource = getExportedResources_->add_resources();
+      }
+      else if (getLastExportedResource_ != NULL)
+      {
+        if (getLastExportedResource_->found())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+        }
+
+        getLastExportedResource_->set_found(true);
+        resource = getLastExportedResource_->mutable_resource();
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
+      
+      resource->set_seq(seq);
+      resource->set_resource_type(Convert(resourceType));
+      resource->set_public_id(publicId);
+      resource->set_modality(modality);
+      resource->set_date(date);
+      resource->set_patient_id(patientId);
+      resource->set_study_instance_uid(studyInstanceUid);
+      resource->set_series_instance_uid(seriesInstanceUid);
+      resource->set_sop_instance_uid(sopInstanceUid);
     }
-
     
     virtual void AnswerMatchingResource(const std::string& resourceId) ORTHANC_OVERRIDE
     {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_MatchingResource);
-
-      OrthancPluginMatchingResource match;
-      match.resourceId = StoreString(resourceId);
-      match.someInstanceId = NULL;
-        
-      matches_.push_back(match);
+      if (lookupResources_ != NULL)
+      {
+        lookupResources_->add_resources_ids(resourceId);
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
     }
-    
     
     virtual void AnswerMatchingResource(const std::string& resourceId,
                                         const std::string& someInstanceId) ORTHANC_OVERRIDE
     {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_MatchingResource);
-
-      OrthancPluginMatchingResource match;
-      match.resourceId = StoreString(resourceId);
-      match.someInstanceId = StoreString(someInstanceId);
-        
-      matches_.push_back(match);
-    }
-
-
-    void AnswerIntegers32(const std::list<int32_t>& values)
-    {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Int32);
-      CopyListToVector(integers32_, values);
-    }
-
-    
-    void AnswerIntegers64(const std::list<int64_t>& values)
-    {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Int64);
-      CopyListToVector(integers64_, values);
-    }
-
-
-    void AnswerInteger64(int64_t value)
-    {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Int64);
-
-      integers64_.resize(1);
-      integers64_[0] = value;
-    }
-
-
-    void AnswerMetadata(int32_t metadata,
-                        const std::string& value)
-    {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_Metadata);
-
-      Metadata tmp;
-      tmp.metadata = metadata;
-      tmp.value = StoreString(value);
-
-      metadata_.push_back(tmp);
-    }
-
-
-    void AnswerStrings(const std::list<std::string>& values)
-    {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_String);
-      CopyListToVector(stringAnswers_, values);
-    }
-
-
-    void AnswerString(const std::string& value)
-    {
-      SetupAnswerType(_OrthancPluginDatabaseAnswerType_String);
-
-      if (stringAnswers_.empty())
+      if (lookupResources_ != NULL)
       {
-        stringAnswers_.push_back(value);
+        lookupResources_->add_resources_ids(resourceId);
+        lookupResources_->add_instances_ids(someInstanceId);
       }
       else
       {
@@ -794,1311 +420,1053 @@ namespace OrthancDatabases
       }
     }
   };
+  
 
-
-  IDatabaseBackendOutput* DatabaseBackendAdapterV4::Factory::CreateOutput()
+  static void ProcessDatabaseOperation(Orthanc::DatabasePluginMessages::DatabaseResponse& response,
+                                       const Orthanc::DatabasePluginMessages::DatabaseRequest& request,
+                                       IndexConnectionsPool& pool)
   {
-    return new DatabaseBackendAdapterV4::Output;
+    switch (request.operation())
+    {
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_SYSTEM_INFORMATION:
+      {
+        IndexConnectionsPool::Accessor accessor(pool);
+        response.mutable_get_system_information()->set_database_version(accessor.GetBackend().GetDatabaseVersion(accessor.GetManager()));
+        response.mutable_get_system_information()->set_supports_flush_to_disk(false);
+        response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
+        response.mutable_get_system_information()->set_supports_labels(accessor.GetBackend().HasLabelsSupport());
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
+        response.mutable_get_system_information()->set_supports_increment_global_property(accessor.GetBackend().HasAtomicIncrementGlobalProperty());
+        response.mutable_get_system_information()->set_has_update_and_get_statistics(accessor.GetBackend().HasUpdateAndGetStatistics());
+        response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
+#endif
+
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+        response.mutable_get_system_information()->set_supports_find(accessor.GetBackend().HasFindSupport());
+        response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
+#endif
+
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_OPEN:
+      {
+        std::list<IdentifierTag> identifierTags;
+
+        if (request.open().identifier_tags().empty())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError,
+                                          "No identifier tag was provided by the Orthanc core");
+        }
+
+        for (int i = 0; i < request.open().identifier_tags().size(); i++)
+        {
+          const Orthanc::DatabasePluginMessages::Open_Request_IdentifierTag& tag = request.open().identifier_tags(i);
+          identifierTags.push_back(IdentifierTag(MessagesToolbox::Convert(tag.level()),
+                                                 Orthanc::DicomTag(tag.group(), tag.element()),
+                                                 tag.name()));
+        }
+          
+        pool.OpenConnections(true, identifierTags);
+        
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_CLOSE:
+      {
+        pool.CloseConnections();
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_FLUSH_TO_DISK:
+      {
+        // Raise an exception since "set_supports_flush_to_disk(false)"
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_START_TRANSACTION:
+      {
+        std::unique_ptr<IndexConnectionsPool::Accessor> transaction(new IndexConnectionsPool::Accessor(pool));
+
+        switch (request.start_transaction().type())
+        {
+          case Orthanc::DatabasePluginMessages::TRANSACTION_READ_ONLY:
+            transaction->GetManager().StartTransaction(TransactionType_ReadOnly);
+            break;
+
+          case Orthanc::DatabasePluginMessages::TRANSACTION_READ_WRITE:
+            transaction->GetManager().StartTransaction(TransactionType_ReadWrite);
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+        }
+
+        response.mutable_start_transaction()->set_transaction(reinterpret_cast<intptr_t>(transaction.release()));
+        break;
+      }
+        
+      case Orthanc::DatabasePluginMessages::OPERATION_UPGRADE:
+      {
+        IndexConnectionsPool::Accessor accessor(pool);
+        OrthancPluginStorageArea* storageArea = reinterpret_cast<OrthancPluginStorageArea*>(request.upgrade().storage_area());
+        accessor.GetBackend().UpgradeDatabase(accessor.GetManager(), request.upgrade().target_version(), storageArea);
+        break;
+      }
+              
+      case Orthanc::DatabasePluginMessages::OPERATION_FINALIZE_TRANSACTION:
+      {
+        IndexConnectionsPool::Accessor* transaction = reinterpret_cast<IndexConnectionsPool::Accessor*>(request.finalize_transaction().transaction());
+        
+        if (transaction == NULL)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+        }
+        else
+        {
+          delete transaction;
+        }
+        
+        break;
+      }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
+      case Orthanc::DatabasePluginMessages::OPERATION_MEASURE_LATENCY:
+      {
+        IndexConnectionsPool::Accessor accessor(pool);
+        response.mutable_measure_latency()->set_latency_us(accessor.GetBackend().MeasureLatency(accessor.GetManager()));
+        break;
+      }
+#endif
+
+      default:
+        LOG(ERROR) << "Not implemented database operation from protobuf: " << request.operation();
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
   }
 
 
-  class DatabaseBackendAdapterV4::Transaction : public boost::noncopyable
+  static void ApplyLookupResources(Orthanc::DatabasePluginMessages::LookupResources_Response& response,
+                                   const Orthanc::DatabasePluginMessages::LookupResources_Request& request,
+                                   IndexBackend& backend,
+                                   DatabaseManager& manager)
   {
-  private:
-    Adapter&   adapter_;
-    std::unique_ptr<Adapter::DatabaseAccessor>  accessor_;
-    std::unique_ptr<Output>    output_;
-    
-  public:
-    Transaction(Adapter& adapter) :
-      adapter_(adapter),
-      accessor_(new Adapter::DatabaseAccessor(adapter)),
-      output_(new Output)
+    size_t countValues = 0;
+
+    for (int i = 0; i < request.lookup().size(); i++)
     {
+      const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint = request.lookup(i);
+      countValues += constraint.values().size();
     }
 
-    ~Transaction()
+    std::vector<const char*> values;
+    values.reserve(countValues);
+
+    DatabaseConstraints lookup;
+
+    for (int i = 0; i < request.lookup().size(); i++)
     {
+      const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint = request.lookup(i);
+
+      if (constraint.tag_group() > 0xffffu ||
+          constraint.tag_element() > 0xffffu)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+          
+      OrthancPluginDatabaseConstraint c;
+      c.level = Convert(constraint.level());
+      c.tagGroup = constraint.tag_group();
+      c.tagElement = constraint.tag_element();
+      c.isIdentifierTag = (constraint.is_identifier_tag() ? 1 : 0);
+      c.isCaseSensitive = (constraint.is_case_sensitive() ? 1 : 0);
+      c.isMandatory = (constraint.is_mandatory() ? 1 : 0);
+
+      switch (constraint.type())
+      {
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_EQUAL:
+          c.type = OrthancPluginConstraintType_Equal;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_SMALLER_OR_EQUAL:
+          c.type = OrthancPluginConstraintType_SmallerOrEqual;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_GREATER_OR_EQUAL:
+          c.type = OrthancPluginConstraintType_GreaterOrEqual;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_WILDCARD:
+          c.type = OrthancPluginConstraintType_Wildcard;
+          break;
+              
+        case Orthanc::DatabasePluginMessages::CONSTRAINT_LIST:
+          c.type = OrthancPluginConstraintType_List;
+          break;
+              
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+      }
+          
+      c.valuesCount = constraint.values().size();
+
+      if (c.valuesCount == 0)
+      {
+        c.values = NULL;
+      }
+      else
+      {
+        c.values = &values[values.size()];
+            
+        for (int j = 0; j < constraint.values().size(); j++)
+        {
+          assert(values.size() < countValues);
+          values.push_back(constraint.values(j).c_str());
+        }
+      }
+
+      lookup.AddConstraint(new DatabaseConstraint(c));
     }
 
-    IndexBackend& GetBackend() const
+    assert(values.size() == countValues);
+
+    std::set<std::string> labels;
+
+    for (int i = 0; i < request.labels().size(); i++)
     {
-      return accessor_->GetBackend();
+      labels.insert(request.labels(i));
     }
 
-    Output& GetOutput() const
+    LabelsConstraint labelsConstraint;
+    switch (request.labels_constraint())
     {
-      return *output_;
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ALL:
+        labelsConstraint = LabelsConstraint_All;
+        break;
+            
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_ANY:
+        labelsConstraint = LabelsConstraint_Any;
+        break;
+            
+      case Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE:
+        labelsConstraint = LabelsConstraint_None;
+        break;
+            
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
 
-    DatabaseManager& GetManager() const
-    {
-      return accessor_->GetManager();
-    }
-  };
+    Output output(response);
+    backend.LookupResources(output, manager, lookup, Convert(request.query_level()),
+                            labels, labelsConstraint, request.limit(), request.retrieve_instances_ids());
+  }
 
   
-  static OrthancPluginErrorCode ReadAnswersCount(OrthancPluginDatabaseTransaction* transaction,
-                                                 uint32_t* target /* out */)
+  static void ProcessTransactionOperation(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                          const Orthanc::DatabasePluginMessages::TransactionRequest& request,
+                                          IndexBackend& backend,
+                                          DatabaseManager& manager)
   {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswersCount(*target);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerAttachment2(OrthancPluginDatabaseTransaction* transaction,
-                                                      OrthancPluginAttachment2* target /* out */,
-                                                      uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerAttachment2(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerChange(OrthancPluginDatabaseTransaction* transaction,
-                                                 OrthancPluginChange* target /* out */,
-                                                 uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerChange(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerDicomTag(OrthancPluginDatabaseTransaction* transaction,
-                                                   uint16_t* group,
-                                                   uint16_t* element,
-                                                   const char** value,
-                                                   uint32_t index)
-  {
-    assert(group != NULL);
-    assert(element != NULL);
-    assert(value != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerDicomTag(*group, *element, *value, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerExportedResource(OrthancPluginDatabaseTransaction* transaction,
-                                                           OrthancPluginExportedResource* target /* out */,
-                                                           uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerExportedResource(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerInt32(OrthancPluginDatabaseTransaction* transaction,
-                                                int32_t* target,
-                                                uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerInt32(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerInt64(OrthancPluginDatabaseTransaction* transaction,
-                                                int64_t* target,
-                                                uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerInt64(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerMatchingResource(OrthancPluginDatabaseTransaction* transaction,
-                                                           OrthancPluginMatchingResource* target,
-                                                           uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerMatchingResource(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                                   int32_t* metadata,
-                                                   const char** value,
-                                                   uint32_t index)
-  {
-    assert(metadata != NULL);
-    assert(value != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerMetadata(*metadata, *value, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadAnswerString(OrthancPluginDatabaseTransaction* transaction,
-                                                 const char** target,
-                                                 uint32_t index)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadAnswerString(*target, index);
-  }
-
-
-  static OrthancPluginErrorCode ReadEventsCount(OrthancPluginDatabaseTransaction* transaction,
-                                                uint32_t* target /* out */)
-  {
-    assert(target != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadEventsCount(*target);
-  }
-
-    
-  static OrthancPluginErrorCode ReadEvent2(OrthancPluginDatabaseTransaction* transaction,
-                                           OrthancPluginDatabaseEvent2* event /* out */,
-                                           uint32_t index)
-  {
-    assert(event != NULL);
-    const DatabaseBackendAdapterV4::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV4::Transaction*>(transaction);
-    return that.GetOutput().ReadEvent2(*event, index);
-  }
-
-    
-  static OrthancPluginErrorCode Open(void* database)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-
-    try
+    switch (request.operation())
     {
-      adapter->OpenConnections();
-      return OrthancPluginErrorCode_Success;
+      case Orthanc::DatabasePluginMessages::OPERATION_ROLLBACK:
+      {
+        manager.RollbackTransaction();
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_COMMIT:
+      {
+        manager.CommitTransaction();
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_ADD_ATTACHMENT:
+      {
+        OrthancPluginAttachment attachment;
+        attachment.uuid = request.add_attachment().attachment().uuid().c_str();
+        attachment.contentType = request.add_attachment().attachment().content_type();
+        attachment.uncompressedSize = request.add_attachment().attachment().uncompressed_size();
+        attachment.uncompressedHash = request.add_attachment().attachment().uncompressed_hash().c_str();
+        attachment.compressionType = request.add_attachment().attachment().compression_type();
+        attachment.compressedSize = request.add_attachment().attachment().compressed_size();
+        attachment.compressedHash = request.add_attachment().attachment().compressed_hash().c_str();
+        
+        backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_CHANGES:
+      {
+        backend.ClearChanges(manager);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_EXPORTED_RESOURCES:
+      {
+        backend.ClearExportedResources(manager);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_DELETE_ATTACHMENT:
+      {
+        Output output(*response.mutable_delete_attachment());
+        backend.DeleteAttachment(output, manager, request.delete_attachment().id(), request.delete_attachment().type());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_DELETE_METADATA:
+      {
+        backend.DeleteMetadata(manager, request.delete_metadata().id(), request.delete_metadata().type());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_DELETE_RESOURCE:
+      {
+        response.mutable_delete_resource()->set_is_remaining_ancestor(false);
+
+        Output output(*response.mutable_delete_resource());
+        backend.DeleteResource(output, manager, request.delete_resource().id());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_METADATA:
+      {
+        typedef std::map<int32_t, std::string>  Values;
+
+        Values values;
+        backend.GetAllMetadata(values, manager, request.get_all_metadata().id());
+
+        response.mutable_get_all_metadata()->mutable_metadata()->Reserve(values.size());
+        for (Values::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          Orthanc::DatabasePluginMessages::GetAllMetadata_Response_Metadata* metadata =
+            response.mutable_get_all_metadata()->add_metadata();
+          metadata->set_type(it->first);
+          metadata->set_value(it->second);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_PUBLIC_IDS:
+      {
+        std::list<std::string>  values;
+        backend.GetAllPublicIds(values, manager, Convert(request.get_all_public_ids().resource_type()));
+
+        response.mutable_get_all_public_ids()->mutable_ids()->Reserve(values.size());
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_all_public_ids()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ALL_PUBLIC_IDS_WITH_LIMITS:
+      {
+        std::list<std::string>  values;
+        backend.GetAllPublicIds(values, manager, Convert(request.get_all_public_ids_with_limits().resource_type()),
+                                request.get_all_public_ids_with_limits().since(),
+                                request.get_all_public_ids_with_limits().limit());
+
+        response.mutable_get_all_public_ids_with_limits()->mutable_ids()->Reserve(values.size());
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_all_public_ids_with_limits()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES:
+      {
+        Output output(*response.mutable_get_changes());
+
+        bool done;
+        backend.GetChanges(output, done, manager, request.get_changes().since(), request.get_changes().limit());
+
+        response.mutable_get_changes()->set_done(done);
+        break;
+      }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES_EXTENDED:
+      {
+        Output output(*response.mutable_get_changes_extended());
+
+        bool done;
+        std::set<uint32_t> changeTypes;
+        for (int i = 0; i < request.get_changes_extended().change_type_size(); ++i)
+        {
+          changeTypes.insert(request.get_changes_extended().change_type(i));
+        }
+
+        backend.GetChangesExtended(output, done, manager, request.get_changes_extended().since(), request.get_changes_extended().to(), changeTypes, request.get_changes_extended().limit());
+
+        response.mutable_get_changes_extended()->set_done(done);
+        break;
+      }
+#endif
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_INTERNAL_ID:
+      {
+        std::list<int64_t>  values;
+        backend.GetChildrenInternalId(values, manager, request.get_children_internal_id().id());
+
+        response.mutable_get_children_internal_id()->mutable_ids()->Reserve(values.size());
+        for (std::list<int64_t>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_children_internal_id()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_PUBLIC_ID:
+      {
+        std::list<std::string>  values;
+        backend.GetChildrenPublicId(values, manager, request.get_children_public_id().id());
+
+        response.mutable_get_children_public_id()->mutable_ids()->Reserve(values.size());
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_children_public_id()->add_ids(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_EXPORTED_RESOURCES:
+      {
+        Output output(*response.mutable_get_exported_resources());
+
+        bool done;
+        backend.GetExportedResources(output, done, manager, request.get_exported_resources().since(),
+                                     request.get_exported_resources().limit());
+
+        response.mutable_get_exported_resources()->set_done(done);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_CHANGE:
+      {
+        response.mutable_get_last_change()->set_found(false);
+
+        Output output(*response.mutable_get_last_change());
+        backend.GetLastChange(output, manager);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_EXPORTED_RESOURCE:
+      {
+        response.mutable_get_last_exported_resource()->set_found(false);
+
+        Output output(*response.mutable_get_last_exported_resource());
+        backend.GetLastExportedResource(output, manager);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_MAIN_DICOM_TAGS:
+      {
+        Output output(*response.mutable_get_main_dicom_tags());
+        backend.GetMainDicomTags(output, manager, request.get_main_dicom_tags().id());
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_PUBLIC_ID:
+      {
+        const std::string id = backend.GetPublicId(manager, request.get_public_id().id());
+        response.mutable_get_public_id()->set_id(id);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_RESOURCES_COUNT:
+      {
+        OrthancPluginResourceType type = Convert(request.get_resources_count().type());
+        uint64_t count = backend.GetResourcesCount(manager, type);
+        response.mutable_get_resources_count()->set_count(count);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_RESOURCE_TYPE:
+      {
+        OrthancPluginResourceType type = backend.GetResourceType(manager, request.get_resource_type().id());
+        response.mutable_get_resource_type()->set_type(Convert(type));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_TOTAL_COMPRESSED_SIZE:
+      {
+        response.mutable_get_total_compressed_size()->set_size(backend.GetTotalCompressedSize(manager));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_TOTAL_UNCOMPRESSED_SIZE:
+      {
+        response.mutable_get_total_uncompressed_size()->set_size(backend.GetTotalUncompressedSize(manager));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_IS_PROTECTED_PATIENT:
+      {
+        bool isProtected = backend.IsProtectedPatient(manager, request.is_protected_patient().patient_id());
+        response.mutable_is_protected_patient()->set_protected_patient(isProtected);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_AVAILABLE_ATTACHMENTS:
+      {
+        std::list<int32_t>  values;
+        backend.ListAvailableAttachments(values, manager, request.list_available_attachments().id());
+
+        response.mutable_list_available_attachments()->mutable_attachments()->Reserve(values.size());
+        for (std::list<int32_t>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_list_available_attachments()->add_attachments(*it);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOG_CHANGE:
+      {
+        backend.LogChange(manager, request.log_change().change_type(),
+                          request.log_change().resource_id(),
+                          Convert(request.log_change().resource_type()),
+                          request.log_change().date().c_str());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOG_EXPORTED_RESOURCE:
+      {
+        backend.LogExportedResource(manager,
+                                    Convert(request.log_exported_resource().resource_type()),
+                                    request.log_exported_resource().public_id().c_str(),
+                                    request.log_exported_resource().modality().c_str(),
+                                    request.log_exported_resource().date().c_str(),
+                                    request.log_exported_resource().patient_id().c_str(),
+                                    request.log_exported_resource().study_instance_uid().c_str(),
+                                    request.log_exported_resource().series_instance_uid().c_str(),
+                                    request.log_exported_resource().sop_instance_uid().c_str());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_ATTACHMENT:
+      {
+        Output output(*response.mutable_lookup_attachment());
+        
+        int64_t revision = -1;
+        backend.LookupAttachment(output, revision, manager, request.lookup_attachment().id(), request.lookup_attachment().content_type());
+
+        if (response.lookup_attachment().found())
+        {
+          response.mutable_lookup_attachment()->set_revision(revision);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_GLOBAL_PROPERTY:
+      {
+        std::string value;
+        if (backend.LookupGlobalProperty(value, manager, request.lookup_global_property().server_id().c_str(),
+                                         request.lookup_global_property().property()))
+        {
+          response.mutable_lookup_global_property()->set_found(true);
+          response.mutable_lookup_global_property()->set_value(value);
+        }
+        else
+        {
+          response.mutable_lookup_global_property()->set_found(false);
+        }
+        
+        break;
+      }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
+      case Orthanc::DatabasePluginMessages::OPERATION_UPDATE_AND_GET_STATISTICS:
+      {
+        int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
+        backend.UpdateAndGetStatistics(manager, patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize);
+
+        response.mutable_update_and_get_statistics()->set_patients_count(patientsCount);
+        response.mutable_update_and_get_statistics()->set_studies_count(studiesCount);
+        response.mutable_update_and_get_statistics()->set_series_count(seriesCount);
+        response.mutable_update_and_get_statistics()->set_instances_count(instancesCount);
+        response.mutable_update_and_get_statistics()->set_total_compressed_size(compressedSize);
+        response.mutable_update_and_get_statistics()->set_total_uncompressed_size(uncompressedSize);
+        break;
+      }
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
+      case Orthanc::DatabasePluginMessages::OPERATION_INCREMENT_GLOBAL_PROPERTY:
+      {
+        int64_t value = backend.IncrementGlobalProperty(manager, request.increment_global_property().server_id().c_str(),
+                                                        request.increment_global_property().property(),
+                                                        request.increment_global_property().increment());
+        response.mutable_increment_global_property()->set_new_value(value);
+        break;
+      }
+#endif
+
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_METADATA:
+      {
+        std::string value;
+        int64_t revision = -1;
+        if (backend.LookupMetadata(value, revision, manager, request.lookup_metadata().id(), request.lookup_metadata().metadata_type()))
+        {
+          response.mutable_lookup_metadata()->set_found(true);
+          response.mutable_lookup_metadata()->set_value(value);
+          response.mutable_lookup_metadata()->set_revision(revision);
+        }
+        else
+        {
+          response.mutable_lookup_metadata()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_PARENT:
+      {
+        int64_t parent = -1;
+        if (backend.LookupParent(parent, manager, request.lookup_parent().id()))
+        {
+          response.mutable_lookup_parent()->set_found(true);
+          response.mutable_lookup_parent()->set_parent(parent);
+        }
+        else
+        {
+          response.mutable_lookup_parent()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCE:
+      {
+        int64_t internalId = -1;
+        OrthancPluginResourceType type;
+        if (backend.LookupResource(internalId, type, manager, request.lookup_resource().public_id().c_str()))
+        {
+          response.mutable_lookup_resource()->set_found(true);
+          response.mutable_lookup_resource()->set_internal_id(internalId);
+          response.mutable_lookup_resource()->set_type(Convert(type));
+        }
+        else
+        {
+          response.mutable_lookup_resource()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SELECT_PATIENT_TO_RECYCLE:
+      {
+        int64_t patientId = -1;
+        if (backend.SelectPatientToRecycle(patientId, manager))
+        {
+          response.mutable_select_patient_to_recycle()->set_found(true);
+          response.mutable_select_patient_to_recycle()->set_patient_id(patientId);
+        }
+        else
+        {
+          response.mutable_select_patient_to_recycle()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SELECT_PATIENT_TO_RECYCLE_WITH_AVOID:
+      {
+        int64_t patientId = -1;
+        if (backend.SelectPatientToRecycle(patientId, manager, request.select_patient_to_recycle_with_avoid().patient_id_to_avoid()))
+        {
+          response.mutable_select_patient_to_recycle_with_avoid()->set_found(true);
+          response.mutable_select_patient_to_recycle_with_avoid()->set_patient_id(patientId);
+        }
+        else
+        {
+          response.mutable_select_patient_to_recycle_with_avoid()->set_found(false);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_GLOBAL_PROPERTY:
+      {
+        backend.SetGlobalProperty(manager, request.set_global_property().server_id().c_str(),
+                                  request.set_global_property().property(),
+                                  request.set_global_property().value().c_str());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_MAIN_DICOM_TAGS:
+      {
+        backend.ClearMainDicomTags(manager, request.clear_main_dicom_tags().id());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_METADATA:
+      {
+        backend.SetMetadata(manager, request.set_metadata().id(),
+                            request.set_metadata().metadata_type(),
+                            request.set_metadata().value().c_str(),
+                            request.set_metadata().revision());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_PROTECTED_PATIENT:
+      {
+        backend.SetProtectedPatient(manager, request.set_protected_patient().patient_id(),
+                                    request.set_protected_patient().protected_patient());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_IS_DISK_SIZE_ABOVE:
+      {
+        bool above = (backend.GetTotalCompressedSize(manager) >= request.is_disk_size_above().threshold());
+        response.mutable_is_disk_size_above()->set_result(above);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCES:
+      {
+        ApplyLookupResources(*response.mutable_lookup_resources(), request.lookup_resources(), backend, manager);
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_CREATE_INSTANCE:
+      {
+        const char* hashPatient = request.create_instance().patient().c_str();
+        const char* hashStudy = request.create_instance().study().c_str();
+        const char* hashSeries = request.create_instance().series().c_str();
+        const char* hashInstance = request.create_instance().instance().c_str();
+        
+        OrthancPluginCreateInstanceResult result;
+        
+        if (backend.HasCreateInstance())
+        {
+          backend.CreateInstance(result, manager, hashPatient, hashStudy, hashSeries, hashInstance);
+        }
+        else
+        {
+          backend.CreateInstanceGeneric(result, manager, hashPatient, hashStudy, hashSeries, hashInstance);
+        }
+
+        response.mutable_create_instance()->set_is_new_instance(result.isNewInstance);
+        response.mutable_create_instance()->set_instance_id(result.instanceId);
+
+        if (result.isNewInstance)
+        {
+          response.mutable_create_instance()->set_is_new_patient(result.isNewPatient);
+          response.mutable_create_instance()->set_is_new_study(result.isNewStudy);
+          response.mutable_create_instance()->set_is_new_series(result.isNewSeries);
+          response.mutable_create_instance()->set_patient_id(result.patientId);
+          response.mutable_create_instance()->set_study_id(result.studyId);
+          response.mutable_create_instance()->set_series_id(result.seriesId);
+        }
+        
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_RESOURCES_CONTENT:
+      {
+        std::vector<OrthancPluginResourcesContentTags> identifierTags;
+        std::vector<OrthancPluginResourcesContentTags> mainDicomTags;
+
+        identifierTags.reserve(request.set_resources_content().tags().size());
+        mainDicomTags.reserve(request.set_resources_content().tags().size());
+        
+        for (int i = 0; i < request.set_resources_content().tags().size(); i++)
+        {
+          if (request.set_resources_content().tags(i).group() > 0xffffu ||
+              request.set_resources_content().tags(i).element() > 0xffffu)
+          {
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+          }
+          
+          OrthancPluginResourcesContentTags tag;
+          tag.resource = request.set_resources_content().tags(i).resource_id();
+          tag.group = request.set_resources_content().tags(i).group();
+          tag.element = request.set_resources_content().tags(i).element();
+          tag.value = request.set_resources_content().tags(i).value().c_str();
+
+          if (request.set_resources_content().tags(i).is_identifier())
+          {
+            identifierTags.push_back(tag);
+          }
+          else
+          {
+            mainDicomTags.push_back(tag);
+          }
+        }
+        
+        std::vector<OrthancPluginResourcesContentMetadata> metadata;
+        metadata.reserve(request.set_resources_content().metadata().size());
+        
+        for (int i = 0; i < request.set_resources_content().metadata().size(); i++)
+        {
+          OrthancPluginResourcesContentMetadata item;
+          item.resource = request.set_resources_content().metadata(i).resource_id();
+          item.metadata = request.set_resources_content().metadata(i).metadata();
+          item.value = request.set_resources_content().metadata(i).value().c_str();
+          metadata.push_back(item);
+        }
+
+        backend.SetResourcesContent(manager,
+                                    identifierTags.size(), (identifierTags.empty() ? NULL : &identifierTags[0]),
+                                    mainDicomTags.size(), (mainDicomTags.empty() ? NULL : &mainDicomTags[0]),
+                                    metadata.size(), (metadata.empty() ? NULL : &metadata[0]));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_METADATA:
+      {
+        std::list<std::string> values;
+        backend.GetChildrenMetadata(values, manager, request.get_children_metadata().id(), request.get_children_metadata().metadata());
+
+        response.mutable_get_children_metadata()->mutable_values()->Reserve(values.size());
+        for (std::list<std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
+        {
+          response.mutable_get_children_metadata()->add_values(*it);
+        }
+
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_CHANGE_INDEX:
+      {
+        response.mutable_get_last_change_index()->set_result(backend.GetLastChangeIndex(manager));
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCE_AND_PARENT:
+      {
+        int64_t id;
+        OrthancPluginResourceType type;
+        std::string parent;
+        
+        if (backend.LookupResourceAndParent(id, type, parent, manager, request.lookup_resource_and_parent().public_id().c_str()))
+        {
+          response.mutable_lookup_resource_and_parent()->set_found(true);
+          response.mutable_lookup_resource_and_parent()->set_id(id);
+          response.mutable_lookup_resource_and_parent()->set_type(Convert(type));
+
+          switch (type)
+          {
+            case OrthancPluginResourceType_Study:
+            case OrthancPluginResourceType_Series:
+            case OrthancPluginResourceType_Instance:
+              if (parent.empty())
+              {
+                throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+              }
+              else
+              {
+                response.mutable_lookup_resource_and_parent()->set_parent_public_id(parent);
+              }
+              break;
+
+            case OrthancPluginResourceType_Patient:
+              if (!parent.empty())
+              {
+                throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+              }
+              break;
+
+            default:
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+          }
+        }
+        else
+        {
+          response.mutable_lookup_resource_and_parent()->set_found(false);
+        }
+
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_ADD_LABEL:
+      {
+        backend.AddLabel(manager, request.add_label().id(), request.add_label().label());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_REMOVE_LABEL:
+      {
+        backend.RemoveLabel(manager, request.remove_label().id(), request.remove_label().label());
+        break;
+      }
+      
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_LABELS:
+      {
+        std::list<std::string>  labels;
+
+        if (request.list_labels().single_resource())
+        {
+          backend.ListLabels(labels, manager, request.list_labels().id());
+        }
+        else
+        {
+          backend.ListAllLabels(labels, manager);
+        }
+
+        response.mutable_list_available_attachments()->mutable_attachments()->Reserve(labels.size());
+        for (std::list<std::string>::const_iterator it = labels.begin(); it != labels.end(); ++it)
+        {
+          response.mutable_list_labels()->add_labels(*it);
+        }
+        
+        break;
+      }
+      
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_FIND:
+      {
+        backend.ExecuteFind(response, manager, request.find());
+        break;
+      }
+#endif
+
+      default:
+        LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
   }
 
   
-  static OrthancPluginErrorCode Close(void* database)
+  static OrthancPluginErrorCode CallBackend(OrthancPluginMemoryBuffer64* serializedResponse,
+                                            void* rawPool,
+                                            const void* requestData,
+                                            uint64_t requestSize)
   {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-
-    try
+    Orthanc::DatabasePluginMessages::Request request;
+    if (!request.ParseFromArray(requestData, requestSize))
     {
-      adapter->CloseConnections();
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode DestructDatabase(void* database)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-
-    if (adapter == NULL)
-    {
+      LOG(ERROR) << "Cannot parse message from the Orthanc core using protobuf";
       return OrthancPluginErrorCode_InternalError;
     }
-    else
+
+    if (rawPool == NULL)
     {
+      LOG(ERROR) << "Received a NULL pointer from the database";
+      return OrthancPluginErrorCode_InternalError;
+    }
+
+    IndexConnectionsPool& pool = *reinterpret_cast<IndexConnectionsPool*>(rawPool);
+
+    try
+    {
+      Orthanc::DatabasePluginMessages::Response response;
+      
+      switch (request.type())
+      {
+        case Orthanc::DatabasePluginMessages::REQUEST_DATABASE:
+          ProcessDatabaseOperation(*response.mutable_database_response(), request.database_request(), pool);
+          break;
+          
+        case Orthanc::DatabasePluginMessages::REQUEST_TRANSACTION:
+        {
+          IndexConnectionsPool::Accessor& transaction = *reinterpret_cast<IndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
+          ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(),
+                                      transaction.GetBackend(), transaction.GetManager());
+          break;
+        }
+          
+        default:
+          LOG(ERROR) << "Not implemented request type from protobuf: " << request.type();
+          break;
+      }
+
+      std::string s;
+      if (!response.SerializeToString(&s))
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Cannot serialize to protobuf");
+      }
+
+      if (OrthancPluginCreateMemoryBuffer64(pool.GetContext(), serializedResponse, s.size()) != OrthancPluginErrorCode_Success)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory, "Cannot allocate a memory buffer");
+      }
+
+      if (!s.empty())
+      {
+        assert(serializedResponse->size == s.size());
+        memcpy(serializedResponse->data, s.c_str(), s.size());
+      }
+
+      return OrthancPluginErrorCode_Success;
+    }
+    catch (::Orthanc::OrthancException& e)
+    {
+      if (e.GetErrorCode() == ::Orthanc::ErrorCode_DatabaseCannotSerialize)
+      {
+        LOG(WARNING) << "An SQL transaction failed and will likely be retried: " << e.GetDetails();
+      }
+      else
+      {
+        LOG(ERROR) << "Exception in database back-end: " << e.What();
+      }
+      return static_cast<OrthancPluginErrorCode>(e.GetErrorCode());
+    }
+    catch (::std::runtime_error& e)
+    {
+      LOG(ERROR) << "Exception in database back-end: " << e.what();
+      return OrthancPluginErrorCode_DatabasePlugin;
+    }
+    catch (...)
+    {
+      LOG(ERROR) << "Native exception";
+      return OrthancPluginErrorCode_DatabasePlugin;
+    }
+  }
+
+  static void FinalizeBackend(void* rawPool)
+  {
+    if (rawPool != NULL)
+    {
+      IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(rawPool);
+      
       if (isBackendInUse_)
       {
         isBackendInUse_ = false;
       }
       else
       {
-        OrthancPluginLogError(adapter->GetContext(), "More than one index backend was registered, internal error");
+        LOG(ERROR) << "More than one index backend was registered, internal error";
       }
-      
-      delete adapter;
 
-      return OrthancPluginErrorCode_Success;
-    }
-  }
-
-  
-  static OrthancPluginErrorCode GetDatabaseVersion(void* database,
-                                                   uint32_t* version)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-      
-    try
-    {
-      DatabaseBackendAdapterV4::Adapter::DatabaseAccessor accessor(*adapter);
-      *version = accessor.GetBackend().GetDatabaseVersion(accessor.GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
-  }
-
-
-  static OrthancPluginErrorCode UpgradeDatabase(void* database,
-                                                OrthancPluginStorageArea* storageArea,
-                                                uint32_t  targetVersion)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-      
-    try
-    {
-      DatabaseBackendAdapterV4::Adapter::DatabaseAccessor accessor(*adapter);
-      accessor.GetBackend().UpgradeDatabase(accessor.GetManager(), targetVersion, storageArea);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
-  }
-
-
-  static OrthancPluginErrorCode HasRevisionsSupport(void* database,
-                                                    uint8_t* target)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-      
-    try
-    {
-      DatabaseBackendAdapterV4::Adapter::DatabaseAccessor accessor(*adapter);
-      *target = (accessor.GetBackend().HasRevisionsSupport() ? 1 : 0);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
-  }
-
-
-  static OrthancPluginErrorCode HasAttachmentCustomDataSupport(void* database,
-                                                               uint8_t* target)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-      
-    try
-    {
-      DatabaseBackendAdapterV4::Adapter::DatabaseAccessor accessor(*adapter);
-      *target = (accessor.GetBackend().HasAttachmentCustomDataSupport() ? 1 : 0);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
-  }
-
-  static OrthancPluginErrorCode StartTransaction(void* database,
-                                                 OrthancPluginDatabaseTransaction** target /* out */,
-                                                 OrthancPluginDatabaseTransactionType type)
-  {
-    DatabaseBackendAdapterV4::Adapter* adapter = reinterpret_cast<DatabaseBackendAdapterV4::Adapter*>(database);
-      
-    try
-    {
-      std::unique_ptr<DatabaseBackendAdapterV4::Transaction> transaction(new DatabaseBackendAdapterV4::Transaction(*adapter));
-      
-      switch (type)
-      {
-        case OrthancPluginDatabaseTransactionType_ReadOnly:
-          transaction->GetManager().StartTransaction(TransactionType_ReadOnly);
-          break;
-
-        case OrthancPluginDatabaseTransactionType_ReadWrite:
-          transaction->GetManager().StartTransaction(TransactionType_ReadWrite);
-          break;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-      }
-      
-      *target = reinterpret_cast<OrthancPluginDatabaseTransaction*>(transaction.release());
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(adapter->GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode DestructTransaction(OrthancPluginDatabaseTransaction* transaction)
-  {
-    if (transaction == NULL)
-    {
-      return OrthancPluginErrorCode_NullPointer;
+      delete pool;
     }
     else
     {
-      delete reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-      return OrthancPluginErrorCode_Success;
+      LOG(ERROR) << "Received a null pointer from the Orthanc core, internal error";
     }
   }
 
   
-  static OrthancPluginErrorCode Rollback(OrthancPluginDatabaseTransaction* transaction)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetManager().RollbackTransaction();
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode Commit(OrthancPluginDatabaseTransaction* transaction,
-                                       int64_t fileSizeDelta /* TODO - not used? */)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetManager().CommitTransaction();
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode AddAttachment2(OrthancPluginDatabaseTransaction* transaction,
-                                               int64_t id,
-                                               const OrthancPluginAttachment2* attachment,
-                                               int64_t revision)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().AddAttachment2(t->GetManager(), id, *attachment, revision);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode ClearChanges(OrthancPluginDatabaseTransaction* transaction)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().ClearChanges(t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode ClearExportedResources(OrthancPluginDatabaseTransaction* transaction)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().ClearExportedResources(t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode ClearMainDicomTags(OrthancPluginDatabaseTransaction* transaction,
-                                                   int64_t resourceId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().ClearMainDicomTags(t->GetManager(), resourceId);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode CreateInstance(OrthancPluginDatabaseTransaction* transaction,
-                                               OrthancPluginCreateInstanceResult* target /* out */,
-                                               const char* hashPatient,
-                                               const char* hashStudy,
-                                               const char* hashSeries,
-                                               const char* hashInstance)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      if (t->GetBackend().HasCreateInstance())
-      {
-        t->GetBackend().CreateInstance(*target, t->GetManager(), hashPatient, hashStudy, hashSeries, hashInstance);
-      }
-      else
-      {
-        t->GetBackend().CreateInstanceGeneric(*target, t->GetManager(), hashPatient, hashStudy, hashSeries, hashInstance);
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode DeleteAttachment(OrthancPluginDatabaseTransaction* transaction,
-                                                 int64_t id,
-                                                 int32_t contentType)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().DeleteAttachment(t->GetOutput(), t->GetManager(), id, contentType);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode DeleteMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                               int64_t id,
-                                               int32_t metadataType)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().DeleteMetadata(t->GetManager(), id, metadataType);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode DeleteResource(OrthancPluginDatabaseTransaction* transaction,
-                                               int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().DeleteResource(t->GetOutput(), t->GetManager(), id);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetAllMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                               int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::map<int32_t, std::string> values;
-      t->GetBackend().GetAllMetadata(values, t->GetManager(), id);
-
-      for (std::map<int32_t, std::string>::const_iterator it = values.begin(); it != values.end(); ++it)
-      {
-        t->GetOutput().AnswerMetadata(it->first, it->second);
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetAllPublicIds(OrthancPluginDatabaseTransaction* transaction,
-                                                OrthancPluginResourceType resourceType)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::list<std::string> values;
-      t->GetBackend().GetAllPublicIds(values, t->GetManager(), resourceType);
-      t->GetOutput().AnswerStrings(values);
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetAllPublicIdsWithLimit(OrthancPluginDatabaseTransaction* transaction,
-                                                         OrthancPluginResourceType resourceType,
-                                                         uint64_t since,
-                                                         uint64_t limit)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::list<std::string> values;
-      t->GetBackend().GetAllPublicIds(values, t->GetManager(), resourceType, since, limit);
-      t->GetOutput().AnswerStrings(values);
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetChanges(OrthancPluginDatabaseTransaction* transaction,
-                                           uint8_t* targetDone /* out */,
-                                           int64_t since,
-                                           uint32_t maxResults)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      bool done;
-      t->GetBackend().GetChanges(t->GetOutput(), done, t->GetManager(), since, maxResults);
-      *targetDone = (done ? 1 : 0);
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetChildrenInternalId(OrthancPluginDatabaseTransaction* transaction,
-                                                      int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::list<int64_t> values;
-      t->GetBackend().GetChildrenInternalId(values, t->GetManager(), id);
-      t->GetOutput().AnswerIntegers64(values);
-        
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetChildrenMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                                    int64_t resourceId,
-                                                    int32_t metadata)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::list<std::string> values;
-      t->GetBackend().GetChildrenMetadata(values, t->GetManager(), resourceId, metadata);
-      t->GetOutput().AnswerStrings(values);
-        
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetChildrenPublicId(OrthancPluginDatabaseTransaction* transaction,
-                                                    int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::list<std::string> values;
-      t->GetBackend().GetChildrenPublicId(values, t->GetManager(), id);
-      t->GetOutput().AnswerStrings(values);
-        
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetExportedResources(OrthancPluginDatabaseTransaction* transaction,
-                                                     uint8_t* targetDone /* out */,
-                                                     int64_t since,
-                                                     uint32_t maxResults)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      bool done;
-      t->GetBackend().GetExportedResources(t->GetOutput(), done, t->GetManager(), since, maxResults);
-      *targetDone = (done ? 1 : 0);
-        
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetLastChange(OrthancPluginDatabaseTransaction* transaction)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().GetLastChange(t->GetOutput(), t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetLastChangeIndex(OrthancPluginDatabaseTransaction* transaction,
-                                                   int64_t* target)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      *target = t->GetBackend().GetLastChangeIndex(t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetLastExportedResource(OrthancPluginDatabaseTransaction* transaction)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().GetLastExportedResource(t->GetOutput(), t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetMainDicomTags(OrthancPluginDatabaseTransaction* transaction,
-                                                 int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().GetMainDicomTags(t->GetOutput(), t->GetManager(), id);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode GetPublicId(OrthancPluginDatabaseTransaction* transaction,
-                                            int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetOutput().AnswerString(t->GetBackend().GetPublicId(t->GetManager(), id));
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode GetResourcesCount(OrthancPluginDatabaseTransaction* transaction,
-                                                  uint64_t* target /* out */,
-                                                  OrthancPluginResourceType resourceType)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      *target = t->GetBackend().GetResourcesCount(t->GetManager(), resourceType);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode GetResourceType(OrthancPluginDatabaseTransaction* transaction,
-                                                OrthancPluginResourceType* target /* out */,
-                                                uint64_t resourceId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      *target = t->GetBackend().GetResourceType(t->GetManager(), resourceId);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode GetTotalCompressedSize(OrthancPluginDatabaseTransaction* transaction,
-                                                       uint64_t* target /* out */)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      *target = t->GetBackend().GetTotalCompressedSize(t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode GetTotalUncompressedSize(OrthancPluginDatabaseTransaction* transaction,
-                                                         uint64_t* target /* out */)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      *target = t->GetBackend().GetTotalUncompressedSize(t->GetManager());
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode IsDiskSizeAbove(OrthancPluginDatabaseTransaction* transaction,
-                                                uint8_t* target,
-                                                uint64_t threshold)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      bool above = (t->GetBackend().GetTotalCompressedSize(t->GetManager()) >= threshold);
-      *target = (above ? 1 : 0);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode IsExistingResource(OrthancPluginDatabaseTransaction* transaction,
-                                                   uint8_t* target,
-                                                   int64_t resourceId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      bool exists = t->GetBackend().IsExistingResource(t->GetManager(), resourceId);
-      *target = (exists ? 1 : 0);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode IsProtectedPatient(OrthancPluginDatabaseTransaction* transaction,
-                                                   uint8_t* target,
-                                                   int64_t resourceId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      bool isProtected = t->GetBackend().IsProtectedPatient(t->GetManager(), resourceId);
-      *target = (isProtected ? 1 : 0);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode ListAvailableAttachments(OrthancPluginDatabaseTransaction* transaction,
-                                                         int64_t resourceId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::list<int32_t> values;
-      t->GetBackend().ListAvailableAttachments(values, t->GetManager(), resourceId);
-      t->GetOutput().AnswerIntegers32(values);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode LogChange(OrthancPluginDatabaseTransaction* transaction,
-                                          int32_t changeType,
-                                          int64_t resourceId,
-                                          OrthancPluginResourceType resourceType,
-                                          const char* date)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().LogChange(t->GetManager(), changeType, resourceId, resourceType, date);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-  
-
-  static OrthancPluginErrorCode LogExportedResource(OrthancPluginDatabaseTransaction* transaction,
-                                                    OrthancPluginResourceType resourceType,
-                                                    const char* publicId,
-                                                    const char* modality,
-                                                    const char* date,
-                                                    const char* patientId,
-                                                    const char* studyInstanceUid,
-                                                    const char* seriesInstanceUid,
-                                                    const char* sopInstanceUid)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      OrthancPluginExportedResource exported;
-      exported.seq = 0;
-      exported.resourceType = resourceType;
-      exported.publicId = publicId;
-      exported.modality = modality;
-      exported.date = date;
-      exported.patientId = patientId;
-      exported.studyInstanceUid = studyInstanceUid;
-      exported.seriesInstanceUid = seriesInstanceUid;
-      exported.sopInstanceUid = sopInstanceUid;
-        
-      t->GetOutput().Clear();
-      t->GetBackend().LogExportedResource(t->GetManager(), exported);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupAttachment(OrthancPluginDatabaseTransaction* transaction,
-                                                 int64_t* revision /* out */,
-                                                 int64_t resourceId,
-                                                 int32_t contentType)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().LookupAttachment(t->GetOutput(), *revision, t->GetManager(), resourceId, contentType);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupGlobalProperty(OrthancPluginDatabaseTransaction* transaction,
-                                                     const char* serverIdentifier,
-                                                     int32_t property)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::string s;
-      if (t->GetBackend().LookupGlobalProperty(s, t->GetManager(), serverIdentifier, property))
-      {
-        t->GetOutput().AnswerString(s);
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                               int64_t* revision /* out */,
-                                               int64_t id,
-                                               int32_t metadata)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::string s;
-      if (t->GetBackend().LookupMetadata(s, *revision, t->GetManager(), id, metadata))
-      {
-        t->GetOutput().AnswerString(s);
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupParent(OrthancPluginDatabaseTransaction* transaction,
-                                             uint8_t* existing /* out */,
-                                             int64_t* parentId /* out */,
-                                             int64_t id)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      if (t->GetBackend().LookupParent(*parentId, t->GetManager(), id))
-      {
-        *existing = 1;
-      }
-      else
-      {
-        *existing = 0;
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupResource(OrthancPluginDatabaseTransaction* transaction,
-                                               uint8_t* isExisting /* out */,
-                                               int64_t* id /* out */,
-                                               OrthancPluginResourceType* type /* out */,
-                                               const char* publicId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      if (t->GetBackend().LookupResource(*id, *type, t->GetManager(), publicId))
-      {
-        *isExisting = 1;
-      }
-      else
-      {
-        *isExisting = 0;
-      }
-        
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupResources(OrthancPluginDatabaseTransaction* transaction,
-                                                uint32_t constraintsCount,
-                                                const OrthancPluginDatabaseConstraint* constraints,
-                                                OrthancPluginResourceType queryLevel,
-                                                uint32_t limit,
-                                                uint8_t requestSomeInstanceId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::vector<Orthanc::DatabaseConstraint> lookup;
-      lookup.reserve(constraintsCount);
-
-      for (uint32_t i = 0; i < constraintsCount; i++)
-      {
-        lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
-      }
-        
-      t->GetBackend().LookupResources(t->GetOutput(), t->GetManager(), lookup, queryLevel, limit, (requestSomeInstanceId != 0));
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-
-  static OrthancPluginErrorCode LookupResourceAndParent(OrthancPluginDatabaseTransaction* transaction,
-                                                        uint8_t* isExisting /* out */,
-                                                        int64_t* id /* out */,
-                                                        OrthancPluginResourceType* type /* out */,
-                                                        const char* publicId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-
-      std::string parent;
-      if (t->GetBackend().LookupResourceAndParent(*id, *type, parent, t->GetManager(), publicId))
-      {
-        *isExisting = 1;
-
-        if (!parent.empty())
-        {
-          t->GetOutput().AnswerString(parent);
-        }
-      }
-      else
-      {
-        *isExisting = 0;
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-  
-  static OrthancPluginErrorCode SelectPatientToRecycle(OrthancPluginDatabaseTransaction* transaction,
-                                                       uint8_t* patientAvailable,
-                                                       int64_t* patientId)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      
-      if (t->GetBackend().SelectPatientToRecycle(*patientId, t->GetManager()))
-      {
-        *patientAvailable = 1;
-      }
-      else
-      {
-        *patientAvailable = 0;
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-    
-  static OrthancPluginErrorCode SelectPatientToRecycle2(OrthancPluginDatabaseTransaction* transaction,
-                                                        uint8_t* patientAvailable,
-                                                        int64_t* patientId,
-                                                        int64_t patientIdToAvoid)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      
-      if (t->GetBackend().SelectPatientToRecycle(*patientId, t->GetManager(), patientIdToAvoid))
-      {
-        *patientAvailable = 1;
-      }
-      else
-      {
-        *patientAvailable = 0;
-      }
-      
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-    
-  static OrthancPluginErrorCode SetGlobalProperty(OrthancPluginDatabaseTransaction* transaction,
-                                                  const char* serverIdentifier,
-                                                  int32_t property,
-                                                  const char* value)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().SetGlobalProperty(t->GetManager(), serverIdentifier, property, value);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-    
-  static OrthancPluginErrorCode SetMetadata(OrthancPluginDatabaseTransaction* transaction,
-                                            int64_t id,
-                                            int32_t metadata,
-                                            const char* value,
-                                            int64_t revision)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().SetMetadata(t->GetManager(), id, metadata, value, revision);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-    
-  static OrthancPluginErrorCode SetProtectedPatient(OrthancPluginDatabaseTransaction* transaction,
-                                                    int64_t id,
-                                                    uint8_t isProtected)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().SetProtectedPatient(t->GetManager(), id, (isProtected != 0));
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-    
-  static OrthancPluginErrorCode SetResourcesContent(OrthancPluginDatabaseTransaction* transaction,
-                                                    uint32_t countIdentifierTags,
-                                                    const OrthancPluginResourcesContentTags* identifierTags,
-                                                    uint32_t countMainDicomTags,
-                                                    const OrthancPluginResourcesContentTags* mainDicomTags,
-                                                    uint32_t countMetadata,
-                                                    const OrthancPluginResourcesContentMetadata* metadata)
-  {
-    DatabaseBackendAdapterV4::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV4::Transaction*>(transaction);
-
-    try
-    {
-      t->GetOutput().Clear();
-      t->GetBackend().SetResourcesContent(t->GetManager(), countIdentifierTags, identifierTags,
-                                          countMainDicomTags, mainDicomTags, countMetadata, metadata);
-      return OrthancPluginErrorCode_Success;
-    }
-    ORTHANC_PLUGINS_DATABASE_CATCH(t->GetBackend().GetContext());
-  }
-
-    
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
                                           unsigned int maxDatabaseRetries)
   {
+    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections));
+    
     if (isBackendInUse_)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
-    
-    if (backend == NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-    }
-
-    OrthancPluginDatabaseBackendV4 params;
-    memset(&params, 0, sizeof(params));
-
-    params.readAnswersCount = ReadAnswersCount;
-    params.readAnswerAttachment2 = ReadAnswerAttachment2;
-    params.readAnswerChange = ReadAnswerChange;
-    params.readAnswerDicomTag = ReadAnswerDicomTag;
-    params.readAnswerExportedResource = ReadAnswerExportedResource;
-    params.readAnswerInt32 = ReadAnswerInt32;
-    params.readAnswerInt64 = ReadAnswerInt64;
-    params.readAnswerMatchingResource = ReadAnswerMatchingResource;
-    params.readAnswerMetadata = ReadAnswerMetadata;
-    params.readAnswerString = ReadAnswerString;
-    
-    params.readEventsCount = ReadEventsCount;
-    params.readEvent2 = ReadEvent2;
-
-    params.open = Open;
-    params.close = Close;
-    params.destructDatabase = DestructDatabase;
-    params.getDatabaseVersion = GetDatabaseVersion;
-    params.upgradeDatabase = UpgradeDatabase;
-    params.hasRevisionsSupport = HasRevisionsSupport;
-    params.hasAttachmentCustomDataSupport = HasAttachmentCustomDataSupport;
-    params.startTransaction = StartTransaction;
-    params.destructTransaction = DestructTransaction;
-    params.rollback = Rollback;
-    params.commit = Commit;
-
-    params.addAttachment2 = AddAttachment2;
-    params.clearChanges = ClearChanges;
-    params.clearExportedResources = ClearExportedResources;
-    params.clearMainDicomTags = ClearMainDicomTags;
-    params.createInstance = CreateInstance;
-    params.deleteAttachment = DeleteAttachment;
-    params.deleteMetadata = DeleteMetadata;
-    params.deleteResource = DeleteResource;
-    params.getAllMetadata = GetAllMetadata;
-    params.getAllPublicIds = GetAllPublicIds;
-    params.getAllPublicIdsWithLimit = GetAllPublicIdsWithLimit;
-    params.getChanges = GetChanges;
-    params.getChildrenInternalId = GetChildrenInternalId;
-    params.getChildrenMetadata = GetChildrenMetadata;
-    params.getChildrenPublicId = GetChildrenPublicId;
-    params.getExportedResources = GetExportedResources;
-    params.getLastChange = GetLastChange;
-    params.getLastChangeIndex = GetLastChangeIndex;
-    params.getLastExportedResource = GetLastExportedResource;
-    params.getMainDicomTags = GetMainDicomTags;
-    params.getPublicId = GetPublicId;
-    params.getResourceType = GetResourceType;
-    params.getResourcesCount = GetResourcesCount;
-    params.getTotalCompressedSize = GetTotalCompressedSize;
-    params.getTotalUncompressedSize = GetTotalUncompressedSize;
-    params.isDiskSizeAbove = IsDiskSizeAbove;
-    params.isExistingResource = IsExistingResource;
-    params.isProtectedPatient = IsProtectedPatient;
-    params.listAvailableAttachments = ListAvailableAttachments;
-    params.logChange = LogChange;
-    params.logExportedResource = LogExportedResource;
-    params.lookupAttachment = LookupAttachment;
-    params.lookupGlobalProperty = LookupGlobalProperty;
-    params.lookupMetadata = LookupMetadata;
-    params.lookupParent = LookupParent;
-    params.lookupResource = LookupResource;
-    params.lookupResourceAndParent = LookupResourceAndParent;
-    params.lookupResources = LookupResources;
-    params.selectPatientToRecycle = SelectPatientToRecycle;
-    params.selectPatientToRecycle2 = SelectPatientToRecycle2;
-    params.setGlobalProperty = SetGlobalProperty;
-    params.setMetadata = SetMetadata;
-    params.setProtectedPatient = SetProtectedPatient;
-    params.setResourcesContent = SetResourcesContent;
 
     OrthancPluginContext* context = backend->GetContext();
  
-    if (OrthancPluginRegisterDatabaseBackendV4(
-          context, &params, sizeof(params), maxDatabaseRetries,
-          new Adapter(backend, countConnections)) != OrthancPluginErrorCode_Success)
+    if (OrthancPluginRegisterDatabaseBackendV4(context, pool.release(), maxDatabaseRetries,
+                                               CallBackend, FinalizeBackend) != OrthancPluginErrorCode_Success)
     {
+      delete backend;
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }
-
-    backend->SetOutputFactory(new Factory);
 
     isBackendInUse_ = true;
   }
@@ -2108,7 +1476,7 @@ namespace OrthancDatabases
   {
     if (isBackendInUse_)
     {
-      fprintf(stderr, "The Orthanc core has not destructed the index backend, internal error\n");
+      LOG(ERROR) << "The Orthanc core has not destructed the index backend, internal error";
     }
   }
 }

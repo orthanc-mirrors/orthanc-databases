@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -35,6 +37,7 @@ namespace OrthancDatabases
   private:
     friend class PostgreSQLStatement;
     friend class PostgreSQLLargeObject;
+    friend class PostgreSQLTransaction;
 
     class Factory;
 
@@ -57,6 +60,11 @@ namespace OrthancDatabases
     ~PostgreSQLDatabase();
 
     void Open();
+
+    bool IsVerboseEnabled() const
+    {
+      return parameters_.IsVerboseEnabled();
+    }
 
     bool AcquireAdvisoryLock(int32_t lock);
 
@@ -90,7 +98,9 @@ namespace OrthancDatabases
 
     public:
       TransientAdvisoryLock(PostgreSQLDatabase&  database,
-                            int32_t lock);
+                            int32_t lock,
+                            unsigned int retries = 10,
+                            unsigned int retryInterval = 500);
 
       ~TransientAdvisoryLock();
     };
@@ -98,5 +108,16 @@ namespace OrthancDatabases
     static IDatabaseFactory* CreateDatabaseFactory(const PostgreSQLParameters& parameters);
 
     static PostgreSQLDatabase* CreateDatabaseConnection(const PostgreSQLParameters& parameters);
+
+  protected:
+    const std::string GetReadWriteTransactionStatement() const
+    {
+      return parameters_.GetReadWriteTransactionStatement();
+    }
+
+    const std::string GetReadOnlyTransactionStatement() const
+    {
+      return parameters_.GetReadOnlyTransactionStatement();
+    }
   };
 }

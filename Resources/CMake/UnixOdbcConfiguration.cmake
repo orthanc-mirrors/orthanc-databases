@@ -1,7 +1,9 @@
 # Orthanc - A Lightweight, RESTful DICOM Store
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
-# Copyright (C) 2017-2021 Osimis S.A., Belgium
+# Copyright (C) 2017-2023 Osimis S.A., Belgium
+# Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+# Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -24,7 +26,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_UNIX_ODBC)
   set(VERSION "2.3.9")  # Used in "config.h.in"
   set(UNIX_ODBC_SOURCES_DIR ${CMAKE_BINARY_DIR}/unixODBC-${VERSION})
   set(UNIX_ODBC_MD5 "06f76e034bb41df5233554abe961a16f")
-  set(UNIX_ODBC_URL "http://orthanc.osimis.io/ThirdPartyDownloads/unixODBC-${VERSION}.tar.gz")
+  set(UNIX_ODBC_URL "https://orthanc.uclouvain.be/downloads/third-party-downloads/unixODBC-${VERSION}.tar.gz")
 
   DownloadPackage(${UNIX_ODBC_MD5} ${UNIX_ODBC_URL} "${UNIX_ODBC_SOURCES_DIR}")
 

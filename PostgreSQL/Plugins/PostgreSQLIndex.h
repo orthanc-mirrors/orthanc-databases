@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -32,6 +34,15 @@ namespace OrthancDatabases
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
 
+  protected:
+    virtual void ClearDeletedFiles(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
+    virtual void ClearDeletedResources(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
+    virtual void ClearRemainingAncestor(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
+    void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
+
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
                     const PostgreSQLParameters& parameters);
@@ -43,7 +54,9 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE;
 
-    virtual void ConfigureDatabase(DatabaseManager& manager) ORTHANC_OVERRIDE;
+    virtual void ConfigureDatabase(DatabaseManager& manager,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;
 
     virtual bool HasRevisionsSupport() const ORTHANC_OVERRIDE
     {
@@ -57,8 +70,19 @@ namespace OrthancDatabases
 
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
-                                   OrthancPluginResourceType type)
-      ORTHANC_OVERRIDE;
+                                   OrthancPluginResourceType type) ORTHANC_OVERRIDE;
+
+    virtual void DeleteResource(IDatabaseBackendOutput& output,
+                                DatabaseManager& manager,
+                                int64_t id) ORTHANC_OVERRIDE;
+
+    virtual void SetResourcesContent(DatabaseManager& manager,
+                                     uint32_t countIdentifierTags,
+                                     const OrthancPluginResourcesContentTags* identifierTags,
+                                     uint32_t countMainDicomTags,
+                                     const OrthancPluginResourcesContentTags* mainDicomTags,
+                                     uint32_t countMetadata,
+                                     const OrthancPluginResourcesContentMetadata* metadata) ORTHANC_OVERRIDE;
 
     virtual uint64_t GetTotalCompressedSize(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
@@ -86,5 +110,44 @@ namespace OrthancDatabases
 
     virtual void TagMostRecentPatient(DatabaseManager& manager,
                                       int64_t patient) ORTHANC_OVERRIDE;
+
+    // New primitive since Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual bool HasAtomicIncrementGlobalProperty() ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual int64_t IncrementGlobalProperty(DatabaseManager& manager,
+                                            const char* serverIdentifier,
+                                            int32_t property,
+                                            int64_t increment) ORTHANC_OVERRIDE;
+
+    virtual bool HasUpdateAndGetStatistics() ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual void UpdateAndGetStatistics(DatabaseManager& manager,
+                                        int64_t& patientsCount,
+                                        int64_t& studiesCount,
+                                        int64_t& seriesCount,
+                                        int64_t& instancesCount,
+                                        int64_t& compressedSize,
+                                        int64_t& uncompressedSize) ORTHANC_OVERRIDE;
+
+// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+//     virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
+// #endif
+
+// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+//     virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+//                              DatabaseManager& manager,
+//                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+// #endif
   };
 }

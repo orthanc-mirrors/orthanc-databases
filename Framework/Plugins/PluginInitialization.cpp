@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -42,10 +44,13 @@ namespace OrthancDatabases
 
 
   bool InitializePlugin(OrthancPluginContext* context,
+                        const std::string& pluginName,
                         const std::string& dbms,
                         bool isIndex)
   {
-#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 7, 2)
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 4)
+    Orthanc::Logging::InitializePluginContext(context, pluginName);
+#elif ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 7, 2)
     Orthanc::Logging::InitializePluginContext(context);
 #else
     Orthanc::Logging::Initialize(context);
@@ -58,6 +63,19 @@ namespace OrthancDatabases
     assert(DisplayPerformanceWarning(dbms, isIndex));
 
     /* Check the version of the Orthanc core */
+    if (OrthancPluginCheckVersion(context) == 0)
+    {
+      LOG(ERROR) << "Your version of Orthanc ("
+                 << context->orthancVersion << ") must be above "
+                 << ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER << "."
+                 << ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER << "."
+                 << ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER
+                 << " to run this plugin";
+      return false;
+    }
+
+
+    /* Warn the user if the Orthanc runtime has not an optimal version */
 
     bool useFallback = true;
     bool isOptimal = false;
@@ -87,18 +105,6 @@ namespace OrthancDatabases
     useFallback = false;
 #  endif
 #endif
-
-    if (useFallback &&
-        OrthancPluginCheckVersion(context) == 0)
-    {
-      LOG(ERROR) << "Your version of Orthanc (" 
-                 << context->orthancVersion << ") must be above "
-                 << ORTHANC_PLUGINS_MINIMAL_MAJOR_NUMBER << "."
-                 << ORTHANC_PLUGINS_MINIMAL_MINOR_NUMBER << "."
-                 << ORTHANC_PLUGINS_MINIMAL_REVISION_NUMBER
-                 << " to run this plugin";
-      return false;
-    }
 
     if (useFallback)
     {
@@ -149,7 +155,7 @@ namespace OrthancDatabases
                                std::string(isIndex ? "index" : "storage area") +
                                " into a " + dbms + " database");
     
-    OrthancPluginSetDescription(context, description.c_str());
+    OrthancPlugins::SetDescription(pluginName, description.c_str());
 
     return true;
   }

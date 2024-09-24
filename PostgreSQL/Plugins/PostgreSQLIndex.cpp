@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -29,6 +31,7 @@
 #include <EmbeddedResources.h>  // Auto-generated file
 
 #include <Compatibility.h>  // For std::unique_ptr<>
+#include <Toolbox.h>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -59,8 +62,18 @@ namespace OrthancDatabases
     return PostgreSQLDatabase::CreateDatabaseFactory(parameters_);
   }
 
+  void PostgreSQLIndex::ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager)
+  {
+    std::string query;
+
+    Orthanc::EmbeddedResources::GetFileResource
+      (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
+    t.GetDatabaseTransaction().ExecuteMultiLines(query);
+  }
   
-  void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager)
+  void PostgreSQLIndex::ConfigureDatabase(DatabaseManager& manager,
+                                          bool hasIdentifierTags,
+                                          const std::list<IdentifierTag>& identifierTags)
   {
     uint32_t expectedVersion = 6;
 
@@ -73,7 +86,7 @@ namespace OrthancDatabases
     if (expectedVersion != 6)
     {
       LOG(ERROR) << "This database plugin is incompatible with your version of Orthanc "
-                 << "expecting the DB schema version " << expectedVersion 
+                 << "expecting the Orthanc DB schema version " << expectedVersion 
                  << ", but this plugin is only compatible with version 6";
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
     }
@@ -86,6 +99,7 @@ namespace OrthancDatabases
     }
 
     {
+      // lock the full DB while checking if it needs to be create/ugraded
       PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
 
       if (clearAll_)
@@ -98,243 +112,121 @@ namespace OrthancDatabases
 
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
-          std::string query;
+          LOG(WARNING) << "PostgreSQL is creating the database schema";
 
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_PREPARE_INDEX);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          ApplyPrepareIndex(t, manager);
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion, expectedVersion);
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, 1);
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 0);
-        }
-          
-        if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
-        {
-          LOG(ERROR) << "Corrupted PostgreSQL database";
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
-        }
-
-        int version = 0;
-        if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
-            version != 6)
-        {
-          LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema version: " << version;
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-        }
-
-        int revision;
-        if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
-        {
-          revision = 1;
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
-        }
-
-        if (revision != 1)
-        {
-          LOG(ERROR) << "PostgreSQL plugin is incompatible with database schema revision: " << revision;
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
-        }
-
-        t.Commit();
-      }
-
-      {
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        int hasTrigram = 0;
-        if (!LookupGlobalIntegerProperty(hasTrigram, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_HasTrigramIndex) ||
-            hasTrigram != 1)
-        {
-          /**
-           * Apply fix for performance issue (speed up wildcard search
-           * by using GIN trigrams). This implements the patch suggested
-           * in issue #47, BUT we also keep the original
-           * "DicomIdentifiersIndexValues", as it leads to better
-           * performance for "strict" searches (i.e. searches involving
-           * no wildcard).
-           * https://www.postgresql.org/docs/current/static/pgtrgm.html
-           * https://bugs.orthanc-server.com/show_bug.cgi?id=47
-           **/
-          try
+          if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
           {
-            // We've observed 9 minutes on DB with 100000 studies
-            LOG(WARNING) << "Trying to enable trigram matching on the PostgreSQL database "
-                         << "to speed up wildcard searches. This may take several minutes";
-
-            t.GetDatabaseTransaction().ExecuteMultiLines(
-              "CREATE EXTENSION IF NOT EXISTS pg_trgm; "
-              "CREATE INDEX DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);");
-
-            SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasTrigramIndex, 1);
-            LOG(WARNING) << "Trigram index has been created";
-
-            t.Commit();
-          }
-          catch (Orthanc::OrthancException&)
-          {
-            LOG(WARNING) << "Performance warning: Your PostgreSQL server does "
-                         << "not support trigram matching";
-            LOG(WARNING) << "-> Consider installing the \"pg_trgm\" extension on the "
-                         << "PostgreSQL server, e.g. on Debian: sudo apt install postgresql-contrib";
+            LOG(ERROR) << "Corrupted PostgreSQL database or failed to create the database schema";
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
           }
         }
         else
         {
-          t.Commit();
-        }
-      }
+          LOG(WARNING) << "The database schema already exists, checking if it needs to be updated";
 
-      {
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        int property = 0;
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_HasCreateInstance) ||
-            property != 2)
-        {
-          LOG(INFO) << "Installing the CreateInstance extension";
-
-          if (property == 1)
+          int version = 0;
+          if (!LookupGlobalIntegerProperty(version, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion) ||
+              version != 6)
           {
-            // Drop older, experimental versions of this extension
-            t.GetDatabaseTransaction().ExecuteMultiLines("DROP FUNCTION CreateInstance("
-                                                         "IN patient TEXT, IN study TEXT, IN series TEXT, in instance TEXT)");
+            LOG(ERROR) << "PostgreSQL plugin is incompatible with Orthanc database schema version: " << version;
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
           }
-        
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_CREATE_INSTANCE);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasCreateInstance, 2);
-        }
+          bool needToRunUpgradeFromUnknownToV1 = false;
+          bool needToRunUpgradeV1toV2 = false;
+          bool needToRunUpgradeV2toV3 = false;
 
-      
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-            property != 1)
-        {
-          LOG(INFO) << "Installing the FastTotalSize extension";
+          int revision;
+          if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+          {
+            LOG(WARNING) << "No DatabasePatchLevel found, assuming it's 1";
+            revision = 1;
+            needToRunUpgradeFromUnknownToV1 = true;
+            needToRunUpgradeV1toV2 = true;
+          }
+          else if (revision == 1)
+          {
+            LOG(WARNING) << "DatabasePatchLevel is 1";
+            needToRunUpgradeFromUnknownToV1 = true;
+            needToRunUpgradeV1toV2 = true;
+            needToRunUpgradeV2toV3 = true;
+          }
+          else if (revision == 2)
+          {
+            LOG(WARNING) << "DatabasePatchLevel is 2";
+            needToRunUpgradeV2toV3 = true;
+          }
 
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_TOTAL_SIZE);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          int hasTrigram = 0;
+          if (!LookupGlobalIntegerProperty(hasTrigram, manager, MISSING_SERVER_IDENTIFIER,
+                                           Orthanc::GlobalProperty_HasTrigramIndex) || 
+              hasTrigram != 1)
+          {
+            // We've observed 9 minutes on DB with 100000 studies
+            LOG(WARNING) << "The DB schema update will try to enable trigram matching on the PostgreSQL database "
+                         << "to speed up wildcard searches. This may take several minutes";
+            needToRunUpgradeV1toV2 = true;
+          }
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetTotalSizeIsFast, 1);
-        }
+          int property = 0;
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                           Orthanc::GlobalProperty_HasFastCountResources) ||
+              property != 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                          Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
+              property != 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                          Orthanc::GlobalProperty_GetLastChangeIndex) ||
+              property != 1)
+          {
+            needToRunUpgradeV1toV2 = true;
+          }
 
+          if (needToRunUpgradeFromUnknownToV1)
+          {
+            LOG(WARNING) << "Upgrading DB schema from unknown to revision 1";
+            std::string query;
 
-        // Installing this extension requires the "GlobalIntegers" table
-        // created by the "FastTotalSize" extension
-        property = 0;
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_HasFastCountResources) ||
-            property != 1)
-        {
-          LOG(INFO) << "Installing the FastCountResources extension";
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_REV1);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          }
+          
+          if (needToRunUpgradeV1toV2)
+          {
+            LOG(WARNING) << "Upgrading DB schema from revision 1 to revision 2";
 
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_FAST_COUNT_RESOURCES);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            std::string query;
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_HasFastCountResources, 1);
-        }
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV1_TO_REV2);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
+            // apply all idempotent changes that are in the PrepareIndex
+            ApplyPrepareIndex(t, manager);
+          }
 
-        // Installing this extension requires the "GlobalIntegers" table
-        // created by the "GetLastChangeIndex" extension
-        property = 0;
-        if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                         Orthanc::GlobalProperty_GetLastChangeIndex) ||
-            property != 1)
-        {
-          LOG(INFO) << "Installing the GetLastChangeIndex extension";
+          if (needToRunUpgradeV2toV3)
+          {
+            LOG(WARNING) << "Upgrading DB schema from revision 2 to revision 3";
 
-          std::string query;
-          Orthanc::EmbeddedResources::GetFileResource
-            (query, Orthanc::EmbeddedResources::POSTGRESQL_GET_LAST_CHANGE_INDEX);
-          t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            std::string query;
 
-          SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_GetLastChangeIndex, 1);
-        }
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV2_TO_REV3);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
 
-        t.Commit();
-      }
- 
-
-      {
-        // New in release 4.0 to deal with multiple writers
-        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
-
-        if (!t.GetDatabaseTransaction().DoesTableExist("ServerProperties"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("CREATE TABLE ServerProperties(server VARCHAR(64) NOT NULL, "
-                                                       "property INTEGER, value TEXT, PRIMARY KEY(server, property))");
-        }
-
-        /**
-         * PostgreSQL 9.5: "Adding a column with a default requires
-         * updating each row of the table (to store the new column
-         * value). However, if no default is specified, PostgreSQL is
-         * able to avoid the physical update." => We set no default
-         * for performance (older entries will be NULL)
-         * https://www.postgresql.org/docs/9.5/ddl-alter.html
-         **/
-        if (!db.DoesColumnExist("Metadata", "revision"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE Metadata ADD COLUMN revision INTEGER");
-        }
-
-        if (!db.DoesColumnExist("AttachedFiles", "revision"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN revision INTEGER");
-        }
-
-        // new in v 4.X
-        if (!db.DoesColumnExist("DeletedFiles", "revision"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE DeletedFiles ADD COLUMN revision INTEGER");
-        }
-
-        if (!db.DoesColumnExist("AttachedFiles", "customData"))
-        {
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE AttachedFiles ADD COLUMN customData TEXT");
-        }
-
-        if (!db.DoesColumnExist("DeletedFiles", "customData"))
-        {
-          // add the column and modify the trigger
-          t.GetDatabaseTransaction().ExecuteMultiLines("ALTER TABLE DeletedFiles ADD COLUMN customData TEXT");
-
-          t.GetDatabaseTransaction().ExecuteMultiLines(
-            "DROP TRIGGER AttachedFileDeleted ON AttachedFiles");
-
-          t.GetDatabaseTransaction().ExecuteMultiLines(
-            "DROP FUNCTION AttachedFileDeletedFunc");
-
-          t.GetDatabaseTransaction().ExecuteMultiLines(
-            "CREATE FUNCTION AttachedFileDeletedFunc() "
-            "RETURNS TRIGGER AS $body$"
-            "BEGIN"
-            "  INSERT INTO DeletedFiles VALUES"
-            "    (old.uuid, old.filetype, old.compressedSize,"
-            "     old.uncompressedSize, old.compressionType,"
-            "     old.uncompressedHash, old.compressedHash,"
-            "     old.revision, old.customData);"
-            "  RETURN NULL;"
-            "END;"
-            "$body$ LANGUAGE plpgsql;");
-
-          t.GetDatabaseTransaction().ExecuteMultiLines(
-            "CREATE TRIGGER AttachedFileDeleted "
-            "AFTER DELETE ON AttachedFiles "
-            "FOR EACH ROW "
-            "EXECUTE PROCEDURE AttachedFileDeletedFunc();"
-          );
+            // apply all idempotent changes that are in the PrepareIndex (update triggers + set Patch level to 3)
+            ApplyPrepareIndex(t, manager);
+          }
         }
 
         t.Commit();
@@ -372,15 +264,15 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT value FROM GlobalIntegers WHERE key = 0");
+        "SELECT * FROM UpdateSingleStatistic(0)");
 
-      statement.SetReadOnly(true);
       statement.Execute();
 
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }
     
-    assert(result == IndexBackend::GetTotalCompressedSize(manager));
+    // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
+    //assert(result == IndexBackend::GetTotalCompressedSize(manager));
     return result;
   }
 
@@ -393,17 +285,169 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT value FROM GlobalIntegers WHERE key = 1");
+        "SELECT * FROM UpdateSingleStatistic(1)");
 
-      statement.SetReadOnly(true);
       statement.Execute();
 
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }
     
-    assert(result == IndexBackend::GetTotalUncompressedSize(manager));
+    // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
+    // assert(result == IndexBackend::GetTotalUncompressedSize(manager));
     return result;
   }
+
+  int64_t PostgreSQLIndex::IncrementGlobalProperty(DatabaseManager& manager,
+                                                   const char* serverIdentifier,
+                                                   int32_t property,
+                                                   int64_t increment)
+  {
+    if (serverIdentifier == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    else
+    {
+      if (strlen(serverIdentifier) == 0)
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT INTO GlobalProperties (property, value) VALUES(${property}, ${increment}) "
+          "  ON CONFLICT (property) DO UPDATE SET value = CAST(GlobalProperties.value AS BIGINT) + ${increment}"
+          " RETURNING CAST(value AS BIGINT)");
+
+        statement.SetParameterType("property", ValueType_Integer64);
+        statement.SetParameterType("increment", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetIntegerValue("property", property);
+        args.SetIntegerValue("increment", increment);
+        
+        statement.Execute(args);
+
+        return statement.ReadInteger64(0);
+      }
+      else
+      {
+        DatabaseManager::CachedStatement statement(
+          STATEMENT_FROM_HERE, manager,
+          "INSERT INTO ServerProperties (server, property, value) VALUES(${server}, ${property}, ${increment}) "
+          "  ON CONFLICT (server, property) DO UPDATE SET value = CAST(ServerProperties.value AS BIGINT) + ${increment}"
+          " RETURNING CAST(value AS BIGINT)");
+
+        statement.SetParameterType("server", ValueType_Utf8String);
+        statement.SetParameterType("property", ValueType_Integer64);
+        statement.SetParameterType("increment", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetUtf8Value("server", serverIdentifier);
+        args.SetIntegerValue("property", property);
+        args.SetIntegerValue("increment", increment);
+        
+        statement.Execute(args);
+
+        return statement.ReadInteger64(0);
+      }
+    }
+  }
+
+  void PostgreSQLIndex::UpdateAndGetStatistics(DatabaseManager& manager,
+                                               int64_t& patientsCount,
+                                               int64_t& studiesCount,
+                                               int64_t& seriesCount,
+                                               int64_t& instancesCount,
+                                               int64_t& compressedSize,
+                                               int64_t& uncompressedSize)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT * FROM UpdateStatistics()");
+
+    statement.Execute();
+
+    patientsCount = statement.ReadInteger64(0);
+    studiesCount = statement.ReadInteger64(1);
+    seriesCount = statement.ReadInteger64(2);
+    instancesCount = statement.ReadInteger64(3);
+    compressedSize = statement.ReadInteger64(4);
+    uncompressedSize = statement.ReadInteger64(5);
+  }
+
+  void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
+  {
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT CreateDeletedFilesTemporaryTable()"
+        );
+      statement.ExecuteWithoutResult();
+    }
+
+  }
+
+  void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)
+  {
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE IF NOT EXISTS  DeletedResources("
+        "resourceType INTEGER NOT NULL,"
+        "publicId VARCHAR(64) NOT NULL"
+        ");"
+        );
+      statement.Execute();
+    }
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM DeletedResources;"
+        );
+
+      statement.Execute();
+    }
+
+  }
+
+  void PostgreSQLIndex::ClearRemainingAncestor(DatabaseManager& manager)
+  {
+  }
+
+  void PostgreSQLIndex::DeleteResource(IDatabaseBackendOutput& output,
+                                       DatabaseManager& manager,
+                                       int64_t id)
+  {
+    // clearing of temporary table is now implemented in the funcion DeleteResource
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT * FROM DeleteResource(${id})");
+
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", id);
+
+    statement.Execute(args);
+
+    if (statement.IsDone() ||
+        statement.GetResultFieldsCount() != 2)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+    }
+
+    statement.SetResultFieldType(0, ValueType_Integer64);
+    statement.SetResultFieldType(1, ValueType_Utf8String);
+
+    if (!statement.IsNull(0))
+    {
+      output.SignalRemainingAncestor(
+        statement.ReadString(1),
+        static_cast<OrthancPluginResourceType>(statement.ReadInteger32(0)));
+    }
+
+    SignalDeletedFiles(output, manager);
+    SignalDeletedResources(output, manager);
+  }
+
 
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
@@ -428,7 +472,7 @@ namespace OrthancDatabases
     args.SetUtf8Value("study", hashStudy);
     args.SetUtf8Value("series", hashSeries);
     args.SetUtf8Value("instance", hashInstance);
-    
+
     statement.Execute(args);
 
     if (statement.IsDone() ||
@@ -441,6 +485,8 @@ namespace OrthancDatabases
     {
       statement.SetResultFieldType(i, ValueType_Integer64);
     }
+
+    // LOG(INFO) << statement.ReadInteger64(0) << statement.ReadInteger64(1) << statement.ReadInteger64(2) << statement.ReadInteger64(3);
 
     result.isNewInstance = (statement.ReadInteger64(3) == 1);
     result.instanceId = statement.ReadInteger64(7);
@@ -458,6 +504,156 @@ namespace OrthancDatabases
 #endif
 
 
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  static void ExecuteSetResourcesContentTags(
+    DatabaseManager& manager,
+    const std::string& table,
+    uint32_t count,
+    const OrthancPluginResourcesContentTags* tags)
+  {
+    std::string sql;
+
+    std::vector<std::string> resourceIds;
+    std::vector<std::string> groups;
+    std::vector<std::string> elements;
+    std::vector<std::string> values;
+
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string resourceArgName = "r" + boost::lexical_cast<std::string>(i);
+      std::string groupArgName = "g" + boost::lexical_cast<std::string>(i);
+      std::string elementArgName = "e" + boost::lexical_cast<std::string>(i);
+      std::string valueArgName = "v" + boost::lexical_cast<std::string>(i);
+
+      args.SetIntegerValue(resourceArgName, tags[i].resource);
+      args.SetInteger32Value(elementArgName, tags[i].element);
+      args.SetInteger32Value(groupArgName, tags[i].group);
+      args.SetUtf8Value(valueArgName, tags[i].value);
+
+      std::string insert = ("(${" + resourceArgName + "}, ${" +
+                            groupArgName + "}, ${" +
+                            elementArgName + "}, " +
+                            "${" + valueArgName + "})");
+
+      if (sql.empty())
+      {
+        sql = "INSERT INTO " + table + " VALUES " + insert;
+      }
+      else
+      {
+        sql += ", " + insert;
+      }
+    }
+
+    if (!sql.empty())
+    {
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+      
+      for (uint32_t i = 0; i < count; i++)
+      {
+        statement.SetParameterType("r" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer64);
+        statement.SetParameterType("g" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer32);
+        statement.SetParameterType("e" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer32);
+        statement.SetParameterType("v" + boost::lexical_cast<std::string>(i),
+                                   ValueType_Utf8String);
+      }
+
+      statement.Execute(args);
+    }
+  }
+#endif
+  
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+  static void ExecuteSetResourcesContentMetadata(
+    DatabaseManager& manager,
+    bool hasRevisionsSupport,
+    uint32_t count,
+    const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    if (count < 1)
+    {
+      return;
+    }
+
+    std::vector<std::string> resourceIds;
+    std::vector<std::string> metadataTypes;
+    std::vector<std::string> metadataValues;
+    std::vector<std::string> revisions;
+
+    Dictionary args;
+    
+    for (uint32_t i = 0; i < count; i++)
+    {
+      std::string resourceArgName = "r" + boost::lexical_cast<std::string>(i);
+      std::string typeArgName = "t" + boost::lexical_cast<std::string>(i);
+      std::string valueArgName = "v" + boost::lexical_cast<std::string>(i);
+
+      args.SetIntegerValue(resourceArgName, metadata[i].resource);
+      args.SetInteger32Value(typeArgName, metadata[i].metadata);
+      args.SetUtf8Value(valueArgName, metadata[i].value);
+
+      resourceIds.push_back("${" + resourceArgName + "}");
+      metadataTypes.push_back("${" + typeArgName + "}");
+      metadataValues.push_back("${" + valueArgName + "}");
+      revisions.push_back("0");
+    }
+
+    std::string joinedResourceIds;
+    std::string joinedMetadataTypes;
+    std::string joinedMetadataValues;
+    std::string joinedRevisions;
+
+    Orthanc::Toolbox::JoinStrings(joinedResourceIds, resourceIds, ",");
+    Orthanc::Toolbox::JoinStrings(joinedMetadataTypes, metadataTypes, ",");
+    Orthanc::Toolbox::JoinStrings(joinedMetadataValues, metadataValues, ",");
+    Orthanc::Toolbox::JoinStrings(joinedRevisions, revisions, ",");
+
+    std::string sql = std::string("SELECT InsertOrUpdateMetadata(ARRAY[") + 
+                                  joinedResourceIds + "], ARRAY[" + 
+                                  joinedMetadataTypes + "], ARRAY[" + 
+                                  joinedMetadataValues + "], ARRAY[" + 
+                                  joinedRevisions + "])";
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+
+    for (uint32_t i = 0; i < count; i++)
+    {
+      statement.SetParameterType("v" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Utf8String);
+      statement.SetParameterType("r" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Integer64);
+      statement.SetParameterType("t" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Integer32);
+    }
+
+    statement.Execute(args);
+  }
+#endif
+
+
+  void PostgreSQLIndex::SetResourcesContent(DatabaseManager& manager,
+                                     uint32_t countIdentifierTags,
+                                     const OrthancPluginResourcesContentTags* identifierTags,
+                                     uint32_t countMainDicomTags,
+                                     const OrthancPluginResourcesContentTags* mainDicomTags,
+                                     uint32_t countMetadata,
+                                     const OrthancPluginResourcesContentMetadata* metadata)
+  {
+    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", countIdentifierTags, identifierTags);
+
+    ExecuteSetResourcesContentTags(manager, "MainDicomTags", countMainDicomTags, mainDicomTags);
+    
+    ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);
+
+  }
+
+
   uint64_t PostgreSQLIndex::GetResourcesCount(DatabaseManager& manager,
                                               OrthancPluginResourceType resourceType)
   {
@@ -471,24 +667,18 @@ namespace OrthancDatabases
     uint64_t result;
     
     {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT value FROM GlobalIntegers WHERE key = ${key}");
+      DatabaseManager::StandaloneStatement statement(
+        manager,
+        std::string("SELECT * FROM UpdateSingleStatistic(") + boost::lexical_cast<std::string>(resourceType + 2) + ")");  // For an explanation of the "+ 2" below, check out "PrepareIndex.sql"
 
-      statement.SetParameterType("key", ValueType_Integer64);
-
-      Dictionary args;
-
-      // For an explanation of the "+ 2" below, check out "FastCountResources.sql"
-      args.SetIntegerValue("key", static_cast<int>(resourceType + 2));
-
-      statement.SetReadOnly(true);
-      statement.Execute(args);
+      statement.Execute();
 
       result = static_cast<uint64_t>(statement.ReadInteger64(0));
     }
       
+    // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
     assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
+
     return result;
   }
 
@@ -513,4 +703,24 @@ namespace OrthancDatabases
     // backward compatibility is necessary
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
+
+
+// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+//   bool PostgreSQLIndex::HasFindSupport() const
+//   {
+//     // TODO-FIND
+//     return false;
+//   }
+// #endif
+
+
+// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+//   void PostgreSQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+//                                     DatabaseManager& manager,
+//                                     const Orthanc::DatabasePluginMessages::Find_Request& request)
+//   {
+//     // TODO-FIND
+//     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+//   }
+// #endif
 }

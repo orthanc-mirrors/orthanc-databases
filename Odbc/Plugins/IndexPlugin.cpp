@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -27,6 +29,8 @@
 
 #include <Logging.h>
 
+#define ORTHANC_PLUGIN_NAME "odbc-index"
+
 
 #if defined(_WIN32)
 #  ifdef _MSC_VER
@@ -41,6 +45,9 @@
 #endif
 
 
+#include <google/protobuf/any.h>
+
+
 static const char* const KEY_ODBC = "Odbc";
 
 
@@ -53,7 +60,9 @@ extern "C"
   
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
-    if (!OrthancDatabases::InitializePlugin(context, "ODBC", true))
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
+    if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "ODBC", true))
     {
       return -1;
     }
@@ -95,7 +104,7 @@ extern "C"
     {
       const std::string connectionString = odbc.GetStringValue("IndexConnectionString", "");
       const unsigned int countConnections = odbc.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
-      const unsigned int maxConnectionRetries = odbc.GetUnsignedIntegerValue("MaxConnectionRetries", 10);
+      const unsigned int maxConnectionRetries = odbc.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
       const unsigned int connectionRetryInterval = odbc.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
 
       if (connectionString.empty())
@@ -129,12 +138,13 @@ extern "C"
   {
     LOG(WARNING) << "ODBC index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
+    google::protobuf::ShutdownProtobufLibrary();
   }
 
 
   ORTHANC_PLUGINS_API const char* OrthancPluginGetName()
   {
-    return "odbc-index";
+    return ORTHANC_PLUGIN_NAME;
   }
 
 

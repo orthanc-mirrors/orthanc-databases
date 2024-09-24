@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -94,18 +96,19 @@ TEST(PostgreSQLIndex, Lock)
   OrthancDatabases::PostgreSQLIndex db1(NULL, noLock);
   db1.SetClearAll(true);
 
-  std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1));
+  std::list<OrthancDatabases::IdentifierTag> identifierTags;
+  std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1, false, identifierTags));
 
   {
     OrthancDatabases::PostgreSQLIndex db2(NULL, lock);
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2, false, identifierTags));
 
     OrthancDatabases::PostgreSQLIndex db3(NULL, lock);
-    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3), Orthanc::OrthancException);
+    ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3, false, identifierTags), Orthanc::OrthancException);
   }
 
   OrthancDatabases::PostgreSQLIndex db4(NULL, lock);
-    std::unique_ptr<OrthancDatabases::DatabaseManager> manager4(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db4));
+    std::unique_ptr<OrthancDatabases::DatabaseManager> manager4(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db4, false, identifierTags));
 }
 
 

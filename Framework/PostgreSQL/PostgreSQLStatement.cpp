@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -24,6 +26,7 @@
 
 #include "../Common/BinaryStringValue.h"
 #include "../Common/InputFileValue.h"
+#include "../Common/Integer32Value.h"
 #include "../Common/Integer64Value.h"
 #include "../Common/NullValue.h"
 #include "../Common/ResultBase.h"
@@ -286,7 +289,8 @@ namespace OrthancDatabases
       }
       
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize);
+      std::string errorString(PQresultErrorMessage(result));
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize, errorString, false); // don't log here, it is handled at higher level
 #else
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
 #endif
@@ -307,7 +311,10 @@ namespace OrthancDatabases
     inputs_(new Inputs),
     formatter_(Dialect_PostgreSQL)
   {
-    LOG(TRACE) << "PostgreSQL: " << sql;
+    if (database.IsVerboseEnabled())
+    {
+      LOG(TRACE) << "PostgreSQL: " << sql;
+    }
   }
 
 
@@ -318,7 +325,11 @@ namespace OrthancDatabases
     formatter_(Dialect_PostgreSQL)
   {
     query.Format(sql_, formatter_);
-    LOG(TRACE) << "PostgreSQL: " << sql_;
+    
+    if (database.IsVerboseEnabled())
+    {
+      LOG(TRACE) << "PostgreSQL: " << sql_;
+    }
 
     for (size_t i = 0; i < formatter_.GetParametersCount(); i++)
     {
@@ -326,6 +337,10 @@ namespace OrthancDatabases
       {
         case ValueType_Integer64:
           DeclareInputInteger64(i);
+          break;
+
+        case ValueType_Integer32:
+          DeclareInputInteger(i);
           break;
 
         case ValueType_Utf8String:
@@ -517,6 +532,10 @@ namespace OrthancDatabases
       {
         case ValueType_Integer64:
           BindInteger64(i, dynamic_cast<const Integer64Value&>(parameters.GetValue(name)).GetValue());
+          break;
+
+        case ValueType_Integer32:
+          BindInteger(i, dynamic_cast<const Integer32Value&>(parameters.GetValue(name)).GetValue());
           break;
 
         case ValueType_Null:

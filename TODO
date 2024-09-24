@@ -10,6 +10,15 @@ Common - Database index
 * Performance of joins in LookupResources: Create cached statement for
   LookupResources, that are grouped to search up to, say, 10 tags,
   instead of recompiling for each request
+* Do not log "DatabaseCannotSerialize" errors in the plugin but only
+  in Orthanc after all retries have been made.
+* Try to avoid the use of temporary tables:
+  https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor/3820
+
+
+* Implement "large queries" for:
+  - updating all metadata of a resource at once
+  - update all maindicomtags of 4 resource levels at once
 
 
 ---------------------
@@ -18,7 +27,7 @@ Common - Storage area
 
 * Implement the "StoreDicom" option from the default filesystem
   storage area to run MySQL/PostgreSQL storage in index-only mode:
-  https://book.orthanc-server.com/contributing.html
+  https://orthanc.uclouvain.be/book/contributing.html
 
 * Performance: Add a pool of connections to PostgreSQL/MySQL, as
   already done in the database index plugins
@@ -27,13 +36,22 @@ Common - Storage area
 PostgreSQL
 ----------
 
-* reported issue to validate:  uploading lots of files through HTTP with:
-  - 1 client and IndexConnectionsCount==1 took 100s
-  - 2 client and IndexConnectionsCount==2 took 600s (lots of transaction replayed)
+* Check if we can force the schema that is used.  By default, Orthanc
+  is using the 'public' schema but, after a wrong command, we have seen
+  a DB where there was a 'AttachedFiles' table in the public schema and another one in a
+  'MyPacs' schema and Orthanc was actually using the 'MyPacs.AttachedFiles' table !!!
+  Orthanc was then seeing only the most recent attached files !!!
+
+* Have a separate "thread" to UpdateStatistics to avoid large computations ?
+
 
 * Seems Orthanc might deadlock when there are plenty of conflicting transactions:
   https://groups.google.com/g/orthanc-users/c/xQelEcKqL9U/m/HsvxwlkvAQAJ
   https://groups.google.com/g/orthanc-users/c/1bkClfZ0KBA/m/s4AlwVh3CQAJ 
+
+* use ReadCommited mode by default
+* use 40 index connection count by default (not 50 because, by default, PG has 100 connections and we want at least
+  a few connections to remain available for sys admins if e.g, 2 Orthanc instances are running on the same server)
 
 -----
 MySQL
@@ -44,6 +62,7 @@ MySQL
 
 * MySQL performance => implement GlobalProperty_GetTotalSizeIsFast:
   https://groups.google.com/d/msg/orthanc-users/kSR4a110zDo/D7e4ITR8BwAJ
+  https://discourse.orthanc-server.org/t/when-running-housekeeping-mysqld-exe-searching-and-dicom-transfer-is-slow/4921/9
 
 * Add index to speed up wildcard search, as already done in PostgreSQL:
 
@@ -51,3 +70,10 @@ MySQL
     ALTER TABLE table ADD FULLTEXT index_name(column1);
 
   - https://dev.mysql.com/doc/refman/8.0/en/index-btree-hash.html
+
+
+----
+ODBC
+----
+
+* https://orthanc.uclouvain.be/bugs/show_bug.cgi?id=224

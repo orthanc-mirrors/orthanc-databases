@@ -1,7 +1,75 @@
 Pending changes in the mainline
 ===============================
 
+DB schema revision: 2
+Minimum plugin SDK (for build): 1.12.3
+Minimum Orthanc runtime: 1.12.3
+
+* Fix updates from plugin version 3.3 to latest version
+* Added support for ExtendedChanges:
+  - changes?type=...&to=...
 * Added support for customData in AttachedFiles
+* Performance optimizations (to be summarized before release):
+  - using more prepared SQL statements:
+    - InsertOrUpdateMetadata
+    - ExecuteSetResourcesContentTags
+  - merged BEGIN and SET TRANSACTION statements
+  - reduced the number of round-trips between Orthanc and the PostgreSQL server:
+    - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 9
+* Fixed a memory leak when executing non cached SQL statements (rarely used)
+
+
+Release 6.2 (2024-03-25)
+========================
+
+DB schema revision: 2
+Minimum plugin SDK (for build): 1.12.3
+Minimum Orthanc runtime: 1.12.3
+
+* Fix check of Orthanc runtime version
+
+
+Release 6.1 (2024-02-14)
+========================
+
+DB schema revision: 2
+
+* Fix handling of MaximumStorageSize & MaximumPatientCount.
+
+
+Release 6.0 (2024-02-08)
+========================
+
+DB schema revision: 2
+
+* The DB schema has been updated to Revision 2.  If you need to reinstall the previous
+  version of the plugin, you should run this script:
+  https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Downgrades/Rev2ToRev1.sql
+* Transaction Mode:
+  Introduced a new configuration "TransactionMode" to select the transaction isolation level.
+  Allowed values: "Serializable", "ReadCommitted".
+  The "Serializable" mode was the only available value up to now.  It is still the default
+  value now.
+  The "ReadCommitted" is possible now due to rewrites of SQL queries and notably improves
+  the Orthanc ability to ingest data from multiple sources in parallel.
+* New "EnableVerboseLogs" configuration to show SQL statements being executed.
+
+
+Release 5.1 (2023-06-27)
+========================
+
+DB schema revision: 1
+
+* Optimization of LookupResources mainly used in tools/find, C-Find and QIDO-RS.
+
+Release 5.0 (2023-04-15)
+========================
+
+* Added support for labels
+* Compatibility with Orthanc SDK 1.12.0 (communications between the
+  Orthanc core and the database plugin using Google Protocol Buffers)
+* Upgraded dependencies for static builds (notably on Windows and LSB):
+  - openssl 3.1.0
 
 
 Release 4.0 (2021-04-22)
@@ -13,7 +81,7 @@ Release 4.0 (2021-04-22)
 * Support of multiple readers/writers, by handling retries from Orthanc SDK 1.9.2
 * Support of range reads for the storage area, from Orthanc SDK 1.9.0
 * Fix issue #193 (LSB binaries crash with PostgreSQL + SSL) by changeset
-  in OrthancFramework: https://hg.orthanc-server.com/orthanc/rev/9a9118406484
+  in OrthancFramework: https://orthanc.uclouvain.be/hg/orthanc/rev/9a9118406484
 * Fix issue #151 (Storage failures when running with two instances and PG_LOCK=false)
 
 

@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -55,7 +57,9 @@ namespace OrthancDatabases
 
     virtual IDatabaseFactory* CreateDatabaseFactory() ORTHANC_OVERRIDE;    
     
-    virtual void ConfigureDatabase(DatabaseManager& manager) ORTHANC_OVERRIDE;
+    virtual void ConfigureDatabase(DatabaseManager& manager,
+                                   bool hasIdentifierTags,
+                                   const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;
     
     virtual bool HasRevisionsSupport() const ORTHANC_OVERRIDE
     {
@@ -87,5 +91,21 @@ namespace OrthancDatabases
                                   DatabaseManager& manager,
                                   int64_t id,
                                   int32_t attachment) ORTHANC_OVERRIDE;
+    
+    // New primitive since Orthanc 1.12.0
+    virtual bool HasLabelsSupport() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
   };
 }

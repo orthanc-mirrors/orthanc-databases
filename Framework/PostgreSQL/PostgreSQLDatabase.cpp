@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -158,7 +160,10 @@ namespace OrthancDatabases
 
   void PostgreSQLDatabase::ExecuteMultiLines(const std::string& sql)
   {
-    LOG(TRACE) << "PostgreSQL: " << sql;
+    if (IsVerboseEnabled())
+    {
+      LOG(INFO) << "PostgreSQL: " << sql;
+    }
     Open();
 
     PGresult* result = PQexec(reinterpret_cast<PGconn*>(pg_), sql.c_str());
@@ -317,13 +322,15 @@ namespace OrthancDatabases
 
   PostgreSQLDatabase::TransientAdvisoryLock::TransientAdvisoryLock(
     PostgreSQLDatabase&  database,
-    int32_t lock) :
+    int32_t lock,
+    unsigned int retries,
+    unsigned int retryInterval) :
     database_(database),
     lock_(lock)
   {
     bool locked = true;
     
-    for (unsigned int i = 0; i < 10; i++)
+    for (unsigned int i = 0; i < retries; i++)
     {
       if (database_.AcquireAdvisoryLock(lock_))
       {
@@ -332,7 +339,7 @@ namespace OrthancDatabases
       }
       else
       {
-        boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+        boost::this_thread::sleep(boost::posix_time::milliseconds(retryInterval));
       }
     }
 

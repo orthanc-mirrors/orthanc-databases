@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -19,21 +21,35 @@
  **/
 
 
-#include "StatementLocation.h"
+#include "Integer32Value.h"
 
-#include <string.h>
+#include "BinaryStringValue.h"
+#include "NullValue.h"
+#include "Utf8StringValue.h"
+
+#include <OrthancException.h>
+
+#include <boost/lexical_cast.hpp>
 
 namespace OrthancDatabases
 {
-  bool StatementLocation::operator< (const StatementLocation& other) const
+  IValue* Integer32Value::Convert(ValueType target) const
   {
-    if (line_ != other.line_)
+    std::string s = boost::lexical_cast<std::string>(value_);
+            
+    switch (target)
     {
-      return line_ < other.line_;
-    }
-    else
-    {
-      return strcmp(file_, other.file_) < 0;
+      case ValueType_Null:
+        return new NullValue;
+
+      case ValueType_BinaryString:
+        return new BinaryStringValue(s);
+
+      case ValueType_Utf8String:
+        return new Utf8StringValue(s);
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
 }

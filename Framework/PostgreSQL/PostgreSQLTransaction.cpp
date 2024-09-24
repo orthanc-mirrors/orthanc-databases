@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -63,23 +65,28 @@ namespace OrthancDatabases
       LOG(ERROR) << "PostgreSQL: Beginning a transaction twice!";
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
-
-    database_.ExecuteMultiLines("BEGIN");
+    std::string transactionStatement;  // if not defined, will use the default DB transaction isolation level
 
     switch (type)
     {
       case TransactionType_ReadWrite:
-        database_.ExecuteMultiLines("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE");
+      {
+        transactionStatement = database_.GetReadWriteTransactionStatement();
         break;
+      }
 
       case TransactionType_ReadOnly:
-        database_.ExecuteMultiLines("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY");
+      {
+        transactionStatement = database_.GetReadOnlyTransactionStatement();
         break;
+      }
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
-        
+
+    database_.ExecuteMultiLines("BEGIN; " + transactionStatement);
+
     isOpen_ = true;
   }
 

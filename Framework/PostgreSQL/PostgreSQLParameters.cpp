@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -41,6 +43,8 @@ namespace OrthancDatabases
     lock_ = true;
     maxConnectionRetries_ = 10;
     connectionRetryInterval_ = 5;
+    isVerboseEnabled_ = false;
+    isolationMode_ = IsolationMode_Serializable;
   }
 
 
@@ -93,8 +97,26 @@ namespace OrthancDatabases
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
 
+    isVerboseEnabled_ = configuration.GetBooleanValue("EnableVerboseLogs", false);
+
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
+
+    std::string transactionMode = configuration.GetStringValue("TransactionMode", "Serializable");
+    if (transactionMode == "ReadCommitted")
+    {
+      LOG(WARNING) << "PostgreSQL: using READ COMMITTED transaction mode";
+      SetIsolationMode(IsolationMode_ReadCommited);
+    }
+    else if (transactionMode == "Serializable")
+    {
+      LOG(WARNING) << "PostgreSQL: using SERIALIZABLE transaction mode";
+      SetIsolationMode(IsolationMode_Serializable);
+    }
+    else
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType, std::string("Invalid value for 'TransactionMode': ") + transactionMode);
+    }
   }
 
 
@@ -176,6 +198,36 @@ namespace OrthancDatabases
   {
     uri_.clear();
     database_ = database;
+  }
+
+  const std::string PostgreSQLParameters::GetReadWriteTransactionStatement() const
+  {
+    switch (isolationMode_)
+    {
+      case IsolationMode_ReadCommited:
+        return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ WRITE";
+
+      case IsolationMode_Serializable:
+        return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ WRITE";
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
+  }
+
+  const std::string PostgreSQLParameters::GetReadOnlyTransactionStatement() const
+  {
+    switch (isolationMode_)
+    {
+      case IsolationMode_ReadCommited:
+        return "SET TRANSACTION ISOLATION LEVEL READ COMMITTED READ ONLY";
+
+      case IsolationMode_Serializable:
+        return "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY";
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+    }
   }
 
   void PostgreSQLParameters::Format(std::string& target) const

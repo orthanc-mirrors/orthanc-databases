@@ -2,7 +2,9 @@
  * Orthanc - A Lightweight, RESTful DICOM Store
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
- * Copyright (C) 2017-2021 Osimis S.A., Belgium
+ * Copyright (C) 2017-2023 Osimis S.A., Belgium
+ * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -89,7 +91,8 @@ namespace OrthancDatabases
 
       if (manager_.get() == NULL)
       {
-        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_));
+        std::list<IdentifierTag> identifierTags;
+        manager_.reset(IndexBackend::CreateSingleDatabaseManager(*backend_, false, identifierTags));
       }
       else
       {
@@ -947,7 +950,9 @@ namespace OrthancDatabases
     try
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);      
-      adapter->GetBackend().LogExportedResource(accessor.GetManager(), *exported);
+      adapter->GetBackend().LogExportedResource(accessor.GetManager(), exported->resourceType, exported->publicId,
+                                                exported->modality, exported->date, exported->patientId,
+                                                exported->studyInstanceUid, exported->seriesInstanceUid, exported->sopInstanceUid);
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1410,15 +1415,17 @@ namespace OrthancDatabases
     {
       DatabaseBackendAdapterV2::Adapter::DatabaseAccessor accessor(*adapter);
 
-      std::vector<Orthanc::DatabaseConstraint> lookup;
-      lookup.reserve(constraintsCount);
+      DatabaseConstraints lookup;
 
       for (uint32_t i = 0; i < constraintsCount; i++)
       {
-        lookup.push_back(Orthanc::DatabaseConstraint(constraints[i]));
+        lookup.AddConstraint(new DatabaseConstraint(constraints[i]));
       }
         
-      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, limit, (requestSomeInstance != 0));
+      std::set<std::string> noLabel;
+      adapter->GetBackend().LookupResources(*output, accessor.GetManager(), lookup, queryLevel, noLabel,
+                                            LabelsConstraint_All, limit, (requestSomeInstance != 0));
+      
       return OrthancPluginErrorCode_Success;
     }
     ORTHANC_PLUGINS_DATABASE_CATCH;
@@ -1633,17 +1640,21 @@ namespace OrthancDatabases
 
   void DatabaseBackendAdapterV2::Register(IDatabaseBackend* backend)
   {
-    if (backend == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-    }
+      std::unique_ptr<IDatabaseBackend> protection(backend);
+    
+      if (backend == NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+      }
 
-    if (adapter_.get() != NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
-    }
+      if (adapter_.get() != NULL)
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+      }
 
-    adapter_.reset(new Adapter(backend));
+      adapter_.reset(new Adapter(protection.release()));
+    }
     
     OrthancPluginDatabaseBackend  params;
     memset(&params, 0, sizeof(params));
