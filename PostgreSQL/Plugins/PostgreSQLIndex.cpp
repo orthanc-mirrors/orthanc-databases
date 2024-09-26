@@ -43,6 +43,7 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasCreateInstance = GlobalProperty_DatabaseInternal1;
   static const GlobalProperty GlobalProperty_HasFastCountResources = GlobalProperty_DatabaseInternal2;
   static const GlobalProperty GlobalProperty_GetLastChangeIndex = GlobalProperty_DatabaseInternal3;
+  static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
 
@@ -206,6 +207,15 @@ namespace OrthancDatabases
             // apply all idempotent changes that are in the PrepareIndexV2
             ApplyPrepareIndex(t, manager);
           }
+
+          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                           Orthanc::GlobalProperty_HasComputeStatisticsReadOnly) ||
+              property != 1)
+          {
+            // apply all idempotent changes that are in the PrepareIndex.  In this case, we are just interested by
+            // ComputeStatisticsReadOnly() that does not need to be uninstalled in case of downgrade.
+            ApplyPrepareIndex(t, manager);
+          }
         }
 
         t.Commit();
@@ -243,7 +253,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT * FROM UpdateSingleStatistic(0)");
+        "SELECT * FROM ComputeStatisticsReadOnly(0)");
 
       statement.Execute();
 
@@ -264,7 +274,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT * FROM UpdateSingleStatistic(1)");
+        "SELECT * FROM ComputeStatisticsReadOnly(1)");
 
       statement.Execute();
 
@@ -648,7 +658,7 @@ namespace OrthancDatabases
     {
       DatabaseManager::StandaloneStatement statement(
         manager,
-        std::string("SELECT * FROM UpdateSingleStatistic(") + boost::lexical_cast<std::string>(resourceType + 2) + ")");  // For an explanation of the "+ 2" below, check out "PrepareIndex.sql"
+        std::string("SELECT * FROM ComputeStatisticsReadOnly(") + boost::lexical_cast<std::string>(resourceType + 2) + ")");  // For an explanation of the "+ 2" below, check out "PrepareIndex.sql"
 
       statement.Execute();
 
