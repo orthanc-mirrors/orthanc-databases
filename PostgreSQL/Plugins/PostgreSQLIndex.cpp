@@ -145,6 +145,7 @@ namespace OrthancDatabases
             revision = 1;
             needToRunUpgradeFromUnknownToV1 = true;
             needToRunUpgradeV1toV2 = true;
+            needToRunUpgradeV2toV3 = true;
           }
           else if (revision == 1)
           {
