@@ -257,7 +257,14 @@ namespace OrthancDatabases
 
       statement.Execute();
 
-      result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      if (statement.IsNull(0))
+      {
+        return 0;
+      }
+      else
+      {
+        result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      }
     }
     
     // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
