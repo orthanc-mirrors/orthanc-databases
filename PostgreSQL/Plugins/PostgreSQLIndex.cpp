@@ -165,18 +165,19 @@ namespace OrthancDatabases
           }
 
           int property = 0;
-          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                           Orthanc::GlobalProperty_HasFastCountResources) ||
-              property != 1)
-          {
-            needToRunUpgradeV1toV2 = true;
-          }
-          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                          Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-              property != 1)
-          {
-            needToRunUpgradeV1toV2 = true;
-          }
+          // these extensions are not installed anymore from v6.0 of the plugin (but the plugin is fast to compute the size and count the resources)
+          // if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+          //                                  Orthanc::GlobalProperty_HasFastCountResources) ||
+          //     property != 1)
+          // {
+          //   needToRunUpgradeV1toV2 = true;
+          // }
+          // if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+          //                                 Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
+          //     property != 1)
+          // {
+          //   needToRunUpgradeV1toV2 = true;
+          // }
           if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                           Orthanc::GlobalProperty_GetLastChangeIndex) ||
               property != 1)
@@ -247,7 +248,6 @@ namespace OrthancDatabases
 
   uint64_t PostgreSQLIndex::GetTotalCompressedSize(DatabaseManager& manager)
   {
-    // Fast version if extension "./FastTotalSize.sql" is installed
     uint64_t result;
 
     {
@@ -275,7 +275,6 @@ namespace OrthancDatabases
   
   uint64_t PostgreSQLIndex::GetTotalUncompressedSize(DatabaseManager& manager)
   {
-    // Fast version if extension "./FastTotalSize.sql" is installed
     uint64_t result;
 
     {
@@ -285,7 +284,14 @@ namespace OrthancDatabases
 
       statement.Execute();
 
-      result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      if (statement.IsNull(0))
+      {
+        return 0;
+      }
+      else
+      {
+        result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      }
     }
     
     // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
@@ -653,8 +659,6 @@ namespace OrthancDatabases
   uint64_t PostgreSQLIndex::GetResourcesCount(DatabaseManager& manager,
                                               OrthancPluginResourceType resourceType)
   {
-    // Optimized version thanks to the "FastCountResources.sql" extension
-
     assert(OrthancPluginResourceType_Patient == 0 &&
            OrthancPluginResourceType_Study == 1 &&
            OrthancPluginResourceType_Series == 2 &&
@@ -669,11 +673,18 @@ namespace OrthancDatabases
 
       statement.Execute();
 
-      result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      if (statement.IsNull(0))
+      {
+        return 0;
+      }
+      else
+      {
+        result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      }
     }
       
     // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
-    assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
+    // assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
 
     return result;
   }
