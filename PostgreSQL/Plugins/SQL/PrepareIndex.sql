@@ -558,11 +558,11 @@ DECLARE
     
 BEGIN
 
-    SELECT VALUE from GlobalIntegers
+    SELECT VALUE FROM GlobalIntegers
     INTO current_value
     WHERE key = statistics_key;
 
-    SELECT sum(value) + current_value FROM GlobalIntegersChanges
+    SELECT COALESCE(SUM(value), 0) + current_value FROM GlobalIntegersChanges
     INTO accumulated_value
     WHERE key = statistics_key;
 
