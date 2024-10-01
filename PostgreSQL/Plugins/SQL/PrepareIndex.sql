@@ -549,7 +549,28 @@ BEGIN
         PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
     END IF;  
 END;
+$body$ LANGUAGE plpgsql;
 
+-- function to compute a statistic in a ReadOnly transaction
+CREATE OR REPLACE FUNCTION ComputeStatisticsReadOnly(
+    IN statistics_key INTEGER,
+    OUT accumulated_value BIGINT
+) RETURNS BIGINT AS $body$
+
+DECLARE
+    current_value BIGINT;
+    
+BEGIN
+
+    SELECT VALUE FROM GlobalIntegers
+    INTO current_value
+    WHERE key = statistics_key;
+
+    SELECT COALESCE(SUM(value), 0) + current_value FROM GlobalIntegersChanges
+    INTO accumulated_value
+    WHERE key = statistics_key;
+
+END;
 $body$ LANGUAGE plpgsql;
 
 
@@ -563,3 +584,4 @@ INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance
 INSERT INTO GlobalProperties VALUES (12, 1); -- GlobalProperty_HasFastCountResources
 INSERT INTO GlobalProperties VALUES (13, 1); -- GlobalProperty_GetLastChangeIndex
+INSERT INTO GlobalProperties VALUES (14, 1); -- GlobalProperty_HasComputeStatisticsReadOnly
