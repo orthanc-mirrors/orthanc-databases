@@ -1,9 +1,14 @@
 Pending changes in the mainline
 ===============================
 
-DB schema revision: 2
+DB schema revision: 3
+
 Minimum plugin SDK (for build): 1.12.3
+Optimal plugin SDK: 1.12.6
+
 Minimum Orthanc runtime: 1.12.3
+Optimal Orthanc runtime: 1.12.6
+
 
 * Fix updates from plugin version 3.3 to latest version
 * Added support for ExtendedChanges:

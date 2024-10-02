@@ -225,6 +225,9 @@ namespace OrthancDatabases
       attachment->set_compression_type(compressionType);
       attachment->set_compressed_size(compressedSize);
       attachment->set_compressed_hash(compressedHash);
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+      attachment->set_custom_data(customData);
+#endif
     }
 
     virtual void SignalDeletedResource(const std::string& publicId,
@@ -288,6 +291,9 @@ namespace OrthancDatabases
         lookupAttachment_->mutable_attachment()->set_compression_type(compressionType);
         lookupAttachment_->mutable_attachment()->set_compressed_size(compressedSize);
         lookupAttachment_->mutable_attachment()->set_compressed_hash(compressedHash);
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA==1
+        lookupAttachment_->mutable_attachment()->set_custom_data(customData);
+#endif
       }
       else
       {
@@ -684,6 +690,9 @@ namespace OrthancDatabases
       
       case Orthanc::DatabasePluginMessages::OPERATION_ADD_ATTACHMENT:
       {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 6)
+        backend.AddAttachment(response, manager, request.add_attachment());
+#else
         OrthancPluginAttachment attachment;
         attachment.uuid = request.add_attachment().attachment().uuid().c_str();
         attachment.contentType = request.add_attachment().attachment().content_type();
@@ -694,9 +703,9 @@ namespace OrthancDatabases
         attachment.compressedHash = request.add_attachment().attachment().compressed_hash().c_str();
         
         backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision());
+#endif
         break;
       }
-      
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_CHANGES:
       {
         backend.ClearChanges(manager);

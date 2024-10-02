@@ -400,17 +400,38 @@ namespace OrthancDatabases
                          attachment.compressionType, attachment.compressedSize, attachment.compressedHash, "", revision);
   }
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
-  void IndexBackend::AddAttachment2(DatabaseManager& manager,
-                                   int64_t id,
-                                   const OrthancPluginAttachment2& attachment,
-                                   int64_t revision)
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 6)
+  void IndexBackend::AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                   DatabaseManager& manager,
+                                   const Orthanc::DatabasePluginMessages::AddAttachment_Request& request)
   {
     assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins supports these features now
-    ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
-                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash, attachment.customData, revision);
+    ExecuteAddAttachment(manager, 
+                         request.id(), 
+                         request.attachment().uuid().c_str(),
+                         request.attachment().content_type(),
+                         request.attachment().uncompressed_size(),
+                         request.attachment().uncompressed_hash().c_str(),
+                         request.attachment().compression_type(),
+                         request.attachment().compressed_size(),
+                         request.attachment().compressed_hash().c_str(),
+                         request.attachment().custom_data().c_str(),
+                         request.revision());
   }
 #endif
+
+
+// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 6)
+//   void IndexBackend::AddAttachment2(DatabaseManager& manager,
+//                                    int64_t id,
+//                                    const OrthancPluginAttachment2& attachment,
+//                                    int64_t revision)
+//   {
+//     assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins supports these features now
+//     ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
+//                          attachment.compressionType, attachment.compressedSize, attachment.compressedHash, attachment.customData, revision);
+//   }
+// #endif
     
   void IndexBackend::AttachChild(DatabaseManager& manager,
                                  int64_t parent,
