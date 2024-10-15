@@ -278,5 +278,13 @@ namespace OrthancDatabases
     // TODO-FIND
     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
+
+  void SQLiteIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                 DatabaseManager& manager,
+                                 const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    // TODO-FIND
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
 #endif
 }

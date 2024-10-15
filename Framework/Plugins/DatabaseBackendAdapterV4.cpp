@@ -1327,6 +1327,12 @@ namespace OrthancDatabases
         backend.ExecuteFind(response, manager, request.find());
         break;
       }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_COUNT_RESOURCES:
+      {
+        backend.ExecuteCount(response, manager, request.find());
+        break;
+      }
 #endif
 
       default:

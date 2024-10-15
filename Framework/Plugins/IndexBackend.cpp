@@ -3187,6 +3187,24 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 
+  void IndexBackend::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                  DatabaseManager& manager,
+                                  const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
+    std::string sql;
+
+    LookupFormatter formatter(manager.GetDialect());
+    std::string lookupSql;
+    ISqlLookupFormatter::Apply(lookupSql, formatter, request);
+
+    sql = "WITH Lookup AS (" + lookupSql + ") SELECT COUNT(*) FROM Lookup";
+
+    DatabaseManager::StandaloneStatement statement(manager, sql);  // TODO-FIND: cache dynamic statement ?  Probably worth it since it can be very complex queries !
+    formatter.PrepareStatement(statement);
+    statement.Execute(formatter.GetDictionary());
+    response.mutable_count_resources()->set_count(statement.ReadInteger64(0));
+  }
+
   void IndexBackend::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                     DatabaseManager& manager,
                                     const Orthanc::DatabasePluginMessages::Find_Request& request)

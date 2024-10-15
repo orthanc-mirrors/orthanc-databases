@@ -101,6 +101,10 @@ namespace OrthancDatabases
     virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                              DatabaseManager& manager,
                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+
+    virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                              DatabaseManager& manager,
+                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 #endif
   };
 }
