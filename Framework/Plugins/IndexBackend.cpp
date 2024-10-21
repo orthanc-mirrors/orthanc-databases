@@ -2216,7 +2216,7 @@ namespace OrthancDatabases
       {
         case Dialect_MSSQL:
         {
-          if (since > 0)
+          if (count > 0 || since > 0)
           {
             sql += " OFFSET " + boost::lexical_cast<std::string>(since) + " ROWS ";
           }

@@ -801,7 +801,8 @@ namespace OrthancDatabases
 
     if (limit != 0)
     {
-      sql += " LIMIT " + boost::lexical_cast<std::string>(limit);
+      sql += " ORDER BY " + FormatLevel(queryLevel) + ".publicId ";  // we need an "order by" to use limits
+      sql += formatter.FormatLimits(0, limit);
     }
   }
 
@@ -1192,7 +1193,8 @@ namespace OrthancDatabases
 
     if (limit != 0)
     {
-      sql += " LIMIT " + boost::lexical_cast<std::string>(limit);
+      sql += " ORDER BY publicId ";  // we need an "order by" to use limits
+      sql += formatter.FormatLimits(0, limit);
     }
   }
 }
