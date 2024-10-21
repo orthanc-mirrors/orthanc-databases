@@ -194,6 +194,8 @@ namespace OrthancDatabases
       {
         IResult::Print(stream, GetResult());
       }
+
+      virtual void Execute(const Dictionary& parameters) = 0;
     };
 
 
@@ -221,7 +223,7 @@ namespace OrthancDatabases
         Execute(parameters);
       }
 
-      void Execute(const Dictionary& parameters);
+      virtual void Execute(const Dictionary& parameters);
 
       void ExecuteWithoutResult()
       {
@@ -253,7 +255,7 @@ namespace OrthancDatabases
         Execute(parameters);
       }
 
-      void Execute(const Dictionary& parameters);
+      virtual void Execute(const Dictionary& parameters);
 
       void ExecuteWithoutResult()
       {

@@ -62,6 +62,8 @@ namespace OrthancDatabases
 
     virtual std::string FormatLimits(uint64_t since, uint64_t count) = 0;
 
+    virtual std::string FormatNull(const char* type) = 0;
+
     /**
      * Whether to escape '[' and ']', which is only needed for
      * MSSQL. New in Orthanc 1.10.0, from the following changeset:

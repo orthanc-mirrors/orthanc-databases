@@ -37,25 +37,17 @@ namespace OrthancDatabases
     const char* file_;
     int line_;
     std::string statement_;
+    std::string hash_;
 
     StatementId(); // Forbidden
     
   public:
     StatementId(const char* file,
-                int line) :
-      file_(file),
-      line_(line)
-    {
-    }
+                int line);
 
     StatementId(const char* file,
                 int line,
-                const std::string& statement) :
-      file_(file),
-      line_(line),
-      statement_(statement)
-    {
-    }
+                const std::string& statement);
 
     const char* GetFile() const
     {

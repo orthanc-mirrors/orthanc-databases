@@ -599,26 +599,26 @@ namespace OrthancDatabases
   bool MySQLIndex::HasFindSupport() const
   {
     // TODO-FIND
-    return false;
+    return true;
   }
 #endif
 
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-  void MySQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                               DatabaseManager& manager,
-                               const Orthanc::DatabasePluginMessages::Find_Request& request)
-  {
-    // TODO-FIND
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-  }
+  // void MySQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  //                              DatabaseManager& manager,
+  //                              const Orthanc::DatabasePluginMessages::Find_Request& request)
+  // {
+  //   // TODO-FIND
+  //   throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  // }
 
-  void MySQLIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                                DatabaseManager& manager,
-                                const Orthanc::DatabasePluginMessages::Find_Request& request)
-  {
-    // TODO-FIND
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-  }
+  // void MySQLIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  //                               DatabaseManager& manager,
+  //                               const Orthanc::DatabasePluginMessages::Find_Request& request)
+  // {
+  //   // TODO-FIND
+  //   throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  // }
 #endif
 }

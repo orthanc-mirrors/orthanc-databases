@@ -24,21 +24,31 @@
 #include "StatementId.h"
 
 #include <string.h>
+#include <Toolbox.h>
 
 namespace OrthancDatabases
 {
   bool StatementId::operator< (const StatementId& other) const
   {
-    if (line_ != other.line_)
-    {
-      return line_ < other.line_;
-    }
-
-    if (strcmp(file_, other.file_) < 0)
-    {
-      return true;
-    }
-
-    return statement_ < other.statement_;
+    return hash_ < other.hash_;
   }
+
+  StatementId::StatementId(const char* file,
+                           int line) :
+      file_(file),
+      line_(line)
+  {
+    Orthanc::Toolbox::ComputeMD5(hash_, file_ + boost::lexical_cast<std::string>(line_));
+  }
+
+  StatementId::StatementId(const char* file,
+                           int line,
+                           const std::string& statement) :
+      file_(file),
+      line_(line),
+      statement_(statement)
+  {
+    Orthanc::Toolbox::ComputeMD5(hash_, file_ + boost::lexical_cast<std::string>(line_) + statement_);
+  }
+
 }
