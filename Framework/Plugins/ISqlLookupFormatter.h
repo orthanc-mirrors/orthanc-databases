@@ -71,6 +71,8 @@ namespace OrthancDatabases
      **/
     virtual bool IsEscapeBrackets() const = 0;
 
+    virtual bool SupportsNullsLast() const = 0;
+
     static void GetLookupLevels(Orthanc::ResourceType& lowerLevel,
                                 Orthanc::ResourceType& upperLevel,
                                 const Orthanc::ResourceType& queryLevel,

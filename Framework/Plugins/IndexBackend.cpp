@@ -2266,6 +2266,11 @@ namespace OrthancDatabases
       return (dialect_ == Dialect_MSSQL);
     }
 
+    virtual bool SupportsNullsLast() const
+    {
+      return (dialect_ == Dialect_PostgreSQL);
+    }
+
     void PrepareStatement(DatabaseManager::StandaloneStatement& statement) const
     {
       statement.SetReadOnly(true);

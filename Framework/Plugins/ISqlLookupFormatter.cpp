@@ -904,7 +904,13 @@ namespace OrthancDatabases
 
         orderingJoins += orderingJoin;
         
-        std::string orderByField = "order" + boost::lexical_cast<std::string>(i) + ".value";
+        std::string orderByField;
+        if (!formatter.SupportsNullsLast())
+        {
+          orderByField = "CASE WHEN order" + boost::lexical_cast<std::string>(i) + ".value IS NULL THEN 1 ELSE 0 END, ";
+        }
+        orderByField += "order" + boost::lexical_cast<std::string>(i) + ".value";
+         
         if (ordering.direction() == Orthanc::DatabasePluginMessages::OrderingDirection::ORDERING_DIRECTION_ASC)
         {
           orderByField += " ASC";
@@ -919,7 +925,15 @@ namespace OrthancDatabases
 
       std::string orderByFieldsString;
       Orthanc::Toolbox::JoinStrings(orderByFieldsString, orderByFields, ", ");
-      ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
+
+      if (formatter.SupportsNullsLast())
+      {
+        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
+      }
+      else
+      {
+        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + ") AS rowNumber";
+      }
     }
     else
     {
