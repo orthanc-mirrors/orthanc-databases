@@ -50,8 +50,9 @@ namespace Orthanc
 namespace OrthancDatabases
 {
   PostgreSQLIndex::PostgreSQLIndex(OrthancPluginContext* context,
-                                   const PostgreSQLParameters& parameters) :
-    IndexBackend(context),
+                                   const PostgreSQLParameters& parameters,
+                                   bool readOnly) :
+    IndexBackend(context, readOnly),
     parameters_(parameters),
     clearAll_(false)
   {
@@ -94,11 +95,18 @@ namespace OrthancDatabases
 
     PostgreSQLDatabase& db = dynamic_cast<PostgreSQLDatabase&>(manager.GetDatabase());
 
-    if (parameters_.HasLock())
+    if (parameters_.HasLock()) 
     {
+      if (IsReadOnly())
+      {
+        LOG(ERROR) << "READ-ONLY SYSTEM: Unable to lock the database when working in ReadOnly mode."; 
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
+      }
+
       db.AdvisoryLock(POSTGRESQL_LOCK_INDEX);
     }
 
+    if (!IsReadOnly())
     {
       // lock the full DB while checking if it needs to be create/ugraded
       PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
@@ -217,9 +225,28 @@ namespace OrthancDatabases
             // ComputeStatisticsReadOnly() that does not need to be uninstalled in case of downgrade.
             ApplyPrepareIndex(t, manager);
           }
+
+          // If you add new tests here, update the test in the "ReadOnly" code below
         }
 
         t.Commit();
+      }
+    }
+    else
+    {
+      LOG(WARNING) << "READ-ONLY SYSTEM: checking if the DB already exists and has the right schema"; 
+
+      DatabaseManager::Transaction t(manager, TransactionType_ReadOnly);
+
+      int property = 0;
+      
+      // test if the last "extension" has been installed
+      if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
+                                        Orthanc::GlobalProperty_HasComputeStatisticsReadOnly) ||
+          property != 1)
+      {
+        LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
     }
   }

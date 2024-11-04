@@ -42,6 +42,7 @@ namespace OrthancDatabases
     class LookupFormatter;
 
     OrthancPluginContext*  context_;
+    bool                   readOnly_;
 
     boost::shared_mutex                                outputFactoryMutex_;
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
@@ -59,6 +60,11 @@ namespace OrthancDatabases
     void SignalDeletedResources(IDatabaseBackendOutput& output,
                                 DatabaseManager& manager);
 
+    bool IsReadOnly()
+    {
+      return readOnly_;
+    }
+
   private:
     void ReadChangesInternal(IDatabaseBackendOutput& output,
                              bool& done,
@@ -75,7 +81,7 @@ namespace OrthancDatabases
                                        uint32_t limit);
 
   public:
-    explicit IndexBackend(OrthancPluginContext* context);
+    explicit IndexBackend(OrthancPluginContext* context, bool readOnly);
 
     virtual OrthancPluginContext* GetContext() ORTHANC_OVERRIDE
     {

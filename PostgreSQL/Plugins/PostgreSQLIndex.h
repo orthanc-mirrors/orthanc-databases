@@ -45,7 +45,8 @@ namespace OrthancDatabases
 
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
-                    const PostgreSQLParameters& parameters);
+                    const PostgreSQLParameters& parameters,
+                    bool readOnly = false);
 
     void SetClearAll(bool clear)
     {

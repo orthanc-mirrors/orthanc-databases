@@ -305,8 +305,10 @@ namespace OrthancDatabases
   }
 
 
-  IndexBackend::IndexBackend(OrthancPluginContext* context) :
-    context_(context)
+  IndexBackend::IndexBackend(OrthancPluginContext* context,
+                             bool readOnly) :
+    context_(context),
+    readOnly_(readOnly)
   {
   }
 

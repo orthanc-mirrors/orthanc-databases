@@ -65,13 +65,20 @@ extern "C"
       return 0;
     }
 
+    bool readOnly = configuration.GetBooleanValue("ReadOnly", false);
+
+    if (readOnly)
+    {
+      LOG(WARNING) << "READ-ONLY SYSTEM: the Database plugin is working in read-only mode";
+    }
+    
     try
     {
       const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
 
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::PostgreSQLIndex(context, parameters), countConnections,
+        new OrthancDatabases::PostgreSQLIndex(context, parameters, readOnly), countConnections,
         parameters.GetMaxConnectionRetries());
     }
     catch (Orthanc::OrthancException& e)
