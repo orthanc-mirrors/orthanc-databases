@@ -113,7 +113,14 @@ extern "C"
                                         "No connection string provided for the ODBC index");
       }
 
-      std::unique_ptr<OrthancDatabases::OdbcIndex> index(new OrthancDatabases::OdbcIndex(context, connectionString));
+      bool readOnly = configuration.GetBooleanValue("ReadOnly", false);
+
+      if (readOnly)
+      {
+        LOG(WARNING) << "READ-ONLY SYSTEM: the Database plugin is working in read-only mode";
+      }
+
+      std::unique_ptr<OrthancDatabases::OdbcIndex> index(new OrthancDatabases::OdbcIndex(context, connectionString, readOnly));
       index->SetMaxConnectionRetries(maxConnectionRetries);
       index->SetConnectionRetryInterval(connectionRetryInterval);
 

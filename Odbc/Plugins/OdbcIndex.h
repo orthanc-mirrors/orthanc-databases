@@ -36,7 +36,8 @@ namespace OrthancDatabases
     
   public:
     OdbcIndex(OrthancPluginContext* context,
-              const std::string& connectionString);
+              const std::string& connectionString,
+              bool readOnly);
 
     unsigned int GetMaxConnectionRetries() const
     {

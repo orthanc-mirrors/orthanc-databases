@@ -36,7 +36,8 @@ namespace OrthancDatabases
 
   public:
     MySQLIndex(OrthancPluginContext* context,
-               const MySQLParameters& parameters);
+               const MySQLParameters& parameters,
+               bool readOnly);
 
     void SetClearAll(bool clear)
     {
