@@ -3198,8 +3198,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define C5_STRING_3 5
 #define C6_INT_1 6
 #define C7_INT_2 7
-#define C8_BIG_INT_1 8
-#define C9_BIG_INT_2 9
+#define C8_INT_3 8
+#define C9_BIG_INT_1 9
+#define C10_BIG_INT_2 10
 
 #define QUERY_LOOKUP 1
 #define QUERY_MAIN_DICOM_TAGS 2
@@ -3315,8 +3316,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
           "  " + formatter.FormatNull("INT") + " AS c6_int1, "
           "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-          "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-          "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+          "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+          "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+          "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
           "  FROM Lookup ";
 
     // need MainDicomTags from resource ?
@@ -3331,8 +3333,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "  tagGroup AS c6_int1, "
              "  tagElement AS c7_int2, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "FROM Lookup "
              "INNER JOIN MainDicomTags ON MainDicomTags.id = Lookup.internalId ";
     }
@@ -3349,8 +3352,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "  type AS c6_int1, "
              "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+            "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "FROM Lookup "
              "INNER JOIN Metadata ON Metadata.id = Lookup.internalId ";
     }
@@ -3358,6 +3362,16 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // need resource attachments ?
     if (request.retrieve_attachments())
     {
+      std::string revision;
+      if (HasRevisionsSupport())
+      {
+        revision = "revision";
+      }
+      else
+      {
+        revision = "0";
+      }
+
       sql += "UNION ALL SELECT "
              "  " TOSTRING(QUERY_ATTACHMENTS) " AS c0_queryId, "
              "  Lookup.internalId AS c1_internalId, "
@@ -3367,8 +3381,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  compressedHash AS c5_string3, "
              "  fileType AS c6_int1, "
              "  compressionType AS c7_int2, "
-             "  compressedSize AS c8_big_int1, "
-             "  uncompressedSize AS c9_big_int2 "
+             "  " + revision + " AS c8_int3, "
+             "  compressedSize AS c9_big_int1, "
+             "  uncompressedSize AS c10_big_int2 "
              "FROM Lookup "
              "INNER JOIN AttachedFiles ON AttachedFiles.id = Lookup.internalId ";
     }
@@ -3385,8 +3400,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "  " + formatter.FormatNull("INT") + " AS c6_int1, "
              "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "FROM Lookup "
              "INNER JOIN Labels ON Labels.id = Lookup.internalId ";
     }
@@ -3422,8 +3438,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  tagGroup AS c6_int1, "
                "  tagElement AS c7_int2, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                "FROM Lookup "
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN MainDicomTags ON MainDicomTags.id = currentLevel.parentId ";
@@ -3440,8 +3457,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  type AS c6_int1, "
                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                "FROM Lookup "
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN Metadata ON Metadata.id = currentLevel.parentId ";
@@ -3475,8 +3493,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  tagGroup AS c6_int1, "
                "  tagElement AS c7_int2, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                "FROM Lookup "
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
@@ -3494,8 +3513,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  type AS c6_int1, "
                 "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                 "FROM Lookup "
                 "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                 "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
@@ -3535,8 +3555,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  tagGroup AS c6_int1, "
                "  tagElement AS c7_int2, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                "FROM Lookup "
                "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                "  INNER JOIN MainDicomTags ON MainDicomTags.id = childLevel.internalId AND (tagGroup, tagElement) IN (" + JoinRequestedTags(childrenSpec) + ")";
@@ -3554,8 +3575,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                "FROM Lookup "
                "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId ";
       }
@@ -3571,8 +3593,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  type AS c6_int1, "
                 "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                 "FROM Lookup "
                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                 "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(childrenSpec) + ") ";
@@ -3606,8 +3629,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  " + formatter.FormatNull("INT") + " AS c6_int1, "
                 "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                 "FROM Lookup "
                 "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                 "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId ";
@@ -3624,8 +3648,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                  "  tagGroup AS c6_int1, "
                  "  tagElement AS c7_int2, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                  "FROM Lookup "
                  "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                  "  INNER JOIN Resources grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
@@ -3643,8 +3668,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                  "  type AS c6_int1, "
                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                  "FROM Lookup "
                  "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                  "  INNER JOIN Resources grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
@@ -3667,8 +3693,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                   "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                   "  " + formatter.FormatNull("INT") + " AS c6_int1, "
                   "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
                   "FROM Lookup "
                   "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                   "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
@@ -3690,8 +3717,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "  " + formatter.FormatNull("INT") + " AS c6_int1, "
              "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "FROM Lookup "
              "  INNER JOIN Resources currentLevel ON currentLevel.internalId = Lookup.internalId "
              "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
@@ -3710,8 +3738,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "    " + formatter.FormatNull("INT") + " AS c6_int1, "
              "    " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "    instanceInternalId AS c8_big_int1, "
-             "    " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "    instanceInternalId AS c9_big_int1, "
+             "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "   FROM OneInstance ";
 
       sql += "   UNION ALL SELECT"
@@ -3723,8 +3752,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "    Metadata.type AS c6_int1, "
              "    " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "    " + formatter.FormatNull("BIGINT") + " AS c8_big_int1, "
-             "    " + formatter.FormatNull("BIGINT") + " AS c9_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "    " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
+             "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "   FROM Metadata "
              "   INNER JOIN OneInstance ON Metadata.id = OneInstance.instanceInternalId";
              
@@ -3737,8 +3767,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    compressedHash AS c5_string3, "
              "    fileType AS c6_int1, "
              "    compressionType AS c7_int2, "
-             "    compressedSize AS c8_big_int1, "
-             "    uncompressedSize AS c9_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             "    compressedSize AS c9_big_int1, "
+             "    uncompressedSize AS c10_big_int2 "
              "   FROM AttachedFiles "
              "   INNER JOIN OneInstance ON AttachedFiles.id = OneInstance.instanceInternalId";
 
@@ -3879,8 +3910,10 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
           attachment->set_content_type(statement->ReadInteger32(C6_INT_1));
           attachment->set_compression_type(statement->ReadInteger32(C7_INT_2));
-          attachment->set_compressed_size(statement->ReadInteger64(C8_BIG_INT_1));
-          attachment->set_uncompressed_size(statement->ReadInteger64(C9_BIG_INT_2));
+          attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
+          attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
+
+          responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C8_INT_3));
         }; break;
 
         case QUERY_METADATA:
@@ -3935,8 +3968,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
           attachment->set_content_type(statement->ReadInteger32(C6_INT_1));
           attachment->set_compression_type(statement->ReadInteger32(C7_INT_2));
-          attachment->set_compressed_size(statement->ReadInteger64(C8_BIG_INT_1));
-          attachment->set_uncompressed_size(statement->ReadInteger64(C9_BIG_INT_2));
+          attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
+          attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
         }; break;
 
         default:
