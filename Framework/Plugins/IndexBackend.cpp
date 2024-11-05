@@ -3913,7 +3913,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
           attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
 
-          responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C8_INT_3));
+          if (!statement->IsNull(C8_INT_3))  // revision can be null for files that have been atttached by older Orthanc versions
+          {
+            responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C8_INT_3));
+          }
+          else
+          {
+            responses[internalId]->add_attachments_revisions(0);
+          }
         }; break;
 
         case QUERY_METADATA:
