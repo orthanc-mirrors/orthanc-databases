@@ -3351,7 +3351,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "  type AS c6_int1, "
-             "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+             "  revision AS c7_int2, "
             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
              "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
              "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3456,7 +3456,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  type AS c6_int1, "
-               "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+               "  revision AS c7_int2, "
                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3512,7 +3512,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  type AS c6_int1, "
-                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                "  revision AS c7_int2, "
                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3592,7 +3592,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  type AS c6_int1, "
-                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                "  revision AS c7_int2, "
                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3667,7 +3667,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                  "  type AS c6_int1, "
-                 "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                 "  revision AS c7_int2, "
                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                  "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3751,7 +3751,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "    Metadata.type AS c6_int1, "
-             "    " + formatter.FormatNull("INT") + " AS c7_int2, "
+             "    revision AS c7_int2, "
              "  " + formatter.FormatNull("INT") + " AS c8_int3, "
              "    " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
              "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3930,6 +3930,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
           metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          
+          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          {
+            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+          }
+          else
+          {
+            metadata->set_revision(0);
+          }
         }; break;
 
         case QUERY_PARENT_METADATA:
@@ -3939,6 +3948,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
           metadata->set_key(statement->ReadInteger32(C6_INT_1));
+
+          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          {
+            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+          }
+          else
+          {
+            metadata->set_revision(0);
+          }
         }; break;
 
         case QUERY_GRAND_PARENT_METADATA:
@@ -3948,6 +3966,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
           metadata->set_key(statement->ReadInteger32(C6_INT_1));
+
+          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          {
+            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+          }
+          else
+          {
+            metadata->set_revision(0);
+          }
         }; break;
 
         case QUERY_PARENT_IDENTIFIER:
@@ -3965,6 +3992,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
           metadata->set_key(statement->ReadInteger32(C6_INT_1));
+
+          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          {
+            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+          }
+          else
+          {
+            metadata->set_revision(0);
+          }
         }; break;
         case QUERY_ONE_INSTANCE_ATTACHMENTS:
         {
