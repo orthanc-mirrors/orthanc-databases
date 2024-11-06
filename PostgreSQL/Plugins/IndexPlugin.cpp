@@ -74,7 +74,7 @@ extern "C"
     
     try
     {
-      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
+      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 50);
 
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(

@@ -16,6 +16,9 @@ Minimum Orthanc runtime: 1.12.3
   - reduced the number of round-trips between Orthanc and the PostgreSQL server:
     - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 9
 * Fixed a memory leak when executing non cached SQL statements (rarely used)
+* New default values for configurations:
+  - "IndexConnectionsCount": 50
+  - "TransactionMode": "ReadCommitted"
 
 
 Release 6.2 (2024-03-25)
