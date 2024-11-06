@@ -3307,6 +3307,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // { // all CTEs must be declared first in some dialects
     // }
 
+    std::string revisionInC7;
+    if (HasRevisionsSupport())
+    {
+      revisionInC7 = "  revision AS c7_int2, ";
+    }
+    else
+    {
+      revisionInC7 = "  0 AS C7_int2, ";
+    }
+
+
     sql += " SELECT "
           "  " TOSTRING(QUERY_LOOKUP) " AS c0_queryId, "
           "  Lookup.internalId AS c1_internalId, "
@@ -3351,8 +3362,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "  type AS c6_int1, "
-             "  revision AS c7_int2, "
-            "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             + revisionInC7 +
+             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
              "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
              "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
              "FROM Lookup "
@@ -3362,16 +3373,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // need resource attachments ?
     if (request.retrieve_attachments())
     {
-      std::string revision;
-      if (HasRevisionsSupport())
-      {
-        revision = "revision";
-      }
-      else
-      {
-        revision = "0";
-      }
-
       sql += "UNION ALL SELECT "
              "  " TOSTRING(QUERY_ATTACHMENTS) " AS c0_queryId, "
              "  Lookup.internalId AS c1_internalId, "
@@ -3380,8 +3381,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  uncompressedHash AS c4_string2, "
              "  compressedHash AS c5_string3, "
              "  fileType AS c6_int1, "
-             "  compressionType AS c7_int2, "
-             "  " + revision + " AS c8_int3, "
+             + revisionInC7 +
+             "  compressionType AS c8_int3, "
              "  compressedSize AS c9_big_int1, "
              "  uncompressedSize AS c10_big_int2 "
              "FROM Lookup "
@@ -3456,7 +3457,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                "  type AS c6_int1, "
-               "  revision AS c7_int2, "
+               + revisionInC7 +
                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3512,7 +3513,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  type AS c6_int1, "
-                "  revision AS c7_int2, "
+                + revisionInC7 +
                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3592,7 +3593,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                 "  type AS c6_int1, "
-                "  revision AS c7_int2, "
+                + revisionInC7 +
                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3667,7 +3668,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
                  "  type AS c6_int1, "
-                 "  revision AS c7_int2, "
+                 + revisionInC7 +
                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
                  "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3751,7 +3752,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
              "    Metadata.type AS c6_int1, "
-             "    revision AS c7_int2, "
+             + revisionInC7 +
              "  " + formatter.FormatNull("INT") + " AS c8_int3, "
              "    " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
              "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
@@ -3766,8 +3767,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    uncompressedHash AS c4_string2, "
              "    compressedHash AS c5_string3, "
              "    fileType AS c6_int1, "
-             "    compressionType AS c7_int2, "
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+             + revisionInC7 +
+             "    compressionType AS c8_int3, "
              "    compressedSize AS c9_big_int1, "
              "    uncompressedSize AS c10_big_int2 "
              "   FROM AttachedFiles "
@@ -3909,13 +3910,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
           attachment->set_content_type(statement->ReadInteger32(C6_INT_1));
-          attachment->set_compression_type(statement->ReadInteger32(C7_INT_2));
+          attachment->set_compression_type(statement->ReadInteger32(C8_INT_3));
           attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
           attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
 
-          if (!statement->IsNull(C8_INT_3))  // revision can be null for files that have been atttached by older Orthanc versions
+          if (!statement->IsNull(C7_INT_2))  // revision can be null for files that have been atttached by older Orthanc versions
           {
-            responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C8_INT_3));
+            responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C7_INT_2));
           }
           else
           {
@@ -4010,7 +4011,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
           attachment->set_content_type(statement->ReadInteger32(C6_INT_1));
-          attachment->set_compression_type(statement->ReadInteger32(C7_INT_2));
+          attachment->set_compression_type(statement->ReadInteger32(C8_INT_3));
           attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
           attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
         }; break;
