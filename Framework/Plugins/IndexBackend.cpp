@@ -3215,10 +3215,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define QUERY_CHILDREN_IDENTIFIERS 20
 #define QUERY_CHILDREN_MAIN_DICOM_TAGS 21
 #define QUERY_CHILDREN_METADATA 22
+#define QUERY_CHILDREN_COUNT 23
 #define QUERY_GRAND_CHILDREN_IDENTIFIERS 30
 #define QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS 31
 #define QUERY_GRAND_CHILDREN_METADATA 32
+#define QUERY_GRAND_CHILDREN_COUNT 33
 #define QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS 40
+#define QUERY_GRAND_GRAND_CHILDREN_COUNT 41
 #define QUERY_ONE_INSTANCE_IDENTIFIER 50
 #define QUERY_ONE_INSTANCE_METADATA 51
 #define QUERY_ONE_INSTANCE_ATTACHMENTS 52
@@ -3582,6 +3585,23 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "FROM Lookup "
                "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId ";
       }
+      else if (childrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
+      {
+        sql += "UNION ALL SELECT "
+               "  " TOSTRING(QUERY_CHILDREN_COUNT) " AS c0_queryId, "
+               "  Lookup.internalId AS c1_internalId, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+               "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+               "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+               "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+               "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+               "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+               "  COUNT(childLevel.internalId) AS c9_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+               "FROM Lookup "
+               "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId GROUP BY Lookup.internalId ";
+      }
 
       if (childrenSpec->retrieve_metadata_size() > 0)
       {
@@ -3636,6 +3656,24 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "FROM Lookup "
                 "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                 "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId ";
+        }
+        else if (grandchildrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
+        {
+          sql += "UNION ALL SELECT "
+                "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "FROM Lookup "
+                "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
+                "  INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId GROUP BY Lookup.internalId ";
         }
 
         if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)
@@ -3701,6 +3739,25 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                   "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                   "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
                   "INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId ";
+          }
+          else if (grandgrandchildrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
+          {
+            sql += "UNION ALL SELECT "
+                  "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                  "  Lookup.internalId AS c1_internalId, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                  "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                  "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                  "FROM Lookup "
+                  "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
+                  "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
+                  "INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId GROUP BY Lookup.internalId ";
           }
         }
       }
@@ -3851,6 +3908,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
           content->add_identifiers(statement->ReadString(C3_STRING_1));
+          content->set_count(content->identifiers_size());
+        }; break;
+
+        case QUERY_CHILDREN_COUNT:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
+          content->set_count(statement->ReadInteger64(C9_BIG_INT_1));
         }; break;
 
         case QUERY_CHILDREN_MAIN_DICOM_TAGS:
@@ -3875,6 +3939,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
           content->add_identifiers(statement->ReadString(C3_STRING_1));
+          content->set_count(content->identifiers_size());
+        }; break;
+
+        case QUERY_GRAND_CHILDREN_COUNT:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
+          content->set_count(statement->ReadInteger64(C9_BIG_INT_1));
         }; break;
 
         case QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS:
@@ -3900,6 +3971,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 3));
           content->add_identifiers(statement->ReadString(C3_STRING_1));
+          content->set_count(content->identifiers_size());
+        }; break;
+
+        case QUERY_GRAND_GRAND_CHILDREN_COUNT:
+        {
+          Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 3));
+          content->set_count(statement->ReadInteger64(C9_BIG_INT_1));
         }; break;
 
         case QUERY_ATTACHMENTS:
