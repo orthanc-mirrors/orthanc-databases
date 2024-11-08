@@ -66,7 +66,7 @@ namespace OrthancDatabases
 
     virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
     {
-      return db_.DoesIndexExist(*this, name);
+      return false;
     }
 
     virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE
