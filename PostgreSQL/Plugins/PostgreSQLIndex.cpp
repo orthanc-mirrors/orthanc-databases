@@ -226,6 +226,17 @@ namespace OrthancDatabases
             ApplyPrepareIndex(t, manager);
           }
 
+          if (!t.GetDatabaseTransaction().DoesIndexExist("ChildrenIndex2"))
+          {
+            // apply all idempotent changes that are in the PrepareIndex.  In this case, we are just interested by
+            // ChildrenIndex2 that does not need to be uninstalled in case of downgrade.
+            ApplyPrepareIndex(t, manager);
+
+            // delete old index
+            DatabaseManager::StandaloneStatement statement(manager, "DROP INDEX IF EXISTS ChildrenIndex");
+            statement.Execute();
+          }
+
           // If you add new tests here, update the test in the "ReadOnly" code below
         }
 
@@ -238,12 +249,8 @@ namespace OrthancDatabases
 
       DatabaseManager::Transaction t(manager, TransactionType_ReadOnly);
 
-      int property = 0;
-      
-      // test if the last "extension" has been installed
-      if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                        Orthanc::GlobalProperty_HasComputeStatisticsReadOnly) ||
-          property != 1)
+      // test if the latest "extension" has been installed
+      if (!t.GetDatabaseTransaction().DoesIndexExist("ChildrenIndex2"))
       {
         LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);

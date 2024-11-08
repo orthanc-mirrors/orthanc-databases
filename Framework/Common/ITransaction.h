@@ -50,6 +50,8 @@ namespace OrthancDatabases
 
     virtual bool DoesTableExist(const std::string& name) = 0;
 
+    virtual bool DoesIndexExist(const std::string& name) = 0;
+
     virtual bool DoesTriggerExist(const std::string& name) = 0;  // Only for MySQL
 
     virtual void ExecuteMultiLines(const std::string& query) = 0;

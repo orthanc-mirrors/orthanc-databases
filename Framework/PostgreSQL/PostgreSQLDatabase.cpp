@@ -210,6 +210,26 @@ namespace OrthancDatabases
     return !result.IsDone();
   }
 
+  bool PostgreSQLDatabase::DoesIndexExist(const std::string& name)
+  {
+    std::string lower;
+    Orthanc::Toolbox::ToLowerCase(lower, name);
+
+    // http://stackoverflow.com/a/24089729/881731
+
+    PostgreSQLStatement statement(*this, 
+                                  "SELECT 1 FROM pg_catalog.pg_class c "
+                                  "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
+                                  "WHERE n.nspname = 'public' AND c.relkind='i' "
+                                  "AND c.relname=$1");
+
+    statement.DeclareInputString(0);
+    statement.BindString(0, lower);
+
+    PostgreSQLResult result(statement);
+    return !result.IsDone();
+  }
+
 
   bool PostgreSQLDatabase::DoesColumnExist(const std::string& tableName,
                                            const std::string& columnName)
@@ -288,6 +308,11 @@ namespace OrthancDatabases
       virtual bool DoesTableExist(const std::string& name) ORTHANC_OVERRIDE
       {
         return db_.DoesTableExist(name.c_str());
+      }
+
+      virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return db_.DoesIndexExist(name.c_str());
       }
 
       virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE

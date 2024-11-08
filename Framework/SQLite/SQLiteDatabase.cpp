@@ -77,6 +77,11 @@ namespace OrthancDatabases
         return db_.GetObject().DoesTableExist(name.c_str());
       }
 
+      virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return false;
+      }
+
       virtual bool DoesTriggerExist(const std::string& name) ORTHANC_OVERRIDE
       {
         return false;
