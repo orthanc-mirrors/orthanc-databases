@@ -1,4 +1,4 @@
-Pending changes in the mainline
+Pending changes in the mainline (future 7.0)
 ===============================
 
 DB schema revision: 2
@@ -7,14 +7,16 @@ Optimal plugin SDK (for build): 1.12.5+
 Minimum Orthanc runtime: 1.12.3
 Optimal Orthanc runtime: 1.12.5+
 
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
 * WARNING: An Index is being replaced to improve performance.  The creation
   of the new index can take some time (we have observed 3 minutes on a
   DB with 70M instances).  Orthanc will not be available during the
   creation of this index.  If needed, you can create it manually before installing
   the new plugin by executing these SQL commands:
 
-    CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId);  -- new in rev 3
-    DROP INDEX IF EXISTS ChildrenIndex;  -- till rev 2; replaced by ChildrenIndex in rev 3 but no need to uninstall ChildrenIndex2 it when downgrading
+    https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Upgrades/Partial/Rev2_1_ReplaceChildrenIndex.sql
 
 
 * Fix updates from plugin version 3.3 to latest version

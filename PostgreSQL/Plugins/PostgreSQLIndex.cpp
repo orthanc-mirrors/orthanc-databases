@@ -228,13 +228,13 @@ namespace OrthancDatabases
 
           if (!t.GetDatabaseTransaction().DoesIndexExist("ChildrenIndex2"))
           {
-            // apply all idempotent changes that are in the PrepareIndex.  In this case, we are just interested by
-            // ChildrenIndex2 that does not need to be uninstalled in case of downgrade.
-            ApplyPrepareIndex(t, manager);
+            LOG(WARNING) << "Installing ChildrenIndex2";
 
-            // delete old index
-            DatabaseManager::StandaloneStatement statement(manager, "DROP INDEX IF EXISTS ChildrenIndex");
-            statement.Execute();
+            std::string query;
+
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV2_1_REPLACE_CHILDREN_INDEX);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
           }
 
           // If you add new tests here, update the test in the "ReadOnly" code below

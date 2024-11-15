@@ -106,7 +106,22 @@ CREATE TABLE IF NOT EXISTS ServerProperties(
         PRIMARY KEY(server, property)
         );
 
-CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId);  -- new in rev 3
+-- new ChildrenIndex2 introduced in v 7.0 (replacing previous ChildrenIndex)
+DO $$
+DECLARE
+    pg_version text;
+BEGIN
+    SELECT version() INTO pg_version;
+
+    IF substring(pg_version from 'PostgreSQL (\d+)\.')::int >= 11 THEN
+        -- PostgreSQL 11 or later
+        EXECUTE 'CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId)';
+    ELSE
+        EXECUTE 'CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST, publicId, internalId)';
+    END IF;
+END $$;
+
+
 CREATE INDEX IF NOT EXISTS PublicIndex ON Resources(publicId);
 CREATE INDEX IF NOT EXISTS ResourceTypeIndex ON Resources(resourceType);
 CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patientId);
