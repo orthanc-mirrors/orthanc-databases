@@ -106,7 +106,6 @@ CREATE TABLE IF NOT EXISTS ServerProperties(
         PRIMARY KEY(server, property)
         );
 
--- new ChildrenIndex2 introduced in v 7.0 (replacing previous ChildrenIndex)
 DO $$
 DECLARE
     pg_version text;
@@ -115,6 +114,8 @@ BEGIN
 
     IF substring(pg_version from 'PostgreSQL (\d+)\.')::int >= 11 THEN
         -- PostgreSQL 11 or later
+
+        -- new ChildrenIndex2 introduced in Rev3 (replacing previous ChildrenIndex)
         EXECUTE 'CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId)';
     ELSE
         EXECUTE 'CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST, publicId, internalId)';
@@ -129,6 +130,7 @@ CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patien
 CREATE INDEX IF NOT EXISTS MainDicomTagsIndex ON MainDicomTags(id);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex1 ON DicomIdentifiers(id);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex2 ON DicomIdentifiers(tagGroup, tagElement);
+CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex3 ON DicomIdentifiers(tagGroup, tagElement, value);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndexValues ON DicomIdentifiers(value);
 
 CREATE INDEX IF NOT EXISTS ChangesIndex ON Changes(internalId);
@@ -585,11 +587,116 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
+-- new in Rev3
+
+CREATE TABLE IF NOT EXISTS ChildCount (
+    parentId BIGINT PRIMARY KEY REFERENCES Resources(internalId) ON DELETE CASCADE,
+    childCount INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT UniqueParentID UNIQUE (parentId)
+);
+
+
+-- Computes the ChildCount for a number of resources for which it has not been computed yet.
+-- This is actually used only after an update to Rev3.  A thread will call this function
+-- at regular interval to update all missing values and stop once all values have been processed.
+CREATE OR REPLACE FUNCTION ComputeMissingChildCount(
+    IN batch_size BIGINT,
+    OUT updated_rows_count BIGINT
+) RETURNS BIGINT AS $body$
+
+BEGIN
+
+    INSERT INTO ChildCount (parentID, childCount)
+    SELECT r.internalId AS parentId, COUNT(childLevel.internalId) AS childCount
+    FROM Resources AS r
+    LEFT JOIN Resources AS childLevel ON r.internalId = childLevel.parentId
+    WHERE r.internalId IN (
+        SELECT internalId FROM Resources AS r
+        WHERE resourceType < 3 AND NOT EXISTS(SELECT 1 FROM ChildCount WHERE ChildCount.parentId = r.internalId)
+        LIMIT batch_size)
+    GROUP BY r.internalId;
+    
+    -- Get the number of rows affected
+    GET DIAGNOSTICS updated_rows_count = ROW_COUNT;
+
+END;
+$body$ LANGUAGE plpgsql;
+
+
+
+CREATE OR REPLACE FUNCTION UpdateChildCount()
+RETURNS TRIGGER AS $body$
+DECLARE
+	parent_id BIGINT;
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+		IF NEW.parentId IS NOT NULL THEN
+            -- try to increment the childcount from the parent
+			UPDATE ChildCount
+		    SET childCount = childCount + 1
+		    WHERE parentId = NEW.parentId
+		    RETURNING parentId INTO parent_id;
+		
+            -- this should only happen for old studies whose childCount has not yet been computed
+		    IF NOT FOUND THEN
+		        INSERT INTO childcount (parentId, childCount)
+		        SELECT parentID, COUNT(*)
+		        FROM Resources
+		        WHERE parentId = parent_id
+		        GROUP BY parentId;
+		    END IF;
+        END IF;
+	
+        -- this is a future parent, start counting the children
+        IF NEW.resourcetype < 3 THEN
+		   insert into ChildCount (parentId, childCount)
+		   values (new.internalId, 0);
+	 	END IF;
+
+    ELSIF TG_OP = 'DELETE' THEN
+
+		IF NEW.parentId IS NOT NULL THEN
+
+            -- Decrement the child count for the parent
+            UPDATE ChildCount
+            SET childCount = childCount - 1
+            WHERE parentId = OLD.parentId
+		    RETURNING parentId INTO parent_id;
+		
+            -- this should only happen for old studies whose childCount has not yet been computed
+		    IF NOT FOUND THEN
+		        INSERT INTO childcount (parentId, childCount)
+		        SELECT parentID, COUNT(*)
+		        FROM Resources
+		        WHERE parentId = parent_id
+		        GROUP BY parentId;
+		    END IF;
+        END IF;
+        
+    END IF;
+    RETURN NULL;
+END;
+$body$ LANGUAGE plpgsql;
+
+-- Trigger for INSERT
+CREATE TRIGGER IncrementChildCount
+AFTER INSERT ON Resources
+FOR EACH ROW
+EXECUTE FUNCTION UpdateChildCount();
+
+-- Trigger for DELETE
+CREATE TRIGGER DecrementChildCount
+AFTER DELETE ON Resources
+FOR EACH ROW
+WHEN (OLD.parentId IS NOT NULL)
+EXECUTE FUNCTION UpdateChildCount();
+
+
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 2); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 3); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance

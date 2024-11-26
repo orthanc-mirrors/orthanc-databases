@@ -92,7 +92,7 @@ EmbedResources(
   POSTGRESQL_PREPARE_INDEX           ${CMAKE_SOURCE_DIR}/Plugins/SQL/PrepareIndex.sql
   POSTGRESQL_UPGRADE_UNKNOWN_TO_REV1 ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/UnknownToRev1.sql
   POSTGRESQL_UPGRADE_REV1_TO_REV2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev1ToRev2.sql
-  POSTGRESQL_UPGRADE_REV2_1_REPLACE_CHILDREN_INDEX    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Partial/Rev2_1_ReplaceChildrenIndex.sql
+  POSTGRESQL_UPGRADE_REV2_TO_REV3    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev2ToRev3.sql
   )
 
 

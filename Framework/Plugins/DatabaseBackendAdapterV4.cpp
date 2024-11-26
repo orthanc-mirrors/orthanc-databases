@@ -1436,6 +1436,9 @@ namespace OrthancDatabases
       
       if (isBackendInUse_)
       {
+        IndexConnectionsPool::Accessor accessor(*pool);
+        accessor.GetBackend().Shutdown();
+        
         isBackendInUse_ = false;
       }
       else

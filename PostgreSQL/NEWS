@@ -1,7 +1,7 @@
 Pending changes in the mainline (future 7.0)
 ===============================
 
-DB schema revision: 2
+DB schema revision: 3
 Minimum plugin SDK (for build): 1.12.3
 Optimal plugin SDK (for build): 1.12.5+
 Minimum Orthanc runtime: 1.12.3
@@ -17,6 +17,9 @@ Optimal Postgresql Server version: 11+
   the new plugin by executing these SQL commands:
 
     https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Upgrades/Partial/Rev2_1_ReplaceChildrenIndex.sql
+
+* WARNING: A new table is being created when upgrading to this version.  A new thread
+  is populating this new table and might consume DB bandwitdh and CPU.
 
 
 * Fix updates from plugin version 3.3 to latest version

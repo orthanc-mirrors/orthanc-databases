@@ -34,6 +34,12 @@ namespace OrthancDatabases
     unsigned int connectionRetryInterval_;
     std::string  connectionString_;
     
+  protected:
+    virtual bool HasChildCountTable() const
+    {
+      return false;
+    }
+
   public:
     OdbcIndex(OrthancPluginContext* context,
               const std::string& connectionString,

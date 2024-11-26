@@ -54,6 +54,8 @@ namespace OrthancDatabases
 
     virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
+    virtual bool HasChildCountTable() const = 0;
+
     void SignalDeletedFiles(IDatabaseBackendOutput& output,
                             DatabaseManager& manager);
 
@@ -456,6 +458,10 @@ namespace OrthancDatabases
                               DatabaseManager& manager,
                               const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 #endif
+
+
+    virtual void Shutdown()
+    {};
 
 
     /**

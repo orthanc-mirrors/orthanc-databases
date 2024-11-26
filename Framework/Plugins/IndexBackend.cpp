@@ -3587,20 +3587,46 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       else if (childrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
       {
-        sql += "UNION ALL SELECT "
-               "  " TOSTRING(QUERY_CHILDREN_COUNT) " AS c0_queryId, "
-               "  Lookup.internalId AS c1_internalId, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-               "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-               "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-               "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-               "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-               "  COUNT(childLevel.internalId) AS c9_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
-               "FROM Lookup "
-               "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId GROUP BY Lookup.internalId ";
+        if (HasChildCountTable())
+        {
+          // we get the count value either from the childCount table if it has been computed or from the Resources table
+          sql += "UNION ALL SELECT "
+                "  " TOSTRING(QUERY_CHILDREN_COUNT) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  COALESCE("
+                "           (ChildCount.childCount),"
+                "        		(SELECT COUNT(childLevel.internalId)"
+                "            FROM Resources AS childLevel"
+                "            WHERE Lookup.internalId = childLevel.parentId"
+                "           )) AS c9_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "FROM Lookup "
+                "LEFT JOIN ChildCount ON Lookup.internalId = ChildCount.parentId ";
+        }
+        else
+        {
+          sql += "UNION ALL SELECT "
+                "  " TOSTRING(QUERY_CHILDREN_COUNT) " AS c0_queryId, "
+                "  Lookup.internalId AS c1_internalId, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  COUNT(childLevel.internalId) AS c9_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "FROM Lookup "
+                "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId GROUP BY Lookup.internalId ";
+        }
       }
 
       if (childrenSpec->retrieve_metadata_size() > 0)
@@ -3659,21 +3685,50 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         }
         else if (grandchildrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
         {
-          sql += "UNION ALL SELECT "
-                "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
-                "  Lookup.internalId AS c1_internalId, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-                "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
-                "FROM Lookup "
-                "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
-                "  INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId GROUP BY Lookup.internalId ";
+          if (HasChildCountTable())
+          {
+            // we get the count value either from the childCount table if it has been computed or from the Resources table
+            sql += "UNION ALL SELECT "
+                  "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                  "  Lookup.internalId AS c1_internalId, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                  "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                  "  COALESCE("
+		              "           (SELECT SUM(ChildCount.childCount)"
+		              "            FROM ChildCount"
+                  "            INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
+                  "            WHERE ChildCount.parentId = childLevel.internalId),"
+                  "        		(SELECT COUNT(grandChildLevel.internalId)"
+                  "            FROM Resources AS childLevel"
+                  "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
+                  "            WHERE Lookup.internalId = childLevel.parentId"
+                  "           )) AS c9_big_int1, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                  "FROM Lookup ";
+          }
+          else
+          {
+            sql += "UNION ALL SELECT "
+                  "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                  "  Lookup.internalId AS c1_internalId, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                  "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                  "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                  "FROM Lookup "
+                  "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
+                  "  INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId GROUP BY Lookup.internalId ";
+          }
         }
 
         if (grandchildrenSpec->retrieve_main_dicom_tags_size() > 0)
@@ -3742,22 +3797,53 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           }
           else if (grandgrandchildrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
           {
-            sql += "UNION ALL SELECT "
-                  "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
-                  "  Lookup.internalId AS c1_internalId, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                  "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                  "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
-                  "FROM Lookup "
-                  "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
-                  "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
-                  "INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId GROUP BY Lookup.internalId ";
+            if (HasChildCountTable())
+            {
+              // we get the count value either from the childCount table if it has been computed or from the Resources table
+              sql += "UNION ALL SELECT "
+                    "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                    "  Lookup.internalId AS c1_internalId, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                    "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                    "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                    "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                    "  COALESCE("
+                    "           (SELECT SUM(ChildCount.childCount)"
+                    "            FROM ChildCount"
+                    "            INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
+                    "            INNER JOIN Resources AS grandChildLevel ON grandChildLevel.parentId = childLevel.internalId"
+                    "            WHERE ChildCount.parentId = grandChildLevel.internalId),"
+                    "        		(SELECT COUNT(grandGrandChildLevel.internalId)"
+                    "            FROM Resources AS childLevel"
+                    "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
+                    "            INNER JOIN Resources AS grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId"
+                    "            WHERE Lookup.internalId = childLevel.parentId"
+                    "           )) AS c9_big_int1, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                    "FROM Lookup ";
+            }
+            else
+            {
+              sql += "UNION ALL SELECT "
+                    "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                    "  Lookup.internalId AS c1_internalId, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                    "  " + formatter.FormatNull("INT") + " AS c6_int1, "
+                    "  " + formatter.FormatNull("INT") + " AS c7_int2, "
+                    "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                    "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                    "FROM Lookup "
+                    "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
+                    "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
+                    "INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId GROUP BY Lookup.internalId ";
+            }
           }
         }
       }

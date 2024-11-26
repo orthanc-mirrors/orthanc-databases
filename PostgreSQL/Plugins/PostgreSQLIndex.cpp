@@ -32,6 +32,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Toolbox.h>
+#include <SystemToolbox.h>
 #include <Logging.h>
 #include <OrthancException.h>
 
@@ -54,7 +55,8 @@ namespace OrthancDatabases
                                    bool readOnly) :
     IndexBackend(context, readOnly),
     parameters_(parameters),
-    clearAll_(false)
+    clearAll_(false),
+    housekeeperShouldStop_(false)
   {
   }
 
@@ -108,7 +110,7 @@ namespace OrthancDatabases
 
     if (!IsReadOnly())
     {
-      // lock the full DB while checking if it needs to be create/ugraded
+      // lock the full DB while checking if it needs to be created/ugraded
       PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
 
       if (clearAll_)
@@ -143,22 +145,30 @@ namespace OrthancDatabases
             throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
           }
 
-          bool needToRunUpgradeFromUnknownToV1 = false;
-          bool needToRunUpgradeV1toV2 = false;
+          bool applyUpgradeFromUnknownToV1 = false;
+          bool applyUpgradeV1toV2 = false;
+          bool applyUpgradeV2toV3 = false;
+          bool applyPrepareIndex = false;
 
           int revision;
           if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
           {
             LOG(WARNING) << "No DatabasePatchLevel found, assuming it's 1";
             revision = 1;
-            needToRunUpgradeFromUnknownToV1 = true;
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeFromUnknownToV1 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
           }
           else if (revision == 1)
           {
             LOG(WARNING) << "DatabasePatchLevel is 1";
-            needToRunUpgradeFromUnknownToV1 = true;
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
+          }
+          else if (revision == 2)
+          {
+            LOG(WARNING) << "DatabasePatchLevel is 2";
+            applyUpgradeV2toV3 = true;
           }
 
           int hasTrigram = 0;
@@ -169,31 +179,24 @@ namespace OrthancDatabases
             // We've observed 9 minutes on DB with 100000 studies
             LOG(WARNING) << "The DB schema update will try to enable trigram matching on the PostgreSQL database "
                          << "to speed up wildcard searches. This may take several minutes";
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
           }
 
           int property = 0;
-          // these extensions are not installed anymore from v6.0 of the plugin (but the plugin is fast to compute the size and count the resources)
-          // if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-          //                                  Orthanc::GlobalProperty_HasFastCountResources) ||
-          //     property != 1)
-          // {
-          //   needToRunUpgradeV1toV2 = true;
-          // }
-          // if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-          //                                 Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-          //     property != 1)
-          // {
-          //   needToRunUpgradeV1toV2 = true;
-          // }
           if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                           Orthanc::GlobalProperty_GetLastChangeIndex) ||
               property != 1)
           {
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
           }
 
-          if (needToRunUpgradeFromUnknownToV1)
+          // If you add new tests here, update the test in the "ReadOnly" code below
+
+          applyPrepareIndex = applyUpgradeV2toV3;
+
+          if (applyUpgradeFromUnknownToV1)
           {
             LOG(WARNING) << "Upgrading DB schema from unknown to revision 1";
             std::string query;
@@ -203,7 +206,7 @@ namespace OrthancDatabases
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
           }
           
-          if (needToRunUpgradeV1toV2)
+          if (applyUpgradeV1toV2)
           {
             LOG(WARNING) << "Upgrading DB schema from revision 1 to revision 2";
 
@@ -212,32 +215,25 @@ namespace OrthancDatabases
             Orthanc::EmbeddedResources::GetFileResource
               (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV1_TO_REV2);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
-
-            // apply all idempotent changes that are in the PrepareIndexV2
-            ApplyPrepareIndex(t, manager);
           }
 
-          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                           Orthanc::GlobalProperty_HasComputeStatisticsReadOnly) ||
-              property != 1)
+          if (applyUpgradeV2toV3)
           {
-            // apply all idempotent changes that are in the PrepareIndex.  In this case, we are just interested by
-            // ComputeStatisticsReadOnly() that does not need to be uninstalled in case of downgrade.
-            ApplyPrepareIndex(t, manager);
-          }
-
-          if (!t.GetDatabaseTransaction().DoesIndexExist("ChildrenIndex2"))
-          {
-            LOG(WARNING) << "Installing ChildrenIndex2";
+            LOG(WARNING) << "Upgrading DB schema from revision 2 to revision 3";
 
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV2_1_REPLACE_CHILDREN_INDEX);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV2_TO_REV3);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
           }
 
-          // If you add new tests here, update the test in the "ReadOnly" code below
+          if (applyPrepareIndex)
+          {
+            // apply all idempotent changes that are in the PrepareIndex.sql
+            ApplyPrepareIndex(t, manager);
+          }
+
         }
 
         t.Commit();
@@ -250,11 +246,18 @@ namespace OrthancDatabases
       DatabaseManager::Transaction t(manager, TransactionType_ReadOnly);
 
       // test if the latest "extension" has been installed
-      if (!t.GetDatabaseTransaction().DoesIndexExist("ChildrenIndex2"))
-      {
+      int revision;
+      if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel)
+          || revision != 2)
+      {      
         LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
+    }
+
+    if (!IsReadOnly())
+    {
+      StartDbHousekeeper(manager);
     }
   }
 
@@ -745,6 +748,60 @@ namespace OrthancDatabases
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
 
+  void PostgreSQLIndex::StartDbHousekeeper(DatabaseManager& manager)
+  {
+    housekeeperShouldStop_ = false;
+    dbHousekeeper_.reset(new boost::thread(WorkerHousekeeper, housekeeperShouldStop_, &manager));
+  }
+
+  void PostgreSQLIndex::Shutdown()
+  {
+    // TODO: stop thread
+    housekeeperShouldStop_ = true;
+    if (dbHousekeeper_.get() != NULL && dbHousekeeper_->joinable())
+    {
+      dbHousekeeper_->join();
+      dbHousekeeper_.reset();
+    }
+  }
+
+  void PostgreSQLIndex::WorkerHousekeeper(bool& housekeeperShouldStop,
+                                          DatabaseManager* manager)
+  {
+    OrthancPluginSetCurrentThreadName(OrthancPlugins::GetGlobalContext(), "PG DB-HK");
+    LOG(WARNING) << "Starting the DB Housekeeper thread";
+
+    bool hasComputedAllMissingChildCount = false;
+    while (!housekeeperShouldStop && !hasComputedAllMissingChildCount)
+    {
+      if (!hasComputedAllMissingChildCount)
+      {
+        LOG(INFO) << "Computing missing ChildCount";
+
+        DatabaseManager::Transaction t(*manager, TransactionType_ReadWrite);        
+        
+        try
+        {
+          DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE, *manager,
+            "SELECT ComputeMissingChildCount(50)");
+
+          statement.Execute();
+
+          int64_t updatedCount = statement.ReadInteger64(0);
+          hasComputedAllMissingChildCount = updatedCount == 0;
+
+          t.Commit();
+        }
+        catch (...)
+        {
+          LOG(ERROR) << "Unexpected error";
+        }
+      }
+      Orthanc::SystemToolbox::USleep(10000);
+    }
+
+    LOG(INFO) << "Stopping the DB Housekeeper thread";
+  }
 
 // #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
 //   bool PostgreSQLIndex::HasFindSupport() const

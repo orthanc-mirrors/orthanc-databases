@@ -34,6 +34,12 @@ namespace OrthancDatabases
     MySQLParameters        parameters_;
     bool                   clearAll_;
 
+  protected:
+    virtual bool HasChildCountTable() const
+    {
+      return false;
+    }
+
   public:
     MySQLIndex(OrthancPluginContext* context,
                const MySQLParameters& parameters,
