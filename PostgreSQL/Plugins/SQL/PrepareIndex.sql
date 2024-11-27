@@ -191,6 +191,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS PatientAdded on Resources;
 CREATE TRIGGER PatientAdded
 AFTER INSERT ON Resources
 FOR EACH ROW
@@ -220,6 +221,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS ResourceDeleted on Resources;
 CREATE TRIGGER ResourceDeleted
 AFTER DELETE ON Resources
 FOR EACH ROW
@@ -498,6 +500,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS InsertedChange on Changes;
 CREATE TRIGGER InsertedChange
 AFTER INSERT ON Changes
 FOR EACH ROW
@@ -678,13 +681,13 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
--- Trigger for INSERT
+DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
 CREATE TRIGGER IncrementChildCount
 AFTER INSERT ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE UpdateChildCount();
 
--- Trigger for DELETE
+DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
 CREATE TRIGGER DecrementChildCount
 AFTER DELETE ON Resources
 FOR EACH ROW
