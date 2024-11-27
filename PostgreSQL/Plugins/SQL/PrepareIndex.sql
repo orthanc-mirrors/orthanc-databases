@@ -630,11 +630,11 @@ DECLARE
 	parent_id BIGINT;
 BEGIN
     IF TG_OP = 'INSERT' THEN
-		IF NEW.parentId IS NOT NULL THEN
+		IF new.parentId IS NOT NULL THEN
             -- try to increment the childcount from the parent
 			UPDATE ChildCount
 		    SET childCount = childCount + 1
-		    WHERE parentId = NEW.parentId
+		    WHERE parentId = new.parentId
 		    RETURNING parentId INTO parent_id;
 		
             -- this should only happen for old studies whose childCount has not yet been computed
@@ -648,19 +648,19 @@ BEGIN
         END IF;
 	
         -- this is a future parent, start counting the children
-        IF NEW.resourcetype < 3 THEN
+        IF new.resourcetype < 3 THEN
 		   insert into ChildCount (parentId, childCount)
 		   values (new.internalId, 0);
 	 	END IF;
 
     ELSIF TG_OP = 'DELETE' THEN
 
-		IF NEW.parentId IS NOT NULL THEN
+		IF old.parentId IS NOT NULL THEN
 
             -- Decrement the child count for the parent
             UPDATE ChildCount
             SET childCount = childCount - 1
-            WHERE parentId = OLD.parentId
+            WHERE parentId = old.parentId
 		    RETURNING parentId INTO parent_id;
 		
             -- this should only happen for old studies whose childCount has not yet been computed
@@ -682,14 +682,14 @@ $body$ LANGUAGE plpgsql;
 CREATE TRIGGER IncrementChildCount
 AFTER INSERT ON Resources
 FOR EACH ROW
-EXECUTE FUNCTION UpdateChildCount();
+EXECUTE PROCEDURE UpdateChildCount();
 
 -- Trigger for DELETE
 CREATE TRIGGER DecrementChildCount
 AFTER DELETE ON Resources
 FOR EACH ROW
 WHEN (OLD.parentId IS NOT NULL)
-EXECUTE FUNCTION UpdateChildCount();
+EXECUTE PROCEDURE UpdateChildCount();
 
 
 
