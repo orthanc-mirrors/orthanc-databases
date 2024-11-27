@@ -4186,6 +4186,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement->Next();
     }    
   }
+
+  bool IndexBackend::HasPerformDbHousekeeping()
+  {
+    return false;
+  }
+
+  void IndexBackend::PerformDbHousekeeping(DatabaseManager& manager)
+  {
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);    
+  }
+
 #endif
 
 }

@@ -56,7 +56,7 @@ namespace OrthancDatabases
     IndexBackend(context, readOnly),
     parameters_(parameters),
     clearAll_(false),
-    housekeeperShouldStop_(false)
+    hkHasComputedAllMissingChildCount_(false)
   {
   }
 
@@ -253,11 +253,6 @@ namespace OrthancDatabases
         LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
-    }
-
-    if (!IsReadOnly())
-    {
-      StartDbHousekeeper(manager);
     }
   }
 
@@ -748,77 +743,38 @@ namespace OrthancDatabases
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
 
-  void PostgreSQLIndex::StartDbHousekeeper(DatabaseManager& manager)
+  bool PostgreSQLIndex::HasPerformDbHousekeeping()
   {
-    housekeeperShouldStop_ = false;
-    dbHousekeeper_.reset(new boost::thread(WorkerHousekeeper, housekeeperShouldStop_, &manager));
+    return true;
   }
 
-  void PostgreSQLIndex::Shutdown()
+  void PostgreSQLIndex::PerformDbHousekeeping(DatabaseManager& manager)
   {
-    // TODO: stop thread
-    housekeeperShouldStop_ = true;
-    if (dbHousekeeper_.get() != NULL && dbHousekeeper_->joinable())
+    // Compute the missing child count (table introduced in rev3)
+    if (!hkHasComputedAllMissingChildCount_)
     {
-      dbHousekeeper_->join();
-      dbHousekeeper_.reset();
-    }
-  }
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE, manager,
+        "SELECT ComputeMissingChildCount(50)");
 
-  void PostgreSQLIndex::WorkerHousekeeper(bool& housekeeperShouldStop,
-                                          DatabaseManager* manager)
-  {
-    OrthancPluginSetCurrentThreadName(OrthancPlugins::GetGlobalContext(), "PG DB-HK");
-    LOG(WARNING) << "Starting the DB Housekeeper thread";
+      statement.Execute();
 
-    bool hasComputedAllMissingChildCount = false;
-    while (!housekeeperShouldStop && !hasComputedAllMissingChildCount)
-    {
-      if (!hasComputedAllMissingChildCount)
+      int64_t updatedCount = statement.ReadInteger64(0);
+      hkHasComputedAllMissingChildCount_ = updatedCount == 0;
+
+      if (updatedCount > 0)
       {
-        LOG(INFO) << "Computing missing ChildCount";
-
-        DatabaseManager::Transaction t(*manager, TransactionType_ReadWrite);        
-        
-        try
-        {
-          DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE, *manager,
-            "SELECT ComputeMissingChildCount(50)");
-
-          statement.Execute();
-
-          int64_t updatedCount = statement.ReadInteger64(0);
-          hasComputedAllMissingChildCount = updatedCount == 0;
-
-          t.Commit();
-        }
-        catch (...)
-        {
-          LOG(ERROR) << "Unexpected error";
-        }
+        LOG(INFO) << "Computed " << updatedCount << " missing ChildCount entries";
       }
-      Orthanc::SystemToolbox::USleep(10000);
+      else
+      {
+        LOG(INFO) << "No missing ChildCount entries";
+      }
     }
 
-    LOG(INFO) << "Stopping the DB Housekeeper thread";
+    // Consume the statistics delta to minimize computation when calling ComputeStatisticsReadOnly
+    {
+      int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
+      UpdateAndGetStatistics(manager, patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize);
+    }
   }
-
-// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-//   bool PostgreSQLIndex::HasFindSupport() const
-//   {
-//     // TODO-FIND
-//     return false;
-//   }
-// #endif
-
-
-// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-//   void PostgreSQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-//                                     DatabaseManager& manager,
-//                                     const Orthanc::DatabasePluginMessages::Find_Request& request)
-//   {
-//     // TODO-FIND
-//     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-//   }
-// #endif
 }

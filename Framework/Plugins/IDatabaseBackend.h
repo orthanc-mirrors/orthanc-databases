@@ -388,9 +388,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
     virtual bool HasFindSupport() const = 0;
     virtual bool HasExtendedChanges() const = 0;
-#endif
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
     // New in Orthanc 1.12.5
     virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                              DatabaseManager& manager,
@@ -400,6 +398,11 @@ namespace OrthancDatabases
     virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                               DatabaseManager& manager,
                               const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
+
+    virtual bool HasPerformDbHousekeeping() = 0;
+
+    virtual void PerformDbHousekeeping(DatabaseManager& manager) = 0;
+
 #endif
   };
 }

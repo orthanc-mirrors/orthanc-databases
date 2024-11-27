@@ -445,6 +445,9 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
 #endif
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+        response.mutable_get_system_information()->set_has_db_housekeeping(accessor.GetBackend().HasPerformDbHousekeeping());
+#endif
         break;
       }
 
@@ -1335,6 +1338,14 @@ namespace OrthancDatabases
       }
 #endif
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+      case Orthanc::DatabasePluginMessages::OPERATION_PERFORM_DB_HOUSEKEEPING:
+      {
+        backend.PerformDbHousekeeping(manager);
+        break;
+      }
+#endif
+
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
@@ -1436,9 +1447,6 @@ namespace OrthancDatabases
       
       if (isBackendInUse_)
       {
-        IndexConnectionsPool::Accessor accessor(*pool);
-        accessor.GetBackend().Shutdown();
-        
         isBackendInUse_ = false;
       }
       else

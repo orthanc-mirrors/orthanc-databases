@@ -35,8 +35,7 @@ namespace OrthancDatabases
   private:
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
-    std::unique_ptr<boost::thread>  dbHousekeeper_;
-    bool                   housekeeperShouldStop_;
+    bool                   hkHasComputedAllMissingChildCount_;
 
   protected:
     virtual void ClearDeletedFiles(DatabaseManager& manager) ORTHANC_OVERRIDE;
@@ -51,10 +50,6 @@ namespace OrthancDatabases
     }
 
     void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
-
-    void StartDbHousekeeper(DatabaseManager& manager);
-
-    static void WorkerHousekeeper(bool& housekeeperShouldStop, DatabaseManager* manager);
 
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
@@ -149,16 +144,9 @@ namespace OrthancDatabases
                                         int64_t& compressedSize,
                                         int64_t& uncompressedSize) ORTHANC_OVERRIDE;
 
-    virtual void Shutdown() ORTHANC_OVERRIDE;
+    virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE;
 
-// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-//     virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
-// #endif
+    virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-//     virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-//                              DatabaseManager& manager,
-//                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
-// #endif
   };
 }
