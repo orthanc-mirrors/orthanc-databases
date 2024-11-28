@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS Resources(
        resourceType INTEGER NOT NULL,
        publicId VARCHAR(64) NOT NULL,
        parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+	   childCount INTEGER,
        CONSTRAINT UniquePublicId UNIQUE (publicId)
        );
 
@@ -529,7 +530,7 @@ BEGIN
 	is_new_instance := 1;
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL) RETURNING internalid INTO patient_internal_id;
+        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_patient := 0;
@@ -537,7 +538,7 @@ BEGIN
     END;
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id) RETURNING internalid INTO study_internal_id;
+        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_study := 0;
@@ -545,7 +546,7 @@ BEGIN
     END;
 
 	BEGIN
-	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id) RETURNING internalid INTO series_internal_id;
+	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_series := 0;
@@ -553,7 +554,7 @@ BEGIN
     END;
 
   	BEGIN
-		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id) RETURNING internalid INTO instance_internal_id;
+		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_instance := 0;
@@ -590,89 +591,75 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
--- new in Rev3
+-- -- new in Rev3b
 
-CREATE TABLE IF NOT EXISTS ChildCount (
-    parentId BIGINT PRIMARY KEY REFERENCES Resources(internalId) ON DELETE CASCADE,
-    childCount INTEGER NOT NULL DEFAULT 0,
-    CONSTRAINT UniqueParentID UNIQUE (parentId)
-);
-
-
--- Computes the ChildCount for a number of resources for which it has not been computed yet.
+-- Computes the childCount for a number of resources for which it has not been computed yet.
 -- This is actually used only after an update to Rev3.  A thread will call this function
 -- at regular interval to update all missing values and stop once all values have been processed.
 CREATE OR REPLACE FUNCTION ComputeMissingChildCount(
     IN batch_size BIGINT,
     OUT updated_rows_count BIGINT
 ) RETURNS BIGINT AS $body$
-
 BEGIN
-
-    INSERT INTO ChildCount (parentID, childCount)
-    SELECT r.internalId AS parentId, COUNT(childLevel.internalId) AS childCount
-    FROM Resources AS r
-    LEFT JOIN Resources AS childLevel ON r.internalId = childLevel.parentId
-    WHERE r.internalId IN (
-        SELECT internalId FROM Resources AS r
-        WHERE resourceType < 3 AND NOT EXISTS(SELECT 1 FROM ChildCount WHERE ChildCount.parentId = r.internalId)
-        LIMIT batch_size)
-    GROUP BY r.internalId;
+	UPDATE Resources AS r
+    SET childCount = (SELECT COUNT(childLevel.internalId)
+                      FROM Resources AS childLevel
+                      WHERE childLevel.parentId = r.internalId)
+    WHERE internalId IN (
+        SELECT internalId FROM Resources
+        WHERE resourceType < 3 AND childCount IS NULL
+        LIMIT batch_size);
     
     -- Get the number of rows affected
     GET DIAGNOSTICS updated_rows_count = ROW_COUNT;
-
 END;
 $body$ LANGUAGE plpgsql;
 
 
 
+DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
+DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
+
 CREATE OR REPLACE FUNCTION UpdateChildCount()
 RETURNS TRIGGER AS $body$
-DECLARE
-	parent_id BIGINT;
 BEGIN
     IF TG_OP = 'INSERT' THEN
 		IF new.parentId IS NOT NULL THEN
             -- try to increment the childcount from the parent
-			UPDATE ChildCount
+            -- note that we already have the lock on this row because the parent is locked in CreateInstance
+			UPDATE Resources
 		    SET childCount = childCount + 1
-		    WHERE parentId = new.parentId
-		    RETURNING parentId INTO parent_id;
+		    WHERE internalId = new.parentId AND childCount IS NOT NULL;
 		
             -- this should only happen for old studies whose childCount has not yet been computed
+            -- note: this child has already been added so it will be counted
 		    IF NOT FOUND THEN
-		        INSERT INTO childcount (parentId, childCount)
-		        SELECT parentID, COUNT(*)
-		        FROM Resources
-		        WHERE parentId = parent_id
-		        GROUP BY parentId;
+		        UPDATE Resources
+                SET childCount = (SELECT COUNT(*)
+		                              FROM Resources
+		                              WHERE internalId = new.parentId)
+		        WHERE internalId = new.parentId;
 		    END IF;
         END IF;
 	
-        -- this is a future parent, start counting the children
-        IF new.resourcetype < 3 THEN
-		   insert into ChildCount (parentId, childCount)
-		   values (new.internalId, 0);
-	 	END IF;
-
     ELSIF TG_OP = 'DELETE' THEN
 
 		IF old.parentId IS NOT NULL THEN
 
             -- Decrement the child count for the parent
-            UPDATE ChildCount
+            -- note that we already have the lock on this row because the parent is locked in DeleteResource
+            UPDATE Resources
             SET childCount = childCount - 1
-            WHERE parentId = old.parentId
-		    RETURNING parentId INTO parent_id;
+            WHERE internalId = old.parentId AND childCount IS NOT NULL;
 		
             -- this should only happen for old studies whose childCount has not yet been computed
+            -- note: this child has already been removed so it will not be counted
 		    IF NOT FOUND THEN
-		        INSERT INTO childcount (parentId, childCount)
-		        SELECT parentID, COUNT(*)
-		        FROM Resources
-		        WHERE parentId = parent_id
-		        GROUP BY parentId;
+		        UPDATE Resources
+                SET childCount = (SELECT COUNT(*)
+		                              FROM Resources
+		                              WHERE internalId = new.parentId)
+		        WHERE internalId = new.parentId;
 		    END IF;
         END IF;
         
@@ -681,13 +668,11 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
 CREATE TRIGGER IncrementChildCount
 AFTER INSERT ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE UpdateChildCount();
 
-DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
 CREATE TRIGGER DecrementChildCount
 AFTER DELETE ON Resources
 FOR EACH ROW
