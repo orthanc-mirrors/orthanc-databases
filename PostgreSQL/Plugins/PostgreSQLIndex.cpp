@@ -248,7 +248,7 @@ namespace OrthancDatabases
       // test if the latest "extension" has been installed
       int revision;
       if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel)
-          || revision != 2)
+          || revision != 3)
       {      
         LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
