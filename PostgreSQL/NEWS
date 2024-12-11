@@ -36,6 +36,10 @@ Optimal Postgresql Server version: 11+
 * New default values for configurations:
   - "IndexConnectionsCount": 50
   - "TransactionMode": "ReadCommitted"
+* Introduced a new thread to perform DB Housekeeping at regular interval (5s) for the
+  DB plugins requiring it (currently only PostgreSQL).  E.g: This avoids very long update
+  times in case you don't call /statistics for a long period.
+
 
 Release 6.2 (2024-03-25)
 ========================
