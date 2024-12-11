@@ -469,7 +469,8 @@ namespace OrthancDatabases
      **/
     static void Register(IndexBackend* backend,
                          size_t countConnections,
-                         unsigned int maxDatabaseRetries);
+                         unsigned int maxDatabaseRetries,
+                         unsigned int housekeepingDelaySeconds);
 
     static void Finalize();
 

@@ -1465,9 +1465,10 @@ namespace OrthancDatabases
   
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
-                                          unsigned int maxDatabaseRetries)
+                                          unsigned int maxDatabaseRetries,
+                                          unsigned int housekeepingDelaySeconds)
   {
-    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections));
+    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
     
     if (isBackendInUse_)
     {

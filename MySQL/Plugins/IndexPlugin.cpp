@@ -77,11 +77,12 @@ extern "C"
     try
     {
       const size_t countConnections = mysql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
+      const unsigned int housekeepingDelaySeconds = 5;  // TODO - PARAMETER
 
       OrthancDatabases::MySQLParameters parameters(mysql, configuration);
       OrthancDatabases::IndexBackend::Register(
         new OrthancDatabases::MySQLIndex(context, parameters, readOnly), countConnections,
-        parameters.GetMaxConnectionRetries());
+        parameters.GetMaxConnectionRetries(), housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {

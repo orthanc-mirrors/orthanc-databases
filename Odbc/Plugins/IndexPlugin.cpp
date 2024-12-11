@@ -106,6 +106,7 @@ extern "C"
       const unsigned int countConnections = odbc.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
       const unsigned int maxConnectionRetries = odbc.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
       const unsigned int connectionRetryInterval = odbc.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
+      const unsigned int housekeepingDelaySeconds = 5;  // TODO - PARAMETER
 
       if (connectionString.empty())
       {
@@ -124,7 +125,7 @@ extern "C"
       index->SetMaxConnectionRetries(maxConnectionRetries);
       index->SetConnectionRetryInterval(connectionRetryInterval);
 
-      OrthancDatabases::IndexBackend::Register(index.release(), countConnections, maxConnectionRetries);
+      OrthancDatabases::IndexBackend::Register(index.release(), countConnections, maxConnectionRetries, housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {

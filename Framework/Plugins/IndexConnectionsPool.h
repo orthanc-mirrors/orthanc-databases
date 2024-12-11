@@ -29,6 +29,7 @@
 #include <MultiThreading/SharedMessageQueue.h>
 
 #include <list>
+#include <boost/thread.hpp>
 
 namespace OrthancDatabases
 {
@@ -43,10 +44,16 @@ namespace OrthancDatabases
     size_t                         countConnections_;
     std::list<DatabaseManager*>    connections_;
     Orthanc::SharedMessageQueue    availableConnections_;
+    bool                           housekeepingContinue_;
+    boost::thread                  housekeepingThread_;
+    boost::posix_time::time_duration  housekeepingDelay_;
+
+    static void HousekeepingThread(IndexConnectionsPool* that);
 
   public:
     IndexConnectionsPool(IndexBackend* backend /* takes ownership */,
-                         size_t countConnections);
+                         size_t countConnections,
+                         unsigned int houseKeepingDelaySeconds);
 
     ~IndexConnectionsPool();
 
