@@ -445,9 +445,6 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
 #endif
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-        response.mutable_get_system_information()->set_has_db_housekeeping(accessor.GetBackend().HasPerformDbHousekeeping());
-#endif
         break;
       }
 
@@ -1334,14 +1331,6 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_COUNT_RESOURCES:
       {
         backend.ExecuteCount(response, manager, request.find());
-        break;
-      }
-#endif
-
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-      case Orthanc::DatabasePluginMessages::OPERATION_PERFORM_DB_HOUSEKEEPING:
-      {
-        backend.PerformDbHousekeeping(manager);
         break;
       }
 #endif
