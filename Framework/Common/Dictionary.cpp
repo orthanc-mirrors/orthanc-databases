@@ -25,6 +25,7 @@
 
 #include "BinaryStringValue.h"
 #include "InputFileValue.h"
+#include "Integer32Value.h"
 #include "Integer64Value.h"
 #include "NullValue.h"
 #include "Utf8StringValue.h"
@@ -126,7 +127,13 @@ namespace OrthancDatabases
     SetValue(key, new Integer64Value(value));
   }
 
-  
+
+  void Dictionary::SetInteger32Value(const std::string& key,
+                                     int32_t value)
+  {
+    SetValue(key, new Integer32Value(value));
+  }
+
   void Dictionary::SetNullValue(const std::string& key)
   {
     SetValue(key, new NullValue);

@@ -45,7 +45,9 @@
 #endif
 
 
-#include <google/protobuf/any.h>
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+#  include <google/protobuf/any.h>
+#endif
 
 
 static const char* const KEY_ODBC = "Odbc";
@@ -60,7 +62,9 @@ extern "C"
   
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+#endif
 
     if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "ODBC", true))
     {
@@ -106,6 +110,7 @@ extern "C"
       const unsigned int countConnections = odbc.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
       const unsigned int maxConnectionRetries = odbc.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
       const unsigned int connectionRetryInterval = odbc.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);
+      const unsigned int housekeepingDelaySeconds = 5;  // TODO - PARAMETER
 
       if (connectionString.empty())
       {
@@ -113,11 +118,18 @@ extern "C"
                                         "No connection string provided for the ODBC index");
       }
 
-      std::unique_ptr<OrthancDatabases::OdbcIndex> index(new OrthancDatabases::OdbcIndex(context, connectionString));
+      bool readOnly = configuration.GetBooleanValue("ReadOnly", false);
+
+      if (readOnly)
+      {
+        LOG(WARNING) << "READ-ONLY SYSTEM: the Database plugin is working in read-only mode";
+      }
+
+      std::unique_ptr<OrthancDatabases::OdbcIndex> index(new OrthancDatabases::OdbcIndex(context, connectionString, readOnly));
       index->SetMaxConnectionRetries(maxConnectionRetries);
       index->SetConnectionRetryInterval(connectionRetryInterval);
 
-      OrthancDatabases::IndexBackend::Register(index.release(), countConnections, maxConnectionRetries);
+      OrthancDatabases::IndexBackend::Register(index.release(), countConnections, maxConnectionRetries, housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -138,7 +150,10 @@ extern "C"
   {
     LOG(WARNING) << "ODBC index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     google::protobuf::ShutdownProtobufLibrary();
+#endif
   }
 
 

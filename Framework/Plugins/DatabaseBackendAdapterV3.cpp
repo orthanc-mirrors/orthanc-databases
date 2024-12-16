@@ -1814,7 +1814,8 @@ namespace OrthancDatabases
     
   void DatabaseBackendAdapterV3::Register(IndexBackend* backend,
                                           size_t countConnections,
-                                          unsigned int maxDatabaseRetries)
+                                          unsigned int maxDatabaseRetries,
+                                          unsigned int housekeepingDelaySeconds)
   {
     std::unique_ptr<IndexBackend> protection(backend);
     
@@ -1905,7 +1906,7 @@ namespace OrthancDatabases
  
     if (OrthancPluginRegisterDatabaseBackendV3(
           context, &params, sizeof(params), maxDatabaseRetries,
-          new IndexConnectionsPool(protection.release(), countConnections)) != OrthancPluginErrorCode_Success)
+          new IndexConnectionsPool(protection.release(), countConnections, housekeepingDelaySeconds)) != OrthancPluginErrorCode_Success)
     {
       delete backend;
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");

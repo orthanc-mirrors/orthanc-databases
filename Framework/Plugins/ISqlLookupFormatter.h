@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include <Enumerations.h>
+#include "MessagesToolbox.h"
 
 #include <boost/noncopyable.hpp>
 #include <vector>
@@ -38,6 +38,7 @@
 namespace OrthancDatabases
 {
   class DatabaseConstraints;
+  class FindRequest;
 
   enum LabelsConstraint
   {
@@ -59,12 +60,18 @@ namespace OrthancDatabases
 
     virtual std::string FormatWildcardEscape() = 0;
 
+    virtual std::string FormatLimits(uint64_t since, uint64_t count) = 0;
+
+    virtual std::string FormatNull(const char* type) = 0;
+
     /**
      * Whether to escape '[' and ']', which is only needed for
      * MSSQL. New in Orthanc 1.10.0, from the following changeset:
      * https://orthanc.uclouvain.be/hg/orthanc-databases/rev/389c037387ea
      **/
     virtual bool IsEscapeBrackets() const = 0;
+
+    virtual bool SupportsNullsLast() const = 0;
 
     static void GetLookupLevels(Orthanc::ResourceType& lowerLevel,
                                 Orthanc::ResourceType& upperLevel,
@@ -86,5 +93,11 @@ namespace OrthancDatabases
                                  const std::set<std::string>& labels,  // New in Orthanc 1.12.0
                                  LabelsConstraint labelsConstraint,    // New in Orthanc 1.12.0
                                  size_t limit);
+
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+    static void Apply(std::string& sql,
+                      ISqlLookupFormatter& formatter,
+                      const Orthanc::DatabasePluginMessages::Find_Request& request);
+#endif
   };
 }

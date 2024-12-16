@@ -152,6 +152,10 @@ namespace OrthancDatabases
           buffer_.resize(8);
           break;
 
+        case MYSQL_TYPE_NULL:
+          orthancType_ = ValueType_Null;
+          break;
+
         case MYSQL_TYPE_STRING:
         case MYSQL_TYPE_VAR_STRING:
         case MYSQL_TYPE_BLOB:

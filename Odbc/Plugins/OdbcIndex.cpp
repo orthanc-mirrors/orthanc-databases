@@ -135,8 +135,9 @@ namespace OrthancDatabases
 
 
   OdbcIndex::OdbcIndex(OrthancPluginContext* context,
-                       const std::string& connectionString) :
-    IndexBackend(context),
+                       const std::string& connectionString,
+                       bool readOnly) :
+    IndexBackend(context, readOnly),
     maxConnectionRetries_(10),
     connectionRetryInterval_(5),
     connectionString_(connectionString)
@@ -695,4 +696,32 @@ namespace OrthancDatabases
 
     SignalDeletedFiles(output, manager);
   }
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool OdbcIndex::HasFindSupport() const
+  {
+    // TODO-FIND
+    return false;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  // void OdbcIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  //                             DatabaseManager& manager,
+  //                             const Orthanc::DatabasePluginMessages::Find_Request& request)
+  // {
+  //   // TODO-FIND
+  //   throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  // }
+
+  // void OdbcIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  //                              DatabaseManager& manager,
+  //                              const Orthanc::DatabasePluginMessages::Find_Request& request)
+  // {
+  //   // TODO-FIND
+  //   throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  // }
+#endif
 }

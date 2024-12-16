@@ -21,39 +21,35 @@
  **/
 
 
-#pragma once
+#include "Integer32Value.h"
 
-#define STATEMENT_FROM_HERE  ::OrthancDatabases::StatementLocation(__FILE__, __LINE__)
+#include "BinaryStringValue.h"
+#include "NullValue.h"
+#include "Utf8StringValue.h"
 
+#include <OrthancException.h>
+
+#include <boost/lexical_cast.hpp>
 
 namespace OrthancDatabases
 {
-  class StatementLocation
+  IValue* Integer32Value::Convert(ValueType target) const
   {
-  private:
-    const char* file_;
-    int line_;
-    
-    StatementLocation(); // Forbidden
-    
-  public:
-    StatementLocation(const char* file,
-                      int line) :
-      file_(file),
-      line_(line)
+    std::string s = boost::lexical_cast<std::string>(value_);
+            
+    switch (target)
     {
-    }
+      case ValueType_Null:
+        return new NullValue;
 
-    const char* GetFile() const
-    {
-      return file_;
-    }
+      case ValueType_BinaryString:
+        return new BinaryStringValue(s);
 
-    int GetLine() const
-    {
-      return line_;
+      case ValueType_Utf8String:
+        return new Utf8StringValue(s);
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
-    
-    bool operator< (const StatementLocation& other) const;
-  };
+  }
 }

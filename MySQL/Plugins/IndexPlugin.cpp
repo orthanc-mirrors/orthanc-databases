@@ -29,7 +29,9 @@
 #include <Logging.h>
 #include <Toolbox.h>
 
-#include <google/protobuf/any.h>
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+#  include <google/protobuf/any.h>
+#endif
 
 #define ORTHANC_PLUGIN_NAME "mysql-index"
 
@@ -37,7 +39,9 @@ extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+#endif
 
     if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "MySQL", true))
     {
@@ -67,14 +71,22 @@ extern "C"
       return 0;
     }
 
+    bool readOnly = configuration.GetBooleanValue("ReadOnly", false);
+
+    if (readOnly)
+    {
+      LOG(WARNING) << "READ-ONLY SYSTEM: the Database plugin is working in read-only mode";
+    }
+
     try
     {
       const size_t countConnections = mysql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
+      const unsigned int housekeepingDelaySeconds = 5;  // TODO - PARAMETER
 
       OrthancDatabases::MySQLParameters parameters(mysql, configuration);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::MySQLIndex(context, parameters), countConnections,
-        parameters.GetMaxConnectionRetries());
+        new OrthancDatabases::MySQLIndex(context, parameters, readOnly), countConnections,
+        parameters.GetMaxConnectionRetries(), housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -99,7 +111,10 @@ extern "C"
     OrthancDatabases::MySQLDatabase::GlobalFinalization();
     Orthanc::HttpClient::GlobalFinalize();
     Orthanc::Toolbox::FinalizeOpenSsl();
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     google::protobuf::ShutdownProtobufLibrary();
+#endif
   }
 
 

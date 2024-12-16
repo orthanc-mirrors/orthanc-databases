@@ -21,21 +21,37 @@
  **/
 
 
-#include "StatementLocation.h"
+#pragma once
 
-#include <string.h>
+#include "IValue.h"
+
+#include <Compatibility.h>
+
+#include <stdint.h>
 
 namespace OrthancDatabases
 {
-  bool StatementLocation::operator< (const StatementLocation& other) const
+  class Integer32Value : public IValue
   {
-    if (line_ != other.line_)
+  private:
+    int32_t  value_;
+
+  public:
+    explicit Integer32Value(int32_t value) :
+    value_(value)
     {
-      return line_ < other.line_;
     }
-    else
+
+    int32_t GetValue() const
     {
-      return strcmp(file_, other.file_) < 0;
+      return value_;
     }
-  }
+
+    virtual ValueType GetType() const ORTHANC_OVERRIDE
+    {
+      return ValueType_Integer32;
+    }
+    
+    virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
+  };
 }

@@ -26,7 +26,9 @@
 
 #include <Logging.h>
 
-#include <google/protobuf/any.h>
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+#  include <google/protobuf/any.h>
+#endif
 
 #define ORTHANC_PLUGIN_NAME "sqlite-index"
 
@@ -35,7 +37,9 @@ extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+#endif
 
     if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "SQLite", true))
     {
@@ -70,7 +74,8 @@ extern "C"
       OrthancDatabases::IndexBackend::Register(
         new OrthancDatabases::SQLiteIndex(context, "index.db"),   // TODO parameter
         1 /* only 1 connection is possible with SQLite */,
-        0 /* no collision is possible, as SQLite has a global lock */);
+        0 /* no collision is possible, as SQLite has a global lock */,
+        0 /* housekeeping delay, unused for SQLite */);
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -91,7 +96,10 @@ extern "C"
   {
     LOG(WARNING) << "SQLite index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     google::protobuf::ShutdownProtobufLibrary();
+#endif
   }
 
 

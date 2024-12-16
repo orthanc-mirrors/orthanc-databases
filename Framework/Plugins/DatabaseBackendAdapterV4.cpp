@@ -27,6 +27,7 @@
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 
 #include "IndexConnectionsPool.h"
+#include "MessagesToolbox.h"
 
 #include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages
 
@@ -91,28 +92,6 @@ namespace OrthancDatabases
   }
 
 
-  static Orthanc::ResourceType Convert2(Orthanc::DatabasePluginMessages::ResourceType resourceType)
-  {
-    switch (resourceType)
-    {
-      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
-        return Orthanc::ResourceType_Patient;
-
-      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
-        return Orthanc::ResourceType_Study;
-
-      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
-        return Orthanc::ResourceType_Series;
-
-      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
-        return Orthanc::ResourceType_Instance;
-
-      default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-    }
-  }
-
-
   class Output : public IDatabaseBackendOutput
   {
   private:
@@ -126,6 +105,10 @@ namespace OrthancDatabases
     Orthanc::DatabasePluginMessages::LookupAttachment::Response*         lookupAttachment_;
     Orthanc::DatabasePluginMessages::LookupResources::Response*          lookupResources_;
 
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+    Orthanc::DatabasePluginMessages::GetChangesExtended::Response*       getChangesExtended_;
+#endif
+
     void Clear()
     {
       deleteAttachment_ = NULL;
@@ -137,6 +120,10 @@ namespace OrthancDatabases
       getMainDicomTags_ = NULL;
       lookupAttachment_ = NULL;
       lookupResources_ = NULL;
+
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      getChangesExtended_ = NULL;
+#endif
     }
     
   public:
@@ -157,7 +144,15 @@ namespace OrthancDatabases
       Clear();
       getChanges_ = &getChanges;
     }
-    
+
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+    Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
+    {
+      Clear();
+      getChangesExtended_ = &getChangesExtended;
+    }
+#endif
+
     Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
     {
       Clear();
@@ -310,6 +305,12 @@ namespace OrthancDatabases
       {
         change = getChanges_->add_changes();
       }
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      else if (getChangesExtended_ != NULL)
+      {
+        change = getChangesExtended_->add_changes();
+      }
+#endif
       else if (getLastChange_ != NULL)
       {
         if (getLastChange_->found())
@@ -439,6 +440,11 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_measure_latency(accessor.GetBackend().HasMeasureLatency());
 #endif
 
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+        response.mutable_get_system_information()->set_supports_find(accessor.GetBackend().HasFindSupport());
+        response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
+#endif
+
         break;
       }
 
@@ -455,7 +461,7 @@ namespace OrthancDatabases
         for (int i = 0; i < request.open().identifier_tags().size(); i++)
         {
           const Orthanc::DatabasePluginMessages::Open_Request_IdentifierTag& tag = request.open().identifier_tags(i);
-          identifierTags.push_back(IdentifierTag(Convert2(tag.level()),
+          identifierTags.push_back(IdentifierTag(MessagesToolbox::Convert(tag.level()),
                                                  Orthanc::DicomTag(tag.group(), tag.element()),
                                                  tag.name()));
         }
@@ -782,7 +788,25 @@ namespace OrthancDatabases
         response.mutable_get_changes()->set_done(done);
         break;
       }
-      
+#if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES_EXTENDED:
+      {
+        Output output(*response.mutable_get_changes_extended());
+
+        bool done;
+        std::set<uint32_t> changeTypes;
+        for (int i = 0; i < request.get_changes_extended().change_type_size(); ++i)
+        {
+          changeTypes.insert(request.get_changes_extended().change_type(i));
+        }
+
+        backend.GetChangesExtended(output, done, manager, request.get_changes_extended().since(), request.get_changes_extended().to(), changeTypes, request.get_changes_extended().limit());
+
+        response.mutable_get_changes_extended()->set_done(done);
+        break;
+      }
+#endif
+
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHILDREN_INTERNAL_ID:
       {
         std::list<int64_t>  values;
@@ -1297,6 +1321,20 @@ namespace OrthancDatabases
         break;
       }
       
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_FIND:
+      {
+        backend.ExecuteFind(response, manager, request.find());
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_COUNT_RESOURCES:
+      {
+        backend.ExecuteCount(response, manager, request.find());
+        break;
+      }
+#endif
+
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
@@ -1416,9 +1454,10 @@ namespace OrthancDatabases
   
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
-                                          unsigned int maxDatabaseRetries)
+                                          unsigned int maxDatabaseRetries,
+                                          unsigned int housekeepingDelaySeconds)
   {
-    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections));
+    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
     
     if (isBackendInUse_)
     {

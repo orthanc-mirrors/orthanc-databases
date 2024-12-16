@@ -27,7 +27,9 @@
 #include <Logging.h>
 #include <Toolbox.h>
 
-#include <google/protobuf/any.h>
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+#  include <google/protobuf/any.h>
+#endif
 
 #define ORTHANC_PLUGIN_NAME "postgresql-index"
 
@@ -36,7 +38,9 @@ extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+#endif
 
     if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "PostgreSQL", true))
     {
@@ -65,14 +69,22 @@ extern "C"
       return 0;
     }
 
+    bool readOnly = configuration.GetBooleanValue("ReadOnly", false);
+
+    if (readOnly)
+    {
+      LOG(WARNING) << "READ-ONLY SYSTEM: the Database plugin is working in read-only mode";
+    }
+    
     try
     {
-      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
+      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 50);
+      const unsigned int housekeepingDelaySeconds = 5;  // TODO - PARAMETER
 
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::PostgreSQLIndex(context, parameters), countConnections,
-        parameters.GetMaxConnectionRetries());
+        new OrthancDatabases::PostgreSQLIndex(context, parameters, readOnly), countConnections,
+        parameters.GetMaxConnectionRetries(), housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -94,7 +106,10 @@ extern "C"
     LOG(WARNING) << "PostgreSQL index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
     Orthanc::Toolbox::FinalizeOpenSsl();
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     google::protobuf::ShutdownProtobufLibrary();
+#endif
   }
 
 

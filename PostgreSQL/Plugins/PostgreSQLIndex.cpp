@@ -32,8 +32,11 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Toolbox.h>
+#include <SystemToolbox.h>
 #include <Logging.h>
 #include <OrthancException.h>
+
+#include <boost/algorithm/string/join.hpp>
 
 
 namespace Orthanc
@@ -43,16 +46,19 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasCreateInstance = GlobalProperty_DatabaseInternal1;
   static const GlobalProperty GlobalProperty_HasFastCountResources = GlobalProperty_DatabaseInternal2;
   static const GlobalProperty GlobalProperty_GetLastChangeIndex = GlobalProperty_DatabaseInternal3;
+  static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
 
 namespace OrthancDatabases
 {
   PostgreSQLIndex::PostgreSQLIndex(OrthancPluginContext* context,
-                                   const PostgreSQLParameters& parameters) :
-    IndexBackend(context),
+                                   const PostgreSQLParameters& parameters,
+                                   bool readOnly) :
+    IndexBackend(context, readOnly),
     parameters_(parameters),
-    clearAll_(false)
+    clearAll_(false),
+    hkHasComputedAllMissingChildCount_(false)
   {
   }
 
@@ -93,13 +99,20 @@ namespace OrthancDatabases
 
     PostgreSQLDatabase& db = dynamic_cast<PostgreSQLDatabase&>(manager.GetDatabase());
 
-    if (parameters_.HasLock())
+    if (parameters_.HasLock()) 
     {
+      if (IsReadOnly())
+      {
+        LOG(ERROR) << "READ-ONLY SYSTEM: Unable to lock the database when working in ReadOnly mode."; 
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Plugin);
+      }
+
       db.AdvisoryLock(POSTGRESQL_LOCK_INDEX);
     }
 
+    if (!IsReadOnly())
     {
-      // lock the full DB while checking if it needs to be create/ugraded
+      // lock the full DB while checking if it needs to be created/ugraded
       PostgreSQLDatabase::TransientAdvisoryLock lock(db, POSTGRESQL_LOCK_DATABASE_SETUP);
 
       if (clearAll_)
@@ -134,22 +147,30 @@ namespace OrthancDatabases
             throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
           }
 
-          bool needToRunUpgradeFromUnknownToV1 = false;
-          bool needToRunUpgradeV1toV2 = false;
+          bool applyUpgradeFromUnknownToV1 = false;
+          bool applyUpgradeV1toV2 = false;
+          bool applyUpgradeV2toV3 = false;
+          bool applyPrepareIndex = false;
 
           int revision;
           if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
           {
             LOG(WARNING) << "No DatabasePatchLevel found, assuming it's 1";
             revision = 1;
-            needToRunUpgradeFromUnknownToV1 = true;
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeFromUnknownToV1 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
           }
           else if (revision == 1)
           {
             LOG(WARNING) << "DatabasePatchLevel is 1";
-            needToRunUpgradeFromUnknownToV1 = true;
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
+          }
+          else if (revision == 2)
+          {
+            LOG(WARNING) << "DatabasePatchLevel is 2";
+            applyUpgradeV2toV3 = true;
           }
 
           int hasTrigram = 0;
@@ -160,30 +181,24 @@ namespace OrthancDatabases
             // We've observed 9 minutes on DB with 100000 studies
             LOG(WARNING) << "The DB schema update will try to enable trigram matching on the PostgreSQL database "
                          << "to speed up wildcard searches. This may take several minutes";
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
           }
 
           int property = 0;
           if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                           Orthanc::GlobalProperty_HasFastCountResources) ||
-              property != 1)
-          {
-            needToRunUpgradeV1toV2 = true;
-          }
-          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
-                                          Orthanc::GlobalProperty_GetTotalSizeIsFast) ||
-              property != 1)
-          {
-            needToRunUpgradeV1toV2 = true;
-          }
-          if (!LookupGlobalIntegerProperty(property, manager, MISSING_SERVER_IDENTIFIER,
                                           Orthanc::GlobalProperty_GetLastChangeIndex) ||
               property != 1)
           {
-            needToRunUpgradeV1toV2 = true;
+            applyUpgradeV1toV2 = true;
+            applyUpgradeV2toV3 = true;
           }
 
-          if (needToRunUpgradeFromUnknownToV1)
+          // If you add new tests here, update the test in the "ReadOnly" code below
+
+          applyPrepareIndex = applyUpgradeV2toV3;
+
+          if (applyUpgradeFromUnknownToV1)
           {
             LOG(WARNING) << "Upgrading DB schema from unknown to revision 1";
             std::string query;
@@ -193,7 +208,7 @@ namespace OrthancDatabases
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
           }
           
-          if (needToRunUpgradeV1toV2)
+          if (applyUpgradeV1toV2)
           {
             LOG(WARNING) << "Upgrading DB schema from revision 1 to revision 2";
 
@@ -202,13 +217,43 @@ namespace OrthancDatabases
             Orthanc::EmbeddedResources::GetFileResource
               (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV1_TO_REV2);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          }
 
-            // apply all idempotent changes that are in the PrepareIndexV2
+          if (applyUpgradeV2toV3)
+          {
+            LOG(WARNING) << "Upgrading DB schema from revision 2 to revision 3";
+
+            std::string query;
+
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV2_TO_REV3);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+          }
+
+          if (applyPrepareIndex)
+          {
+            // apply all idempotent changes that are in the PrepareIndex.sql
             ApplyPrepareIndex(t, manager);
           }
+
         }
 
         t.Commit();
+      }
+    }
+    else
+    {
+      LOG(WARNING) << "READ-ONLY SYSTEM: checking if the DB already exists and has the right schema"; 
+
+      DatabaseManager::Transaction t(manager, TransactionType_ReadOnly);
+
+      // test if the latest "extension" has been installed
+      int revision;
+      if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel)
+          || revision != 3)
+      {      
+        LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
       }
     }
   }
@@ -237,17 +282,23 @@ namespace OrthancDatabases
 
   uint64_t PostgreSQLIndex::GetTotalCompressedSize(DatabaseManager& manager)
   {
-    // Fast version if extension "./FastTotalSize.sql" is installed
     uint64_t result;
 
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT * FROM UpdateSingleStatistic(0)");
+        "SELECT * FROM ComputeStatisticsReadOnly(0)");
 
       statement.Execute();
 
-      result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      if (statement.IsNull(0))
+      {
+        return 0;
+      }
+      else
+      {
+        result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      }
     }
     
     // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
@@ -258,17 +309,23 @@ namespace OrthancDatabases
   
   uint64_t PostgreSQLIndex::GetTotalUncompressedSize(DatabaseManager& manager)
   {
-    // Fast version if extension "./FastTotalSize.sql" is installed
     uint64_t result;
 
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT * FROM UpdateSingleStatistic(1)");
+        "SELECT * FROM ComputeStatisticsReadOnly(1)");
 
       statement.Execute();
 
-      result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      if (statement.IsNull(0))
+      {
+        return 0;
+      }
+      else
+      {
+        result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      }
     }
     
     // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
@@ -487,23 +544,34 @@ namespace OrthancDatabases
   static void ExecuteSetResourcesContentTags(
     DatabaseManager& manager,
     const std::string& table,
-    const std::string& variablePrefix,
     uint32_t count,
     const OrthancPluginResourcesContentTags* tags)
   {
     std::string sql;
+
+    std::vector<std::string> resourceIds;
+    std::vector<std::string> groups;
+    std::vector<std::string> elements;
+    std::vector<std::string> values;
+
     Dictionary args;
     
     for (uint32_t i = 0; i < count; i++)
     {
-      std::string name = variablePrefix + boost::lexical_cast<std::string>(i);
+      std::string resourceArgName = "r" + boost::lexical_cast<std::string>(i);
+      std::string groupArgName = "g" + boost::lexical_cast<std::string>(i);
+      std::string elementArgName = "e" + boost::lexical_cast<std::string>(i);
+      std::string valueArgName = "v" + boost::lexical_cast<std::string>(i);
 
-      args.SetUtf8Value(name, tags[i].value);
-      
-      std::string insert = ("(" + boost::lexical_cast<std::string>(tags[i].resource) + ", " +
-                            boost::lexical_cast<std::string>(tags[i].group) + ", " +
-                            boost::lexical_cast<std::string>(tags[i].element) + ", " +
-                            "${" + name + "})");
+      args.SetIntegerValue(resourceArgName, tags[i].resource);
+      args.SetInteger32Value(elementArgName, tags[i].element);
+      args.SetInteger32Value(groupArgName, tags[i].group);
+      args.SetUtf8Value(valueArgName, tags[i].value);
+
+      std::string insert = ("(${" + resourceArgName + "}, ${" +
+                            groupArgName + "}, ${" +
+                            elementArgName + "}, " +
+                            "${" + valueArgName + "})");
 
       if (sql.empty())
       {
@@ -517,11 +585,17 @@ namespace OrthancDatabases
 
     if (!sql.empty())
     {
-      DatabaseManager::StandaloneStatement statement(manager, sql);
-
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+      
       for (uint32_t i = 0; i < count; i++)
       {
-        statement.SetParameterType(variablePrefix + boost::lexical_cast<std::string>(i),
+        statement.SetParameterType("r" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer64);
+        statement.SetParameterType("g" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer32);
+        statement.SetParameterType("e" + boost::lexical_cast<std::string>(i),
+                                    ValueType_Integer32);
+        statement.SetParameterType("v" + boost::lexical_cast<std::string>(i),
                                    ValueType_Utf8String);
       }
 
@@ -552,25 +626,24 @@ namespace OrthancDatabases
     
     for (uint32_t i = 0; i < count; i++)
     {
-      std::string argName = "m" + boost::lexical_cast<std::string>(i);
+      std::string resourceArgName = "r" + boost::lexical_cast<std::string>(i);
+      std::string typeArgName = "t" + boost::lexical_cast<std::string>(i);
+      std::string valueArgName = "v" + boost::lexical_cast<std::string>(i);
 
-      args.SetUtf8Value(argName, metadata[i].value);
+      args.SetIntegerValue(resourceArgName, metadata[i].resource);
+      args.SetInteger32Value(typeArgName, metadata[i].metadata);
+      args.SetUtf8Value(valueArgName, metadata[i].value);
 
-      resourceIds.push_back(boost::lexical_cast<std::string>(metadata[i].resource));
-      metadataTypes.push_back(boost::lexical_cast<std::string>(metadata[i].metadata));
-      metadataValues.push_back("${" + argName + "}");
+      resourceIds.push_back("${" + resourceArgName + "}");
+      metadataTypes.push_back("${" + typeArgName + "}");
+      metadataValues.push_back("${" + valueArgName + "}");
       revisions.push_back("0");
     }
 
-    std::string joinedResourceIds;
-    std::string joinedMetadataTypes;
-    std::string joinedMetadataValues;
-    std::string joinedRevisions;
-
-    Orthanc::Toolbox::JoinStrings(joinedResourceIds, resourceIds, ",");
-    Orthanc::Toolbox::JoinStrings(joinedMetadataTypes, metadataTypes, ",");
-    Orthanc::Toolbox::JoinStrings(joinedMetadataValues, metadataValues, ",");
-    Orthanc::Toolbox::JoinStrings(joinedRevisions, revisions, ",");
+    std::string joinedResourceIds = boost::algorithm::join(resourceIds, ",");
+    std::string joinedMetadataTypes = boost::algorithm::join(metadataTypes, ",");
+    std::string joinedMetadataValues = boost::algorithm::join(metadataValues, ",");
+    std::string joinedRevisions = boost::algorithm::join(revisions, ",");
 
     std::string sql = std::string("SELECT InsertOrUpdateMetadata(ARRAY[") + 
                                   joinedResourceIds + "], ARRAY[" + 
@@ -578,12 +651,16 @@ namespace OrthancDatabases
                                   joinedMetadataValues + "], ARRAY[" + 
                                   joinedRevisions + "])";
 
-    DatabaseManager::StandaloneStatement statement(manager, sql);
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
 
     for (uint32_t i = 0; i < count; i++)
     {
-      statement.SetParameterType("m" + boost::lexical_cast<std::string>(i),
+      statement.SetParameterType("v" + boost::lexical_cast<std::string>(i),
                                   ValueType_Utf8String);
+      statement.SetParameterType("r" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Integer64);
+      statement.SetParameterType("t" + boost::lexical_cast<std::string>(i),
+                                  ValueType_Integer32);
     }
 
     statement.Execute(args);
@@ -599,11 +676,9 @@ namespace OrthancDatabases
                                      uint32_t countMetadata,
                                      const OrthancPluginResourcesContentMetadata* metadata)
   {
-    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", "i",
-                                   countIdentifierTags, identifierTags);
+    ExecuteSetResourcesContentTags(manager, "DicomIdentifiers", countIdentifierTags, identifierTags);
 
-    ExecuteSetResourcesContentTags(manager, "MainDicomTags", "t",
-                                   countMainDicomTags, mainDicomTags);
+    ExecuteSetResourcesContentTags(manager, "MainDicomTags", countMainDicomTags, mainDicomTags);
     
     ExecuteSetResourcesContentMetadata(manager, HasRevisionsSupport(), countMetadata, metadata);
 
@@ -613,8 +688,6 @@ namespace OrthancDatabases
   uint64_t PostgreSQLIndex::GetResourcesCount(DatabaseManager& manager,
                                               OrthancPluginResourceType resourceType)
   {
-    // Optimized version thanks to the "FastCountResources.sql" extension
-
     assert(OrthancPluginResourceType_Patient == 0 &&
            OrthancPluginResourceType_Study == 1 &&
            OrthancPluginResourceType_Series == 2 &&
@@ -625,15 +698,22 @@ namespace OrthancDatabases
     {
       DatabaseManager::StandaloneStatement statement(
         manager,
-        std::string("SELECT * FROM UpdateSingleStatistic(") + boost::lexical_cast<std::string>(resourceType + 2) + ")");  // For an explanation of the "+ 2" below, check out "PrepareIndex.sql"
+        std::string("SELECT * FROM ComputeStatisticsReadOnly(") + boost::lexical_cast<std::string>(resourceType + 2) + ")");  // For an explanation of the "+ 2" below, check out "PrepareIndex.sql"
 
       statement.Execute();
 
-      result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      if (statement.IsNull(0))
+      {
+        return 0;
+      }
+      else
+      {
+        result = static_cast<uint64_t>(statement.ReadInteger64(0));
+      }
     }
       
     // disabled because this is not alway true while transactions are being executed in READ COMITTED TRANSACTION.  This is however true when no files are being delete/added
-    assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
+    // assert(result == IndexBackend::GetResourcesCount(manager, resourceType));
 
     return result;
   }
@@ -658,5 +738,40 @@ namespace OrthancDatabases
     // This behavior is implemented in "CreateInstance()", and no
     // backward compatibility is necessary
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+  }
+
+  bool PostgreSQLIndex::HasPerformDbHousekeeping()
+  {
+    return true;
+  }
+
+  void PostgreSQLIndex::PerformDbHousekeeping(DatabaseManager& manager)
+  {
+    // Compute the missing child count (table introduced in rev3)
+    if (!hkHasComputedAllMissingChildCount_)
+    {
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE, manager,
+        "SELECT ComputeMissingChildCount(50)");
+
+      statement.Execute();
+
+      int64_t updatedCount = statement.ReadInteger64(0);
+      hkHasComputedAllMissingChildCount_ = updatedCount == 0;
+
+      if (updatedCount > 0)
+      {
+        LOG(INFO) << "Computed " << updatedCount << " missing ChildCount entries";
+      }
+      else
+      {
+        LOG(INFO) << "No missing ChildCount entries";
+      }
+    }
+
+    // Consume the statistics delta to minimize computation when calling ComputeStatisticsReadOnly
+    {
+      int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
+      UpdateAndGetStatistics(manager, patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize);
+    }
   }
 }

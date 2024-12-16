@@ -65,37 +65,28 @@ namespace OrthancDatabases
       LOG(ERROR) << "PostgreSQL: Beginning a transaction twice!";
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
-
-    database_.ExecuteMultiLines("BEGIN");
+    std::string transactionStatement;  // if not defined, will use the default DB transaction isolation level
 
     switch (type)
     {
       case TransactionType_ReadWrite:
       {
-        std::string statement = database_.GetReadWriteTransactionStatement();
-        if (!statement.empty()) // if not defined, will use the default DB transaction isolation level
-        {
-          database_.ExecuteMultiLines(statement);
-        }
-
+        transactionStatement = database_.GetReadWriteTransactionStatement();
         break;
       }
 
       case TransactionType_ReadOnly:
       {
-        std::string statement = database_.GetReadOnlyTransactionStatement();
-        if (!statement.empty()) // if not defined, will use the default DB transaction isolation level
-        {
-          database_.ExecuteMultiLines(statement);
-        }
-
+        transactionStatement = database_.GetReadOnlyTransactionStatement();
         break;
       }
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
-        
+
+    database_.ExecuteMultiLines("BEGIN; " + transactionStatement);
+
     isOpen_ = true;
   }
 

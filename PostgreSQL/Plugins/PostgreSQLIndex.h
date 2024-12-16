@@ -25,6 +25,8 @@
 
 #include "../../Framework/Plugins/IndexBackend.h"
 #include "../../Framework/PostgreSQL/PostgreSQLParameters.h"
+#include <boost/thread.hpp>
+
 
 namespace OrthancDatabases
 {
@@ -33,6 +35,7 @@ namespace OrthancDatabases
   private:
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
+    bool                   hkHasComputedAllMissingChildCount_;
 
   protected:
     virtual void ClearDeletedFiles(DatabaseManager& manager) ORTHANC_OVERRIDE;
@@ -41,11 +44,17 @@ namespace OrthancDatabases
 
     virtual void ClearRemainingAncestor(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
+    virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
     void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
 
   public:
     PostgreSQLIndex(OrthancPluginContext* context,
-                    const PostgreSQLParameters& parameters);
+                    const PostgreSQLParameters& parameters,
+                    bool readOnly = false);
 
     void SetClearAll(bool clear)
     {
@@ -134,6 +143,10 @@ namespace OrthancDatabases
                                         int64_t& instancesCount,
                                         int64_t& compressedSize,
                                         int64_t& uncompressedSize) ORTHANC_OVERRIDE;
+
+    virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE;
+
+    virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
   };
 }

@@ -30,16 +30,7 @@
 
 #pragma once
 
-#include <orthanc/OrthancCDatabasePlugin.h>
-
-#define ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT 0
-
-#if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)      // Macro introduced in 1.3.1
-#  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 5, 2)
-#    undef  ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT
-#    define ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT 1
-#  endif
-#endif
+#include "MessagesToolbox.h"
 
 #include <DicomFormat/DicomMap.h>
 
@@ -47,31 +38,6 @@
 
 namespace OrthancDatabases
 {
-  enum ConstraintType
-  {
-    ConstraintType_Equal,
-    ConstraintType_SmallerOrEqual,
-    ConstraintType_GreaterOrEqual,
-    ConstraintType_Wildcard,
-    ConstraintType_List
-  };
-
-  namespace Plugins
-  {
-    OrthancPluginResourceType Convert(Orthanc::ResourceType type);
-
-    Orthanc::ResourceType Convert(OrthancPluginResourceType type);
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    OrthancPluginConstraintType Convert(ConstraintType constraint);
-#endif
-
-#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    ConstraintType Convert(OrthancPluginConstraintType constraint);
-#endif
-  }
-
-
   class DatabaseConstraint : public boost::noncopyable
   {
   private:
@@ -94,6 +60,10 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     explicit DatabaseConstraint(const OrthancPluginDatabaseConstraint& constraint);
+#endif
+
+#if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
+    explicit DatabaseConstraint(const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint);
 #endif
 
     Orthanc::ResourceType GetLevel() const
@@ -170,5 +140,7 @@ namespace OrthancDatabases
     }
 
     const DatabaseConstraint& GetConstraint(size_t index) const;
+
+    std::string Format() const;
   };
 }

@@ -34,9 +34,16 @@ namespace OrthancDatabases
     unsigned int connectionRetryInterval_;
     std::string  connectionString_;
     
+  protected:
+    virtual bool HasChildCountTable() const
+    {
+      return false;
+    }
+
   public:
     OdbcIndex(OrthancPluginContext* context,
-              const std::string& connectionString);
+              const std::string& connectionString,
+              bool readOnly);
 
     unsigned int GetMaxConnectionRetries() const
     {
@@ -92,5 +99,19 @@ namespace OrthancDatabases
     {
       return false;
     }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    // virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+    //                          DatabaseManager& manager,
+    //                          const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+
+    // virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+    //                           DatabaseManager& manager,
+    //                           const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
   };
 }

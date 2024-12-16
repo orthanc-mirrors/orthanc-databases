@@ -67,5 +67,26 @@ namespace OrthancDatabases
     {
       return true;
     }
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                              DatabaseManager& manager,
+                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+    virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
   };
 }

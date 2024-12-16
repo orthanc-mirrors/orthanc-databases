@@ -116,6 +116,7 @@ list(APPEND DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/ISqlLookupFormatter.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/IndexBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/IndexConnectionsPool.cpp
+  ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/MessagesToolbox.cpp
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Plugins/OrthancPluginCppWrapper.cpp
   )

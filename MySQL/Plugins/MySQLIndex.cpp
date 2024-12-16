@@ -39,8 +39,9 @@
 namespace OrthancDatabases
 {
   MySQLIndex::MySQLIndex(OrthancPluginContext* context,
-                         const MySQLParameters& parameters) :
-    IndexBackend(context),
+                         const MySQLParameters& parameters,
+                         bool readOnly) :
+    IndexBackend(context, readOnly),
     parameters_(parameters),
     clearAll_(false)
   {
@@ -592,5 +593,33 @@ namespace OrthancDatabases
       }
     }   
   }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  bool MySQLIndex::HasFindSupport() const
+  {
+    // TODO-FIND
+    return true;
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+  // void MySQLIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  //                              DatabaseManager& manager,
+  //                              const Orthanc::DatabasePluginMessages::Find_Request& request)
+  // {
+  //   // TODO-FIND
+  //   throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  // }
+
+  // void MySQLIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  //                               DatabaseManager& manager,
+  //                               const Orthanc::DatabasePluginMessages::Find_Request& request)
+  // {
+  //   // TODO-FIND
+  //   throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  // }
 #endif
 }

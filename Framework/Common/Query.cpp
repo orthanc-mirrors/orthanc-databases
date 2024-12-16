@@ -76,7 +76,7 @@ namespace OrthancDatabases
       parameter = parameter.substr(2, parameter.size() - 3);
 
       tokens_.push_back(new Token(true, parameter));
-      parameters_[parameter] = ValueType_Null;
+      parameters_[parameter] = ValueType_Utf8String;
 
       last = it->second;
 

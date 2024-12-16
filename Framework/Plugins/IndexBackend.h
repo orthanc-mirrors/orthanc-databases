@@ -42,6 +42,7 @@ namespace OrthancDatabases
     class LookupFormatter;
 
     OrthancPluginContext*  context_;
+    bool                   readOnly_;
 
     boost::shared_mutex                                outputFactoryMutex_;
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
@@ -53,11 +54,18 @@ namespace OrthancDatabases
 
     virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
+    virtual bool HasChildCountTable() const = 0;
+
     void SignalDeletedFiles(IDatabaseBackendOutput& output,
                             DatabaseManager& manager);
 
     void SignalDeletedResources(IDatabaseBackendOutput& output,
                                 DatabaseManager& manager);
+
+    bool IsReadOnly()
+    {
+      return readOnly_;
+    }
 
   private:
     void ReadChangesInternal(IDatabaseBackendOutput& output,
@@ -65,7 +73,8 @@ namespace OrthancDatabases
                              DatabaseManager& manager,
                              DatabaseManager::CachedStatement& statement,
                              const Dictionary& args,
-                             uint32_t limit);
+                             uint32_t limit,
+                             bool returnFirstResults);
 
     void ReadExportedResourcesInternal(IDatabaseBackendOutput& output,
                                        bool& done,
@@ -74,7 +83,8 @@ namespace OrthancDatabases
                                        uint32_t limit);
 
   public:
-    explicit IndexBackend(OrthancPluginContext* context);
+    explicit IndexBackend(OrthancPluginContext* context,
+                          bool readOnly);
 
     virtual OrthancPluginContext* GetContext() ORTHANC_OVERRIDE
     {
@@ -130,7 +140,15 @@ namespace OrthancDatabases
                             DatabaseManager& manager,
                             int64_t since,
                             uint32_t limit) ORTHANC_OVERRIDE;
-    
+
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    const std::set<uint32_t>& changeTypes,
+                                    uint32_t limit) ORTHANC_OVERRIDE;
+
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
                                        int64_t id) ORTHANC_OVERRIDE;
@@ -420,6 +438,34 @@ namespace OrthancDatabases
 
     virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    // New primitives since Orthanc 1.12.5
+    virtual bool HasExtendedChanges() const ORTHANC_OVERRIDE
+    {
+      return true;
+    }
+
+    virtual bool HasFindSupport() const ORTHANC_OVERRIDE;
+
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+
+    virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                              DatabaseManager& manager,
+                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+    virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
+    virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+
     /**
      * "maxDatabaseRetries" is to handle
      * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a
@@ -428,7 +474,8 @@ namespace OrthancDatabases
      **/
     static void Register(IndexBackend* backend,
                          size_t countConnections,
-                         unsigned int maxDatabaseRetries);
+                         unsigned int maxDatabaseRetries,
+                         unsigned int housekeepingDelaySeconds);
 
     static void Finalize();
 

@@ -110,6 +110,14 @@ namespace OrthancDatabases
                             int64_t since,
                             uint32_t limit) = 0;
 
+    virtual void GetChangesExtended(IDatabaseBackendOutput& output,
+                                    bool& done /*out*/,
+                                    DatabaseManager& manager,
+                                    int64_t since,
+                                    int64_t to,
+                                    const std::set<uint32_t>& changeTypes,
+                                    uint32_t limit) = 0;
+
     virtual void GetChildrenInternalId(std::list<int64_t>& target /*out*/,
                                        DatabaseManager& manager,
                                        int64_t id) = 0;
@@ -377,6 +385,23 @@ namespace OrthancDatabases
     // New in Orthanc 1.12.3
     virtual uint64_t MeasureLatency(DatabaseManager& manager) = 0;
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
+    virtual bool HasFindSupport() const = 0;
+    virtual bool HasExtendedChanges() const = 0;
 
+    // New in Orthanc 1.12.5
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
+
+    // New in Orthanc 1.12.5
+    virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                              DatabaseManager& manager,
+                              const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
+#endif
+
+    virtual bool HasPerformDbHousekeeping() = 0;
+
+    virtual void PerformDbHousekeeping(DatabaseManager& manager) = 0;
   };
 }

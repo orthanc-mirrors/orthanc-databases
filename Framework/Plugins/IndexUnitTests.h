@@ -29,8 +29,6 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 
-#include <orthanc/OrthancCDatabasePlugin.h>
-
 #include <gtest/gtest.h>
 #include <list>
 
@@ -232,13 +230,13 @@ TEST(IndexBackend, Basic)
   ImplicitTransaction::SetErrorOnDoubleExecution(true);
 
 #if ORTHANC_ENABLE_POSTGRESQL == 1
-  PostgreSQLIndex db(&context, globalParameters_);
+  PostgreSQLIndex db(&context, globalParameters_, false);
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_MYSQL == 1
-  MySQLIndex db(&context, globalParameters_);
+  MySQLIndex db(&context, globalParameters_, false);
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_ODBC == 1
-  OdbcIndex db(&context, connectionString_);
+  OdbcIndex db(&context, connectionString_, false);
 #elif ORTHANC_ENABLE_SQLITE == 1  // Must be the last one
   SQLiteIndex db(&context);  // Open in memory
 #else
