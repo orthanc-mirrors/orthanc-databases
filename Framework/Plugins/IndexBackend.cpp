@@ -4076,8 +4076,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_CHILDREN_MAIN_DICOM_TAGS:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
-          Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
-          tag->add_values(statement->ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
+          tag->set_value(statement->ReadString(C3_STRING_1)); // TODO: handle sequences ??
           tag->set_group(statement->ReadInteger32(C6_INT_1));
           tag->set_element(statement->ReadInteger32(C7_INT_2));
         }; break;
@@ -4085,10 +4085,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_CHILDREN_METADATA:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
-          Orthanc::DatabasePluginMessages::Find_Response_MultipleMetadata* metadata = content->add_metadata();
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
-          metadata->add_values(statement->ReadString(C3_STRING_1));
+          metadata->set_value(statement->ReadString(C3_STRING_1));
           metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_revision(0);  // Setting a revision is not required in this case, as of Orthanc 1.12.5
         }; break;
 
         case QUERY_GRAND_CHILDREN_IDENTIFIERS:
@@ -4107,9 +4108,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
-          Orthanc::DatabasePluginMessages::Find_Response_MultipleTags* tag = content->add_main_dicom_tags();
+          Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
-          tag->add_values(statement->ReadString(C3_STRING_1)); // TODO: handle sequences ??
+          tag->set_value(statement->ReadString(C3_STRING_1)); // TODO: handle sequences ??
           tag->set_group(statement->ReadInteger32(C6_INT_1));
           tag->set_element(statement->ReadInteger32(C7_INT_2));
         }; break;
@@ -4117,10 +4118,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_GRAND_CHILDREN_METADATA:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
-          Orthanc::DatabasePluginMessages::Find_Response_MultipleMetadata* metadata = content->add_metadata();
+          Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
-          metadata->add_values(statement->ReadString(C3_STRING_1));
+          metadata->set_value(statement->ReadString(C3_STRING_1));
           metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_revision(0);  // Setting a revision is not required in this case, as of Orthanc 1.12.5
         }; break;
 
         case QUERY_GRAND_GRAND_CHILDREN_IDENTIFIERS:
