@@ -924,8 +924,21 @@ namespace OrthancDatabases
         {
           orderByField = "CASE WHEN order" + boost::lexical_cast<std::string>(i) + ".value IS NULL THEN 1 ELSE 0 END, ";
         }
-        orderByField += "order" + boost::lexical_cast<std::string>(i) + ".value";
-         
+
+        switch (ordering.cast())
+        {
+          case Orthanc::DatabasePluginMessages::OrderingCast::ORDERING_CAST_INT:
+            orderByField += "CAST(order" + boost::lexical_cast<std::string>(i) + ".value AS " + formatter.FormatIntegerCast() + ")";
+            break;
+          case Orthanc::DatabasePluginMessages::OrderingCast::ORDERING_CAST_FLOAT:
+            orderByField += "CAST(order" + boost::lexical_cast<std::string>(i) + ".value AS " + formatter.FormatFloatCast() + ")";
+            break;
+          case Orthanc::DatabasePluginMessages::OrderingCast::ORDERING_CAST_STRING:
+          default:
+            orderByField += "order" + boost::lexical_cast<std::string>(i) + ".value";
+            break;
+        }
+
         if (ordering.direction() == Orthanc::DatabasePluginMessages::OrderingDirection::ORDERING_DIRECTION_ASC)
         {
           orderByField += " ASC";

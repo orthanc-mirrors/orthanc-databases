@@ -73,6 +73,10 @@ namespace OrthancDatabases
 
     virtual bool SupportsNullsLast() const = 0;
 
+    virtual std::string FormatIntegerCast() const = 0;
+
+    virtual std::string FormatFloatCast() const = 0;
+
     static void GetLookupLevels(Orthanc::ResourceType& lowerLevel,
                                 Orthanc::ResourceType& upperLevel,
                                 const Orthanc::ResourceType& queryLevel,

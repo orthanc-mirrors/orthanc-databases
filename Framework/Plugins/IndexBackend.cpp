@@ -2282,6 +2282,38 @@ namespace OrthancDatabases
       return (dialect_ == Dialect_PostgreSQL);
     }
 
+    virtual std::string FormatIntegerCast() const
+    {
+      switch (dialect_)
+      {
+        case Dialect_MSSQL:
+          return "INT";
+        case Dialect_SQLite:
+        case Dialect_PostgreSQL:
+          return "INTEGER";
+        case Dialect_MySQL:
+          return "SIGNED";
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
+
+    virtual std::string FormatFloatCast() const
+    {
+      switch (dialect_)
+      {
+        case Dialect_SQLite:
+          return "REAL";
+        case Dialect_MSSQL:
+        case Dialect_PostgreSQL:
+          return "FLOAT";
+        case Dialect_MySQL:
+          return "DECIMAL(10,10)";
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
+
     void PrepareStatement(DatabaseManager::StandaloneStatement& statement) const
     {
       statement.SetReadOnly(true);
