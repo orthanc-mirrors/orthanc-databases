@@ -36,6 +36,8 @@
 #include <OrthancException.h>
 #include <Toolbox.h>
 
+#include <boost/algorithm/string/join.hpp>
+
 
 namespace OrthancDatabases
 {
@@ -60,6 +62,8 @@ namespace OrthancDatabases
     return s;
   }
 
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   static std::string JoinChanges(const std::set<uint32_t>& changeTypes)
   {
     std::set<std::string> changeTypesString;
@@ -73,7 +77,9 @@ namespace OrthancDatabases
 
     return joinedChangesTypes;
   }
-  
+#endif  
+
+
   template <typename T>
   static void ReadListOfIntegers(std::list<T>& target,
                                  DatabaseManager::CachedStatement& statement,
@@ -663,8 +669,7 @@ namespace OrthancDatabases
     std::string filtersString;
     if (filters.size() > 0)
     {
-      Orthanc::Toolbox::JoinStrings(filtersString, filters, " AND ");
-      filtersString = "WHERE " + filtersString;
+      filtersString = "WHERE " + boost::algorithm::join(filters, " AND ");
     }
 
     std::string sql;
@@ -1361,7 +1366,11 @@ namespace OrthancDatabases
 
   bool IndexBackend::HasMeasureLatency()
   {
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 2)
     return true;
+#else
+    return false;
+#endif
   }
 
 
@@ -3075,6 +3084,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
   uint64_t IndexBackend::MeasureLatency(DatabaseManager& manager)
   {
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 2)
     // execute 11x the simplest statement and return the median value
     std::vector<uint64_t> measures;
 
@@ -3092,6 +3102,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     std::sort(measures.begin(), measures.end());
 
     return measures[measures.size() / 2];
+#else
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+#endif
   }
 
 
@@ -4258,17 +4271,5 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement->Next();
     }    
   }
-
-  bool IndexBackend::HasPerformDbHousekeeping()
-  {
-    return false;
-  }
-
-  void IndexBackend::PerformDbHousekeeping(DatabaseManager& manager)
-  {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);    
-  }
-
 #endif
-
 }

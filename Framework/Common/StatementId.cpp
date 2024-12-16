@@ -26,6 +26,8 @@
 #include <string.h>
 #include <Toolbox.h>
 
+#include <boost/lexical_cast.hpp>
+
 namespace OrthancDatabases
 {
   bool StatementId::operator< (const StatementId& other) const

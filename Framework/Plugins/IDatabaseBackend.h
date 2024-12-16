@@ -398,11 +398,10 @@ namespace OrthancDatabases
     virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                               DatabaseManager& manager,
                               const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
+#endif
 
     virtual bool HasPerformDbHousekeeping() = 0;
 
     virtual void PerformDbHousekeeping(DatabaseManager& manager) = 0;
-
-#endif
   };
 }

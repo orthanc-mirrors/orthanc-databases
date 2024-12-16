@@ -84,11 +84,9 @@ namespace OrthancDatabases
                               const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 #endif
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
     virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
     {
       return false;
     }
-#endif
   };
 }

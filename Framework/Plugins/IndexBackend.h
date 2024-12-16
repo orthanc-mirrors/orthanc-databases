@@ -439,7 +439,7 @@ namespace OrthancDatabases
     virtual uint64_t MeasureLatency(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-    // New primitive since Orthanc 1.12.5
+    // New primitives since Orthanc 1.12.5
     virtual bool HasExtendedChanges() const ORTHANC_OVERRIDE
     {
       return true;
@@ -454,12 +454,17 @@ namespace OrthancDatabases
     virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                               DatabaseManager& manager,
                               const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
-
-    virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE;
-
-    virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE;
 #endif
 
+    virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
+    virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
 
     /**
      * "maxDatabaseRetries" is to handle

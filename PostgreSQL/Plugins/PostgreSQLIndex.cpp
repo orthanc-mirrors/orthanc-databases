@@ -36,6 +36,8 @@
 #include <Logging.h>
 #include <OrthancException.h>
 
+#include <boost/algorithm/string/join.hpp>
+
 
 namespace Orthanc
 {
@@ -638,15 +640,10 @@ namespace OrthancDatabases
       revisions.push_back("0");
     }
 
-    std::string joinedResourceIds;
-    std::string joinedMetadataTypes;
-    std::string joinedMetadataValues;
-    std::string joinedRevisions;
-
-    Orthanc::Toolbox::JoinStrings(joinedResourceIds, resourceIds, ",");
-    Orthanc::Toolbox::JoinStrings(joinedMetadataTypes, metadataTypes, ",");
-    Orthanc::Toolbox::JoinStrings(joinedMetadataValues, metadataValues, ",");
-    Orthanc::Toolbox::JoinStrings(joinedRevisions, revisions, ",");
+    std::string joinedResourceIds = boost::algorithm::join(resourceIds, ",");
+    std::string joinedMetadataTypes = boost::algorithm::join(metadataTypes, ",");
+    std::string joinedMetadataValues = boost::algorithm::join(metadataValues, ",");
+    std::string joinedRevisions = boost::algorithm::join(revisions, ",");
 
     std::string sql = std::string("SELECT InsertOrUpdateMetadata(ARRAY[") + 
                                   joinedResourceIds + "], ARRAY[" + 
