@@ -16,7 +16,7 @@ Optimal Postgresql Server version: 11+
   creation of this index.  If needed, you can create it manually before installing
   the new plugin by executing these SQL commands:
 
-    https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Upgrades/Partial/Rev2_To_Rev3b.sql
+    https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Upgrades/Partial/Rev2_To_Rev3.sql
 
 * WARNING: A new column has been added in the resources table when upgrading to this version.  A new thread
   is populating this new table and might consume DB bandwitdh and CPU.

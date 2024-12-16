@@ -25,6 +25,19 @@ END $$;
 
 DROP INDEX IF EXISTS ChildrenIndex;  -- replaced by ChildrenIndex2 but no need to uninstall ChildrenIndex2 when downgrading
 
+-- add the childCount columns in Resources if not yet done
+
+DO $body$
+BEGIN
+	IF NOT EXISTS (SELECT * FROM information_schema.columns WHERE table_schema='public' AND table_name='resources' AND column_name='childcount') THEN
+		ALTER TABLE Resources ADD COLUMN childcount INTEGER;
+	ELSE
+		raise notice 'the resources.childcount column already exists';
+	END IF;
+
+END $body$;
+
+
 
 -- other changes performed in PrepareIndex.sql:
   -- add ChildCount tables and triggers

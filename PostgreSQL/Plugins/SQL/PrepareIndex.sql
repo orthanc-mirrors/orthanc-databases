@@ -591,7 +591,7 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
--- -- new in Rev3b
+-- -- new in Rev3
 
 -- Computes the childCount for a number of resources for which it has not been computed yet.
 -- This is actually used only after an update to Rev3.  A thread will call this function
