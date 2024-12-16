@@ -95,6 +95,12 @@ namespace OrthancDatabases
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
+    else if (backend->HasPerformDbHousekeeping() &&
+             houseKeepingDelaySeconds == 0)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange,
+                                      "The delay between two executions of housekeeping cannot be zero second");
+    }
     else
     {
       context_ = backend_->GetContext();

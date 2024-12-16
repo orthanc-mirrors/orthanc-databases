@@ -83,7 +83,8 @@ namespace OrthancDatabases
                                        uint32_t limit);
 
   public:
-    explicit IndexBackend(OrthancPluginContext* context, bool readOnly);
+    explicit IndexBackend(OrthancPluginContext* context,
+                          bool readOnly);
 
     virtual OrthancPluginContext* GetContext() ORTHANC_OVERRIDE
     {
@@ -457,7 +458,6 @@ namespace OrthancDatabases
     virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE;
 
     virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE;
-
 #endif
 
 
