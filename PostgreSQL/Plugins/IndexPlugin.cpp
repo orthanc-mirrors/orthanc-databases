@@ -79,7 +79,7 @@ extern "C"
     try
     {
       const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 50);
-      const unsigned int housekeepingDelaySeconds = 5;  // TODO - PARAMETER
+      const unsigned int housekeepingDelaySeconds = postgresql.GetUnsignedIntegerValue("HousekeepingInterval", 1);
 
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(
