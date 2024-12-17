@@ -276,26 +276,26 @@ namespace OrthancDatabases
     OrthancDatabases::ConstraintType constraintType;
     switch (constraint.type())
     {
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_EQUAL:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_EQUAL:
       constraintType = OrthancDatabases::ConstraintType_Equal;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_GREATER_OR_EQUAL:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_GREATER_OR_EQUAL:
       constraintType = OrthancDatabases::ConstraintType_GreaterOrEqual;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_LIST:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_LIST:
       constraintType = OrthancDatabases::ConstraintType_List;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_SMALLER_OR_EQUAL:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_SMALLER_OR_EQUAL:
       constraintType = OrthancDatabases::ConstraintType_SmallerOrEqual;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_WILDCARD:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_WILDCARD:
       constraintType = OrthancDatabases::ConstraintType_Wildcard;
       break;
     default:
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
     }
 
-    if (constraint.type() == Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_LIST)
+    if (constraint.type() == Orthanc::DatabasePluginMessages::CONSTRAINT_LIST)
     {
       for (int i = 0; i < constraint.values_size(); ++i)
       {
@@ -927,19 +927,19 @@ namespace OrthancDatabases
 
         switch (ordering.cast())
         {
-          case Orthanc::DatabasePluginMessages::OrderingCast::ORDERING_CAST_INT:
+          case Orthanc::DatabasePluginMessages::ORDERING_CAST_INT:
             orderByField += "CAST(order" + boost::lexical_cast<std::string>(i) + ".value AS " + formatter.FormatIntegerCast() + ")";
             break;
-          case Orthanc::DatabasePluginMessages::OrderingCast::ORDERING_CAST_FLOAT:
+          case Orthanc::DatabasePluginMessages::ORDERING_CAST_FLOAT:
             orderByField += "CAST(order" + boost::lexical_cast<std::string>(i) + ".value AS " + formatter.FormatFloatCast() + ")";
             break;
-          case Orthanc::DatabasePluginMessages::OrderingCast::ORDERING_CAST_STRING:
+          case Orthanc::DatabasePluginMessages::ORDERING_CAST_STRING:
           default:
             orderByField += "order" + boost::lexical_cast<std::string>(i) + ".value";
             break;
         }
 
-        if (ordering.direction() == Orthanc::DatabasePluginMessages::OrderingDirection::ORDERING_DIRECTION_ASC)
+        if (ordering.direction() == Orthanc::DatabasePluginMessages::ORDERING_DIRECTION_ASC)
         {
           orderByField += " ASC";
         }
