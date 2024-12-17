@@ -3167,16 +3167,16 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     
     switch (level)
     {
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
         content = response->mutable_patient_content();
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
         content = response->mutable_study_content();
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
         content =response->mutable_series_content();
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
         content = response->mutable_instance_content();
         break;
       default:
@@ -3193,13 +3193,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     
     switch (childrenLevel)
     {
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
         content = response->mutable_children_studies_content();
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
         content =response->mutable_children_series_content();
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
         content = response->mutable_children_instances_content();
         break;
       default:
@@ -3319,25 +3319,25 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     std::string oneInstanceSqlCTE;
 
-    if (request.level() != Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE &&
+    if (request.level() != Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE &&
         request.retrieve_one_instance_metadata_and_attachments())
     {
       switch (request.level())
       {
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
         {
           oneInstanceSqlCTE = "SELECT Lookup.internalId AS parentInternalId, childLevel.publicId AS instancePublicId, childLevel.internalId AS instanceInternalId, ROW_NUMBER() OVER (PARTITION BY Lookup.internalId ORDER BY childLevel.publicId) AS rowNum"
                 "   FROM Resources AS childLevel "
                 "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId";
         }; break;
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
         {
           oneInstanceSqlCTE = "SELECT Lookup.internalId AS parentInternalId, grandChildLevel.publicId AS instancePublicId, grandChildLevel.internalId AS instanceInternalId, ROW_NUMBER() OVER (PARTITION BY Lookup.internalId ORDER BY grandChildLevel.publicId) AS rowNum"
                 "   FROM Resources AS grandChildLevel "
                 "   INNER JOIN Resources childLevel ON grandChildLevel.parentId = childLevel.internalId "
                 "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId";
         }; break;
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
         {
           oneInstanceSqlCTE = "SELECT Lookup.internalId AS parentInternalId, grandGrandChildLevel.publicId AS instancePublicId, grandGrandChildLevel.internalId AS instanceInternalId, ROW_NUMBER() OVER (PARTITION BY Lookup.internalId ORDER BY grandGrandChildLevel.publicId) AS rowNum"
                 "   FROM Resources AS grandGrandChildLevel "
@@ -3458,18 +3458,18 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 
     // need MainDicomTags from parent ?
-    if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
+    if (request.level() > Orthanc::DatabasePluginMessages::RESOURCE_PATIENT)
     {
       const Orthanc::DatabasePluginMessages::Find_Request_ParentSpecification* parentSpec = NULL;
       switch (request.level())
       {
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
         parentSpec = &(request.parent_patient());
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
         parentSpec = &(request.parent_study());
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+      case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
         parentSpec = &(request.parent_series());
         break;
       
@@ -3516,15 +3516,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
 
       // need MainDicomTags from grandparent ?
-      if (request.level() > Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
+      if (request.level() > Orthanc::DatabasePluginMessages::RESOURCE_STUDY)
       {
         const Orthanc::DatabasePluginMessages::Find_Request_ParentSpecification* grandparentSpec = NULL;
         switch (request.level())
         {
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+        case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
           grandparentSpec = &(request.parent_patient());
           break;
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE:
+        case Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE:
           grandparentSpec = &(request.parent_study());
           break;
         
@@ -3575,18 +3575,18 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 
     // need MainDicomTags from children ?
-    if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES)
+    if (request.level() <= Orthanc::DatabasePluginMessages::RESOURCE_SERIES)
     {
       const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec = NULL;
       switch (request.level())
       {
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
         childrenSpec = &(request.children_studies());
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
         childrenSpec = &(request.children_series());
         break;
-      case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_SERIES:
+      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
         childrenSpec = &(request.children_instances());
         break;
       
@@ -3715,15 +3715,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(childrenSpec) + ") ";
       }
 
-      if (request.level() <= Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY)
+      if (request.level() <= Orthanc::DatabasePluginMessages::RESOURCE_STUDY)
       {
         const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandchildrenSpec = NULL;
         switch (request.level())
         {
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT:
+        case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
           grandchildrenSpec = &(request.children_series());
           break;
-        case Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_STUDY:
+        case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
           grandchildrenSpec = &(request.children_instances());
           break;
         
@@ -3861,7 +3861,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  INNER JOIN Metadata ON Metadata.id = grandChildLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(grandchildrenSpec) + ") ";
         }
 
-        if (request.level() == Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_PATIENT)
+        if (request.level() == Orthanc::DatabasePluginMessages::RESOURCE_PATIENT)
         {
           const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandgrandchildrenSpec = &(request.children_instances());
 
@@ -3985,7 +3985,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 
     // need one instance info ?
-    if (request.level() != Orthanc::DatabasePluginMessages::ResourceType::RESOURCE_INSTANCE &&
+    if (request.level() != Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE &&
         request.retrieve_one_instance_metadata_and_attachments())
     {
       sql += "   UNION ALL SELECT"
