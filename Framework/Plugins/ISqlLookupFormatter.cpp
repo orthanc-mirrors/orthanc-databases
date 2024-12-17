@@ -858,13 +858,13 @@ namespace OrthancDatabases
   {
     switch (level)
     {
-      case Orthanc::ResourceType::ResourceType_Patient:
+      case Orthanc::ResourceType_Patient:
         return request.orthanc_id_patient();
-      case Orthanc::ResourceType::ResourceType_Study:
+      case Orthanc::ResourceType_Study:
         return request.orthanc_id_study();
-      case Orthanc::ResourceType::ResourceType_Series:
+      case Orthanc::ResourceType_Series:
         return request.orthanc_id_series();
-      case Orthanc::ResourceType::ResourceType_Instance:
+      case Orthanc::ResourceType_Instance:
         return request.orthanc_id_instance();
       default:
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
@@ -907,10 +907,10 @@ namespace OrthancDatabases
         
         switch (ordering.key_type())
         {
-          case Orthanc::DatabasePluginMessages::OrderingKeyType::ORDERING_KEY_TYPE_DICOM_TAG:
+          case Orthanc::DatabasePluginMessages::ORDERING_KEY_TYPE_DICOM_TAG:
             FormatJoinForOrdering(orderingJoin, ordering.tag_group(), ordering.tag_element(), MessagesToolbox::Convert(ordering.tag_level()), ordering.is_identifier_tag(), i, queryLevel);
             break;
-          case Orthanc::DatabasePluginMessages::OrderingKeyType::ORDERING_KEY_TYPE_METADATA:
+          case Orthanc::DatabasePluginMessages::ORDERING_KEY_TYPE_METADATA:
             FormatJoinForOrdering(orderingJoin, ordering.metadata(), i, queryLevel);
             break;
           default:
