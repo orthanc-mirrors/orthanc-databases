@@ -35,7 +35,7 @@ namespace OrthancDatabases
     std::string  connectionString_;
     
   protected:
-    virtual bool HasChildCountTable() const
+    virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
     {
       return false;
     }

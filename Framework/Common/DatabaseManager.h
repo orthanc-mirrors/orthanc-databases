@@ -223,7 +223,7 @@ namespace OrthancDatabases
         Execute(parameters);
       }
 
-      virtual void Execute(const Dictionary& parameters);
+      virtual void Execute(const Dictionary& parameters) ORTHANC_OVERRIDE;
 
       void ExecuteWithoutResult()
       {
@@ -255,7 +255,7 @@ namespace OrthancDatabases
         Execute(parameters);
       }
 
-      virtual void Execute(const Dictionary& parameters);
+      virtual void Execute(const Dictionary& parameters) ORTHANC_OVERRIDE;
 
       void ExecuteWithoutResult()
       {

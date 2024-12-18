@@ -2164,7 +2164,7 @@ namespace OrthancDatabases
     }
     
   public:
-    LookupFormatter(Dialect dialect) :
+    explicit LookupFormatter(Dialect dialect) :
       dialect_(dialect),
       count_(0)
     {

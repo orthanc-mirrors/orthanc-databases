@@ -55,10 +55,9 @@ namespace OrthancDatabases
     {
       if (boost::posix_time::second_clock::local_time() - lastInvocation >= that->housekeepingDelay_)
       {
-        Accessor accessor(*that);
-
         try
         {
+          Accessor accessor(*that);
           accessor.GetBackend().PerformDbHousekeeping(accessor.GetManager());
         }
         catch (Orthanc::OrthancException& e)
