@@ -3152,7 +3152,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   bool IndexBackend::HasFindSupport() const
   {
-    // TODO-FIND  move to child plugins ?
     return true;
   }
 #endif
@@ -3296,9 +3295,6 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                     DatabaseManager& manager,
                                     const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
-    // TODO-FIND move to child plugins ?
-
-
     // If we want the Find to use a read-only transaction, we can not create temporary tables with
     // the lookup results.  So we must use a CTE (Common Table Expression).  
     // However, a CTE can only be used in a single query -> we must unionize all the following 

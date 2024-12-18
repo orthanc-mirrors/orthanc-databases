@@ -105,13 +105,13 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-    // virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-    //                          DatabaseManager& manager,
-    //                          const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+    virtual void ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                             DatabaseManager& manager,
+                             const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 
-    // virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-    //                           DatabaseManager& manager,
-    //                           const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+    virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                              DatabaseManager& manager,
+                              const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 #endif
   };
 }
