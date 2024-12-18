@@ -567,7 +567,14 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.IsExistingResource(*manager, a));
   ASSERT_TRUE(db.IsExistingResource(*manager, b));
   ASSERT_EQ(2u, db.GetAllResourcesCount(*manager));
-  db.DeleteResource(*output, *manager, a);
+
+  {
+    // An explicit transaction is needed here
+    manager->StartTransaction(TransactionType_ReadWrite);
+    db.DeleteResource(*output, *manager, a);
+    manager->CommitTransaction();
+  }
+  
   ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
   ASSERT_FALSE(db.IsExistingResource(*manager, a));
   ASSERT_FALSE(db.IsExistingResource(*manager, b));

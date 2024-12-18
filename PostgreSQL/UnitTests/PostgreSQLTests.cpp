@@ -548,7 +548,7 @@ TEST(PostgreSQLIndex, CreateInstance)
 
   std::string s;
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal1));
-  ASSERT_EQ("2", s);
+  ASSERT_EQ("3", s);
 
   OrthancPluginCreateInstanceResult r1, r2;
   
@@ -565,8 +565,10 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_EQ(r1.instanceId, r2.instanceId);
 
   // Breaking the hierarchy
-  memset(&r2, 0, sizeof(r2));
-  ASSERT_THROW(db.CreateInstance(r2, *manager, "a", "e", "c", "f"), Orthanc::OrthancException);
+  // This does not throw anymore since at least 6.0.  This would only happen in case of series hash collision
+  // which would actually be very damagefull at many places in Orthanc.
+  // memset(&r2, 0, sizeof(r2));
+  // ASSERT_THROW(db.CreateInstance(r2, *manager, "a", "e", "c", "f"), Orthanc::OrthancException);
 
   memset(&r2, 0, sizeof(r2));
   db.CreateInstance(r2, *manager, "a", "b", "c", "e");
