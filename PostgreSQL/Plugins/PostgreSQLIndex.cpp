@@ -549,11 +549,6 @@ namespace OrthancDatabases
   {
     std::string sql;
 
-    std::vector<std::string> resourceIds;
-    std::vector<std::string> groups;
-    std::vector<std::string> elements;
-    std::vector<std::string> values;
-
     Dictionary args;
     
     for (uint32_t i = 0; i < count; i++)
