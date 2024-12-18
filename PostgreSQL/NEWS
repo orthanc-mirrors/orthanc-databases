@@ -1,5 +1,5 @@
-Pending changes in the mainline (future 7.0)
-===============================
+Release 7.0 (2024-12-18)
+========================
 
 DB schema revision: 3
 Minimum plugin SDK (for build): 1.12.5+
@@ -14,33 +14,39 @@ Optimal Postgresql Server version: 11+
   of the new index can take some time (we have observed 3 minutes on a
   DB with 70M instances).  Orthanc will not be available during the
   creation of this index.  If needed, you can create it manually before installing
-  the new plugin by executing these SQL commands:
+  the new plugin by executing this SQL command (extracted from
+  https://orthanc.uclouvain.be/hg/orthanc-databases/file/default/PostgreSQL/Plugins/SQL/Upgrades/Rev2ToRev3.sql):
 
-    https://orthanc.uclouvain.be/hg/orthanc-databases/file/tip/PostgreSQL/Plugins/SQL/Upgrades/Partial/Rev2_To_Rev3.sql
+    CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId)
 
 * WARNING: A new column has been added in the resources table when upgrading to this version.  A new thread
-  is populating this new table and might consume DB bandwitdh and CPU.
+  is populating this new table and might consume DB bandwitdh and CPU until it has populated the column.  
+  The creation of the new column might also take a few minutes the first time you launch this version.
 
+* WARNING: when upgrading very large databases, make sur to read this section of the Orthanc book:
+  https://orthanc.uclouvain.be/book/plugins/postgresql.html#note-for-large-databases-and-multiple-orthanc-instances
 
-* Added support for ExtendedChanges:
-  - changes?type=...&to=...
-* Performance optimizations (to be summarized before release):
-  - using more prepared SQL statements:
-    - InsertOrUpdateMetadata
-    - ExecuteSetResourcesContentTags
-  - merged BEGIN and SET TRANSACTION statements
+* Added support for ExtendedChanges introduced in Orthanc 1.12.5
+  enabling new get arguments (type & to) in the /changes API route.
+* Added support for ExtendedFind introduced in Orthanc 1.12.5
+  enabling new filtering and ordering options in /tools/find API route.
+* Performance optimizations:
   - reduced the number of round-trips between Orthanc and the PostgreSQL server:
-    - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 9
+    - replaced numerous small queries by a single large query in /tools/find.
+    - reduced the number of queries when ingesting new instances.
+  - using more prepared SQL statements
+
 * Fixed a memory leak when executing non cached SQL statements (rarely used)
 * New default values for configurations:
   - "IndexConnectionsCount": 50
   - "TransactionMode": "ReadCommitted"
-* Introduced a new thread to perform DB Housekeeping at regular interval (5s) for the
-  DB plugins requiring it (currently only PostgreSQL).  E.g: This avoids very long update
-  times in case you don't call /statistics for a long period.  The execution interval of
-  this thread can be configured through "HousekeepingInterval".
+* Introduced a new thread to perform DB Housekeeping at regular interval.  
+  E.g: This avoids very long update times in case you don't call /statistics 
+  for a long period.  The execution interval of this thread can be configured 
+  through "HousekeepingInterval" (default: 1s).
 * Fix updates from plugin version 3.3 to latest version
 * Fix a bug introduced in 6.0 in the PatientRecyclingOrder when using patient protection.
+
 
 Release 6.2 (2024-03-25)
 ========================
