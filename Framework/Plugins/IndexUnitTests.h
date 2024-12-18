@@ -700,6 +700,8 @@ TEST(IndexBackend, Basic)
     }
   }
 
+#if ORTHANC_ENABLE_POSTGRESQL == 0  // In PostgreSQL, remaining ancestor are implemented in the PostgreSQLIndex, not in the IndexBackend.  Note: they are tested in the integration tests
+
   for (size_t level = 1; level < 4; level++)
   {
     for (size_t attachmentLevel = 0; attachmentLevel < 4; attachmentLevel++)
@@ -799,6 +801,7 @@ TEST(IndexBackend, Basic)
       }
     }
   }
+#endif
 
   manager->Close();
 }
