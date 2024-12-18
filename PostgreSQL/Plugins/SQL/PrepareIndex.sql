@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS GlobalIntegers(
 -- 4: SeriesCount
 -- 5: InstancesCount
 -- 6: ChangeSeq
--- 7: PatientRecyclingOrderSeq
+-- 7: PatientRecyclingOrderSeq  (removed in 7.0)
 
 CREATE TABLE IF NOT EXISTS ServerProperties(
         server VARCHAR(64) NOT NULL,
@@ -170,12 +170,18 @@ BEGIN
     DECLARE
         newSeq BIGINT;
     BEGIN
-        UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
         IF is_update > 0 THEN
             -- Note: Protected patients are not listed in this table !  So, they won't be updated
-            UPDATE PatientRecyclingOrder SET seq = newSeq WHERE PatientRecyclingOrder.patientId = patient_id;
+            WITH deleted_rows AS (
+                DELETE FROM PatientRecyclingOrder
+                WHERE PatientRecyclingOrder.patientId = patient_id
+                RETURNING patientId
+            )
+            INSERT INTO PatientRecyclingOrder (patientId)
+            SELECT patientID FROM deleted_rows
+            WHERE EXISTS(SELECT 1 FROM deleted_rows);
         ELSE
-            INSERT INTO PatientRecyclingOrder VALUES (newSeq, patient_id);
+            INSERT INTO PatientRecyclingOrder VALUES (DEFAULT, patient_id);
         END IF;
     END;
 END;
@@ -198,10 +204,14 @@ AFTER INSERT ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE PatientAddedFunc();
 
--- initial population of PatientRecyclingOrderSeq
-INSERT INTO GlobalIntegers
-    SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
-    ON CONFLICT DO NOTHING;
+-- initial population of 
+SELECT setval('patientrecyclingorder_seq_seq', MAX(seq)) FROM PatientRecyclingOrder;
+DELETE FROM GlobalIntegers WHERE key = 7;
+        -- UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
+
+-- INSERT INTO GlobalIntegers
+--     SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
+--     ON CONFLICT DO NOTHING;
 
 
 ------------------- ResourceDeleted trigger -------------------

@@ -84,7 +84,51 @@ DROP TRIGGER IF EXISTS IncrementChildCount ON Resources;
 DROP FUNCTION ComputeMissingChildCount;
 DROP FUNCTION UpdateChildCount;
 
+-- restore the previous PatientRecyclingOrder logic although it was buggy wrt protected patients
+DROP TRIGGER IF EXISTS PatientAdded ON Resources;
 
+CREATE OR REPLACE FUNCTION PatientAddedOrUpdated(
+    IN patient_id BIGINT,
+    IN is_update BIGINT
+    )
+RETURNS VOID AS $body$
+BEGIN
+    DECLARE
+        newSeq BIGINT;
+    BEGIN
+        UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
+        IF is_update > 0 THEN
+            -- Note: Protected patients are not listed in this table !  So, they won't be updated
+            UPDATE PatientRecyclingOrder SET seq = newSeq WHERE PatientRecyclingOrder.patientId = patient_id;
+        ELSE
+            INSERT INTO PatientRecyclingOrder VALUES (newSeq, patient_id);
+        END IF;
+    END;
+END;
+$body$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION PatientAddedFunc() 
+RETURNS TRIGGER AS $body$
+BEGIN
+  -- The "0" corresponds to "OrthancPluginResourceType_Patient"
+  IF new.resourceType = 0 THEN
+    PERFORM PatientAddedOrUpdated(new.internalId, 0);
+  END IF;
+  RETURN NULL;
+END;
+$body$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS PatientAdded on Resources;
+CREATE TRIGGER PatientAdded
+AFTER INSERT ON Resources
+FOR EACH ROW
+EXECUTE PROCEDURE PatientAddedFunc();
+
+INSERT INTO GlobalIntegers
+    SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
+    ON CONFLICT DO NOTHING;
+
+-----------
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 -- modify only the ones that have changed

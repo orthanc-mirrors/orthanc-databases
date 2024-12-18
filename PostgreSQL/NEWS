@@ -22,7 +22,6 @@ Optimal Postgresql Server version: 11+
   is populating this new table and might consume DB bandwitdh and CPU.
 
 
-* Fix updates from plugin version 3.3 to latest version
 * Added support for ExtendedChanges:
   - changes?type=...&to=...
 * Performance optimizations (to be summarized before release):
@@ -40,7 +39,8 @@ Optimal Postgresql Server version: 11+
   DB plugins requiring it (currently only PostgreSQL).  E.g: This avoids very long update
   times in case you don't call /statistics for a long period.  The execution interval of
   this thread can be configured through "HousekeepingInterval".
-
+* Fix updates from plugin version 3.3 to latest version
+* Fix a bug introduced in 6.0 in the PatientRecyclingOrder when using patient protection.
 
 Release 6.2 (2024-03-25)
 ========================

@@ -574,7 +574,7 @@ TEST(IndexBackend, Basic)
     db.DeleteResource(*output, *manager, a);
     manager->CommitTransaction();
   }
-  
+
   ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
   ASSERT_FALSE(db.IsExistingResource(*manager, a));
   ASSERT_FALSE(db.IsExistingResource(*manager, b));
@@ -606,7 +606,14 @@ TEST(IndexBackend, Basic)
   ASSERT_FALSE(db.IsProtectedPatient(*manager, p1));
   ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager));
   ASSERT_EQ(p2, r);
-  db.DeleteResource(*output, *manager, p2);
+
+  {
+    // An explicit transaction is needed here
+    manager->StartTransaction(TransactionType_ReadWrite);
+    db.DeleteResource(*output, *manager, p2);
+    manager->CommitTransaction();
+  }
+
   ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager, p3));
   ASSERT_EQ(p1, r);
 
@@ -636,8 +643,13 @@ TEST(IndexBackend, Basic)
     ASSERT_EQ(longProperty, tmp);
   }
 
-  db.DeleteResource(*output, *manager, p1);
-  db.DeleteResource(*output, *manager, p3);
+  {
+    manager->StartTransaction(TransactionType_ReadWrite);
+    db.DeleteResource(*output, *manager, p1);
+    db.DeleteResource(*output, *manager, p3);
+    manager->CommitTransaction();
+  }
+
 
   for (size_t level = 0; level < 4; level++)
   {
@@ -671,7 +683,11 @@ TEST(IndexBackend, Basic)
       deletedResources.clear();
       remainingAncestor.reset();
     
-      db.DeleteResource(*output, *manager, resources[level]);
+      {
+        manager->StartTransaction(TransactionType_ReadWrite);
+        db.DeleteResource(*output, *manager, resources[level]);
+        manager->CommitTransaction();
+      }
     
       ASSERT_EQ(1u, deletedAttachments.size());
       ASSERT_EQ("attachment", *deletedAttachments.begin());
@@ -728,7 +744,11 @@ TEST(IndexBackend, Basic)
       deletedResources.clear();
       remainingAncestor.reset();
     
-      db.DeleteResource(*output, *manager, resources[3]);  // delete instance
+      {
+        manager->StartTransaction(TransactionType_ReadWrite);
+        db.DeleteResource(*output, *manager, resources[3]);  // delete instance
+        manager->CommitTransaction();
+      }
 
       if (attachmentLevel < level)
       {
@@ -771,8 +791,12 @@ TEST(IndexBackend, Basic)
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
     
-      db.DeleteResource(*output, *manager, resources[0]);
-      db.DeleteResource(*output, *manager, unrelated);
+      {
+        manager->StartTransaction(TransactionType_ReadWrite);
+        db.DeleteResource(*output, *manager, resources[0]);
+        db.DeleteResource(*output, *manager, unrelated);
+        manager->CommitTransaction();
+      }
     }
   }
 
