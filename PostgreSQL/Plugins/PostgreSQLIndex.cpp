@@ -737,7 +737,7 @@ namespace OrthancDatabases
 
   bool PostgreSQLIndex::HasPerformDbHousekeeping()
   {
-    return true;
+    return !IsReadOnly(); // Don't start HK on ReadOnly databases !
   }
 
   void PostgreSQLIndex::PerformDbHousekeeping(DatabaseManager& manager)
