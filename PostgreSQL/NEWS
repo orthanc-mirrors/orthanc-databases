@@ -12,6 +12,9 @@ Optimal Postgresql Server version: 11+
 
 
 * Disable DB Housekeeping thread on ReadOnly systems.
+* Find: Implemented support for searching for child resources fulfilling 
+  a dicom tag constraint.  This solves the search against ModalitiesInStudy
+  that was broken when used with pagination.
 
 
 Release 7.0 (2024-12-18)
