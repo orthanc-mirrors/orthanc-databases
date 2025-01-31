@@ -2,8 +2,8 @@
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
 # Copyright (C) 2017-2023 Osimis S.A., Belgium
-# Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
-# Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+# Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+# Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -25,11 +25,11 @@ project(OrthancPostgreSQL)
 set(ORTHANC_PLUGIN_VERSION "mainline")
 
 # This is the preferred version of the Orthanc SDK for this plugin
-set(ORTHANC_SDK_DEFAULT_VERSION "1.12.3")
+set(ORTHANC_SDK_DEFAULT_VERSION "1.12.5")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
-set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4")
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4" "1.12.5")
 
 # This is the minimal version of the Orthanc runtime that will provide
 # best performance. If the version of the Orthanc runtime is below
@@ -37,13 +37,13 @@ set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4")
 # plugin will still start).
 set(ORTHANC_OPTIMAL_VERSION_MAJOR    1)
 set(ORTHANC_OPTIMAL_VERSION_MINOR    12)
-set(ORTHANC_OPTIMAL_VERSION_REVISION 3)
+set(ORTHANC_OPTIMAL_VERSION_REVISION 5)
 
 if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.12.4")
+  set(ORTHANC_FRAMEWORK_VERSION "1.12.5")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
@@ -93,6 +93,7 @@ EmbedResources(
   POSTGRESQL_UPGRADE_UNKNOWN_TO_REV1 ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/UnknownToRev1.sql
   POSTGRESQL_UPGRADE_REV1_TO_REV2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev1ToRev2.sql
   POSTGRESQL_UPGRADE_REV2_TO_REV3    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev2ToRev3.sql
+  POSTGRESQL_UPGRADE_REV3_TO_REV4    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev3ToRev4.sql
   )
 
 

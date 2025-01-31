@@ -1,27 +1,89 @@
 Pending changes in the mainline
 ===============================
 
-DB schema revision: 3
+DB schema revision: 4
 
-Minimum plugin SDK (for build): 1.12.3
+Minimum plugin SDK (for build): 1.12.6
 Optimal plugin SDK: 1.12.6
 
-Minimum Orthanc runtime: 1.12.3
+Minimum Orthanc runtime: 1.12.6
 Optimal Orthanc runtime: 1.12.6
 
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
 
-* Fix updates from plugin version 3.3 to latest version
-* Added support for ExtendedChanges:
-  - changes?type=...&to=...
+
 * Added support for customData in AttachedFiles
-* Performance optimizations (to be summarized before release):
-  - using more prepared SQL statements:
-    - InsertOrUpdateMetadata
-    - ExecuteSetResourcesContentTags
-  - merged BEGIN and SET TRANSACTION statements
+
+
+
+Release 7.1 (2025-01-23)
+========================
+
+DB schema revision: 3
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.5
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.6
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+
+* Disable DB Housekeeping thread on ReadOnly systems.
+* Find: Implemented support for searching for child resources fulfilling 
+  a dicom tag constraint.  This solves the search against ModalitiesInStudy
+  that was broken when used with pagination.
+
+
+Release 7.0 (2024-12-18)
+========================
+
+DB schema revision: 3
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.5
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.5
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+* WARNING: An Index is being replaced to improve performance.  The creation
+  of the new index can take some time (we have observed 3 minutes on a
+  DB with 70M instances).  Orthanc will not be available during the
+  creation of this index.  If needed, you can create it manually before installing
+  the new plugin by executing this SQL command (extracted from
+  https://orthanc.uclouvain.be/hg/orthanc-databases/file/default/PostgreSQL/Plugins/SQL/Upgrades/Rev2ToRev3.sql):
+
+    CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId)
+
+* WARNING: A new column has been added in the resources table when upgrading to this version.  A new thread
+  is populating this new table and might consume DB bandwitdh and CPU until it has populated the column.  
+  The creation of the new column might also take a few minutes the first time you launch this version.
+
+* WARNING: when upgrading very large databases, make sur to read this section of the Orthanc book:
+  https://orthanc.uclouvain.be/book/plugins/postgresql.html#note-for-large-databases-and-multiple-orthanc-instances
+
+* Added support for ExtendedChanges introduced in Orthanc 1.12.5
+  enabling new get arguments (type & to) in the /changes API route.
+* Added support for ExtendedFind introduced in Orthanc 1.12.5
+  enabling new filtering and ordering options in /tools/find API route.
+* Performance optimizations:
   - reduced the number of round-trips between Orthanc and the PostgreSQL server:
-    - e.g: when receiving an instance in an existing series, reduced the number of SQL queries from 13 to 9
+    - replaced numerous small queries by a single large query in /tools/find.
+    - reduced the number of queries when ingesting new instances.
+  - using more prepared SQL statements
+
 * Fixed a memory leak when executing non cached SQL statements (rarely used)
+* New default values for configurations:
+  - "IndexConnectionsCount": 50
+  - "TransactionMode": "ReadCommitted"
+* Introduced a new thread to perform DB Housekeeping at regular interval.  
+  E.g: This avoids very long update times in case you don't call /statistics 
+  for a long period.  The execution interval of this thread can be configured 
+  through "HousekeepingInterval" (default: 1s).
+* Fix updates from plugin version 3.3 to latest version
+* Fix a bug introduced in 6.0 in the PatientRecyclingOrder when using patient protection.
 
 
 Release 6.2 (2024-03-25)

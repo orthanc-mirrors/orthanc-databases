@@ -5,6 +5,7 @@ Pending changes in the mainline
 * Added support for revision in AttachedFiles & Metadata
 * Added support for ExtendedChanges:
   - changes?type=...&to=...
+* Added support for ExtendedFind
 * Fixed a memory leak when executing non cached SQL statements (rarely used)
 
 

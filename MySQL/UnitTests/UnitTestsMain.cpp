@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -49,7 +49,7 @@ TEST(MySQLIndex, Lock)
   OrthancDatabases::MySQLParameters lock = globalParameters_;
   lock.SetLock(true);
 
-  OrthancDatabases::MySQLIndex db1(NULL, noLock);
+  OrthancDatabases::MySQLIndex db1(NULL, noLock, false);
   db1.SetClearAll(true);
 
   std::list<OrthancDatabases::IdentifierTag> identifierTags;
@@ -57,15 +57,15 @@ TEST(MySQLIndex, Lock)
   std::unique_ptr<OrthancDatabases::DatabaseManager> manager1(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db1, false, identifierTags));
 
   {
-    OrthancDatabases::MySQLIndex db2(NULL, lock);
+    OrthancDatabases::MySQLIndex db2(NULL, lock, false);
     std::unique_ptr<OrthancDatabases::DatabaseManager> manager2(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db2, false, identifierTags));
 
-    OrthancDatabases::MySQLIndex db3(NULL, lock);
+    OrthancDatabases::MySQLIndex db3(NULL, lock, false);
     ASSERT_THROW(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db3, false, identifierTags), Orthanc::OrthancException);
 
   }
 
-  OrthancDatabases::MySQLIndex db4(NULL, lock);
+  OrthancDatabases::MySQLIndex db4(NULL, lock, false);
   std::unique_ptr<OrthancDatabases::DatabaseManager> manager4(OrthancDatabases::IndexBackend::CreateSingleDatabaseManager(db4, false, identifierTags));
 }
 

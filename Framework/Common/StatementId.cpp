@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -24,21 +24,33 @@
 #include "StatementId.h"
 
 #include <string.h>
+#include <Toolbox.h>
+
+#include <boost/lexical_cast.hpp>
 
 namespace OrthancDatabases
 {
   bool StatementId::operator< (const StatementId& other) const
   {
-    if (line_ != other.line_)
-    {
-      return line_ < other.line_;
-    }
-
-    if (strcmp(file_, other.file_) < 0)
-    {
-      return true;
-    }
-
-    return statement_ < other.statement_;
+    return hash_ < other.hash_;
   }
+
+  StatementId::StatementId(const char* file,
+                           int line) :
+      file_(file),
+      line_(line)
+  {
+    Orthanc::Toolbox::ComputeMD5(hash_, file_ + boost::lexical_cast<std::string>(line_));
+  }
+
+  StatementId::StatementId(const char* file,
+                           int line,
+                           const std::string& statement) :
+      file_(file),
+      line_(line),
+      statement_(statement)
+  {
+    Orthanc::Toolbox::ComputeMD5(hash_, file_ + boost::lexical_cast<std::string>(line_) + statement_);
+  }
+
 }

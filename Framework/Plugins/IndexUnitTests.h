@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -230,13 +230,13 @@ TEST(IndexBackend, Basic)
   ImplicitTransaction::SetErrorOnDoubleExecution(true);
 
 #if ORTHANC_ENABLE_POSTGRESQL == 1
-  PostgreSQLIndex db(&context, globalParameters_);
+  PostgreSQLIndex db(&context, globalParameters_, false);
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_MYSQL == 1
-  MySQLIndex db(&context, globalParameters_);
+  MySQLIndex db(&context, globalParameters_, false);
   db.SetClearAll(true);
 #elif ORTHANC_ENABLE_ODBC == 1
-  OdbcIndex db(&context, connectionString_);
+  OdbcIndex db(&context, connectionString_, false);
 #elif ORTHANC_ENABLE_SQLITE == 1  // Must be the last one
   SQLiteIndex db(&context);  // Open in memory
 #else
@@ -567,7 +567,14 @@ TEST(IndexBackend, Basic)
   ASSERT_TRUE(db.IsExistingResource(*manager, a));
   ASSERT_TRUE(db.IsExistingResource(*manager, b));
   ASSERT_EQ(2u, db.GetAllResourcesCount(*manager));
-  db.DeleteResource(*output, *manager, a);
+
+  {
+    // An explicit transaction is needed here
+    manager->StartTransaction(TransactionType_ReadWrite);
+    db.DeleteResource(*output, *manager, a);
+    manager->CommitTransaction();
+  }
+
   ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
   ASSERT_FALSE(db.IsExistingResource(*manager, a));
   ASSERT_FALSE(db.IsExistingResource(*manager, b));
@@ -599,7 +606,14 @@ TEST(IndexBackend, Basic)
   ASSERT_FALSE(db.IsProtectedPatient(*manager, p1));
   ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager));
   ASSERT_EQ(p2, r);
-  db.DeleteResource(*output, *manager, p2);
+
+  {
+    // An explicit transaction is needed here
+    manager->StartTransaction(TransactionType_ReadWrite);
+    db.DeleteResource(*output, *manager, p2);
+    manager->CommitTransaction();
+  }
+
   ASSERT_TRUE(db.SelectPatientToRecycle(r, *manager, p3));
   ASSERT_EQ(p1, r);
 
@@ -629,8 +643,13 @@ TEST(IndexBackend, Basic)
     ASSERT_EQ(longProperty, tmp);
   }
 
-  db.DeleteResource(*output, *manager, p1);
-  db.DeleteResource(*output, *manager, p3);
+  {
+    manager->StartTransaction(TransactionType_ReadWrite);
+    db.DeleteResource(*output, *manager, p1);
+    db.DeleteResource(*output, *manager, p3);
+    manager->CommitTransaction();
+  }
+
 
   for (size_t level = 0; level < 4; level++)
   {
@@ -664,7 +683,11 @@ TEST(IndexBackend, Basic)
       deletedResources.clear();
       remainingAncestor.reset();
     
-      db.DeleteResource(*output, *manager, resources[level]);
+      {
+        manager->StartTransaction(TransactionType_ReadWrite);
+        db.DeleteResource(*output, *manager, resources[level]);
+        manager->CommitTransaction();
+      }
     
       ASSERT_EQ(1u, deletedAttachments.size());
       ASSERT_EQ("attachment", *deletedAttachments.begin());
@@ -676,6 +699,8 @@ TEST(IndexBackend, Basic)
       ASSERT_TRUE(remainingAncestor.get() == NULL);
     }
   }
+
+#if ORTHANC_ENABLE_POSTGRESQL == 0  // In PostgreSQL, remaining ancestor are implemented in the PostgreSQLIndex, not in the IndexBackend.  Note: they are tested in the integration tests
 
   for (size_t level = 1; level < 4; level++)
   {
@@ -721,7 +746,11 @@ TEST(IndexBackend, Basic)
       deletedResources.clear();
       remainingAncestor.reset();
     
-      db.DeleteResource(*output, *manager, resources[3]);  // delete instance
+      {
+        manager->StartTransaction(TransactionType_ReadWrite);
+        db.DeleteResource(*output, *manager, resources[3]);  // delete instance
+        manager->CommitTransaction();
+      }
 
       if (attachmentLevel < level)
       {
@@ -764,10 +793,15 @@ TEST(IndexBackend, Basic)
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
     
-      db.DeleteResource(*output, *manager, resources[0]);
-      db.DeleteResource(*output, *manager, unrelated);
+      {
+        manager->StartTransaction(TransactionType_ReadWrite);
+        db.DeleteResource(*output, *manager, resources[0]);
+        db.DeleteResource(*output, *manager, unrelated);
+        manager->CommitTransaction();
+      }
     }
   }
+#endif
 
   manager->Close();
 }

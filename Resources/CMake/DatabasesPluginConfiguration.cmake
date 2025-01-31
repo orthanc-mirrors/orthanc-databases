@@ -2,8 +2,8 @@
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
 # Copyright (C) 2017-2023 Osimis S.A., Belgium
-# Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
-# Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+# Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+# Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -48,6 +48,8 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_ORTHANC_SDK)
     set(ORTHANC_SDK_ROOT ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.12.3)
   elseif (ORTHANC_SDK_VERSION STREQUAL "1.12.4")
     set(ORTHANC_SDK_ROOT ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.12.4)
+  elseif (ORTHANC_SDK_VERSION STREQUAL "1.12.5")
+    set(ORTHANC_SDK_ROOT ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.12.5)
   elseif (ORTHANC_SDK_VERSION STREQUAL "framework")
     set(tmp ${ORTHANC_FRAMEWORK_ROOT}/../../OrthancServer/Plugins/Include/)
     message(${tmp})

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS Resources(
        resourceType INTEGER NOT NULL,
        publicId VARCHAR(64) NOT NULL,
        parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+	   childCount INTEGER,
        CONSTRAINT UniquePublicId UNIQUE (publicId)
        );
 
@@ -52,7 +53,7 @@ CREATE TABLE IF NOT EXISTS AttachedFiles(
        uncompressedHash VARCHAR(40),
        compressedHash VARCHAR(40),
        revision INTEGER,
-       customData TEXT,              -- new in schema rev 3
+       customData TEXT,              -- new in schema rev 4
        PRIMARY KEY(id, fileType)
        );              
 
@@ -99,7 +100,7 @@ CREATE TABLE IF NOT EXISTS GlobalIntegers(
 -- 4: SeriesCount
 -- 5: InstancesCount
 -- 6: ChangeSeq
--- 7: PatientRecyclingOrderSeq
+-- 7: PatientRecyclingOrderSeq  (removed in 7.0)
 
 CREATE TABLE IF NOT EXISTS ServerProperties(
         server VARCHAR(64) NOT NULL,
@@ -107,7 +108,23 @@ CREATE TABLE IF NOT EXISTS ServerProperties(
         PRIMARY KEY(server, property)
         );
 
-CREATE INDEX IF NOT EXISTS ChildrenIndex ON Resources(parentId);
+DO $$
+DECLARE
+    pg_version text;
+BEGIN
+    SELECT version() INTO pg_version;
+
+    IF substring(pg_version from 'PostgreSQL (\d+)\.')::int >= 11 THEN
+        -- PostgreSQL 11 or later
+
+        -- new ChildrenIndex2 introduced in Rev3 (replacing previous ChildrenIndex)
+        EXECUTE 'CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST) INCLUDE (publicId, internalId)';
+    ELSE
+        EXECUTE 'CREATE INDEX IF NOT EXISTS ChildrenIndex2 ON Resources USING btree (parentId ASC NULLS LAST, publicId, internalId)';
+    END IF;
+END $$;
+
+
 CREATE INDEX IF NOT EXISTS PublicIndex ON Resources(publicId);
 CREATE INDEX IF NOT EXISTS ResourceTypeIndex ON Resources(resourceType);
 CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patientId);
@@ -115,6 +132,7 @@ CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patien
 CREATE INDEX IF NOT EXISTS MainDicomTagsIndex ON MainDicomTags(id);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex1 ON DicomIdentifiers(id);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex2 ON DicomIdentifiers(tagGroup, tagElement);
+CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex3 ON DicomIdentifiers(tagGroup, tagElement, value);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndexValues ON DicomIdentifiers(value);
 
 CREATE INDEX IF NOT EXISTS ChangesIndex ON Changes(internalId);
@@ -153,12 +171,18 @@ BEGIN
     DECLARE
         newSeq BIGINT;
     BEGIN
-        UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
         IF is_update > 0 THEN
             -- Note: Protected patients are not listed in this table !  So, they won't be updated
-            UPDATE PatientRecyclingOrder SET seq = newSeq WHERE PatientRecyclingOrder.patientId = patient_id;
+            WITH deleted_rows AS (
+                DELETE FROM PatientRecyclingOrder
+                WHERE PatientRecyclingOrder.patientId = patient_id
+                RETURNING patientId
+            )
+            INSERT INTO PatientRecyclingOrder (patientId)
+            SELECT patientID FROM deleted_rows
+            WHERE EXISTS(SELECT 1 FROM deleted_rows);
         ELSE
-            INSERT INTO PatientRecyclingOrder VALUES (newSeq, patient_id);
+            INSERT INTO PatientRecyclingOrder VALUES (DEFAULT, patient_id);
         END IF;
     END;
 END;
@@ -175,15 +199,20 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS PatientAdded on Resources;
 CREATE TRIGGER PatientAdded
 AFTER INSERT ON Resources
 FOR EACH ROW
 EXECUTE PROCEDURE PatientAddedFunc();
 
--- initial population of PatientRecyclingOrderSeq
-INSERT INTO GlobalIntegers
-    SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
-    ON CONFLICT DO NOTHING;
+-- initial population of 
+SELECT setval('patientrecyclingorder_seq_seq', MAX(seq)) FROM PatientRecyclingOrder;
+DELETE FROM GlobalIntegers WHERE key = 7;
+        -- UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
+
+-- INSERT INTO GlobalIntegers
+--     SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
+--     ON CONFLICT DO NOTHING;
 
 
 ------------------- ResourceDeleted trigger -------------------
@@ -204,6 +233,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS ResourceDeleted on Resources;
 CREATE TRIGGER ResourceDeleted
 AFTER DELETE ON Resources
 FOR EACH ROW
@@ -485,6 +515,7 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS InsertedChange on Changes;
 CREATE TRIGGER InsertedChange
 AFTER INSERT ON Changes
 FOR EACH ROW
@@ -513,7 +544,7 @@ BEGIN
 	is_new_instance := 1;
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL) RETURNING internalid INTO patient_internal_id;
+        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_patient := 0;
@@ -521,7 +552,7 @@ BEGIN
     END;
 
 	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id) RETURNING internalid INTO study_internal_id;
+        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_study := 0;
@@ -529,7 +560,7 @@ BEGIN
     END;
 
 	BEGIN
-	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id) RETURNING internalid INTO series_internal_id;
+	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_series := 0;
@@ -537,7 +568,7 @@ BEGIN
     END;
 
   	BEGIN
-		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id) RETURNING internalid INTO instance_internal_id;
+		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
     EXCEPTION
         WHEN unique_violation THEN
             is_new_instance := 0;
@@ -574,11 +605,100 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
+-- -- new in Rev3
+
+-- Computes the childCount for a number of resources for which it has not been computed yet.
+-- This is actually used only after an update to Rev3.  A thread will call this function
+-- at regular interval to update all missing values and stop once all values have been processed.
+CREATE OR REPLACE FUNCTION ComputeMissingChildCount(
+    IN batch_size BIGINT,
+    OUT updated_rows_count BIGINT
+) RETURNS BIGINT AS $body$
+BEGIN
+	UPDATE Resources AS r
+    SET childCount = (SELECT COUNT(childLevel.internalId)
+                      FROM Resources AS childLevel
+                      WHERE childLevel.parentId = r.internalId)
+    WHERE internalId IN (
+        SELECT internalId FROM Resources
+        WHERE resourceType < 3 AND childCount IS NULL
+        LIMIT batch_size);
+    
+    -- Get the number of rows affected
+    GET DIAGNOSTICS updated_rows_count = ROW_COUNT;
+END;
+$body$ LANGUAGE plpgsql;
+
+
+
+DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
+DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
+
+CREATE OR REPLACE FUNCTION UpdateChildCount()
+RETURNS TRIGGER AS $body$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+		IF new.parentId IS NOT NULL THEN
+            -- try to increment the childcount from the parent
+            -- note that we already have the lock on this row because the parent is locked in CreateInstance
+			UPDATE Resources
+		    SET childCount = childCount + 1
+		    WHERE internalId = new.parentId AND childCount IS NOT NULL;
+		
+            -- this should only happen for old studies whose childCount has not yet been computed
+            -- note: this child has already been added so it will be counted
+		    IF NOT FOUND THEN
+		        UPDATE Resources
+                SET childCount = (SELECT COUNT(*)
+		                              FROM Resources
+		                              WHERE internalId = new.parentId)
+		        WHERE internalId = new.parentId;
+		    END IF;
+        END IF;
+	
+    ELSIF TG_OP = 'DELETE' THEN
+
+		IF old.parentId IS NOT NULL THEN
+
+            -- Decrement the child count for the parent
+            -- note that we already have the lock on this row because the parent is locked in DeleteResource
+            UPDATE Resources
+            SET childCount = childCount - 1
+            WHERE internalId = old.parentId AND childCount IS NOT NULL;
+		
+            -- this should only happen for old studies whose childCount has not yet been computed
+            -- note: this child has already been removed so it will not be counted
+		    IF NOT FOUND THEN
+		        UPDATE Resources
+                SET childCount = (SELECT COUNT(*)
+		                              FROM Resources
+		                              WHERE internalId = new.parentId)
+		        WHERE internalId = new.parentId;
+		    END IF;
+        END IF;
+        
+    END IF;
+    RETURN NULL;
+END;
+$body$ LANGUAGE plpgsql;
+
+CREATE TRIGGER IncrementChildCount
+AFTER INSERT ON Resources
+FOR EACH ROW
+EXECUTE PROCEDURE UpdateChildCount();
+
+CREATE TRIGGER DecrementChildCount
+AFTER DELETE ON Resources
+FOR EACH ROW
+WHEN (OLD.parentId IS NOT NULL)
+EXECUTE PROCEDURE UpdateChildCount();
+
+
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
-DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13);
+DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 3); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 4); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance

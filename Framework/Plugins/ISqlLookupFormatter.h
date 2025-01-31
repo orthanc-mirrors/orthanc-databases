@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -62,12 +62,20 @@ namespace OrthancDatabases
 
     virtual std::string FormatLimits(uint64_t since, uint64_t count) = 0;
 
+    virtual std::string FormatNull(const char* type) = 0;
+
     /**
      * Whether to escape '[' and ']', which is only needed for
      * MSSQL. New in Orthanc 1.10.0, from the following changeset:
      * https://orthanc.uclouvain.be/hg/orthanc-databases/rev/389c037387ea
      **/
     virtual bool IsEscapeBrackets() const = 0;
+
+    virtual bool SupportsNullsLast() const = 0;
+
+    virtual std::string FormatIntegerCast() const = 0;
+
+    virtual std::string FormatFloatCast() const = 0;
 
     static void GetLookupLevels(Orthanc::ResourceType& lowerLevel,
                                 Orthanc::ResourceType& upperLevel,

@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -135,8 +135,9 @@ namespace OrthancDatabases
 
 
   OdbcIndex::OdbcIndex(OrthancPluginContext* context,
-                       const std::string& connectionString) :
-    IndexBackend(context),
+                       const std::string& connectionString,
+                       bool readOnly) :
+    IndexBackend(context, readOnly),
     maxConnectionRetries_(10),
     connectionRetryInterval_(5),
     connectionString_(connectionString)
@@ -721,18 +722,22 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   bool OdbcIndex::HasFindSupport() const
   {
-    // TODO-FIND
     return false;
   }
 #endif
 
-
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-  void OdbcIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                              DatabaseManager& manager,
-                              const Orthanc::DatabasePluginMessages::Find_Request& request)
+  void SQLiteIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                DatabaseManager& manager,
+                                const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
-    // TODO-FIND
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+  }
+
+  void SQLiteIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                 DatabaseManager& manager,
+                                 const Orthanc::DatabasePluginMessages::Find_Request& request)
+  {
     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
 #endif

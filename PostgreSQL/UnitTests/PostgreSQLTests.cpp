@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -548,7 +548,7 @@ TEST(PostgreSQLIndex, CreateInstance)
 
   std::string s;
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal1));
-  ASSERT_EQ("2", s);
+  ASSERT_EQ("3", s);
 
   OrthancPluginCreateInstanceResult r1, r2;
   
@@ -565,8 +565,10 @@ TEST(PostgreSQLIndex, CreateInstance)
   ASSERT_EQ(r1.instanceId, r2.instanceId);
 
   // Breaking the hierarchy
-  memset(&r2, 0, sizeof(r2));
-  ASSERT_THROW(db.CreateInstance(r2, *manager, "a", "e", "c", "f"), Orthanc::OrthancException);
+  // This does not throw anymore since at least 6.0.  This would only happen in case of series hash collision
+  // which would actually be very damagefull at many places in Orthanc.
+  // memset(&r2, 0, sizeof(r2));
+  // ASSERT_THROW(db.CreateInstance(r2, *manager, "a", "e", "c", "f"), Orthanc::OrthancException);
 
   memset(&r2, 0, sizeof(r2));
   db.CreateInstance(r2, *manager, "a", "b", "c", "e");

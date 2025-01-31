@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -27,7 +27,9 @@
 #include <Logging.h>
 #include <Toolbox.h>
 
-#include <google/protobuf/any.h>
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
+#  include <google/protobuf/any.h>
+#endif
 
 #define ORTHANC_PLUGIN_NAME "postgresql-index"
 
@@ -36,7 +38,9 @@ extern "C"
 {
   ORTHANC_PLUGINS_API int32_t OrthancPluginInitialize(OrthancPluginContext* context)
   {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+#endif
 
     if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "PostgreSQL", true))
     {
@@ -65,14 +69,22 @@ extern "C"
       return 0;
     }
 
+    bool readOnly = configuration.GetBooleanValue("ReadOnly", false);
+
+    if (readOnly)
+    {
+      LOG(WARNING) << "READ-ONLY SYSTEM: the Database plugin is working in read-only mode";
+    }
+    
     try
     {
-      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 1);
+      const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 50);
+      const unsigned int housekeepingDelaySeconds = postgresql.GetUnsignedIntegerValue("HousekeepingInterval", 1);
 
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::PostgreSQLIndex(context, parameters), countConnections,
-        parameters.GetMaxConnectionRetries());
+        new OrthancDatabases::PostgreSQLIndex(context, parameters, readOnly), countConnections,
+        parameters.GetMaxConnectionRetries(), housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {
@@ -94,7 +106,10 @@ extern "C"
     LOG(WARNING) << "PostgreSQL index is finalizing";
     OrthancDatabases::IndexBackend::Finalize();
     Orthanc::Toolbox::FinalizeOpenSsl();
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     google::protobuf::ShutdownProtobufLibrary();
+#endif
   }
 
 

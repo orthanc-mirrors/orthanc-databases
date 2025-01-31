@@ -41,6 +41,9 @@ PostgreSQL
   a DB where there was a 'AttachedFiles' table in the public schema and another one in a
   'MyPacs' schema and Orthanc was actually using the 'MyPacs.AttachedFiles' table !!!
   Orthanc was then seeing only the most recent attached files !!!
+  We should also be able to use other schemas:
+  https://discourse.orthanc-server.org/t/orthanc-container-unable-to-connect-to-specified-postgresql-database/5471
+
 
 * Have a separate "thread" to UpdateStatistics to avoid large computations ?
 
@@ -76,4 +79,4 @@ MySQL
 ODBC
 ----
 
-* https://orthanc.uclouvain.be/bugs/show_bug.cgi?id=224
+* Implement labels

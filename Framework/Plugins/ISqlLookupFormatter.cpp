@@ -3,8 +3,8 @@
  * Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
  * Department, University Hospital of Liege, Belgium
  * Copyright (C) 2017-2023 Osimis S.A., Belgium
- * Copyright (C) 2024-2024 Orthanc Team SRL, Belgium
- * Copyright (C) 2021-2024 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+ * Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
+ * Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
  *
  * This program is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Affero General Public License
@@ -35,8 +35,9 @@
 #include <OrthancException.h>
 #include <Toolbox.h>
 
-#include <cassert>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/lexical_cast.hpp>
+#include <cassert>
 #include <list>
 
 
@@ -64,6 +65,7 @@ namespace OrthancDatabases
   }
 
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   static std::string FormatLevel(const char* prefix, Orthanc::ResourceType level)
   {
     switch (level)
@@ -84,6 +86,8 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
   }      
+#endif
+
 
   static bool FormatComparison(std::string& target,
                                ISqlLookupFormatter& formatter,
@@ -261,6 +265,7 @@ namespace OrthancDatabases
   }
 
 
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   static bool FormatComparison(std::string& target,
                                ISqlLookupFormatter& formatter,
                                const Orthanc::DatabasePluginMessages::DatabaseMetadataConstraint& constraint,
@@ -271,26 +276,26 @@ namespace OrthancDatabases
     OrthancDatabases::ConstraintType constraintType;
     switch (constraint.type())
     {
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_EQUAL:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_EQUAL:
       constraintType = OrthancDatabases::ConstraintType_Equal;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_GREATER_OR_EQUAL:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_GREATER_OR_EQUAL:
       constraintType = OrthancDatabases::ConstraintType_GreaterOrEqual;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_LIST:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_LIST:
       constraintType = OrthancDatabases::ConstraintType_List;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_SMALLER_OR_EQUAL:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_SMALLER_OR_EQUAL:
       constraintType = OrthancDatabases::ConstraintType_SmallerOrEqual;
       break;
-    case Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_WILDCARD:
+    case Orthanc::DatabasePluginMessages::CONSTRAINT_WILDCARD:
       constraintType = OrthancDatabases::ConstraintType_Wildcard;
       break;
     default:
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
     }
 
-    if (constraint.type() == Orthanc::DatabasePluginMessages::ConstraintType::CONSTRAINT_LIST)
+    if (constraint.type() == Orthanc::DatabasePluginMessages::CONSTRAINT_LIST)
     {
       for (int i = 0; i < constraint.values_size(); ++i)
       {
@@ -313,6 +318,8 @@ namespace OrthancDatabases
                             escapeBrackets); 
 
   }
+#endif
+
 
   static bool FormatComparison(std::string& target,
                                ISqlLookupFormatter& formatter,
@@ -374,6 +381,8 @@ namespace OrthancDatabases
                boost::lexical_cast<std::string>(constraint.GetTag().GetElement()));
   }
 
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   static void FormatJoin(std::string& target,
                          const Orthanc::DatabasePluginMessages::DatabaseMetadataConstraint& constraint,
                          Orthanc::ResourceType level,
@@ -396,7 +405,10 @@ namespace OrthancDatabases
                ".internalId AND " + tag + ".type = " +
                boost::lexical_cast<std::string>(constraint.metadata());
   }
+#endif
 
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   static void FormatJoinForOrdering(std::string& target,
                                     uint32_t tagGroup,
                                     uint32_t tagElement,
@@ -450,7 +462,10 @@ namespace OrthancDatabases
                " LEFT JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "grandgrandparent.internalId AND " + tagFilter;
     }
   }
+#endif
 
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
   static void FormatJoinForOrdering(std::string& target,
                                     int32_t metadata,
                                     size_t index,
@@ -462,6 +477,7 @@ namespace OrthancDatabases
              ".internalId AND " + arg + ".type = " +
              boost::lexical_cast<std::string>(metadata);
   }
+#endif
 
 
   static std::string Join(const std::list<std::string>& values,
@@ -560,8 +576,7 @@ namespace OrthancDatabases
           }
         }
 
-        std::string values;
-        Orthanc::Toolbox::JoinStrings(values, comparisonValues, ", ");
+        std::string values = boost::algorithm::join(comparisonValues, ", ");
 
         if (constraint.IsCaseSensitive())
         {
@@ -801,7 +816,8 @@ namespace OrthancDatabases
 
     if (limit != 0)
     {
-      sql += " LIMIT " + boost::lexical_cast<std::string>(limit);
+      sql += " ORDER BY " + FormatLevel(queryLevel) + ".publicId ";  // we need an "order by" to use limits
+      sql += formatter.FormatLimits(0, limit);
     }
   }
 
@@ -842,13 +858,13 @@ namespace OrthancDatabases
   {
     switch (level)
     {
-      case Orthanc::ResourceType::ResourceType_Patient:
+      case Orthanc::ResourceType_Patient:
         return request.orthanc_id_patient();
-      case Orthanc::ResourceType::ResourceType_Study:
+      case Orthanc::ResourceType_Study:
         return request.orthanc_id_study();
-      case Orthanc::ResourceType::ResourceType_Series:
+      case Orthanc::ResourceType_Series:
         return request.orthanc_id_series();
-      case Orthanc::ResourceType::ResourceType_Instance:
+      case Orthanc::ResourceType_Instance:
         return request.orthanc_id_instance();
       default:
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
@@ -891,10 +907,10 @@ namespace OrthancDatabases
         
         switch (ordering.key_type())
         {
-          case Orthanc::DatabasePluginMessages::OrderingKeyType::ORDERING_KEY_TYPE_DICOM_TAG:
+          case Orthanc::DatabasePluginMessages::ORDERING_KEY_TYPE_DICOM_TAG:
             FormatJoinForOrdering(orderingJoin, ordering.tag_group(), ordering.tag_element(), MessagesToolbox::Convert(ordering.tag_level()), ordering.is_identifier_tag(), i, queryLevel);
             break;
-          case Orthanc::DatabasePluginMessages::OrderingKeyType::ORDERING_KEY_TYPE_METADATA:
+          case Orthanc::DatabasePluginMessages::ORDERING_KEY_TYPE_METADATA:
             FormatJoinForOrdering(orderingJoin, ordering.metadata(), i, queryLevel);
             break;
           default:
@@ -903,8 +919,27 @@ namespace OrthancDatabases
 
         orderingJoins += orderingJoin;
         
-        std::string orderByField = "order" + boost::lexical_cast<std::string>(i) + ".value";
-        if (ordering.direction() == Orthanc::DatabasePluginMessages::OrderingDirection::ORDERING_DIRECTION_ASC)
+        std::string orderByField;
+        if (!formatter.SupportsNullsLast())
+        {
+          orderByField = "CASE WHEN order" + boost::lexical_cast<std::string>(i) + ".value IS NULL THEN 1 ELSE 0 END, ";
+        }
+
+        switch (ordering.cast())
+        {
+          case Orthanc::DatabasePluginMessages::ORDERING_CAST_INT:
+            orderByField += "CAST(order" + boost::lexical_cast<std::string>(i) + ".value AS " + formatter.FormatIntegerCast() + ")";
+            break;
+          case Orthanc::DatabasePluginMessages::ORDERING_CAST_FLOAT:
+            orderByField += "CAST(order" + boost::lexical_cast<std::string>(i) + ".value AS " + formatter.FormatFloatCast() + ")";
+            break;
+          case Orthanc::DatabasePluginMessages::ORDERING_CAST_STRING:
+          default:
+            orderByField += "order" + boost::lexical_cast<std::string>(i) + ".value";
+            break;
+        }
+
+        if (ordering.direction() == Orthanc::DatabasePluginMessages::ORDERING_DIRECTION_ASC)
         {
           orderByField += " ASC";
         }
@@ -916,9 +951,16 @@ namespace OrthancDatabases
         orderByFields.push_back(orderByField);
       }
 
-      std::string orderByFieldsString;
-      Orthanc::Toolbox::JoinStrings(orderByFieldsString, orderByFields, ", ");
-      ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
+      std::string orderByFieldsString = boost::algorithm::join(orderByFields, ", ");
+
+      if (formatter.SupportsNullsLast())
+      {
+        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
+      }
+      else
+      {
+        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + ") AS rowNumber";
+      }
     }
     else
     {
@@ -981,7 +1023,25 @@ namespace OrthancDatabases
       {
         std::string join;
         FormatJoin(join, constraint, count);
-        joins += join;
+
+
+        if (constraint.GetLevel() <= queryLevel)
+        {
+          joins += join;
+        }
+        else if (constraint.GetLevel() == queryLevel + 1 && !comparison.empty())
+        {
+          // new in v 1.12.6, the constraints on child tags are actually looking for one child with this value
+          comparison = " EXISTS (SELECT 1 FROM Resources AS " + FormatLevel(static_cast<Orthanc::ResourceType>(queryLevel + 1)) + 
+                       join + 
+                       " WHERE " + comparison + " AND " + 
+                       FormatLevel(static_cast<Orthanc::ResourceType>(queryLevel + 1)) + ".parentId = " + FormatLevel(static_cast<Orthanc::ResourceType>(queryLevel)) + ".internalId) ";
+        }
+
+        if (!comparison.empty())
+        {
+          comparisons += " AND " + comparison;
+        }
 
         if (!comparison.empty())
         {
@@ -1020,13 +1080,14 @@ namespace OrthancDatabases
               FormatLevel(static_cast<Orthanc::ResourceType>(level + 1)) + ".parentId");
     }
 
-    for (int level = queryLevel + 1; level <= lowerLevel; level++)
-    {
-      sql += (" INNER JOIN Resources " +
-              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + " ON " +
-              FormatLevel(static_cast<Orthanc::ResourceType>(level - 1)) + ".internalId=" +
-              FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".parentId");
-    }
+    // disabled in v 1.12.6 now that the child levels are considered as "is there at least one child that meets this constraint"
+    // for (int level = queryLevel + 1; level <= lowerLevel; level++)
+    // {
+    //   sql += (" INNER JOIN Resources " +
+    //           FormatLevel(static_cast<Orthanc::ResourceType>(level)) + " ON " +
+    //           FormatLevel(static_cast<Orthanc::ResourceType>(level - 1)) + ".internalId=" +
+    //           FormatLevel(static_cast<Orthanc::ResourceType>(level)) + ".parentId");
+    // }
 
     std::list<std::string> where;
     where.push_back(strQueryLevel + ".resourceType = " +
@@ -1192,7 +1253,8 @@ namespace OrthancDatabases
 
     if (limit != 0)
     {
-      sql += " LIMIT " + boost::lexical_cast<std::string>(limit);
+      sql += " ORDER BY publicId ";  // we need an "order by" to use limits
+      sql += formatter.FormatLimits(0, limit);
     }
   }
 }
