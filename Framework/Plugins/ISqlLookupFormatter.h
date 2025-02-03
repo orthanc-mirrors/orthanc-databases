@@ -56,6 +56,8 @@ namespace OrthancDatabases
 
     virtual std::string GenerateParameter(const std::string& value) = 0;
 
+    virtual std::string GenerateParameter(const int64_t& value) = 0;
+    
     virtual std::string FormatResourceType(Orthanc::ResourceType level) = 0;
 
     virtual std::string FormatWildcardEscape() = 0;

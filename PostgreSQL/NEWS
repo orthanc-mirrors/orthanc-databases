@@ -12,6 +12,8 @@ Optimal Postgresql Server version: 11+
 
 
 Maintenance:
+* Fixed high memory usage due to caching of too many
+  prepared SQL statement when using since & limit.
 * Removed duplicate comparison in find SQL queries.
 
 

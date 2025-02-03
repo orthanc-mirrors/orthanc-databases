@@ -2180,6 +2180,16 @@ namespace OrthancDatabases
       return "${" + key + "}";
     }
 
+    virtual std::string GenerateParameter(const int64_t& value)
+    {
+      const std::string key = FormatParameter(count_);
+
+      count_ ++;
+      dictionary_.SetIntegerValue(key, value);
+
+      return "${" + key + "}";
+    }
+
     virtual std::string FormatResourceType(Orthanc::ResourceType level)
     {
       return boost::lexical_cast<std::string>(MessagesToolbox::ConvertToPlainC(level));
@@ -2229,11 +2239,13 @@ namespace OrthancDatabases
         {
           if (count > 0 || since > 0)
           {
-            sql += " OFFSET " + boost::lexical_cast<std::string>(since) + " ROWS ";
+            std::string parameterSince = GenerateParameter(since);
+            sql += " OFFSET " + parameterSince + " ROWS ";
           }
           if (count > 0)
           {
-            sql += " FETCH NEXT " + boost::lexical_cast<std::string>(count) + " ROWS ONLY ";
+            std::string parameterCount = GenerateParameter(count);
+            sql += " FETCH NEXT " + parameterCount + " ROWS ONLY ";
           }
         }; break;
         case Dialect_SQLite:
@@ -2241,26 +2253,32 @@ namespace OrthancDatabases
         {
           if (count > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(count);
+            std::string parameterCount = GenerateParameter(count);
+            sql += " LIMIT " + parameterCount;
           }
           if (since > 0)
           {
-            sql += " OFFSET " + boost::lexical_cast<std::string>(since);
+            std::string parameterSince = GenerateParameter(since);
+            sql += " OFFSET " + parameterSince;
           }
         }; break;
         case Dialect_MySQL:
         {
           if (count > 0 && since > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(since) + ", " + boost::lexical_cast<std::string>(count);
+            std::string parameterCount = GenerateParameter(count);
+            std::string parameterSince = GenerateParameter(since);
+            sql += " LIMIT " + parameterSince + ", " + parameterCount;
           }
           else if (count > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(count);
+            std::string parameterCount = GenerateParameter(count);
+            sql += " LIMIT " + parameterCount;
           }
           else if (since > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(since) + ", 18446744073709551615"; // max uint64 value when you don't want any limit
+            std::string parameterSince = GenerateParameter(since);
+            sql += " LIMIT " + parameterSince + ", 18446744073709551615"; // max uint64 value when you don't want any limit
           }
         }; break;
         default:
@@ -4035,13 +4053,16 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     sql += " ORDER BY c0_queryId, c2_rowNumber";  // this is really important to make sure that the Lookup query is the first one to provide results since we use it to create the responses element !
 
     std::unique_ptr<DatabaseManager::StatementBase> statement;
+
+    Query::Parameters parametersTypes;
+    formatter.GetDictionary().GetParametersType(parametersTypes);
     if (manager.GetDialect() == Dialect_MySQL)
     { // TODO: investigate why "complex" cached statement do not seem to work properly in MySQL
-      statement.reset(new DatabaseManager::StandaloneStatement(manager, sql));
+      statement.reset(new DatabaseManager::StandaloneStatement(manager, sql, parametersTypes));
     }
     else
     {
-      statement.reset(new DatabaseManager::CachedStatement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql));
+      statement.reset(new DatabaseManager::CachedStatement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql, parametersTypes));
     }
     
     statement->Execute(formatter.GetDictionary());

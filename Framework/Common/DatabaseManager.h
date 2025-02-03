@@ -212,10 +212,18 @@ namespace OrthancDatabases
       StatementId             statementId_;
       IPrecompiledStatement*  statement_;
 
+      void Setup(const std::string& sql,
+                 const Query::Parameters& parametersTypes);
+                 
     public:
       CachedStatement(const StatementId& statementId,
                       DatabaseManager& manager,
                       const std::string& sql);
+
+      CachedStatement(const StatementId& statementId,
+                      DatabaseManager& manager,
+                      const std::string& sql,
+                      const Query::Parameters& parametersTypes);
 
       void Execute()
       {
@@ -246,6 +254,10 @@ namespace OrthancDatabases
     public:
       StandaloneStatement(DatabaseManager& manager,
                           const std::string& sql);
+
+      StandaloneStatement(DatabaseManager& manager,
+                          const std::string& sql,
+                          const Query::Parameters& parametersTypes);
 
       virtual ~StandaloneStatement();
 

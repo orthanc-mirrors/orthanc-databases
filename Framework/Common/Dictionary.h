@@ -27,6 +27,7 @@
 
 #include <map>
 #include <stdint.h>
+#include "Query.h"
 
 namespace OrthancDatabases
 {
@@ -74,5 +75,7 @@ namespace OrthancDatabases
     void SetNullValue(const std::string& key);
 
     const IValue& GetValue(const std::string& key) const;
+
+    void GetParametersType(Query::Parameters& target) const;
   };
 }
