@@ -1,6 +1,19 @@
 Pending changes in the mainline
 ===============================
 
+DB schema revision: 3
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.5
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.6
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+
+Maintenance:
+* Removed duplicate comparison in find SQL queries.
+
 
 
 Release 7.1 (2025-01-23)

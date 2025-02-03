@@ -1043,11 +1043,6 @@ namespace OrthancDatabases
           comparisons += " AND " + comparison;
         }
 
-        if (!comparison.empty())
-        {
-          comparisons += " AND " + comparison;
-        }
-
         count ++;
       }
     }
