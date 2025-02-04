@@ -528,42 +528,47 @@ namespace OrthancDatabases
     {
       const std::string& name = formatter_.GetParameterName(i);
       
-      switch (formatter_.GetParameterType(i))
+      const IValue& value = parameters.GetValue(name);
+
+      if (value.GetType() == ValueType_Null)
       {
-        case ValueType_Integer64:
-          BindInteger64(i, dynamic_cast<const Integer64Value&>(parameters.GetValue(name)).GetValue());
-          break;
-
-        case ValueType_Integer32:
-          BindInteger(i, dynamic_cast<const Integer32Value&>(parameters.GetValue(name)).GetValue());
-          break;
-
-        case ValueType_Null:
-          BindNull(i);
-          break;
-
-        case ValueType_Utf8String:
-          BindString(i, dynamic_cast<const Utf8StringValue&>
-                     (parameters.GetValue(name)).GetContent());
-          break;
-
-        case ValueType_BinaryString:
-          BindString(i, dynamic_cast<const BinaryStringValue&>
-                     (parameters.GetValue(name)).GetContent());
-          break;
-
-        case ValueType_InputFile:
+        BindNull(i);
+      }
+      else
+      {
+        switch (formatter_.GetParameterType(i))
         {
-          const InputFileValue& blob =
-            dynamic_cast<const InputFileValue&>(parameters.GetValue(name));
+          case ValueType_Integer64:
+            BindInteger64(i, dynamic_cast<const Integer64Value&>(parameters.GetValue(name)).GetValue());
+            break;
 
-          PostgreSQLLargeObject largeObject(database_, blob.GetContent());
-          BindLargeObject(i, largeObject);
-          break;
+          case ValueType_Integer32:
+            BindInteger(i, dynamic_cast<const Integer32Value&>(parameters.GetValue(name)).GetValue());
+            break;
+
+          case ValueType_Utf8String:
+            BindString(i, dynamic_cast<const Utf8StringValue&>
+                      (parameters.GetValue(name)).GetContent());
+            break;
+
+          case ValueType_BinaryString:
+            BindString(i, dynamic_cast<const BinaryStringValue&>
+                      (parameters.GetValue(name)).GetContent());
+            break;
+
+          case ValueType_InputFile:
+          {
+            const InputFileValue& blob =
+              dynamic_cast<const InputFileValue&>(parameters.GetValue(name));
+
+            PostgreSQLLargeObject largeObject(database_, blob.GetContent());
+            BindLargeObject(i, largeObject);
+            break;
+          }
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
         }
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
       }
     }
 

@@ -66,20 +66,12 @@ namespace OrthancDatabases
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) = 0;
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 6)
-    // New in Orthanc 1.12.6
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
+    // New in Orthanc 1.12.7
     virtual void AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                DatabaseManager& manager,
                                const Orthanc::DatabasePluginMessages::AddAttachment_Request& request) = 0;
 #endif
-
-// #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 6)
-
-//     virtual void AddAttachment2(DatabaseManager& manager,
-//                                int64_t id,
-//                                const OrthancPluginAttachment2& attachment,
-//                                int64_t revision) = 0;
-// #endif
 
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,

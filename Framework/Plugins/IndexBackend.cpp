@@ -392,7 +392,14 @@ namespace OrthancDatabases
     args.SetUtf8Value("hash", uncompressedHash);
     args.SetUtf8Value("hash-compressed", compressedHash);
     args.SetIntegerValue("revision", revision);
-    args.SetUtf8Value("custom-data", customData);
+    if (customData != NULL && strlen(customData) > 0)
+    {
+      args.SetUtf8Value("custom-data", customData);
+    }
+    else
+    {
+      args.SetNullValue("custom-data");
+    }
 
     statement.Execute(args);
   }
@@ -403,17 +410,17 @@ namespace OrthancDatabases
                                    const OrthancPluginAttachment& attachment,
                                    int64_t revision)
   {
-    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins supports these features now
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins support these features now
     ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
                          attachment.compressionType, attachment.compressedSize, attachment.compressedHash, "", revision);
   }
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 7)
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
   void IndexBackend::AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                    DatabaseManager& manager,
                                    const Orthanc::DatabasePluginMessages::AddAttachment_Request& request)
   {
-    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins supports these features now
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins support these features now
     ExecuteAddAttachment(manager, 
                          request.id(), 
                          request.attachment().uuid().c_str(),
@@ -1194,14 +1201,13 @@ namespace OrthancDatabases
   }
 
     
-  /* Use GetOutput().AnswerAttachment() */
   bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
                                       int64_t& revision /*out*/,
                                       DatabaseManager& manager,
                                       int64_t id,
                                       int32_t contentType)
   {
-    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // we force v4 plugins to support both ! 
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // we have forced all v4 plugins to support both ! 
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
@@ -1240,7 +1246,6 @@ namespace OrthancDatabases
       {
         customData = statement.ReadString(7);
       }
-
 
       output.AnswerAttachment(statement.ReadString(0),
                               contentType,
@@ -4210,7 +4215,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uuid(statement->ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
-          attachment->set_custom_data(statement->ReadString(C6_STRING_4));
+          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
           attachment->set_content_type(statement->ReadInteger32(C7_INT_1));
           attachment->set_compression_type(statement->ReadInteger32(C9_INT_3));
           attachment->set_compressed_size(statement->ReadInteger64(C10_BIG_INT_1));
@@ -4312,7 +4317,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uuid(statement->ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
-          attachment->set_custom_data(statement->ReadString(C6_STRING_4));
+          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
           attachment->set_content_type(statement->ReadInteger32(C7_INT_1));
           attachment->set_compression_type(statement->ReadInteger32(C9_INT_3));
           attachment->set_compressed_size(statement->ReadInteger64(C10_BIG_INT_1));

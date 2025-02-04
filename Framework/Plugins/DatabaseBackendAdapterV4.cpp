@@ -690,7 +690,7 @@ namespace OrthancDatabases
       
       case Orthanc::DatabasePluginMessages::OPERATION_ADD_ATTACHMENT:
       {
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 7)
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
         backend.AddAttachment(response, manager, request.add_attachment());
 #else
         OrthancPluginAttachment attachment;

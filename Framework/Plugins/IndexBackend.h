@@ -100,7 +100,7 @@ namespace OrthancDatabases
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) ORTHANC_OVERRIDE;
 
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 7)
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
     // New in Orthanc 1.12.7
     virtual void AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                DatabaseManager& manager,
