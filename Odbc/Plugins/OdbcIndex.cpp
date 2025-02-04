@@ -706,14 +706,14 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 5)
-  void SQLiteIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  void OdbcIndex::ExecuteFind(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                 DatabaseManager& manager,
                                 const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
 
-  void SQLiteIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+  void OdbcIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                  DatabaseManager& manager,
                                  const Orthanc::DatabasePluginMessages::Find_Request& request)
   {

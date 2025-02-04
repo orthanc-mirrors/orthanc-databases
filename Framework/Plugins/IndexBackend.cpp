@@ -2332,15 +2332,6 @@ namespace OrthancDatabases
       }
     }
 
-    void PrepareStatement(DatabaseManager::StandaloneStatement& statement) const
-    {
-      statement.SetReadOnly(true);
-      
-      for (size_t i = 0; i < count_; i++)
-      {
-        statement.SetParameterType(FormatParameter(i), ValueType_Utf8String);
-      }
-    }
 
     const Dictionary& GetDictionary() const
     {
@@ -2457,9 +2448,10 @@ namespace OrthancDatabases
       }
     }
 
-    DatabaseManager::StandaloneStatement statement(manager, sql);
-    formatter.PrepareStatement(statement);
+    Query::Parameters parametersTypes;
+    formatter.GetDictionary().GetParametersType(parametersTypes);
 
+    DatabaseManager::StandaloneStatement statement(manager, sql, parametersTypes);
     statement.Execute(formatter.GetDictionary());
 
     while (!statement.IsDone())
@@ -3304,7 +3296,10 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     sql = "WITH Lookup AS (" + lookupSql + ") SELECT COUNT(*) FROM Lookup";
 
-    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+    Query::Parameters parametersTypes;
+    formatter.GetDictionary().GetParametersType(parametersTypes);
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql, parametersTypes);
     statement.Execute(formatter.GetDictionary());
     response.mutable_count_resources()->set_count(statement.ReadInteger64(0));
   }
