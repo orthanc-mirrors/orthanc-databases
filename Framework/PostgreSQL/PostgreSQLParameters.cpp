@@ -98,6 +98,7 @@ namespace OrthancDatabases
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
 
     isVerboseEnabled_ = configuration.GetBooleanValue("EnableVerboseLogs", false);
+    allowInconsistentChildCounts_ = configuration.GetBooleanValue("AllowInconsistentChildCounts", false);
 
     maxConnectionRetries_ = configuration.GetUnsignedIntegerValue("MaximumConnectionRetries", 10);
     connectionRetryInterval_ = configuration.GetUnsignedIntegerValue("ConnectionRetryInterval", 5);

@@ -51,6 +51,7 @@ namespace OrthancDatabases
     unsigned int maxConnectionRetries_;
     unsigned int connectionRetryInterval_;
     bool         isVerboseEnabled_;
+    bool         allowInconsistentChildCounts_;
     IsolationMode isolationMode_;
     void Reset();
 
@@ -152,6 +153,10 @@ namespace OrthancDatabases
       return isVerboseEnabled_;
     }
 
+    bool GetAllowInconsistentChildCounts() const
+    {
+      return allowInconsistentChildCounts_;
+    }
 
     void Format(std::string& target) const;
   };

@@ -1,7 +1,7 @@
 Pending changes in the mainline
 ===============================
 
-DB schema revision: 3
+DB schema revision: 4
 Minimum plugin SDK (for build): 1.12.5
 Optimal plugin SDK (for build): 1.12.5
 Minimum Orthanc runtime: 1.12.5
@@ -12,6 +12,13 @@ Optimal Postgresql Server version: 11+
 
 
 Maintenance:
+* Optimized the SQL query that is maintaing the childCount
+  when new instances are ingested.
+* New configuration "AllowInconsistentChildCounts" to speed
+  up childCount computation.  If set to true, childCount values
+  of recently ingested resources will be incorrect until the next
+  execution of the DB Housekeeping thread (defined by "HousekeepingInterval"
+  - default value is 1s)
 * Fixed high memory usage due to caching of too many
   prepared SQL statement when using since & limit.
 * Removed duplicate comparison in find SQL queries.

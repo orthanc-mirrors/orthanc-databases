@@ -44,7 +44,7 @@ namespace OrthancDatabases
 
     virtual void ClearRemainingAncestor(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
-    virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
+    virtual bool HasChildCountColumn() const ORTHANC_OVERRIDE
     {
       return true;
     }
