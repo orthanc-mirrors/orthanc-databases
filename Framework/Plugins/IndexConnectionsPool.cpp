@@ -49,7 +49,10 @@ namespace OrthancDatabases
 
   void IndexConnectionsPool::HousekeepingThread(IndexConnectionsPool* that)
   {
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 2)
     OrthancPluginSetCurrentThreadName(OrthancPlugins::GetGlobalContext(), "DB HOUSEKEEPING");    
+#endif
+
     boost::posix_time::ptime lastInvocation = boost::posix_time::second_clock::local_time();
 
     while (that->housekeepingContinue_)
