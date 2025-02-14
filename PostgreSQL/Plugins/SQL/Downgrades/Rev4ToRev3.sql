@@ -1,6 +1,22 @@
 -- This file contains an SQL procedure to downgrade from schema Rev4 to Rev3 (version = 6).
   -- It re-installs the old childcount trigger mechanisms
 
+DO $$
+DECLARE
+    current_revision TEXT;
+    expected_revision TEXT;
+BEGIN
+    expected_revision := '4';
+
+    SELECT value INTO current_revision FROM GlobalProperties WHERE property = 4; -- GlobalProperty_DatabasePatchLevel
+
+    IF current_revision != expected_revision THEN
+        RAISE EXCEPTION 'Unexpected schema revision % to run this script.  Expected revision = %', current_revision, expected_revision;
+    END IF;
+END $$;
+
+---
+
 DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
 DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
 
