@@ -22,6 +22,7 @@ Maintenance:
 * Fixed high memory usage due to caching of too many
   prepared SQL statement when using since & limit.
 * Removed duplicate comparison in find SQL queries.
+* Now returning results when e.g, ordering instances against a metadata they don't have.
 
 
 
