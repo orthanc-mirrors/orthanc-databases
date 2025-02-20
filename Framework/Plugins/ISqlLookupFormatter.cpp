@@ -440,26 +440,26 @@ namespace OrthancDatabases
 
     if (tagLevel == requestLevel)
     {
-      target = " FULL JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + FormatLevel(requestLevel) +
+      target = " LEFT JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + FormatLevel(requestLevel) +
                 ".internalId AND " + tagFilter;
     }
     else if (static_cast<int32_t>(requestLevel) - static_cast<int32_t>(tagLevel) == 1)
     {
       target = " INNER JOIN Resources " + orderArg + "parent ON " + orderArg + "parent.internalId = " + FormatLevel(requestLevel) + ".parentId "
-               " FULL JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "parent.internalId AND " + tagFilter;
+               " LEFT JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "parent.internalId AND " + tagFilter;
     }
     else if (static_cast<int32_t>(requestLevel) - static_cast<int32_t>(tagLevel) == 2)
     {
       target = " INNER JOIN Resources " + orderArg + "parent ON " + orderArg + "parent.internalId = " + FormatLevel(requestLevel) + ".parentId "
                " INNER JOIN Resources " + orderArg + "grandparent ON " + orderArg + "grandparent.internalId = " + orderArg + "parent.parentId "
-               " FULL JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "grandparent.internalId AND " + tagFilter;
+               " LEFT JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "grandparent.internalId AND " + tagFilter;
     }
     else if (static_cast<int32_t>(requestLevel) - static_cast<int32_t>(tagLevel) == 3)
     {
       target = " INNER JOIN Resources " + orderArg + "parent ON " + orderArg + "parent.internalId = " + FormatLevel(requestLevel) + ".parentId "
                " INNER JOIN Resources " + orderArg + "grandparent ON " + orderArg + "grandparent.internalId = " + orderArg + "parent.parentId "
                " INNER JOIN Resources " + orderArg + "grandgrandparent ON " + orderArg + "grandgrandparent.internalId = " + orderArg + "grandparent.parentId "
-               " FULL JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "grandgrandparent.internalId AND " + tagFilter;
+               " LEFT JOIN " + tagTable + " " + orderArg + " ON " + orderArg + ".id = " + orderArg + "grandgrandparent.internalId AND " + tagFilter;
     }
   }
 #endif
@@ -473,7 +473,7 @@ namespace OrthancDatabases
   {
     std::string arg = "order" + boost::lexical_cast<std::string>(index);
 
-    target = " FULL JOIN Metadata " + arg + " ON " + arg + ".id = " + FormatLevel(requestLevel) +
+    target = " LEFT JOIN Metadata " + arg + " ON " + arg + ".id = " + FormatLevel(requestLevel) +
              ".internalId AND " + arg + ".type = " +
              boost::lexical_cast<std::string>(metadata);
   }
