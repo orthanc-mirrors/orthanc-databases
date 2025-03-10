@@ -43,18 +43,20 @@ namespace OrthancDatabases
 
     OrthancPluginContext*  context_;
     bool                   readOnly_;
+    bool                   allowInconsistentChildCounts_;
 
     boost::shared_mutex                                outputFactoryMutex_;
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
+
     virtual void ClearDeletedFiles(DatabaseManager& manager);
 
     virtual void ClearDeletedResources(DatabaseManager& manager);
 
     virtual void ClearRemainingAncestor(DatabaseManager& manager);
 
-    virtual bool HasChildCountTable() const = 0;
+    virtual bool HasChildCountColumn() const = 0;
 
     void SignalDeletedFiles(IDatabaseBackendOutput& output,
                             DatabaseManager& manager);
@@ -84,7 +86,8 @@ namespace OrthancDatabases
 
   public:
     explicit IndexBackend(OrthancPluginContext* context,
-                          bool readOnly);
+                          bool readOnly,
+                          bool allowInconsistentChildCounts);
 
     virtual OrthancPluginContext* GetContext() ORTHANC_OVERRIDE
     {

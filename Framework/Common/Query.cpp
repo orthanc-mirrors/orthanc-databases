@@ -56,7 +56,7 @@ namespace OrthancDatabases
   };
 
 
-  void Query::Setup(const std::string& sql)
+  void Query::Setup(const std::string& sql, const Query::Parameters& parametersTypes)
   {
     boost::regex regex("\\$\\{(.*?)\\}");
 
@@ -76,7 +76,17 @@ namespace OrthancDatabases
       parameter = parameter.substr(2, parameter.size() - 3);
 
       tokens_.push_back(new Token(true, parameter));
-      parameters_[parameter] = ValueType_Utf8String;
+      
+      // when we already know the type of the parameter, set it directly to the right value
+      Query::Parameters::const_iterator itp = parametersTypes.find(parameter);
+      if (itp != parametersTypes.end())
+      {
+        parameters_[parameter] = itp->second;
+      }
+      else
+      {
+        parameters_[parameter] = ValueType_Utf8String;
+      }
 
       last = it->second;
 
@@ -93,7 +103,15 @@ namespace OrthancDatabases
   Query::Query(const std::string& sql) :
     readOnly_(false)
   {
-    Setup(sql);
+    Query::Parameters emptyParameters;
+    Setup(sql, emptyParameters);
+  }
+
+  Query::Query(const std::string& sql,
+               const Query::Parameters& parametersTypes) :
+    readOnly_(false)
+  {
+    Setup(sql, parametersTypes);
   }
 
 
@@ -101,7 +119,16 @@ namespace OrthancDatabases
                bool readOnly) :
     readOnly_(readOnly)
   {
-    Setup(sql);
+    Query::Parameters emptyParameters;
+    Setup(sql, emptyParameters);
+  }
+
+  Query::Query(const std::string& sql,
+               bool readOnly,
+               const Query::Parameters& parametersTypes) :
+    readOnly_(readOnly)
+  {
+    Setup(sql, parametersTypes);
   }
 
   

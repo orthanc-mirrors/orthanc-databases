@@ -313,9 +313,11 @@ namespace OrthancDatabases
 
 
   IndexBackend::IndexBackend(OrthancPluginContext* context,
-                             bool readOnly) :
+                             bool readOnly, 
+                             bool allowInconsistentChildCounts) :
     context_(context),
-    readOnly_(readOnly)
+    readOnly_(readOnly),
+    allowInconsistentChildCounts_(allowInconsistentChildCounts)
   {
   }
 
@@ -2182,6 +2184,16 @@ namespace OrthancDatabases
       return "${" + key + "}";
     }
 
+    virtual std::string GenerateParameter(const int64_t& value)
+    {
+      const std::string key = FormatParameter(count_);
+
+      count_ ++;
+      dictionary_.SetIntegerValue(key, value);
+
+      return "${" + key + "}";
+    }
+
     virtual std::string FormatResourceType(Orthanc::ResourceType level)
     {
       return boost::lexical_cast<std::string>(MessagesToolbox::ConvertToPlainC(level));
@@ -2231,11 +2243,13 @@ namespace OrthancDatabases
         {
           if (count > 0 || since > 0)
           {
-            sql += " OFFSET " + boost::lexical_cast<std::string>(since) + " ROWS ";
+            std::string parameterSince = GenerateParameter(since);
+            sql += " OFFSET " + parameterSince + " ROWS ";
           }
           if (count > 0)
           {
-            sql += " FETCH NEXT " + boost::lexical_cast<std::string>(count) + " ROWS ONLY ";
+            std::string parameterCount = GenerateParameter(count);
+            sql += " FETCH NEXT " + parameterCount + " ROWS ONLY ";
           }
         }; break;
         case Dialect_SQLite:
@@ -2243,26 +2257,32 @@ namespace OrthancDatabases
         {
           if (count > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(count);
+            std::string parameterCount = GenerateParameter(count);
+            sql += " LIMIT " + parameterCount;
           }
           if (since > 0)
           {
-            sql += " OFFSET " + boost::lexical_cast<std::string>(since);
+            std::string parameterSince = GenerateParameter(since);
+            sql += " OFFSET " + parameterSince;
           }
         }; break;
         case Dialect_MySQL:
         {
           if (count > 0 && since > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(since) + ", " + boost::lexical_cast<std::string>(count);
+            std::string parameterCount = GenerateParameter(count);
+            std::string parameterSince = GenerateParameter(since);
+            sql += " LIMIT " + parameterSince + ", " + parameterCount;
           }
           else if (count > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(count);
+            std::string parameterCount = GenerateParameter(count);
+            sql += " LIMIT " + parameterCount;
           }
           else if (since > 0)
           {
-            sql += " LIMIT " + boost::lexical_cast<std::string>(since) + ", 18446744073709551615"; // max uint64 value when you don't want any limit
+            std::string parameterSince = GenerateParameter(since);
+            sql += " LIMIT " + parameterSince + ", 18446744073709551615"; // max uint64 value when you don't want any limit
           }
         }; break;
         default:
@@ -2316,15 +2336,6 @@ namespace OrthancDatabases
       }
     }
 
-    void PrepareStatement(DatabaseManager::StandaloneStatement& statement) const
-    {
-      statement.SetReadOnly(true);
-      
-      for (size_t i = 0; i < count_; i++)
-      {
-        statement.SetParameterType(FormatParameter(i), ValueType_Utf8String);
-      }
-    }
 
     const Dictionary& GetDictionary() const
     {
@@ -2441,9 +2452,10 @@ namespace OrthancDatabases
       }
     }
 
-    DatabaseManager::StandaloneStatement statement(manager, sql);
-    formatter.PrepareStatement(statement);
+    Query::Parameters parametersTypes;
+    formatter.GetDictionary().GetParametersType(parametersTypes);
 
+    DatabaseManager::StandaloneStatement statement(manager, sql, parametersTypes);
     statement.Execute(formatter.GetDictionary());
 
     while (!statement.IsDone())
@@ -3289,7 +3301,10 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     sql = "WITH Lookup AS (" + lookupSql + ") SELECT COUNT(*) FROM Lookup";
 
-    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+    Query::Parameters parametersTypes;
+    formatter.GetDictionary().GetParametersType(parametersTypes);
+
+    DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql, parametersTypes);
     statement.Execute(formatter.GetDictionary());
     response.mutable_count_resources()->set_count(statement.ReadInteger64(0));
   }
@@ -3306,6 +3321,29 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // why we have generic column names.
     // So, at the end we'll have only one very big query !
 
+    const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec = NULL;
+    const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandchildrenSpec = NULL;
+    const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandgrandchildrenSpec = NULL;
+
+    switch (request.level())
+    {
+    case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
+      childrenSpec = &(request.children_studies());
+      grandchildrenSpec = &(request.children_series());
+      grandgrandchildrenSpec = &(request.children_instances());
+      break;
+    case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
+      childrenSpec = &(request.children_series());
+      grandchildrenSpec = &(request.children_instances());
+      break;
+    case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
+      childrenSpec = &(request.children_instances());
+      break;
+    
+    default:
+      break;
+    }
+
     std::string sql;
 
     // extract the resource id of interest by executing the lookup in a CTE
@@ -3318,6 +3356,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     std::string oneInstanceSqlCTE;
 
+    // OneInstance CTE
     if (request.level() != Orthanc::DatabasePluginMessages::RESOURCE_INSTANCE &&
         request.retrieve_one_instance_metadata_and_attachments())
     {
@@ -3351,10 +3390,47 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       sql += ", OneInstance AS (SELECT parentInternalId, instancePublicId, instanceInternalId FROM _OneInstance WHERE rowNum = 1) ";  // this is a generic way to implement DISTINCT ON
     }
 
-    // if (!oneInstanceSqlCTE.empty() && (manager.GetDialect() == Dialect_MySQL || manager.GetDialect() == Dialect_SQLite))
-    // { // all CTEs must be declared first in some dialects
-    // }
+    // GrandChildCount CTE in some specific cases
+    bool hasGrandChildCountCTE = false;
+    if (HasChildCountColumn() && !allowInconsistentChildCounts_ &&
+        grandchildrenSpec != NULL && 
+        !grandchildrenSpec->retrieve_identifiers() && // no need to count if we have retrieved the list of identifiers
+        grandchildrenSpec->retrieve_count())  
+    {
+      sql += ", ValidGrandChildCounts AS (SELECT thisLevel.internalId, COALESCE(SUM(childLevel.childCount), 0) AS totalGrandChildCount "
+             "  FROM Resources AS thisLevel "
+             "  LEFT JOIN Resources AS childLevel ON childLevel.parentId = thisLevel.internalId "
+             "    WHERE NOT EXISTS (SELECT 1 FROM InvalidChildCounts WHERE id = thisLevel.internalId) "
+             "      AND NOT EXISTS (SELECT 1 FROM Resources AS child "
+             "                               JOIN InvalidChildCounts ON InvalidChildCounts.id = child.internalId "
+             "                               WHERE child.parentId = thisLevel.internalId) "
+             "  GROUP BY thisLevel.internalId) ";
+      hasGrandChildCountCTE = true;
+    }
 
+    // GrandGrandChildCount CTE in some specific cases
+    bool hasGrandGrandChildCountCTE = false;
+    if (HasChildCountColumn() && !allowInconsistentChildCounts_ &&
+        grandgrandchildrenSpec != NULL && 
+        !grandgrandchildrenSpec->retrieve_identifiers() && // no need to count if we have retrieved the list of identifiers
+        grandgrandchildrenSpec->retrieve_count())  
+    {
+      sql += ", ValidGrandGrandChildCounts AS (SELECT thisLevel.internalId, COALESCE(SUM(grandChildLevel.childCount), 0) AS totalGrandGrandChildCount "
+              "  FROM Resources AS thisLevel "
+              "  LEFT JOIN Resources AS childLevel ON childLevel.parentId = thisLevel.internalId "
+              "  LEFT JOIN Resources AS grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
+              "    WHERE NOT EXISTS (SELECT 1 FROM InvalidChildCounts WHERE id = thisLevel.internalId) "
+              "      AND NOT EXISTS (SELECT 1 FROM Resources AS child "
+              "                               JOIN InvalidChildCounts ON InvalidChildCounts.id = child.internalId "
+              "                               WHERE child.parentId = thisLevel.internalId) "
+              "      AND NOT EXISTS (SELECT 1 FROM Resources AS grandChild "
+              "                               JOIN Resources AS child ON grandChild.parentId = child.internalId "
+              "                               JOIN InvalidChildCounts ON InvalidChildCounts.id = grandChild.internalId "
+              "                               WHERE child.parentId = thisLevel.internalId) "
+              "  GROUP BY thisLevel.internalId) ";
+      hasGrandGrandChildCountCTE = true;
+    }
+    
     std::string revisionInC7;
     if (HasRevisionsSupport())
     {
@@ -3585,22 +3661,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     // need MainDicomTags from children ?
     if (request.level() <= Orthanc::DatabasePluginMessages::RESOURCE_SERIES)
     {
-      const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* childrenSpec = NULL;
-      switch (request.level())
-      {
-      case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
-        childrenSpec = &(request.children_studies());
-        break;
-      case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
-        childrenSpec = &(request.children_series());
-        break;
-      case Orthanc::DatabasePluginMessages::RESOURCE_SERIES:
-        childrenSpec = &(request.children_instances());
-        break;
-      
-      default:
-        break;
-      }
+      assert(childrenSpec != NULL);
 
       if (childrenSpec->retrieve_main_dicom_tags_size() > 0)
       {
@@ -3643,30 +3704,24 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       else if (childrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
       {
-        if (HasChildCountTable())  // TODO: rename in HasChildCountColumn ?
+        if (HasChildCountColumn())
         {
-          // // we get the count value either from the childCount table if it has been computed or from the Resources table
-          // sql += "UNION ALL SELECT "
-          //       "  " TOSTRING(QUERY_CHILDREN_COUNT) " AS c0_queryId, "
-          //       "  Lookup.internalId AS c1_internalId, "
-          //       "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-          //       "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-          //       "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-          //       "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-          //       "  " + formatter.FormatNull("INT") + " AS c7_int1, "
-          //       "  " + formatter.FormatNull("INT") + " AS c8_int2, "
-          //       "  " + formatter.FormatNull("INT") + " AS c9_int3, "
-          //       "  COALESCE("
-          //       "           (ChildCount.childCount),"
-          //       "        		(SELECT COUNT(childLevel.internalId)"
-          //       "            FROM Resources AS childLevel"
-          //       "            WHERE Lookup.internalId = childLevel.parentId"
-          //       "           )) AS c10_big_int1, "
-          //       "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
-          //       "FROM Lookup "
-          //       "LEFT JOIN ChildCount ON Lookup.internalId = ChildCount.parentId ";
-
           // we get the count value either from the childCount column if it has been computed or from the Resources table
+          std::string getResourcesChildCount;
+          
+          if (allowInconsistentChildCounts_) // allow approximate childCount if childCount is populated but has not yet been updated
+          {
+            getResourcesChildCount = "Resources.childCount"; // read the last known value without taking into account the InvalidChildCounts table to speed up the query
+          }
+          else
+          {
+            // read the last known value only if it has not been invalidated by an entry in the InvalidChildCounts table -> more complex/slower query
+            getResourcesChildCount = "SELECT childCount "
+                                     "FROM Resources AS thisLevel "
+                                     "WHERE thisLevel.internalId = lookup.internalId "
+                                     "  AND NOT EXISTS (SELECT 1 FROM Invalidchildcounts WHERE id = thisLevel.internalId)"; 
+          }
+
           sql += "UNION ALL SELECT "
                 "  " TOSTRING(QUERY_CHILDREN_COUNT) " AS c0_queryId, "
                 "  Lookup.internalId AS c1_internalId, "
@@ -3679,7 +3734,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
                 "  COALESCE("
-                "           (Resources.childCount),"
+                "           (" + getResourcesChildCount + "),"
                 "        		(SELECT COUNT(childLevel.internalId)"
                 "            FROM Resources AS childLevel"
                 "            WHERE Lookup.internalId = childLevel.parentId"
@@ -3730,19 +3785,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       if (request.level() <= Orthanc::DatabasePluginMessages::RESOURCE_STUDY)
       {
-        const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandchildrenSpec = NULL;
-        switch (request.level())
-        {
-        case Orthanc::DatabasePluginMessages::RESOURCE_PATIENT:
-          grandchildrenSpec = &(request.children_series());
-          break;
-        case Orthanc::DatabasePluginMessages::RESOURCE_STUDY:
-          grandchildrenSpec = &(request.children_instances());
-          break;
-        
-        default:
-          break;
-        }
+        assert(grandchildrenSpec != NULL);
 
         // need grand children identifiers ?
         if (grandchildrenSpec->retrieve_identifiers())  
@@ -3766,55 +3809,51 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         }
         else if (grandchildrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
         {
-          if (HasChildCountTable())
+          if (HasChildCountColumn())
           {
-            // // we get the count value either from the childCount table if it has been computed or from the Resources table
-            // sql += "UNION ALL SELECT "
-            //       "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
-            //       "  Lookup.internalId AS c1_internalId, "
-            //       "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-            //       "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-            //       "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-            //       "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-            //       "  " + formatter.FormatNull("INT") + " AS c7_int1, "
-            //       "  " + formatter.FormatNull("INT") + " AS c8_int2, "
-            //       "  " + formatter.FormatNull("INT") + " AS c9_int3, "
-            //       "  COALESCE("
-		        //       "           (SELECT SUM(ChildCount.childCount)"
-		        //       "            FROM ChildCount"
-            //       "            INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
-            //       "            WHERE ChildCount.parentId = childLevel.internalId),"
-            //       "        		(SELECT COUNT(grandChildLevel.internalId)"
-            //       "            FROM Resources AS childLevel"
-            //       "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
-            //       "            WHERE Lookup.internalId = childLevel.parentId"
-            //       "           )) AS c10_big_int1, "
-            //       "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
-            //       "FROM Lookup ";
+
+            // we get the count value either from the childCount column if it has been computed or from the Resources table
+            std::string getResourcesGrandChildCount;
+            
+            if (allowInconsistentChildCounts_) // allow approximate childCount if childCount is populated but has not yet been updated
+            {
+              // read the last known value without taking into account the InvalidChildCounts table to speed up the query
+              getResourcesGrandChildCount = "SELECT SUM(childLevel.childCount) "
+                                            "FROM Resources AS childLevel "
+                                            "WHERE childLevel.parentId = Lookup.internalId"; 
+            }
+            else
+            {
+              assert(hasGrandChildCountCTE);
+              // read the last known value only if it has not been invalidated by an entry in the InvalidChildCounts table -> more complex/slower query
+              getResourcesGrandChildCount = "SELECT totalGrandChildCount "
+                                            "FROM ValidGrandChildCounts "
+                                            "WHERE internalId = lookup.internalId";
+                                            //"  AND NOT EXISTS (SELECT 1 FROM Invalidchildcounts WHERE id = childLevel.internalId OR id = lookup.internalId)"; 
+            }
 
             // we get the count value either from the childCount column if it has been computed or from the Resources table
             sql += "UNION ALL SELECT "
-                  "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
-                  "  Lookup.internalId AS c1_internalId, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
-                  "  " + formatter.FormatNull("INT") + " AS c7_int1, "
-                  "  " + formatter.FormatNull("INT") + " AS c8_int2, "
-                  "  " + formatter.FormatNull("INT") + " AS c9_int3, "
-                  "  COALESCE("
-		              "           (SELECT SUM(childLevel.childCount)"
-		              "            FROM Resources AS childLevel"
-                  "            WHERE childLevel.parentId = Lookup.internalId),"
-                  "        		(SELECT COUNT(grandChildLevel.internalId)"
-                  "            FROM Resources AS childLevel"
-                  "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
-                  "            WHERE Lookup.internalId = childLevel.parentId"
-                  "           )) AS c10_big_int1, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
-                  "FROM Lookup ";
+
+                    "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
+                    "  Lookup.internalId AS c1_internalId, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
+                    "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                    "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                    "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                    "  COALESCE("
+                    "           (" + getResourcesGrandChildCount + "),"
+                    "        		(SELECT COUNT(grandChildLevel.internalId)"
+                    "            FROM Resources AS childLevel"
+                    "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
+                    "            WHERE Lookup.internalId = childLevel.parentId"
+                    "           )) AS c10_big_int1, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
+                    "FROM Lookup ";
           }
           else
           {
@@ -3881,7 +3920,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         if (request.level() == Orthanc::DatabasePluginMessages::RESOURCE_PATIENT)
         {
-          const Orthanc::DatabasePluginMessages::Find_Request_ChildrenSpecification* grandgrandchildrenSpec = &(request.children_instances());
+          assert(grandgrandchildrenSpec != NULL);
 
           // need grand children identifiers ?
           if (grandgrandchildrenSpec->retrieve_identifiers())  
@@ -3906,33 +3945,29 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           }
           else if (grandgrandchildrenSpec->retrieve_count())  // no need to count if we have retrieved the list of identifiers
           {
-            if (HasChildCountTable())
+            if (HasChildCountColumn())
             {
-              // // we get the count value either from the childCount table if it has been computed or from the Resources table
-              // sql += "UNION ALL SELECT "
-              //       "  " TOSTRING(QUERY_GRAND_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
-              //       "  Lookup.internalId AS c1_internalId, "
-              //       "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
-              //       "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
-              //       "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
-              //       "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-              //       "  " + formatter.FormatNull("INT") + " AS c7_int1, "
-              //       "  " + formatter.FormatNull("INT") + " AS c8_int2, "
-              //       "  " + formatter.FormatNull("INT") + " AS c9_int3, "
-              //       "  COALESCE("
-              //       "           (SELECT SUM(ChildCount.childCount)"
-              //       "            FROM ChildCount"
-              //       "            INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
-              //       "            INNER JOIN Resources AS grandChildLevel ON grandChildLevel.parentId = childLevel.internalId"
-              //       "            WHERE ChildCount.parentId = grandChildLevel.internalId),"
-              //       "        		(SELECT COUNT(grandGrandChildLevel.internalId)"
-              //       "            FROM Resources AS childLevel"
-              //       "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
-              //       "            INNER JOIN Resources AS grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId"
-              //       "            WHERE Lookup.internalId = childLevel.parentId"
-              //       "           )) AS c10_big_int1, "
-              //       "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
-              //       "FROM Lookup ";
+              std::string getResourcesGrandGrandChildCount;
+              if (allowInconsistentChildCounts_) // allow approximate childCount if childCount is populated but has not yet been updated
+              {
+                // read the last known value without taking into account the InvalidChildCounts table to speed up the query
+                getResourcesGrandGrandChildCount = "SELECT SUM(grandChildLevel.childCount)"
+                                                   "FROM Resources AS grandChildLevel"
+                                                   "INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
+                                                   "WHERE grandChildLevel.parentId = childLevel.internalId"; 
+              }
+              else
+              {
+                assert(hasGrandGrandChildCountCTE);
+                // read the last known value only if it has not been invalidated by an entry in the InvalidChildCounts table -> more complex/slower query
+                getResourcesGrandGrandChildCount = "SELECT totalGrandGrandChildCount "
+                                                   "FROM ValidGrandGrandChildCounts "
+                                                   "WHERE internalId = lookup.internalId";
+                                                  //  "INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
+                                                  //  "WHERE grandChildLevel.parentId = childLevel.internalId"
+                                                  //  "  AND NOT EXISTS (SELECT 1 FROM Invalidchildcounts WHERE id = grandChildLevel.internalId OR id = childLevel.internalId OR id = lookup.internalId)";
+              }
+  
 
               // we get the count value either from the childCount column if it has been computed or from the Resources table
               sql += "UNION ALL SELECT "
@@ -3947,10 +3982,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                     "  " + formatter.FormatNull("INT") + " AS c9_int3, "
                     "  COALESCE("
-                    "           (SELECT SUM(grandChildLevel.childCount)"
-                    "            FROM Resources AS grandChildLevel"
-                    "            INNER JOIN Resources AS childLevel ON childLevel.parentId = Lookup.internalId"
-                    "            WHERE grandChildLevel.parentId = childLevel.internalId),"
+                    "           (" + getResourcesGrandGrandChildCount + "),"
                     "        		(SELECT COUNT(grandGrandChildLevel.internalId)"
                     "            FROM Resources AS childLevel"
                     "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
@@ -4064,13 +4096,16 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     sql += " ORDER BY c0_queryId, c2_rowNumber";  // this is really important to make sure that the Lookup query is the first one to provide results since we use it to create the responses element !
 
     std::unique_ptr<DatabaseManager::StatementBase> statement;
+
+    Query::Parameters parametersTypes;
+    formatter.GetDictionary().GetParametersType(parametersTypes);
     if (manager.GetDialect() == Dialect_MySQL)
     { // TODO: investigate why "complex" cached statement do not seem to work properly in MySQL
-      statement.reset(new DatabaseManager::StandaloneStatement(manager, sql));
+      statement.reset(new DatabaseManager::StandaloneStatement(manager, sql, parametersTypes));
     }
     else
     {
-      statement.reset(new DatabaseManager::CachedStatement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql));
+      statement.reset(new DatabaseManager::CachedStatement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql, parametersTypes));
     }
     
     statement->Execute(formatter.GetDictionary());

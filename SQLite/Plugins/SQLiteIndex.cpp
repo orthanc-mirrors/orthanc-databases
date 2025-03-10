@@ -206,7 +206,7 @@ namespace OrthancDatabases
 
   SQLiteIndex::SQLiteIndex(OrthancPluginContext* context,
                            const std::string& path) :
-    IndexBackend(context, false /* not read-only */),
+    IndexBackend(context, false /* not read-only */, false),
     path_(path),
     fast_(true)
   {
@@ -218,7 +218,7 @@ namespace OrthancDatabases
 
 
   SQLiteIndex::SQLiteIndex(OrthancPluginContext* context) :
-    IndexBackend(context, false /* not read-only */),
+    IndexBackend(context, false /* not read-only */, false),
     fast_(true)
   {
   }

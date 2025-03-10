@@ -35,7 +35,7 @@ namespace OrthancDatabases
     bool                   clearAll_;
 
   protected:
-    virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
+    virtual bool HasChildCountColumn() const ORTHANC_OVERRIDE
     {
       return false;
     }

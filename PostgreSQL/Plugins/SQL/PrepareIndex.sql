@@ -630,6 +630,55 @@ END;
 $body$ LANGUAGE plpgsql;
 
 
+-- -- new in rev4
+
+-- This table records all resource entries whose childCount column is currently invalid
+-- because of recent addition/removal of a child.
+-- This way, each transaction that is adding/removing a child can add row independently 
+-- in this table without having to lock the parent resource row.
+-- At regular interval, the DB housekeeping thread updates the childCount column of
+-- resources with an entry in this table.
+CREATE TABLE IF NOT EXISTS InvalidChildCounts(
+    id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+    updatedAt TIMESTAMP DEFAULT NOW());
+
+-- Updates the Resources.childCount column with the delta that have not been committed yet.
+-- A thread will call this function at regular interval to update all pending values.
+CREATE OR REPLACE FUNCTION UpdateInvalidChildCounts(
+    OUT updated_rows_count BIGINT
+) RETURNS BIGINT AS $body$
+DECLARE
+  locked_resources_ids BIGINT[];
+BEGIN
+
+    -- Lock the resources rows asap to prevent deadlocks
+    -- that will need to be retried
+    SELECT ARRAY(SELECT internalId
+                 FROM Resources
+                 WHERE internalId IN (SELECT DISTINCT id FROM InvalidChildCounts)
+                 FOR UPDATE)
+    INTO locked_resources_ids;
+
+    -- New rows can be added in the meantime, they won't be taken into account this time.
+    WITH deleted_rows AS (
+        DELETE FROM InvalidChildCounts
+        WHERE id = ANY(locked_resources_ids)
+        RETURNING id
+    )
+
+	UPDATE Resources
+    SET childCount = (SELECT COUNT(childLevel.internalId)
+                      FROM Resources AS childLevel
+                      WHERE childLevel.parentId = Resources.internalId)
+    WHERE internalid = ANY(locked_resources_ids);
+    
+    -- Get the number of rows affected
+    GET DIAGNOSTICS updated_rows_count = ROW_COUNT;
+
+END;
+$body$ LANGUAGE plpgsql;
+
+
 
 DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
 DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
@@ -639,42 +688,20 @@ RETURNS TRIGGER AS $body$
 BEGIN
     IF TG_OP = 'INSERT' THEN
 		IF new.parentId IS NOT NULL THEN
-            -- try to increment the childcount from the parent
-            -- note that we already have the lock on this row because the parent is locked in CreateInstance
-			UPDATE Resources
-		    SET childCount = childCount + 1
-		    WHERE internalId = new.parentId AND childCount IS NOT NULL;
-		
-            -- this should only happen for old studies whose childCount has not yet been computed
-            -- note: this child has already been added so it will be counted
-		    IF NOT FOUND THEN
-		        UPDATE Resources
-                SET childCount = (SELECT COUNT(*)
-		                              FROM Resources
-		                              WHERE internalId = new.parentId)
-		        WHERE internalId = new.parentId;
-		    END IF;
+            -- mark the parent's childCount as invalid
+			INSERT INTO InvalidChildCounts VALUES(new.parentId);
         END IF;
 	
     ELSIF TG_OP = 'DELETE' THEN
 
 		IF old.parentId IS NOT NULL THEN
-
-            -- Decrement the child count for the parent
-            -- note that we already have the lock on this row because the parent is locked in DeleteResource
-            UPDATE Resources
-            SET childCount = childCount - 1
-            WHERE internalId = old.parentId AND childCount IS NOT NULL;
-		
-            -- this should only happen for old studies whose childCount has not yet been computed
-            -- note: this child has already been removed so it will not be counted
-		    IF NOT FOUND THEN
-		        UPDATE Resources
-                SET childCount = (SELECT COUNT(*)
-		                              FROM Resources
-		                              WHERE internalId = new.parentId)
-		        WHERE internalId = new.parentId;
-		    END IF;
+            BEGIN
+                -- mark the parent's childCount as invalid
+                INSERT INTO InvalidChildCounts VALUES(old.parentId);
+            EXCEPTION
+                -- when deleting the last child of a parent, the insert will fail (this is expected)
+                WHEN foreign_key_violation THEN NULL;
+            END;
         END IF;
         
     END IF;

@@ -568,11 +568,29 @@ namespace OrthancDatabases
     StatementBase(manager),
     statementId_(statementId)
   {
+    Query::Parameters emptyParameters;
+    Setup(sql, emptyParameters);
+  }
+
+
+  DatabaseManager::CachedStatement::CachedStatement(const StatementId& statementId,
+                                                    DatabaseManager& manager,
+                                                    const std::string& sql,
+                                                    const Query::Parameters& parametersTypes) :
+    StatementBase(manager),
+    statementId_(statementId)
+  {
+    Setup(sql, parametersTypes);
+  }
+
+  void DatabaseManager::CachedStatement::Setup(const std::string& sql,
+                                               const Query::Parameters& parametersTypes)
+  {
     statement_ = GetManager().LookupCachedStatement(statementId_);
 
     if (statement_ == NULL)
     {
-      SetQuery(new Query(sql));
+      SetQuery(new Query(sql, parametersTypes));
     }
     else
     {
@@ -639,7 +657,17 @@ namespace OrthancDatabases
                                                             const std::string& sql) :
     StatementBase(manager)
   {
-    SetQuery(new Query(sql));
+    Query::Parameters emptyParameters;
+    SetQuery(new Query(sql, emptyParameters));
+  }
+
+
+  DatabaseManager::StandaloneStatement::StandaloneStatement(DatabaseManager& manager,
+                                                            const std::string& sql,
+                                                            const Query::Parameters& parametersTypes) :
+    StatementBase(manager)
+  {
+    SetQuery(new Query(sql, parametersTypes));
   }
 
       

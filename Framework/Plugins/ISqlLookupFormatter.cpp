@@ -473,7 +473,7 @@ namespace OrthancDatabases
   {
     std::string arg = "order" + boost::lexical_cast<std::string>(index);
 
-    target = " INNER JOIN Metadata " + arg + " ON " + arg + ".id = " + FormatLevel(requestLevel) +
+    target = " LEFT JOIN Metadata " + arg + " ON " + arg + ".id = " + FormatLevel(requestLevel) +
              ".internalId AND " + arg + ".type = " +
              boost::lexical_cast<std::string>(metadata);
   }
@@ -1036,11 +1036,6 @@ namespace OrthancDatabases
                        join + 
                        " WHERE " + comparison + " AND " + 
                        FormatLevel(static_cast<Orthanc::ResourceType>(queryLevel + 1)) + ".parentId = " + FormatLevel(static_cast<Orthanc::ResourceType>(queryLevel)) + ".internalId) ";
-        }
-
-        if (!comparison.empty())
-        {
-          comparisons += " AND " + comparison;
         }
 
         if (!comparison.empty())

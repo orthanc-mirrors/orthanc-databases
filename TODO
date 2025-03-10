@@ -7,11 +7,6 @@
 Common - Database index
 -----------------------
 
-* Performance of joins in LookupResources: Create cached statement for
-  LookupResources, that are grouped to search up to, say, 10 tags,
-  instead of recompiling for each request
-* Do not log "DatabaseCannotSerialize" errors in the plugin but only
-  in Orthanc after all retries have been made.
 * Try to avoid the use of temporary tables:
   https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor/3820
 
@@ -45,16 +40,10 @@ PostgreSQL
   https://discourse.orthanc-server.org/t/orthanc-container-unable-to-connect-to-specified-postgresql-database/5471
 
 
-* Have a separate "thread" to UpdateStatistics to avoid large computations ?
-
-
 * Seems Orthanc might deadlock when there are plenty of conflicting transactions:
   https://groups.google.com/g/orthanc-users/c/xQelEcKqL9U/m/HsvxwlkvAQAJ
   https://groups.google.com/g/orthanc-users/c/1bkClfZ0KBA/m/s4AlwVh3CQAJ 
 
-* use ReadCommited mode by default
-* use 40 index connection count by default (not 50 because, by default, PG has 100 connections and we want at least
-  a few connections to remain available for sys admins if e.g, 2 Orthanc instances are running on the same server)
 
 -----
 MySQL

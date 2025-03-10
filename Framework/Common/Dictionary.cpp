@@ -155,4 +155,15 @@ namespace OrthancDatabases
       return *found->second;
     }
   }
+
+  void Dictionary::GetParametersType(Query::Parameters& target) const
+  {
+    target.clear();
+
+    for (Values::const_iterator it = values_.begin(); 
+         it != values_.end(); ++it)
+    {
+      target[it->first] = it->second->GetType();
+    }
+  }
 }

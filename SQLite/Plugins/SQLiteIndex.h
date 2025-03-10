@@ -89,7 +89,7 @@ namespace OrthancDatabases
                               const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 #endif
 
-    virtual bool HasChildCountTable() const ORTHANC_OVERRIDE
+    virtual bool HasChildCountColumn() const ORTHANC_OVERRIDE
     {
       return false;
     }

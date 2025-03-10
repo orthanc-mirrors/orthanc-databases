@@ -41,7 +41,7 @@ namespace OrthancDatabases
   MySQLIndex::MySQLIndex(OrthancPluginContext* context,
                          const MySQLParameters& parameters,
                          bool readOnly) :
-    IndexBackend(context, readOnly),
+    IndexBackend(context, readOnly, false),
     parameters_(parameters),
     clearAll_(false)
   {

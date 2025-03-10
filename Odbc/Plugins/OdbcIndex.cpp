@@ -137,7 +137,7 @@ namespace OrthancDatabases
   OdbcIndex::OdbcIndex(OrthancPluginContext* context,
                        const std::string& connectionString,
                        bool readOnly) :
-    IndexBackend(context, readOnly),
+    IndexBackend(context, readOnly, false),
     maxConnectionRetries_(10),
     connectionRetryInterval_(5),
     connectionString_(connectionString)

@@ -40,4 +40,4 @@ END $body$;
 
 
 -- other changes performed in PrepareIndex.sql:
-  -- add ChildCount tables and triggers
+  -- add ChildCount triggers

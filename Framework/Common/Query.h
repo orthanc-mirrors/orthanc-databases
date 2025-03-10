@@ -48,8 +48,8 @@ namespace OrthancDatabases
                           ValueType type) = 0;
     };
 
-  private:
     typedef std::map<std::string, ValueType>  Parameters;
+  private:
 
     class Token;
 
@@ -57,13 +57,18 @@ namespace OrthancDatabases
     Parameters           parameters_;
     bool                 readOnly_;
 
-    void Setup(const std::string& sql);
+    void Setup(const std::string& sql, const Query::Parameters& parametersTypes);
 
   public:
     explicit Query(const std::string& sql);
+    explicit Query(const std::string& sql, const Parameters& parametersType);
 
     Query(const std::string& sql,
           bool isReadOnly);
+
+    Query(const std::string& sql,
+          bool isReadOnly, 
+          const Parameters& parametersType);
 
     ~Query();
 

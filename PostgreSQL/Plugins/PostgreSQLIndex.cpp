@@ -49,13 +49,14 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
+#define CURRENT_DB_REVISION 5
 
 namespace OrthancDatabases
 {
   PostgreSQLIndex::PostgreSQLIndex(OrthancPluginContext* context,
                                    const PostgreSQLParameters& parameters,
                                    bool readOnly) :
-    IndexBackend(context, readOnly),
+    IndexBackend(context, readOnly, parameters.GetAllowInconsistentChildCounts()),
     parameters_(parameters),
     clearAll_(false),
     hkHasComputedAllMissingChildCount_(false)
@@ -122,6 +123,7 @@ namespace OrthancDatabases
 
       {
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+        bool hasAppliedAnUpgrade = false;
 
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
@@ -147,40 +149,12 @@ namespace OrthancDatabases
             throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        
           }
 
-          bool applyUpgradeFromUnknownToV1 = false;
-          bool applyUpgradeV1toV2 = false;
-          bool applyUpgradeV2toV3 = false;
-          bool applyUpgradeV3toV4 = false;
-          bool applyPrepareIndex = false;
-
-          int revision;
-          if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+          int currentRevision = 0;
+          if (!LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
           {
-            LOG(WARNING) << "No DatabasePatchLevel found, assuming it's 1";
-            revision = 1;
-            applyUpgradeFromUnknownToV1 = true;
-            applyUpgradeV1toV2 = true;
-            applyUpgradeV2toV3 = true;
-            applyUpgradeV3toV4 = true;
+            LOG(WARNING) << "No Database revision found";
           }
-          else if (revision == 1)
-          {
-            LOG(WARNING) << "DatabasePatchLevel is 1";
-            applyUpgradeV1toV2 = true;
-            applyUpgradeV2toV3 = true;
-            applyUpgradeV3toV4 = true;
-          }
-          else if (revision == 2)
-          {
-            LOG(WARNING) << "DatabasePatchLevel is 2";
-            applyUpgradeV2toV3 = true;
-            applyUpgradeV3toV4 = true;
-          }
-          else if (revision == 3)
-          {
-            LOG(WARNING) << "DatabasePatchLevel is 3";
-            applyUpgradeV3toV4 = true;
-          }
+          LOG(WARNING) << "Current Database revision is " << currentRevision;
 
           int hasTrigram = 0;
           if (!LookupGlobalIntegerProperty(hasTrigram, manager, MISSING_SERVER_IDENTIFIER,
@@ -189,10 +163,12 @@ namespace OrthancDatabases
           {
             // We've observed 9 minutes on DB with 100000 studies
             LOG(WARNING) << "The DB schema update will try to enable trigram matching on the PostgreSQL database "
-                         << "to speed up wildcard searches. This may take several minutes";
-            applyUpgradeV1toV2 = true;
-            applyUpgradeV2toV3 = true;
-            applyUpgradeV3toV4 = true;
+                         << "to speed up wildcard searches. This may take several minutes. ";
+            if (currentRevision > 0)
+            {
+              LOG(WARNING) << "Considering current revision is 1";
+              currentRevision = 1;
+            }
           }
 
           int property = 0;
@@ -200,16 +176,18 @@ namespace OrthancDatabases
                                           Orthanc::GlobalProperty_GetLastChangeIndex) ||
               property != 1)
           {
-            applyUpgradeV1toV2 = true;
-            applyUpgradeV2toV3 = true;
-            applyUpgradeV3toV4 = true;
+            LOG(WARNING) << "The DB schema does not contain the GetLastChangeIndex update. ";
+            if (currentRevision > 0)
+            {
+              LOG(WARNING) << "Considering current revision is 1";
+              currentRevision = 1;
+            }
+
           }
 
           // If you add new tests here, update the test in the "ReadOnly" code below
 
-          applyPrepareIndex = applyUpgradeV3toV4;
-
-          if (applyUpgradeFromUnknownToV1)
+          if (currentRevision == 0)
           {
             LOG(WARNING) << "Upgrading DB schema from unknown to revision 1";
             std::string query;
@@ -217,9 +195,10 @@ namespace OrthancDatabases
             Orthanc::EmbeddedResources::GetFileResource
               (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_UNKNOWN_TO_REV1);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            currentRevision = 1;
           }
           
-          if (applyUpgradeV1toV2)
+          if (currentRevision == 1)
           {
             LOG(WARNING) << "Upgrading DB schema from revision 1 to revision 2";
 
@@ -228,9 +207,10 @@ namespace OrthancDatabases
             Orthanc::EmbeddedResources::GetFileResource
               (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV1_TO_REV2);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            currentRevision = 2;
           }
 
-          if (applyUpgradeV2toV3)
+          if (currentRevision == 2)
           {
             LOG(WARNING) << "Upgrading DB schema from revision 2 to revision 3";
 
@@ -239,9 +219,10 @@ namespace OrthancDatabases
             Orthanc::EmbeddedResources::GetFileResource
               (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV2_TO_REV3);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            currentRevision = 3;
           }
 
-          if (applyUpgradeV3toV4)
+          if (currentRevision == 3)
           {
             LOG(WARNING) << "Upgrading DB schema from revision 3 to revision 4";
 
@@ -250,17 +231,62 @@ namespace OrthancDatabases
             Orthanc::EmbeddedResources::GetFileResource
               (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV3_TO_REV4);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            hasAppliedAnUpgrade = true;
+            currentRevision = 4;
           }
 
-          if (applyPrepareIndex)
+          if (currentRevision == 4)
           {
+            LOG(WARNING) << "Upgrading DB schema from revision 4 to revision 5";
+
+            std::string query;
+
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV4_TO_REV5);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            hasAppliedAnUpgrade = true;
+            currentRevision = 5;
+          }
+
+          if (hasAppliedAnUpgrade)
+          {
+            LOG(WARNING) << "Upgrading DB schema by applying PrepareIndex.sql";
             // apply all idempotent changes that are in the PrepareIndex.sql
             ApplyPrepareIndex(t, manager);
+
+            if (!LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+            {
+              LOG(ERROR) << "No Database revision found after the upgrade !";
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+            }
+
+            LOG(WARNING) << "Database revision after the upgrade is " << currentRevision;
+
+            if (currentRevision != CURRENT_DB_REVISION)
+            {
+              LOG(ERROR) << "Invalid database revision after the upgrade !";
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+            }
           }
 
         }
 
         t.Commit();
+
+        if (hasAppliedAnUpgrade)
+        {
+          int currentRevision = 0;
+          
+          LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel);
+          LOG(WARNING) << "Database revision after the upgrade is " << currentRevision;
+
+          if (currentRevision != CURRENT_DB_REVISION)
+          {
+            LOG(ERROR) << "Invalid database revision after the upgrade !";
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+          }
+        }
+
       }
     }
     else
@@ -272,7 +298,7 @@ namespace OrthancDatabases
       // test if the latest "extension" has been installed
       int revision;
       if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel)
-          || revision != 3)
+          || revision != CURRENT_DB_REVISION)
       {      
         LOG(ERROR) << "READ-ONLY SYSTEM: the DB does not have the correct schema to run with this version of the plugin"; 
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
@@ -789,6 +815,27 @@ namespace OrthancDatabases
     {
       int64_t patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize;
       UpdateAndGetStatistics(manager, patientsCount, studiesCount, seriesCount, instancesCount, compressedSize, uncompressedSize);
+    }
+
+    // Update the invalidated childCounts
+    try
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT * FROM UpdateInvalidChildCounts()");
+  
+      statement.Execute();
+      
+      int64_t updatedCount = statement.ReadInteger64(0);
+      if (updatedCount > 0)
+      {
+        LOG(INFO) << "Updated " << updatedCount << " invalid ChildCount entries";
+      }
+    }
+    catch (Orthanc::OrthancException&)
+    {
+      // the statement may fail in case of temporary deadlock -> it will be retried at the next HK
+      LOG(INFO) << "Updat of invalid ChildCount entries has failed (will be retried)";
     }
   }
 }

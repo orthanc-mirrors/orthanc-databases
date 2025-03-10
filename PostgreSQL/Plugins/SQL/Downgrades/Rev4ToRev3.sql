@@ -1,56 +1,87 @@
 -- This file contains an SQL procedure to downgrade from schema Rev4 to Rev3 (version = 6).
--- It removes the column that has been added in Rev4
+-- It re-installs the old childcount trigger mechanisms
 
--- these constraints were introduced in Rev4
-ALTER TABLE AttachedFiles DROP COLUMN customData;
-
--- reinstall previous triggers
-CREATE OR REPLACE FUNCTION CreateDeletedFilesTemporaryTable(
-) RETURNS VOID AS $body$
-
+DO $$
+DECLARE
+    current_revision TEXT;
+    expected_revision TEXT;
 BEGIN
+    expected_revision := '4';
 
-    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
-    
-    -- note: temporary tables are created at session (connection) level -> they are likely to exist
-    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles(
-        uuid VARCHAR(64) NOT NULL,
-        fileType INTEGER,
-        compressedSize BIGINT,
-        uncompressedSize BIGINT,
-        compressionType INTEGER,
-        uncompressedHash VARCHAR(40),
-        compressedHash VARCHAR(40)
-        );
+    SELECT value INTO current_revision FROM GlobalProperties WHERE property = 4; -- GlobalProperty_DatabasePatchLevel
 
-    RESET client_min_messages;
+    IF current_revision != expected_revision THEN
+        RAISE EXCEPTION 'Unexpected schema revision % to run this script.  Expected revision = %', current_revision, expected_revision;
+    END IF;
+END $$;
 
-    -- clear the temporary table in case it has been created earlier in the session
-    DELETE FROM DeletedFiles;
-END;
+---
 
-$body$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS IncrementChildCount on Resources;
+DROP TRIGGER IF EXISTS DecrementChildCount on Resources;
 
-
-CREATE OR REPLACE FUNCTION AttachedFileDeletedFunc() 
+CREATE OR REPLACE FUNCTION UpdateChildCount()
 RETURNS TRIGGER AS $body$
 BEGIN
-  INSERT INTO DeletedFiles VALUES
-    (old.uuid, old.filetype, old.compressedSize,
-     old.uncompressedSize, old.compressionType,
-     old.uncompressedHash, old.compressedHash);
-  RETURN NULL;
+    IF TG_OP = 'INSERT' THEN
+		IF new.parentId IS NOT NULL THEN
+            -- try to increment the childcount from the parent
+            -- note that we already have the lock on this row because the parent is locked in CreateInstance
+			UPDATE Resources
+		    SET childCount = childCount + 1
+		    WHERE internalId = new.parentId AND childCount IS NOT NULL;
+		
+            -- this should only happen for old studies whose childCount has not yet been computed
+            -- note: this child has already been added so it will be counted
+		    IF NOT FOUND THEN
+		        UPDATE Resources
+                SET childCount = (SELECT COUNT(*)
+		                              FROM Resources
+		                              WHERE internalId = new.parentId)
+		        WHERE internalId = new.parentId;
+		    END IF;
+        END IF;
+	
+    ELSIF TG_OP = 'DELETE' THEN
+
+		IF old.parentId IS NOT NULL THEN
+
+            -- Decrement the child count for the parent
+            -- note that we already have the lock on this row because the parent is locked in DeleteResource
+            UPDATE Resources
+            SET childCount = childCount - 1
+            WHERE internalId = old.parentId AND childCount IS NOT NULL;
+		
+            -- this should only happen for old studies whose childCount has not yet been computed
+            -- note: this child has already been removed so it will not be counted
+		    IF NOT FOUND THEN
+		        UPDATE Resources
+                SET childCount = (SELECT COUNT(*)
+		                              FROM Resources
+		                              WHERE internalId = new.parentId)
+		        WHERE internalId = new.parentId;
+		    END IF;
+        END IF;
+        
+    END IF;
+    RETURN NULL;
 END;
 $body$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS AttachedFileDeleted on AttachedFiles;
-CREATE TRIGGER AttachedFileDeleted
-AFTER DELETE ON AttachedFiles
+CREATE TRIGGER IncrementChildCount
+AFTER INSERT ON Resources
 FOR EACH ROW
-EXECUTE PROCEDURE AttachedFileDeletedFunc();
+EXECUTE PROCEDURE UpdateChildCount();
 
+CREATE TRIGGER DecrementChildCount
+AFTER DELETE ON Resources
+FOR EACH ROW
+WHEN (OLD.parentId IS NOT NULL)
+EXECUTE PROCEDURE UpdateChildCount();
 
+-----------
 
-DELETE FROM GlobalProperties WHERE property IN (4);
+-- set the global properties that actually documents the DB version, revision and some of the capabilities
+-- modify only the ones that have changed
+DELETE FROM GlobalProperties WHERE property IN (4, 11);
 INSERT INTO GlobalProperties VALUES (4, 3); -- GlobalProperty_DatabasePatchLevel
-
