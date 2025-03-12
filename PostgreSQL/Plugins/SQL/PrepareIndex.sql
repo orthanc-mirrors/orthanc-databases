@@ -725,7 +725,7 @@ EXECUTE PROCEDURE UpdateChildCount();
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 4); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 5); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance
