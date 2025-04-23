@@ -539,44 +539,45 @@ BEGIN
 	is_new_series := 1;
 	is_new_instance := 1;
 
-	-- Check if patient exists
-	SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
-	IF NOT FOUND THEN
-		INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
-	ELSE
-		is_new_patient := 0;
-	END IF;
+	BEGIN
+        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_patient := 0;
+            SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
+    END;
 
-	-- Check if study exists
-	SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
-	IF NOT FOUND THEN
-		INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
-	ELSE
-		is_new_study := 0;
-	END IF;
+	BEGIN
+        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_study := 0;
+            SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
+    END;
 
-	-- Check if series exists
-	SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
-	IF NOT FOUND THEN
-		INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
-	ELSE
-		is_new_series := 0;
-	END IF;
+	BEGIN
+	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_series := 0;
+            SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
+    END;
 
-	-- Check if instance exists
-	SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
-	IF NOT FOUND THEN
+  	BEGIN
 		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
-	ELSE
-		is_new_instance := 0;
-	END IF;
+    EXCEPTION
+        WHEN unique_violation THEN
+            is_new_instance := 0;
+            SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
+    END;
 
-	IF is_new_instance > 0 THEN
-		-- Move the patient to the end of the recycling order.
-		PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
-	END IF;
+    -- IF is_new_instance > 0 THEN
+    --  -- Move the patient to the end of the recycling order.
+    --    PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
+    -- END IF;  
 END;
 $body$ LANGUAGE plpgsql;
+
 
 -- function to compute a statistic in a ReadOnly transaction
 CREATE OR REPLACE FUNCTION ComputeStatisticsReadOnly(
