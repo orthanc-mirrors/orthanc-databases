@@ -534,47 +534,77 @@ CREATE OR REPLACE FUNCTION CreateInstance(
   OUT instance_internal_id BIGINT) AS $body$
 
 BEGIN
+	-- assume the parents already exists
+
 	is_new_patient := 1;
 	is_new_study := 1;
 	is_new_series := 1;
 	is_new_instance := 1;
 
-	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_patient := 0;
-            SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
-    END;
+	-- First, check if the series already exists
+	SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
 
-	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_study := 0;
-            SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
-    END;
+	IF series_internal_id IS NOT NULL THEN
+	    -- RAISE NOTICE 'series-found %', series_internal_id;
+		is_new_patient := 0;
+		is_new_study := 0;
+		is_new_series := 0;
 
-	BEGIN
-	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_series := 0;
-            SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
-    END;
+		-- If the series exists, insert the instance directly
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_instance := 0;
+				SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
+		END;
 
-  	BEGIN
-		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_instance := 0;
-            SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
-    END;
+    	SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
+		SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
 
-    -- IF is_new_instance > 0 THEN
-    --  -- Move the patient to the end of the recycling order.
-    --    PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
-    -- END IF;  
+	ELSE
+	    -- RAISE NOTICE 'series-not-found';
+
+		-- If the series does not exist, execute the "full" steps
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_patient := 0;
+				SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
+		END;
+	
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_study := 0;
+				SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
+		END;
+	
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_series := 0;
+				SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
+		END;
+	
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_instance := 0;
+				SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
+		END;
+
+	END IF;
+
+
+	-- IF is_new_instance > 0 THEN
+	-- 	-- Move the patient to the end of the recycling order.
+	-- 	PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
+	-- END IF;
 END;
 $body$ LANGUAGE plpgsql;
 
