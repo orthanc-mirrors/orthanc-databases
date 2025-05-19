@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS AttachedFiles(
        uncompressedHash VARCHAR(40),
        compressedHash VARCHAR(40),
        revision INTEGER,
-       customData TEXT,              -- new in schema rev 4
+       customData TEXT,              -- new in schema rev 5
        PRIMARY KEY(id, fileType)
        );              
 

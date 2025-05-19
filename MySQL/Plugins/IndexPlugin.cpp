@@ -31,6 +31,7 @@
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 #  include <google/protobuf/any.h>
+#  include <google/protobuf/stubs/common.h>
 #endif
 
 #define ORTHANC_PLUGIN_NAME "mysql-index"
