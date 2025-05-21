@@ -466,6 +466,52 @@ namespace OrthancDatabases
                               const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
 #endif
 
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+    virtual void StoreKeyValue(DatabaseManager& manager,
+                                const std::string& storeId,
+                                const std::string& key,
+                                const std::string& value) ORTHANC_OVERRIDE;
+
+    virtual void DeleteKeyValue(DatabaseManager& manager,
+                                const std::string& storeId,
+                                const std::string& key) ORTHANC_OVERRIDE;
+
+    virtual bool GetKeyValue(DatabaseManager& manager,
+                              std::string& value,
+                              const std::string& storeId,
+                              const std::string& key) ORTHANC_OVERRIDE;
+
+    virtual void ListKeysValues(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                DatabaseManager& manager,
+                                const Orthanc::DatabasePluginMessages::ListKeysValues_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    virtual void EnqueueValue(DatabaseManager& manager,
+                              const std::string& queueId,
+                              const std::string& value) ORTHANC_OVERRIDE;
+
+    virtual bool DequeueValue(DatabaseManager& manager,
+                              std::string& value,
+                              const std::string& queueId,
+                              bool fromFront) ORTHANC_OVERRIDE;
+
+    virtual uint64_t GetQueueSize(DatabaseManager& manager,
+                                  const std::string& queueId) ORTHANC_OVERRIDE;
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    virtual bool GetAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                DatabaseManager& manager,
+                                const Orthanc::DatabasePluginMessages::GetAttachment_Request& request) ORTHANC_OVERRIDE;
+
+    virtual void UpdateAttachmentCustomData(DatabaseManager& manager,
+                                            const std::string& attachmentUuid,
+                                            const std::string& customData) ORTHANC_OVERRIDE;
+
+#endif
+
     virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE
     {
       return false;

@@ -453,6 +453,18 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
 #endif
 
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+        response.mutable_get_system_information()->set_has_attachment_custom_data(accessor.GetBackend().HasAttachmentCustomDataSupport());
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+        response.mutable_get_system_information()->set_supports_queues(accessor.GetBackend().HasQueues());
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+        response.mutable_get_system_information()->set_supports_key_value_stores(accessor.GetBackend().HasKeyValueStores());
+#endif
+
         break;
       }
 
@@ -1344,6 +1356,96 @@ namespace OrthancDatabases
         backend.ExecuteCount(response, manager, request.find());
         break;
       }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_STORE_KEY_VALUE:
+      {
+        backend.StoreKeyValue(manager, 
+                              request.store_key_value().store_id(),
+                              request.store_key_value().key(),
+                              request.store_key_value().value());
+      }; break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_KEY_VALUE:
+      {
+        std::string value;
+        bool found = backend.GetKeyValue(manager, 
+                                         value,
+                                         request.store_key_value().store_id(),
+                                         request.store_key_value().key());
+        response.mutable_get_key_value()->set_found(found);
+
+        if (found)
+        {
+          response.mutable_get_key_value()->set_value(value);
+        }
+      }; break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_DELETE_KEY_VALUE:
+      {
+        backend.DeleteKeyValue(manager, 
+                               request.store_key_value().store_id(),
+                               request.store_key_value().key());
+      }; break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_KEY_VALUES:
+      {
+        backend.ListKeysValues(response, 
+                               manager, 
+                               request.list_keys_values());
+      }; break;
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_ENQUEUE_VALUE:
+      {
+        backend.EnqueueValue(manager,
+                             request.enqueue_value().queue_id(),
+                             request.enqueue_value().value());
+      }; break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_DEQUEUE_VALUE:
+      {
+        std::string value;
+        bool found = backend.DequeueValue(manager,
+                                          value,
+                                          request.dequeue_value().queue_id(),
+                                          request.dequeue_value().origin() == Orthanc::DatabasePluginMessages::QUEUE_ORIGIN_FRONT);
+        response.mutable_dequeue_value()->set_found(found);
+        
+        if (found)
+        {
+          response.mutable_dequeue_value()->set_value(value);
+        }
+      }; break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_QUEUE_SIZE:
+      {
+        uint64_t size = backend.GetQueueSize(manager,
+                                             request.dequeue_value().queue_id());
+        response.mutable_get_queue_size()->set_size(size);
+      }; break;
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ATTACHMENT:
+      {
+        bool found = backend.GetAttachment(response,
+                                           manager,
+                                           request.get_attachment());
+        response.mutable_get_attachment()->set_found(found);
+      }; break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_UPDATE_ATTACHMENT_CUSTOM_DATA:
+      {
+        backend.UpdateAttachmentCustomData(manager,
+                                           request.update_attachment_custom_data().uuid(),
+                                           request.update_attachment_custom_data().custom_data());
+      }; break;
+
 #endif
 
       default:

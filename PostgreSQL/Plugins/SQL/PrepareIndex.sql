@@ -721,6 +721,23 @@ WHEN (OLD.parentId IS NOT NULL)
 EXECUTE PROCEDURE UpdateChildCount();
 
 
+-- new in 1.12.99
+
+CREATE TABLE KeyValueStores(
+       storeId TEXT NOT NULL,
+       key TEXT NOT NULL,
+       value TEXT NOT NULL,
+       PRIMARY KEY(storeId, key)  -- Prevents duplicates
+       );
+
+CREATE TABLE Queues (
+       id BIGSERIAL NOT NULL PRIMARY KEY,
+       queueId TEXT NOT NULL,
+       value TEXT
+);
+
+CREATE INDEX QueuesIndex ON Queues (queueId, id);
+
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);

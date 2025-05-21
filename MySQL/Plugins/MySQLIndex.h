@@ -66,6 +66,16 @@ namespace OrthancDatabases
       return true;
     }
     
+    virtual bool HasKeyValueStores() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
+    virtual bool HasQueues() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
                                    OrthancPluginResourceType type)

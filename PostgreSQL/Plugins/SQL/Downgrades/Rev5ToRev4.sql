@@ -50,6 +50,12 @@ FOR EACH ROW
 EXECUTE PROCEDURE AttachedFileDeletedFunc();
 
 
+DROP TABLE IF EXISTS KeyValueStores;
+
+DROP TABLE IF EXISTS Queues;
+
+DROP INDEX IF EXISTS QueuesIndex;
+
 
 DELETE FROM GlobalProperties WHERE property IN (4);
 INSERT INTO GlobalProperties VALUES (4, 4); -- GlobalProperty_DatabasePatchLevel

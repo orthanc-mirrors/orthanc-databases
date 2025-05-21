@@ -4366,4 +4366,282 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }    
   }
 #endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+    void IndexBackend::StoreKeyValue(DatabaseManager& manager,
+                                     const std::string& storeId,
+                                     const std::string& key,
+                                     const std::string& value)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO KeyValueStores VALUES(${storeId}, ${key}, ${value})");
+
+      Dictionary args;
+
+      statement.SetParameterType("storeId", ValueType_Utf8String);
+      statement.SetParameterType("key", ValueType_Utf8String);
+      statement.SetParameterType("value", ValueType_Utf8String);
+
+      args.SetUtf8Value("storeId", storeId);
+      args.SetUtf8Value("key", key);
+      args.SetUtf8Value("value", value);
+
+      statement.Execute(args);
+    }
+
+    void IndexBackend::DeleteKeyValue(DatabaseManager& manager,
+                                      const std::string& storeId,
+                                      const std::string& key)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM KeyValueStores WHERE storeId = ${storeId} AND key = ${key}");
+
+      Dictionary args;
+
+      statement.SetParameterType("storeId", ValueType_Utf8String);
+      statement.SetParameterType("key", ValueType_Utf8String);
+
+      args.SetUtf8Value("storeId", storeId);
+      args.SetUtf8Value("key", key);
+
+      statement.Execute(args);
+    }
+
+    bool IndexBackend::GetKeyValue(DatabaseManager& manager,
+                                   std::string& value,
+                                   const std::string& storeId,
+                                  const std::string& key)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT value FROM KeyValueStores WHERE storeId = ${storeId} AND key = ${key}");
+        
+      statement.SetReadOnly(true);
+      
+      Dictionary args;
+      statement.SetParameterType("storeId", ValueType_Utf8String);
+      statement.SetParameterType("key", ValueType_Utf8String);
+
+      args.SetUtf8Value("storeId", storeId);
+      args.SetUtf8Value("key", key);
+
+      statement.Execute(args);
+
+      if (statement.IsDone())
+      {
+        return false;
+      }
+      else
+      {
+        value = statement.ReadString(0);
+        return true;
+      }
+    }                  
+
+    void IndexBackend::ListKeysValues(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                      DatabaseManager& manager,
+                                      const Orthanc::DatabasePluginMessages::ListKeysValues_Request& request)
+    {
+      LookupFormatter formatter(manager.GetDialect());
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+      
+      std::string storeIdParameter = formatter.GenerateParameter(request.store_id());
+
+      if (request.from_first())
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " ORDER BY ASC " + formatter.FormatLimits(0, request.limit())));
+      }
+      else
+      {
+        std::string fromKeyParameter = formatter.GenerateParameter(request.from_key());
+
+        statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " AND key > " + fromKeyParameter + " ORDER BY ASC " + formatter.FormatLimits(0, request.limit())));
+      }
+        
+      statement->Execute(formatter.GetDictionary());
+        
+      if (!statement->IsDone())
+      {
+        if (statement->GetResultFieldsCount() != 2)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        
+        statement->SetResultFieldType(0, ValueType_Utf8String);
+        statement->SetResultFieldType(1, ValueType_Utf8String);
+
+        while (!statement->IsDone())
+        {
+          Orthanc::DatabasePluginMessages::ListKeysValues_Response_KeyValue* kv = response.mutable_list_keys_values()->add_keys_values();
+          kv->set_key(statement->ReadString(0));
+          kv->set_value(statement->ReadString(1));
+
+          statement->Next();
+        }
+      }
+
+    }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    void IndexBackend::EnqueueValue(DatabaseManager& manager,
+                                    const std::string& queueId,
+                                    const std::string& value)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO Queues VALUES(${queueId}, ${value})");
+
+      Dictionary args;
+
+      statement.SetParameterType("queueId", ValueType_Utf8String);
+      statement.SetParameterType("value", ValueType_Utf8String);
+
+      args.SetUtf8Value("queueId", queueId);
+      args.SetUtf8Value("value", value);
+
+      statement.Execute(args);
+    }
+
+    bool IndexBackend::DequeueValue(DatabaseManager& manager,
+                                    std::string& value,
+                                    const std::string& queueId,
+                                    bool fromFront)
+    {
+      LookupFormatter formatter(manager.GetDialect());
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+      
+      std::string queueIdParameter = formatter.GenerateParameter(queueId);
+
+      if (fromFront)
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY ASC " + formatter.FormatLimits(0, 1)));
+      }
+      else
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY DESC " + formatter.FormatLimits(0, 1)));
+      }
+        
+      statement->Execute(formatter.GetDictionary());
+
+      if (statement->IsDone())
+      {
+        return false;
+      }        
+      else
+      {
+        if (statement->GetResultFieldsCount() != 2)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+
+        statement->SetResultFieldType(0, ValueType_Integer64);
+        statement->SetResultFieldType(1, ValueType_Utf8String);
+
+        int64_t id = statement->ReadInteger64(0);
+        value = statement->ReadString(1);
+
+        DatabaseManager::CachedStatement statement2(
+          STATEMENT_FROM_HERE, manager,
+          "DELETE FROM Queues WHERE id = ${id}");
+
+        Dictionary args;
+
+        statement2.SetParameterType("id", ValueType_Integer64);
+        args.SetIntegerValue("id", id);
+
+        statement2.Execute(args);
+
+        return true;
+      }
+    }
+
+    uint64_t IndexBackend::GetQueueSize(DatabaseManager& manager,
+                                        const std::string& queueId)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT COUNT(*) FROM KeyValueStores WHERE queueId = ${queueId}");
+        
+      statement.SetReadOnly(true);
+      
+      Dictionary args;
+      statement.SetParameterType("queueId", ValueType_Utf8String);
+      args.SetUtf8Value("queueId", queueId);
+
+      statement.Execute(args);
+
+      return statement.ReadInteger64(0);
+    }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    bool IndexBackend::GetAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                     DatabaseManager& manager,
+                                     const Orthanc::DatabasePluginMessages::GetAttachment_Request& request)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT uuid, fileType, uncompressedSize, uncompressedHash, compressionType, "
+        "compressedSize, compressedHash, revision, customData FROM AttachedFiles WHERE uuid = ${uuid}");
+
+      statement.SetReadOnly(true);
+
+      Dictionary args;
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      args.SetUtf8Value("uuid", request.uuid());
+
+      statement.Execute(args);
+
+      if (statement.IsDone())
+      {
+        return false;
+      }
+      else
+      {
+        response.mutable_get_attachment()->set_revision(statement.ReadInteger64(7));
+        response.mutable_get_attachment()->mutable_attachment()->set_uuid(statement.ReadString(0));
+        response.mutable_get_attachment()->mutable_attachment()->set_content_type(statement.ReadInteger32(1));
+        response.mutable_get_attachment()->mutable_attachment()->set_uncompressed_size(statement.ReadInteger64(2));
+        response.mutable_get_attachment()->mutable_attachment()->set_uncompressed_hash(statement.ReadString(3));
+        response.mutable_get_attachment()->mutable_attachment()->set_compression_type(statement.ReadInteger32(4));
+        response.mutable_get_attachment()->mutable_attachment()->set_compressed_size(statement.ReadInteger64(5));
+        response.mutable_get_attachment()->mutable_attachment()->set_compressed_hash(statement.ReadString(6));
+        response.mutable_get_attachment()->mutable_attachment()->set_custom_data(statement.ReadString(8));
+
+        return true;        
+      }
+
+    }
+
+    void  IndexBackend::UpdateAttachmentCustomData(DatabaseManager& manager,
+                                                   const std::string& attachmentUuid,
+                                                   const std::string& customData)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "UPDATE AttachedFiles SET customData = ${customData} WHERE uuid = ${uuid}");
+
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      statement.SetParameterType("customData", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("uuid", attachmentUuid);
+      args.SetUtf8Value("customData", customData);
+      
+      statement.Execute(args);
+    }
+#endif
 }

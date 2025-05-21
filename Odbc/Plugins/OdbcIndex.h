@@ -73,9 +73,19 @@ namespace OrthancDatabases
       return true;
     }
 
-    bool HasAttachmentCustomDataSupport() const ORTHANC_OVERRIDE
+    virtual bool HasAttachmentCustomDataSupport() const ORTHANC_OVERRIDE
     {
       return true;
+    }
+
+    virtual bool HasKeyValueStores() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
+    virtual bool HasQueues() const ORTHANC_OVERRIDE
+    {
+      return false;
     }
 
     virtual int64_t CreateResource(DatabaseManager& manager,
