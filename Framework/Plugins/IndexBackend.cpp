@@ -400,7 +400,7 @@ namespace OrthancDatabases
     }
     else
     {
-      args.SetNullValue("custom-data");
+      args.SetUtf8NullValue("custom-data");
     }
 
     statement.Execute(args);
@@ -4454,7 +4454,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " ORDER BY ASC " + formatter.FormatLimits(0, request.limit())));
+                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " ORDER BY key ASC " + formatter.FormatLimits(0, request.limit())));
       }
       else
       {
@@ -4462,7 +4462,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " AND key > " + fromKeyParameter + " ORDER BY ASC " + formatter.FormatLimits(0, request.limit())));
+                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " AND key > " + fromKeyParameter + " ORDER BY key ASC " + formatter.FormatLimits(0, request.limit())));
       }
         
       statement->Execute(formatter.GetDictionary());
@@ -4525,13 +4525,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY ASC " + formatter.FormatLimits(0, 1)));
+                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY id ASC " + formatter.FormatLimits(0, 1)));
       }
       else
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY DESC " + formatter.FormatLimits(0, 1)));
+                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY id DESC " + formatter.FormatLimits(0, 1)));
       }
         
       statement->Execute(formatter.GetDictionary());

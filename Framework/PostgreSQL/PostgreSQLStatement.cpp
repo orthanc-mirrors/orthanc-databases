@@ -530,7 +530,7 @@ namespace OrthancDatabases
       
       const IValue& value = parameters.GetValue(name);
 
-      if (value.GetType() == ValueType_Null)
+      if (value.GetType() == ValueType_Null || value.IsNull())
       {
         BindNull(i);
       }
@@ -539,27 +539,27 @@ namespace OrthancDatabases
         switch (formatter_.GetParameterType(i))
         {
           case ValueType_Integer64:
-            BindInteger64(i, dynamic_cast<const Integer64Value&>(parameters.GetValue(name)).GetValue());
+            BindInteger64(i, dynamic_cast<const Integer64Value&>(value).GetValue());
             break;
 
           case ValueType_Integer32:
-            BindInteger(i, dynamic_cast<const Integer32Value&>(parameters.GetValue(name)).GetValue());
+            BindInteger(i, dynamic_cast<const Integer32Value&>(value).GetValue());
             break;
 
           case ValueType_Utf8String:
             BindString(i, dynamic_cast<const Utf8StringValue&>
-                      (parameters.GetValue(name)).GetContent());
+                      (value).GetContent());
             break;
 
           case ValueType_BinaryString:
             BindString(i, dynamic_cast<const BinaryStringValue&>
-                      (parameters.GetValue(name)).GetContent());
+                      (value).GetContent());
             break;
 
           case ValueType_InputFile:
           {
             const InputFileValue& blob =
-              dynamic_cast<const InputFileValue&>(parameters.GetValue(name));
+              dynamic_cast<const InputFileValue&>(value);
 
             PostgreSQLLargeObject largeObject(database_, blob.GetContent());
             BindLargeObject(i, largeObject);
