@@ -1372,8 +1372,8 @@ namespace OrthancDatabases
         std::string value;
         bool found = backend.GetKeyValue(manager, 
                                          value,
-                                         request.store_key_value().store_id(),
-                                         request.store_key_value().key());
+                                         request.get_key_value().store_id(),
+                                         request.get_key_value().key());
         response.mutable_get_key_value()->set_found(found);
 
         if (found)
@@ -1385,8 +1385,8 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_DELETE_KEY_VALUE:
       {
         backend.DeleteKeyValue(manager, 
-                               request.store_key_value().store_id(),
-                               request.store_key_value().key());
+                               request.delete_key_value().store_id(),
+                               request.delete_key_value().key());
       }; break;
 
       case Orthanc::DatabasePluginMessages::OPERATION_LIST_KEY_VALUES:
