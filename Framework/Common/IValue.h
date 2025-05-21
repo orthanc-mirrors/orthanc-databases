@@ -40,5 +40,10 @@ namespace OrthancDatabases
     virtual ValueType GetType() const = 0;
 
     virtual IValue* Convert(ValueType target) const = 0;
+
+    virtual bool IsNull() const  // TODO: right now, only the Utf8StringValue implements nullable values
+    {
+      return false;
+    }
   };
 }

@@ -134,9 +134,9 @@ namespace OrthancDatabases
     SetValue(key, new Integer32Value(value));
   }
 
-  void Dictionary::SetNullValue(const std::string& key)
+  void Dictionary::SetUtf8NullValue(const std::string& key)
   {
-    SetValue(key, new NullValue);
+    SetValue(key, new Utf8StringValue());
   }
 
   

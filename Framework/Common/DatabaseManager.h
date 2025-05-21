@@ -155,6 +155,8 @@ namespace OrthancDatabases
         return query_.release();
       }
 
+      void SetParametersTypes(const Dictionary& parameters);
+      
     public:
       explicit StatementBase(DatabaseManager& manager);
 

@@ -33,6 +33,8 @@ namespace OrthancDatabases
 {
   class Dictionary : public boost::noncopyable
   {
+  public:
+    typedef std::map<std::string, ValueType> Types;
   private:
     typedef std::map<std::string, IValue*>   Values;
 
@@ -56,6 +58,8 @@ namespace OrthancDatabases
     void SetUtf8Value(const std::string& key,
                       const std::string& utf8);
 
+    void SetUtf8NullValue(const std::string& key);
+
     void SetBinaryValue(const std::string& key,
                         const std::string& binary);
 
@@ -72,10 +76,10 @@ namespace OrthancDatabases
     void SetInteger32Value(const std::string& key,
                            int32_t value);
 
-    void SetNullValue(const std::string& key);
-
     const IValue& GetValue(const std::string& key) const;
 
     void GetParametersType(Query::Parameters& target) const;
+
+    void GetParametersTypes(Types& target) const;
   };
 }
