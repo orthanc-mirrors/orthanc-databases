@@ -4497,7 +4497,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO Queues VALUES(${queueId}, ${value})");
+        "INSERT INTO Queues VALUES(${AUTOINCREMENT} ${queueId}, ${value})");
 
       Dictionary args;
 
@@ -4525,13 +4525,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY id ASC " + formatter.FormatLimits(0, 1)));
+                        "SELECT id, value FROM Queues WHERE queueId= " + queueIdParameter + " ORDER BY id ASC " + formatter.FormatLimits(0, 1)));
       }
       else
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT id, value FROM Queues WHERE storeId= " + queueIdParameter + " ORDER BY id DESC " + formatter.FormatLimits(0, 1)));
+                        "SELECT id, value FROM Queues WHERE queueId= " + queueIdParameter + " ORDER BY id DESC " + formatter.FormatLimits(0, 1)));
       }
         
       statement->Execute(formatter.GetDictionary());

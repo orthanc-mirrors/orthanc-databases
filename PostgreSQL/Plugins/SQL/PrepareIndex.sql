@@ -1,4 +1,4 @@
--- This SQL file creates a DB in Rev2 directly
+-- This SQL file creates a DB in Rev5 directly
 -- It is also run after upgrade scripts to create new tables and or create/replace triggers and functions.
 -- This script is self contained, it contains everything that needs to be run to create an Orthanc DB.
 -- Note to developers: 
@@ -721,7 +721,7 @@ WHEN (OLD.parentId IS NOT NULL)
 EXECUTE PROCEDURE UpdateChildCount();
 
 
--- new in 1.12.99
+-- new in 1.12.99 (rev 5 ?)
 
 CREATE TABLE KeyValueStores(
        storeId TEXT NOT NULL,
