@@ -4573,7 +4573,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT COUNT(*) FROM KeyValueStores WHERE queueId = ${queueId}");
+        "SELECT COUNT(*) FROM Queues WHERE queueId = ${queueId}");
         
       statement.SetReadOnly(true);
       
