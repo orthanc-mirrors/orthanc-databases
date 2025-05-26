@@ -4373,9 +4373,10 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                      const std::string& key,
                                      const std::string& value)
     {
+      // TODO: that probably needs to be adapted in ODBC and MySQL
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO KeyValueStores VALUES(${storeId}, ${key}, ${value})");
+        "INSERT INTO KeyValueStores VALUES(${storeId}, ${key}, ${value}) ON CONFLICT (storeId, key) DO UPDATE SET value = EXCLUDED.value;");
 
       Dictionary args;
 
@@ -4619,7 +4620,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         response.mutable_get_attachment()->mutable_attachment()->set_compression_type(statement.ReadInteger32(4));
         response.mutable_get_attachment()->mutable_attachment()->set_compressed_size(statement.ReadInteger64(5));
         response.mutable_get_attachment()->mutable_attachment()->set_compressed_hash(statement.ReadString(6));
-        response.mutable_get_attachment()->mutable_attachment()->set_custom_data(statement.ReadString(8));
+        response.mutable_get_attachment()->mutable_attachment()->set_custom_data(statement.ReadStringOrNull(8));
 
         return true;        
       }
@@ -4639,7 +4640,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       Dictionary args;
       args.SetUtf8Value("uuid", attachmentUuid);
-      args.SetUtf8Value("customData", customData);
+      if (customData.empty())
+      {
+        args.SetUtf8NullValue("customData");
+      }
+      else
+      {
+        args.SetUtf8Value("customData", customData);
+      }
       
       statement.Execute(args);
     }
