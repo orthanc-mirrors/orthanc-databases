@@ -1424,7 +1424,7 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_GET_QUEUE_SIZE:
       {
         uint64_t size = backend.GetQueueSize(manager,
-                                             request.dequeue_value().queue_id());
+                                             request.get_queue_size().queue_id());
         response.mutable_get_queue_size()->set_size(size);
       }; break;
 
