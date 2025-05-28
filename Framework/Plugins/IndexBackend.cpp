@@ -4526,13 +4526,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT id, value FROM Queues WHERE queueId= " + queueIdParameter + " ORDER BY id ASC " + formatter.FormatLimits(0, 1)));
+                        "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                        "SELECT value FROM poppedRows"));
       }
       else
       {
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
-                        "SELECT id, value FROM Queues WHERE queueId= " + queueIdParameter + " ORDER BY id DESC " + formatter.FormatLimits(0, 1)));
+                        "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                        "SELECT value FROM poppedRows"));
       }
         
       statement->Execute(formatter.GetDictionary());
@@ -4543,27 +4545,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }        
       else
       {
-        if (statement->GetResultFieldsCount() != 2)
-        {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-        }
-
-        statement->SetResultFieldType(0, ValueType_Integer64);
-        statement->SetResultFieldType(1, ValueType_Utf8String);
-
-        int64_t id = statement->ReadInteger64(0);
-        value = statement->ReadString(1);
-
-        DatabaseManager::CachedStatement statement2(
-          STATEMENT_FROM_HERE, manager,
-          "DELETE FROM Queues WHERE id = ${id}");
-
-        Dictionary args;
-
-        statement2.SetParameterType("id", ValueType_Integer64);
-        args.SetIntegerValue("id", id);
-
-        statement2.Execute(args);
+        statement->SetResultFieldType(0, ValueType_Utf8String);
+        value = statement->ReadString(0);
 
         return true;
       }
