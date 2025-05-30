@@ -721,7 +721,7 @@ WHEN (OLD.parentId IS NOT NULL)
 EXECUTE PROCEDURE UpdateChildCount();
 
 
--- new in 1.12.99 (rev 5 ?)
+-- new in 1.12.8 (rev 5 ?)
 
 CREATE TABLE KeyValueStores(
        storeId TEXT NOT NULL,
