@@ -1370,8 +1370,7 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_GET_KEY_VALUE:
       {
         std::string value;
-        bool found = backend.GetKeyValue(manager, 
-                                         value,
+        bool found = backend.GetKeyValue(value, manager,
                                          request.get_key_value().store_id(),
                                          request.get_key_value().key());
         response.mutable_get_key_value()->set_found(found);
@@ -1409,8 +1408,7 @@ namespace OrthancDatabases
       case Orthanc::DatabasePluginMessages::OPERATION_DEQUEUE_VALUE:
       {
         std::string value;
-        bool found = backend.DequeueValue(manager,
-                                          value,
+        bool found = backend.DequeueValue(value, manager,
                                           request.dequeue_value().queue_id(),
                                           request.dequeue_value().origin() == Orthanc::DatabasePluginMessages::QUEUE_ORIGIN_FRONT);
         response.mutable_dequeue_value()->set_found(found);

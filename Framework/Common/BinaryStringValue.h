@@ -35,6 +35,10 @@ namespace OrthancDatabases
     std::string  content_;
 
   public:
+    BinaryStringValue()
+    {
+    }
+
     explicit BinaryStringValue(const std::string& content) :
       content_(content)
     {
@@ -53,6 +57,11 @@ namespace OrthancDatabases
     size_t GetSize() const
     {
       return content_.size();
+    }
+
+    void Swap(std::string& other)
+    {
+      content_.swap(other);
     }
 
     virtual ValueType GetType() const ORTHANC_OVERRIDE

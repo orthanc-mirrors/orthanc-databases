@@ -468,18 +468,18 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
     virtual void StoreKeyValue(DatabaseManager& manager,
-                                const std::string& storeId,
-                                const std::string& key,
-                                const std::string& value) ORTHANC_OVERRIDE;
+                               const std::string& storeId,
+                               const std::string& key,
+                               const std::string& value) ORTHANC_OVERRIDE;
 
     virtual void DeleteKeyValue(DatabaseManager& manager,
                                 const std::string& storeId,
                                 const std::string& key) ORTHANC_OVERRIDE;
 
-    virtual bool GetKeyValue(DatabaseManager& manager,
-                              std::string& value,
-                              const std::string& storeId,
-                              const std::string& key) ORTHANC_OVERRIDE;
+    virtual bool GetKeyValue(std::string& value,
+                             DatabaseManager& manager,
+                             const std::string& storeId,
+                             const std::string& key) ORTHANC_OVERRIDE;
 
     virtual void ListKeysValues(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                 DatabaseManager& manager,
@@ -491,8 +491,8 @@ namespace OrthancDatabases
                               const std::string& queueId,
                               const std::string& value) ORTHANC_OVERRIDE;
 
-    virtual bool DequeueValue(DatabaseManager& manager,
-                              std::string& value,
+    virtual bool DequeueValue(std::string& value,
+                              DatabaseManager& manager,
                               const std::string& queueId,
                               bool fromFront) ORTHANC_OVERRIDE;
 

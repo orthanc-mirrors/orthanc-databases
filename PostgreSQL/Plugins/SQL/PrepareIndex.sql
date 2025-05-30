@@ -726,14 +726,14 @@ EXECUTE PROCEDURE UpdateChildCount();
 CREATE TABLE KeyValueStores(
        storeId TEXT NOT NULL,
        key TEXT NOT NULL,
-       value TEXT NOT NULL,
+       value BYTEA NOT NULL,
        PRIMARY KEY(storeId, key)  -- Prevents duplicates
        );
 
 CREATE TABLE Queues (
        id BIGSERIAL NOT NULL PRIMARY KEY,
        queueId TEXT NOT NULL,
-       value TEXT
+       value BYTEA
 );
 
 CREATE INDEX QueuesIndex ON Queues (queueId, id);

@@ -23,8 +23,6 @@
 
 #include "IndexBackend.h"
 
-#include "../Common/BinaryStringValue.h"
-#include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
 #include "DatabaseBackendAdapterV2.h"
 #include "DatabaseBackendAdapterV3.h"
@@ -4385,15 +4383,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         STATEMENT_FROM_HERE, manager,
         "INSERT INTO KeyValueStores VALUES(${storeId}, ${key}, ${value}) ON CONFLICT (storeId, key) DO UPDATE SET value = EXCLUDED.value;");
 
-      Dictionary args;
-
       statement.SetParameterType("storeId", ValueType_Utf8String);
       statement.SetParameterType("key", ValueType_Utf8String);
-      statement.SetParameterType("value", ValueType_Utf8String);
+      statement.SetParameterType("value", ValueType_BinaryString);
 
+      Dictionary args;
       args.SetUtf8Value("storeId", storeId);
       args.SetUtf8Value("key", key);
-      args.SetUtf8Value("value", value);
+      args.SetBinaryValue("value", value);
 
       statement.Execute(args);
     }
@@ -4406,36 +4403,35 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         STATEMENT_FROM_HERE, manager,
         "DELETE FROM KeyValueStores WHERE storeId = ${storeId} AND key = ${key}");
 
-      Dictionary args;
-
       statement.SetParameterType("storeId", ValueType_Utf8String);
       statement.SetParameterType("key", ValueType_Utf8String);
 
+      Dictionary args;
       args.SetUtf8Value("storeId", storeId);
       args.SetUtf8Value("key", key);
 
       statement.Execute(args);
     }
 
-    bool IndexBackend::GetKeyValue(DatabaseManager& manager,
-                                   std::string& value,
+    bool IndexBackend::GetKeyValue(std::string& value,
+                                   DatabaseManager& manager,
                                    const std::string& storeId,
-                                  const std::string& key)
+                                   const std::string& key)
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "SELECT value FROM KeyValueStores WHERE storeId = ${storeId} AND key = ${key}");
         
       statement.SetReadOnly(true);
-      
-      Dictionary args;
       statement.SetParameterType("storeId", ValueType_Utf8String);
       statement.SetParameterType("key", ValueType_Utf8String);
 
+      Dictionary args;
       args.SetUtf8Value("storeId", storeId);
       args.SetUtf8Value("key", key);
 
       statement.Execute(args);
+      statement.SetResultFieldType(0, ValueType_BinaryString);
 
       if (statement.IsDone())
       {
@@ -4452,6 +4448,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                       DatabaseManager& manager,
                                       const Orthanc::DatabasePluginMessages::ListKeysValues_Request& request)
     {
+      response.mutable_list_keys_values()->Clear();
+
       LookupFormatter formatter(manager.GetDialect());
 
       std::unique_ptr<DatabaseManager::CachedStatement> statement;
@@ -4467,14 +4465,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       else
       {
         std::string fromKeyParameter = formatter.GenerateParameter(request.from_key());
-
         statement.reset(new DatabaseManager::CachedStatement(
                         STATEMENT_FROM_HERE, manager,
                         "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " AND key > " + fromKeyParameter + " ORDER BY key ASC " + formatter.FormatLimits(0, request.limit())));
       }
-        
+
       statement->Execute(formatter.GetDictionary());
-        
+
       if (!statement->IsDone())
       {
         if (statement->GetResultFieldsCount() != 2)
@@ -4483,7 +4480,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         }
         
         statement->SetResultFieldType(0, ValueType_Utf8String);
-        statement->SetResultFieldType(1, ValueType_Utf8String);
+        statement->SetResultFieldType(1, ValueType_BinaryString);
 
         while (!statement->IsDone())
         {
@@ -4507,19 +4504,18 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         STATEMENT_FROM_HERE, manager,
         "INSERT INTO Queues VALUES(${AUTOINCREMENT} ${queueId}, ${value})");
 
-      Dictionary args;
-
       statement.SetParameterType("queueId", ValueType_Utf8String);
-      statement.SetParameterType("value", ValueType_Utf8String);
+      statement.SetParameterType("value", ValueType_BinaryString);
 
+      Dictionary args;
       args.SetUtf8Value("queueId", queueId);
-      args.SetUtf8Value("value", value);
+      args.SetBinaryValue("value", value);
 
       statement.Execute(args);
     }
 
-    bool IndexBackend::DequeueValue(DatabaseManager& manager,
-                                    std::string& value,
+    bool IndexBackend::DequeueValue(std::string& value,
+                                    DatabaseManager& manager,
                                     const std::string& queueId,
                                     bool fromFront)
     {
@@ -4529,21 +4525,44 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       
       std::string queueIdParameter = formatter.GenerateParameter(queueId);
 
-      if (fromFront)
+      switch (manager.GetDialect())
       {
-        statement.reset(new DatabaseManager::CachedStatement(
-                        STATEMENT_FROM_HERE, manager,
-                        "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
-                        "SELECT value FROM poppedRows"));
+        case Dialect_PostgreSQL:
+          if (fromFront)
+          {
+            statement.reset(new DatabaseManager::CachedStatement(
+                              STATEMENT_FROM_HERE, manager,
+                              "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                              "SELECT value FROM poppedRows"));
+          }
+          else
+          {
+            statement.reset(new DatabaseManager::CachedStatement(
+                              STATEMENT_FROM_HERE, manager,
+                              "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                              "SELECT value FROM poppedRows"));
+          }
+          break;
+
+        case Dialect_SQLite:
+          if (fromFront)
+          {
+            statement.reset(new DatabaseManager::CachedStatement(
+                              STATEMENT_FROM_HERE, manager,
+                              "DELETE FROM Queues WHERE id = (SELECT id FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id ASC LIMIT 1) RETURNING value"));
+          }
+          else
+          {
+            statement.reset(new DatabaseManager::CachedStatement(
+                              STATEMENT_FROM_HERE, manager,
+                              "DELETE FROM Queues WHERE id = (SELECT id FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1) RETURNING value"));
+          }
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
       }
-      else
-      {
-        statement.reset(new DatabaseManager::CachedStatement(
-                        STATEMENT_FROM_HERE, manager,
-                        "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
-                        "SELECT value FROM poppedRows"));
-      }
-        
+
       statement->Execute(formatter.GetDictionary());
 
       if (statement->IsDone())
@@ -4552,9 +4571,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }        
       else
       {
-        statement->SetResultFieldType(0, ValueType_Utf8String);
+        statement->SetResultFieldType(0, ValueType_BinaryString);
         value = statement->ReadString(0);
-
         return true;
       }
     }
@@ -4567,12 +4585,13 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         "SELECT COUNT(*) FROM Queues WHERE queueId = ${queueId}");
         
       statement.SetReadOnly(true);
-      
-      Dictionary args;
       statement.SetParameterType("queueId", ValueType_Utf8String);
+
+      Dictionary args;
       args.SetUtf8Value("queueId", queueId);
 
       statement.Execute(args);
+      statement.SetResultFieldType(0, ValueType_Integer64);
 
       return statement.ReadInteger64(0);
     }
@@ -4589,9 +4608,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         "compressedSize, compressedHash, revision, customData FROM AttachedFiles WHERE uuid = ${uuid}");
 
       statement.SetReadOnly(true);
+      statement.SetParameterType("uuid", ValueType_Utf8String);
 
       Dictionary args;
-      statement.SetParameterType("uuid", ValueType_Utf8String);
       args.SetUtf8Value("uuid", request.uuid());
 
       statement.Execute(args);
@@ -4630,6 +4649,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       Dictionary args;
       args.SetUtf8Value("uuid", attachmentUuid);
+
       if (customData.empty())
       {
         args.SetUtf8NullValue("customData");

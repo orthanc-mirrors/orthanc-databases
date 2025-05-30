@@ -168,12 +168,28 @@ namespace OrthancDatabases
     CheckColumn(column, 0);
 
     Oid oid = PQftype(reinterpret_cast<PGresult*>(result_), column);
-    if (oid != TEXTOID && oid != VARCHAROID && oid != BYTEAOID)
+    if (oid != TEXTOID && oid != VARCHAROID)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
     }
 
     return std::string(PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column));
+  }
+
+
+  void PostgreSQLResult::GetBinaryString(std::string& target,
+                                         unsigned int column) const
+  {
+    CheckColumn(column, 0);
+
+    Oid oid = PQftype(reinterpret_cast<PGresult*>(result_), column);
+    if (oid != BYTEAOID)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
+    }
+
+    target.assign(PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column),
+                  PQgetlength(reinterpret_cast<PGresult*>(result_), position_, column));
   }
 
 
@@ -256,7 +272,14 @@ namespace OrthancDatabases
         return new Utf8StringValue(GetString(column));
 
       case BYTEAOID:
-        return new BinaryStringValue(GetString(column));
+      {
+        std::string s;
+        GetBinaryString(s, column);
+
+        std::unique_ptr<BinaryStringValue> value(new BinaryStringValue);
+        value->Swap(s);
+        return value.release();
+      }
 
       case OIDOID:
         return new LargeObjectResult(database_, GetLargeObjectOid(column));

@@ -156,3 +156,20 @@ FOR EACH ROW WHEN new.resourceType = 0  -- The "0" corresponds to "OrthancPlugin
 BEGIN
   INSERT INTO PatientRecyclingOrder VALUES (NULL, new.internalId);
 END;
+
+
+-- New in Orthanc 1.12.8
+CREATE TABLE KeyValueStores(
+       storeId TEXT NOT NULL,
+       key TEXT NOT NULL,
+       value BLOB NOT NULL,
+       PRIMARY KEY(storeId, key)  -- Prevents duplicates
+       );
+
+CREATE TABLE Queues (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       queueId TEXT NOT NULL,
+       value BLOB
+);
+
+CREATE INDEX QueuesIndex ON Queues (queueId, id);

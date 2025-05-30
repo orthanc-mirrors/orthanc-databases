@@ -223,7 +223,7 @@ namespace OrthancDatabases
     }
 
     oids_[param] = type;
-    binary_[param] = (type == TEXTOID || type == BYTEAOID || type == OIDOID) ? 0 : 1;
+    binary_[param] = (type == TEXTOID || type == OIDOID) ? 0 : 1;
   }
 
 
@@ -283,16 +283,23 @@ namespace OrthancDatabases
 
     if (PQtransactionStatus(reinterpret_cast<PGconn*>(database_.pg_)) == PQTRANS_INERROR)
     {
+      std::string message;
+
       if (result != NULL)
       {
-        PQclear(result);
+        message.assign(PQresultErrorMessage(result));
+        PQclear(result);  // Frees the memory allocated by "PQresultErrorMessage()"
       }
-      
+
+      if (message.empty())
+      {
+        message = "Collision between multiple writers";
+      }
+
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 9, 2)
-      std::string errorString(PQresultErrorMessage(result));
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize, errorString, false); // don't log here, it is handled at higher level
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseCannotSerialize, message, false); // don't log here, it is handled #else
 #else
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, "Collision between multiple writers");
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_Database, message);
 #endif
     }
     else if (result == NULL)
@@ -454,19 +461,21 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
 
-    if (oids_[param] != TEXTOID && oids_[param] != BYTEAOID)
+    switch (oids_[param])
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
-    }
+      case TEXTOID:
+      {
+        std::string s = value + '\0';  // Make sure that there is an end-of-string character
+        inputs_->SetItem(param, s.c_str(), s.size());
+        break;
+      }
 
-    if (value.size() == 0)
-    {
-      inputs_->SetItem(param, "", 1 /* end-of-string character */);
-    }
-    else
-    {
-      inputs_->SetItem(param, value.c_str(), 
-                       value.size() + 1);  // "+1" for end-of-string character
+      case BYTEAOID:
+        inputs_->SetItem(param, value.c_str(), value.size());
+        break;
+
+      default:
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
     }
   }
 
@@ -547,19 +556,16 @@ namespace OrthancDatabases
             break;
 
           case ValueType_Utf8String:
-            BindString(i, dynamic_cast<const Utf8StringValue&>
-                      (value).GetContent());
+            BindString(i, dynamic_cast<const Utf8StringValue&>(value).GetContent());
             break;
 
           case ValueType_BinaryString:
-            BindString(i, dynamic_cast<const BinaryStringValue&>
-                      (value).GetContent());
+            BindString(i, dynamic_cast<const BinaryStringValue&>(value).GetContent());
             break;
 
           case ValueType_InputFile:
           {
-            const InputFileValue& blob =
-              dynamic_cast<const InputFileValue&>(value);
+            const InputFileValue& blob = dynamic_cast<const InputFileValue&>(value);
 
             PostgreSQLLargeObject largeObject(database_, blob.GetContent());
             BindLargeObject(i, largeObject);
