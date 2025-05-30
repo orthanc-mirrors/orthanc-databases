@@ -4250,11 +4250,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uuid(statement->ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
-          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
+
           attachment->set_content_type(statement->ReadInteger32(C7_INT_1));
           attachment->set_compression_type(statement->ReadInteger32(C9_INT_3));
           attachment->set_compressed_size(statement->ReadInteger64(C10_BIG_INT_1));
           attachment->set_uncompressed_size(statement->ReadInteger64(C11_BIG_INT_2));
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 8)
+          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
+#endif
 
           if (!statement->IsNull(C8_INT_2))  // revision can be null for files that have been atttached by older Orthanc versions
           {
@@ -4352,11 +4356,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uuid(statement->ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
-          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
           attachment->set_content_type(statement->ReadInteger32(C7_INT_1));
           attachment->set_compression_type(statement->ReadInteger32(C9_INT_3));
           attachment->set_compressed_size(statement->ReadInteger64(C10_BIG_INT_1));
           attachment->set_uncompressed_size(statement->ReadInteger64(C11_BIG_INT_2));
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 8)
+          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
+#endif
         }; break;
 
         default:
