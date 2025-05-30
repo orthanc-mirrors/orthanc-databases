@@ -855,6 +855,13 @@ namespace OrthancPlugins
                 const HttpHeaders& headers) const;
 
     bool DoPost(MemoryBuffer& target,
+                size_t index,
+                const std::string& uri,
+                const std::string& body,
+                const HttpHeaders& headers,
+                unsigned int timeout) const;
+
+    bool DoPost(MemoryBuffer& target,
                 const std::string& name,
                 const std::string& uri,
                 const std::string& body,
@@ -865,6 +872,13 @@ namespace OrthancPlugins
                 const std::string& uri,
                 const std::string& body,
                 const HttpHeaders& headers) const;
+
+    bool DoPost(Json::Value& target,
+                size_t index,
+                const std::string& uri,
+                const std::string& body,
+                const HttpHeaders& headers,
+                unsigned int timeout) const;
 
     bool DoPost(Json::Value& target,
                 const std::string& name,
@@ -1399,6 +1413,9 @@ namespace OrthancPlugins
 // helper method to convert Http headers from the plugin SDK to a std::map
 void GetHttpHeaders(HttpHeaders& result, const OrthancPluginHttpRequest* request);
 
+// helper method to re-serialize the get arguments from the SDK into a string
+void SerializeGetArguments(std::string& output, const OrthancPluginHttpRequest* request);
+
 #if HAS_ORTHANC_PLUGIN_WEBDAV == 1
   class IWebDavCollection : public boost::noncopyable
   {
@@ -1528,6 +1545,10 @@ void GetHttpHeaders(HttpHeaders& result, const OrthancPluginHttpRequest* request
 
   public:
     RestApiClient();
+    
+    // used to forward a call from the plugin to the core
+    RestApiClient(const char* url,
+                  const OrthancPluginHttpRequest* request);
 
     void SetMethod(OrthancPluginHttpMethod method)
     {
@@ -1584,12 +1605,17 @@ void GetHttpHeaders(HttpHeaders& result, const OrthancPluginHttpRequest* request
 
     bool Execute();
 
+    // Execute and forward the response as is
+    void Forward(OrthancPluginContext* context, OrthancPluginRestOutput* output);
+
     uint16_t GetHttpStatus() const;
 
     bool LookupAnswerHeader(std::string& value,
                             const std::string& key) const;
 
     const std::string& GetAnswerBody() const;
+
+    bool GetAnswerJson(Json::Value& output) const;
   };
 #endif
 }
