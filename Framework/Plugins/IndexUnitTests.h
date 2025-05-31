@@ -217,6 +217,7 @@ static OrthancPluginErrorCode InvokeService(struct _OrthancPluginContext_t* cont
 }
 
 
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
 static void ListKeys(std::set<std::string>& keys,
                      OrthancDatabases::IndexBackend& db,
                      OrthancDatabases::DatabaseManager& manager,
@@ -289,6 +290,7 @@ static void ListKeys(std::set<std::string>& keys,
     }
   }
 }
+#endif
 
 
 TEST(IndexBackend, Basic)
@@ -877,6 +879,8 @@ TEST(IndexBackend, Basic)
   }
 #endif
 
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
   {
     manager->StartTransaction(TransactionType_ReadWrite);
 
@@ -950,7 +954,10 @@ TEST(IndexBackend, Basic)
 
     manager->CommitTransaction();
   }
+#endif
 
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
   {
     manager->StartTransaction(TransactionType_ReadWrite);
 
@@ -1004,6 +1011,7 @@ TEST(IndexBackend, Basic)
 
     manager->CommitTransaction();
   }
+#endif
 
   manager->Close();
 }
