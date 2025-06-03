@@ -112,8 +112,23 @@ namespace OrthancDatabases
 
     virtual int64_t GetLastChangeIndex(DatabaseManager& manager) ORTHANC_OVERRIDE;
 
+    // This is now obsolete
     virtual void TagMostRecentPatient(DatabaseManager& manager,
                                       int64_t patient) ORTHANC_OVERRIDE;
+
+    virtual void SetProtectedPatient(DatabaseManager& manager,
+                                     int64_t internalId, 
+                                     bool isProtected) ORTHANC_OVERRIDE;
+
+    virtual bool IsProtectedPatient(DatabaseManager& manager,
+                                    int64_t internalId) ORTHANC_OVERRIDE;
+
+    virtual bool SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                        DatabaseManager& manager) ORTHANC_OVERRIDE;
+    
+    virtual bool SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                        DatabaseManager& manager,
+                                        int64_t patientIdToAvoid) ORTHANC_OVERRIDE;
 
     // New primitive since Orthanc 1.12.0
     virtual bool HasLabelsSupport() const ORTHANC_OVERRIDE

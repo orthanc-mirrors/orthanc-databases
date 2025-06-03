@@ -1,7 +1,85 @@
--- This file contains an SQL procedure to downgrade from schema Rev5 to Rev4 (version = 6).
-  -- It re-installs the old CreateInstance method
+-- This file contains an SQL procedure to downgrade from schema Rev99 to Rev4 (version = 6).
 
 
+-- Re-installs the old PatientRecycling
+-----------
+
+CREATE TABLE IF NOT EXISTS PatientRecyclingOrder(
+       seq BIGSERIAL NOT NULL PRIMARY KEY,
+       patientId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+       CONSTRAINT UniquePatientId UNIQUE (patientId)
+       );
+
+CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patientId);
+
+DROP TRIGGER IF EXISTS PatientAdded ON Resources;
+
+CREATE OR REPLACE FUNCTION PatientAddedOrUpdated(
+    IN patient_id BIGINT,
+    IN is_update BIGINT
+    )
+RETURNS VOID AS $body$
+BEGIN
+    DECLARE
+        newSeq BIGINT;
+    BEGIN
+        IF is_update > 0 THEN
+            -- Note: Protected patients are not listed in this table !  So, they won't be updated
+            WITH deleted_rows AS (
+                DELETE FROM PatientRecyclingOrder
+                WHERE PatientRecyclingOrder.patientId = patient_id
+                RETURNING patientId
+            )
+            INSERT INTO PatientRecyclingOrder (patientId)
+            SELECT patientID FROM deleted_rows
+            WHERE EXISTS(SELECT 1 FROM deleted_rows);
+        ELSE
+            INSERT INTO PatientRecyclingOrder VALUES (DEFAULT, patient_id);
+        END IF;
+    END;
+END;
+$body$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION PatientAddedFunc() 
+RETURNS TRIGGER AS $body$
+BEGIN
+  -- The "0" corresponds to "OrthancPluginResourceType_Patient"
+  IF new.resourceType = 0 THEN
+    PERFORM PatientAddedOrUpdated(new.internalId, 0);
+  END IF;
+  RETURN NULL;
+END;
+$body$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS PatientAdded on Resources;
+CREATE TRIGGER PatientAdded
+AFTER INSERT ON Resources
+FOR EACH ROW
+EXECUTE PROCEDURE PatientAddedFunc();
+
+DROP FUNCTION IF EXISTS ProtectPatient(patient_id BIGINT);
+
+DROP FUNCTION IF EXISTS UnprotectPatient;
+
+-- repopulate the PatientRecyclingOrderTable
+WITH UnprotectedPatients AS (SELECT r.internalId
+  FROM Resources r
+  RIGHT JOIN Metadata m ON r.internalId = m.id AND m.type = 19  -- 19 = PatientRecyclingOrder
+  WHERE r.resourceType = 0
+    AND NOT EXISTS (SELECT 1 FROM Metadata m
+                    WHERE m.id = r.internalId AND m.type = 18 AND m.value = 'true') -- 18 = IsProtected
+  ORDER BY CAST(m.value AS INTEGER) ASC)
+
+INSERT INTO PatientRecyclingOrder (patientId)
+SELECT internalId
+FROM UnprotectedPatients;
+
+DROP SEQUENCE IF EXISTS PatientRecyclingOrderSequence;
+
+-- remove the IsProtected and PatientRecyclingOrder metadata
+DELETE FROM Metadata WHERE type IN (18, 19);
+
+-- Re-installs the old CreateInstance method
 -----------
 
 CREATE OR REPLACE FUNCTION CreateInstance(

@@ -76,12 +76,6 @@ CREATE TABLE IF NOT EXISTS ExportedResources(
        date VARCHAR(64)
        ); 
 
-CREATE TABLE IF NOT EXISTS PatientRecyclingOrder(
-       seq BIGSERIAL NOT NULL PRIMARY KEY,
-       patientId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
-       CONSTRAINT UniquePatientId UNIQUE (patientId)
-       );
-
 CREATE TABLE IF NOT EXISTS Labels(
         id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
         label TEXT, 
@@ -126,7 +120,6 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS PublicIndex ON Resources(publicId);
 CREATE INDEX IF NOT EXISTS ResourceTypeIndex ON Resources(resourceType);
-CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patientId);
 
 CREATE INDEX IF NOT EXISTS MainDicomTagsIndex ON MainDicomTags(id);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex1 ON DicomIdentifiers(id);
@@ -158,61 +151,23 @@ begin
 END $body$;
 
 
-------------------- PatientAdded trigger & PatientRecyclingOrder -------------------
-DROP TRIGGER IF EXISTS PatientAdded ON Resources;
-
+--------------------- PatientRecyclingOrder -------------------
+-- from rev 99, we always maintain a PatientRecyclingOrder metadata, no matter if the patient is protected or not
 CREATE OR REPLACE FUNCTION PatientAddedOrUpdated(
-    IN patient_id BIGINT,
-    IN is_update BIGINT
+    IN patient_id BIGINT
     )
 RETURNS VOID AS $body$
 BEGIN
     DECLARE
         newSeq BIGINT;
     BEGIN
-        IF is_update > 0 THEN
-            -- Note: Protected patients are not listed in this table !  So, they won't be updated
-            WITH deleted_rows AS (
-                DELETE FROM PatientRecyclingOrder
-                WHERE PatientRecyclingOrder.patientId = patient_id
-                RETURNING patientId
-            )
-            INSERT INTO PatientRecyclingOrder (patientId)
-            SELECT patientID FROM deleted_rows
-            WHERE EXISTS(SELECT 1 FROM deleted_rows);
-        ELSE
-            INSERT INTO PatientRecyclingOrder VALUES (DEFAULT, patient_id);
-        END IF;
+        INSERT INTO Metadata (id, type, value, revision)
+        VALUES (patient_id, 19, nextval('PatientRecyclingOrderSequence')::TEXT, 0)
+        ON CONFLICT (id, type)
+        DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
     END;
 END;
 $body$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION PatientAddedFunc() 
-RETURNS TRIGGER AS $body$
-BEGIN
-  -- The "0" corresponds to "OrthancPluginResourceType_Patient"
-  IF new.resourceType = 0 THEN
-    PERFORM PatientAddedOrUpdated(new.internalId, 0);
-  END IF;
-  RETURN NULL;
-END;
-$body$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS PatientAdded on Resources;
-CREATE TRIGGER PatientAdded
-AFTER INSERT ON Resources
-FOR EACH ROW
-EXECUTE PROCEDURE PatientAddedFunc();
-
--- initial population of 
-SELECT setval('patientrecyclingorder_seq_seq', MAX(seq)) FROM PatientRecyclingOrder;
-DELETE FROM GlobalIntegers WHERE key = 7;
-        -- UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
-
--- INSERT INTO GlobalIntegers
---     SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
---     ON CONFLICT DO NOTHING;
-
 
 ------------------- ResourceDeleted trigger -------------------
 DROP TRIGGER IF EXISTS ResourceDeleted ON Resources;
@@ -534,7 +489,8 @@ CREATE OR REPLACE FUNCTION CreateInstance(
   OUT instance_internal_id BIGINT) AS $body$
 
 BEGIN
-	-- assume the parents already exists
+	-- Assume the parent series already exists to minimize exceptions.  
+    -- Most of the instances are not the first of their series - especially when we need high performances.
 
 	is_new_patient := 1;
 	is_new_study := 1;
@@ -601,10 +557,10 @@ BEGIN
 	END IF;
 
 
-	-- IF is_new_instance > 0 THEN
-	-- 	-- Move the patient to the end of the recycling order.
-	-- 	PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
-	-- END IF;
+	IF is_new_instance > 0 THEN
+		-- Move the patient to the end of the recycling order.
+		PERFORM PatientAddedOrUpdated(patient_internal_id);
+	END IF;
 END;
 $body$ LANGUAGE plpgsql;
 
@@ -748,11 +704,39 @@ WHEN (OLD.parentId IS NOT NULL)
 EXECUTE PROCEDURE UpdateChildCount();
 
 
+-- new in rev 99
+
+CREATE SEQUENCE IF NOT EXISTS PatientRecyclingOrderSequence INCREMENT 1 START 1;
+
+CREATE OR REPLACE FUNCTION ProtectPatient(patient_id BIGINT)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO Metadata (id, type, value, revision) -- 18 = IsProtected
+    VALUES (patient_id, 18, 'true', 0)
+    ON CONFLICT (id, type)
+    DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
+END;
+$$ LANGUAGE plpgsql;
+
+-- remove IsProtected and update PatientRecyclingOrder
+CREATE OR REPLACE FUNCTION UnprotectPatient(patient_id BIGINT)
+RETURNS VOID AS $$
+BEGIN
+    DELETE FROM Metadata WHERE id = patient_id AND type = 18; -- 18 = IsProtected
+
+    INSERT INTO Metadata (id, type, value, revision)
+    VALUES (patient_id, 19, nextval('PatientRecyclingOrderSequence')::TEXT, 0)
+    ON CONFLICT (id, type)
+    DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
+END;
+$$ LANGUAGE plpgsql;
+
+
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 5); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 99); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance

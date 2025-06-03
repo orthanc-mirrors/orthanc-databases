@@ -49,7 +49,7 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
-#define CURRENT_DB_REVISION 5
+#define CURRENT_DB_REVISION 99
 
 namespace OrthancDatabases
 {
@@ -242,10 +242,10 @@ namespace OrthancDatabases
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV4_TO_REV5);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV4_TO_REV99);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
             hasAppliedAnUpgrade = true;
-            currentRevision = 5;
+            currentRevision = 99;
           }
 
           if (hasAppliedAnUpgrade)
@@ -782,6 +782,111 @@ namespace OrthancDatabases
     // backward compatibility is necessary
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
+
+  void PostgreSQLIndex::SetProtectedPatient(DatabaseManager& manager,
+                                            int64_t internalId, 
+                                            bool isProtected)
+  {
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+    Dictionary args;
+
+    if (isProtected)
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT ProtectPatient(${id})"));
+    }
+    else
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT UnprotectPatient(${id})"));
+    }        
+
+    statement->SetParameterType("id", ValueType_Integer64);
+    args.SetIntegerValue("id", internalId);
+      
+    statement->Execute(args);
+  }
+
+  bool PostgreSQLIndex::IsProtectedPatient(DatabaseManager& manager,
+                                        int64_t internalId)
+  {
+    std::string value;
+    int64_t revision;
+    
+    if (LookupMetadata(value, revision, manager, internalId, 18)) // 18 = IsProtected
+    {
+      return value == "true";
+    }
+
+    return false;
+  }
+
+  bool PostgreSQLIndex::SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                               DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT r.internalId "
+      "FROM Resources r "
+      "JOIN Metadata m ON r.internalId = m.id AND m.type = 19 " // 19 = PatientRecyclingOrder
+      "WHERE r.resourceType = 0 "
+      "  AND NOT EXISTS "
+      "   (SELECT 1 FROM Metadata m "
+      "    WHERE m.id = r.internalId AND m.type = 18 AND m.value = 'true') "  // 18 = IsProtected
+      " ORDER BY CAST(m.value AS INTEGER) ASC LIMIT 1;");
+    
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    if (statement.IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      internalId = statement.ReadInteger64(0);
+      return true;
+    }
+  }
+
+    
+  bool PostgreSQLIndex::SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                               DatabaseManager& manager,
+                                               int64_t patientIdToAvoid)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT r.internalId "
+      "FROM Resources r "
+      "JOIN Metadata m ON r.internalId = m.id AND m.type = 19 " // 19 = PatientRecyclingOrder
+      "WHERE r.resourceType = 0 "
+      "  AND r.internalId != ${id} "
+      "  AND NOT EXISTS "
+      "   (SELECT 1 FROM Metadata m "
+      "    WHERE m.id = r.internalId AND m.type = 18 AND m.value = 'true') "  // 18 = IsProtected
+      " ORDER BY CAST(m.value AS INTEGER) ASC LIMIT 1;");
+
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", patientIdToAvoid);
+
+    statement.Execute(args);
+
+    if (statement.IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      internalId = statement.ReadInteger64(0);
+      return true;
+    }
+  }
+
 
   bool PostgreSQLIndex::HasPerformDbHousekeeping()
   {
