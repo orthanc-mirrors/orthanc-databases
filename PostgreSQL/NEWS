@@ -13,8 +13,9 @@ Optimal Postgresql Server version: 11+
 
 Maintenance:
 * Optimized the CreateInstance SQL query.
-* Internal: The PatientRecyclingOrder has been refactored and is now stored in
-  Patient metadata (18: IsProtected, 19: PatientRecyclingOrder)
+* Internals: 
+  - The PatientRecyclingOrder has been refactored and is now stored in
+    Patient metadata (18: IsProtected, 19: PatientRecyclingOrder)
 
 
 Release 7.2 (2025-02-27)
