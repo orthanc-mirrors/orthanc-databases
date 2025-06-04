@@ -207,19 +207,12 @@ DECLARE
 
 BEGIN
 
-    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
-    
-    -- note: temporary tables are created at session (connection) level -> they are likely to exist
-    -- these tables are used by the triggers
-    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedResources(
+    -- note: temporary tables are now created at transaction level and are dropped on commit
+    CREATE TEMPORARY TABLE DeletedResources(
         resourceType INTEGER NOT NULL,
         publicId VARCHAR(64) NOT NULL
-        );
+        ) ON COMMIT DROP;
 
-    RESET client_min_messages;
-
-    -- clear the temporary table in case it has been created earlier in the session
-    DELETE FROM DeletedResources;
     
     -- create/clear the DeletedFiles temporary table
     PERFORM CreateDeletedFilesTemporaryTable();
@@ -250,10 +243,8 @@ CREATE OR REPLACE FUNCTION CreateDeletedFilesTemporaryTable(
 
 BEGIN
 
-    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
-    
-    -- note: temporary tables are created at session (connection) level -> they are likely to exist
-    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles(
+    -- note: temporary tables are now created at transaction level and are dropped on commit
+    CREATE TEMPORARY TABLE DeletedFiles(
         uuid VARCHAR(64) NOT NULL,
         fileType INTEGER,
         compressedSize BIGINT,
@@ -261,12 +252,8 @@ BEGIN
         compressionType INTEGER,
         uncompressedHash VARCHAR(40),
         compressedHash VARCHAR(40)
-        );
+        ) ON COMMIT DROP;
 
-    RESET client_min_messages;
-
-    -- clear the temporary table in case it has been created earlier in the session
-    DELETE FROM DeletedFiles;
 END;
 
 $body$ LANGUAGE plpgsql;

@@ -141,6 +141,87 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
+-- Restore these 2 functions that have been optimized
+-----------
+------------------- DeleteResource function -------------------
+
+CREATE OR REPLACE FUNCTION DeleteResource(
+    IN id BIGINT,
+    OUT remaining_ancestor_resource_type INTEGER,
+    OUT remaining_anncestor_public_id TEXT) AS $body$
+
+DECLARE
+    deleted_row RECORD;
+    locked_row RECORD;
+
+BEGIN
+
+    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
+    
+    -- note: temporary tables are created at session (connection) level -> they are likely to exist
+    -- these tables are used by the triggers
+    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedResources(
+        resourceType INTEGER NOT NULL,
+        publicId VARCHAR(64) NOT NULL
+        );
+
+    RESET client_min_messages;
+
+    -- clear the temporary table in case it has been created earlier in the session
+    DELETE FROM DeletedResources;
+    
+    -- create/clear the DeletedFiles temporary table
+    PERFORM CreateDeletedFilesTemporaryTable();
+
+    -- Before deleting an object, we need to lock its parent until the end of the transaction to avoid that
+    -- 2 threads deletes the last 2 instances of a series at the same time -> none of them would realize
+    -- that they are deleting the last instance and the parent resources would not be deleted.
+    -- Locking only the immediate parent is sufficient to prevent from this.
+    SELECT * INTO locked_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
+
+    -- delete the resource itself
+    DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_row;
+    -- note: there is a ResourceDeletedFunc trigger that will execute here and delete the parents if there are no remaining children + 
+
+    -- If this resource still has siblings, keep track of the remaining parent
+    -- (a parent that must not be deleted but whose LastUpdate must be updated)
+    SELECT resourceType, publicId INTO remaining_ancestor_resource_type, remaining_anncestor_public_id
+        FROM Resources 
+        WHERE internalId = deleted_row.parentId
+            AND EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_row.parentId);
+
+END;
+
+$body$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION CreateDeletedFilesTemporaryTable(
+) RETURNS VOID AS $body$
+
+BEGIN
+
+    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
+    
+    -- note: temporary tables are created at session (connection) level -> they are likely to exist
+    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles(
+        uuid VARCHAR(64) NOT NULL,
+        fileType INTEGER,
+        compressedSize BIGINT,
+        uncompressedSize BIGINT,
+        compressionType INTEGER,
+        uncompressedHash VARCHAR(40),
+        compressedHash VARCHAR(40)
+        );
+
+    RESET client_min_messages;
+
+    -- clear the temporary table in case it has been created earlier in the session
+    DELETE FROM DeletedFiles;
+END;
+
+$body$ LANGUAGE plpgsql;
+
+
+
 ----------
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
