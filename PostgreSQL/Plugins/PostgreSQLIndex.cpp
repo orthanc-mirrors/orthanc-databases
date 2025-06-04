@@ -459,7 +459,7 @@ namespace OrthancDatabases
 
   void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
   {
-    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+    {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
         "SELECT CreateDeletedFilesTemporaryTable()"
@@ -471,29 +471,12 @@ namespace OrthancDatabases
 
   void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)
   {
-    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "CREATE TEMPORARY TABLE IF NOT EXISTS  DeletedResources("
-        "resourceType INTEGER NOT NULL,"
-        "publicId VARCHAR(64) NOT NULL"
-        ");"
-        );
-      statement.Execute();
-    }
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "DELETE FROM DeletedResources;"
-        );
-
-      statement.Execute();
-    }
-
+    // not used anymore in PostgreSQL
   }
 
   void PostgreSQLIndex::ClearRemainingAncestor(DatabaseManager& manager)
   {
+    // not used anymore in PostgreSQL
   }
 
   void PostgreSQLIndex::DeleteResource(IDatabaseBackendOutput& output,

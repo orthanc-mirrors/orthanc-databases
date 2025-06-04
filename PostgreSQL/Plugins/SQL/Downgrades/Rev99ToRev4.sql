@@ -220,6 +220,31 @@ END;
 
 $body$ LANGUAGE plpgsql;
 
+-- restore the DeletedResource trigger
+
+------------------- ResourceDeleted trigger -------------------
+DROP TRIGGER IF EXISTS ResourceDeleted ON Resources;
+
+-- The following trigger combines 2 triggers from SQLite:
+-- ResourceDeleted + ResourceDeletedParentCleaning
+CREATE OR REPLACE FUNCTION ResourceDeletedFunc() 
+RETURNS TRIGGER AS $body$
+BEGIN
+  -- RAISE NOTICE 'ResourceDeletedFunc %', old.publicId;
+  INSERT INTO DeletedResources VALUES (old.resourceType, old.publicId);
+  
+  -- If this resource is the latest child, delete the parent
+  DELETE FROM Resources WHERE internalId = old.parentId
+                              AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId);
+  RETURN NULL;
+END;
+$body$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS ResourceDeleted on Resources;
+CREATE TRIGGER ResourceDeleted
+AFTER DELETE ON Resources
+FOR EACH ROW
+EXECUTE PROCEDURE ResourceDeletedFunc();
 
 
 ----------

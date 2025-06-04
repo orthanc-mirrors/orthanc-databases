@@ -169,30 +169,6 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
-------------------- ResourceDeleted trigger -------------------
-DROP TRIGGER IF EXISTS ResourceDeleted ON Resources;
-
--- The following trigger combines 2 triggers from SQLite:
--- ResourceDeleted + ResourceDeletedParentCleaning
-CREATE OR REPLACE FUNCTION ResourceDeletedFunc() 
-RETURNS TRIGGER AS $body$
-BEGIN
-  -- RAISE NOTICE 'ResourceDeletedFunc %', old.publicId;
-  INSERT INTO DeletedResources VALUES (old.resourceType, old.publicId);
-  
-  -- If this resource is the latest child, delete the parent
-  DELETE FROM Resources WHERE internalId = old.parentId
-                              AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId);
-  RETURN NULL;
-END;
-$body$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS ResourceDeleted on Resources;
-CREATE TRIGGER ResourceDeleted
-AFTER DELETE ON Resources
-FOR EACH ROW
-EXECUTE PROCEDURE ResourceDeletedFunc();
-
 
 ------------------- DeleteResource function -------------------
 
@@ -202,7 +178,10 @@ CREATE OR REPLACE FUNCTION DeleteResource(
     OUT remaining_anncestor_public_id TEXT) AS $body$
 
 DECLARE
-    deleted_row RECORD;
+    deleted_resource_row RECORD;
+    deleted_parent_row RECORD;
+    deleted_grand_parent_row RECORD;
+    deleted_grand_grand_parent_row RECORD;
     locked_row RECORD;
 
 BEGIN
@@ -224,16 +203,47 @@ BEGIN
     SELECT * INTO locked_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
 
     -- delete the resource itself
-    DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_row;
-    -- note: there is a ResourceDeletedFunc trigger that will execute here and delete the parents if there are no remaining children + 
+    DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_resource_row;
 
+    -- keep track of the deleted resources for C++ code
+    INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId);
+  
     -- If this resource still has siblings, keep track of the remaining parent
     -- (a parent that must not be deleted but whose LastUpdate must be updated)
     SELECT resourceType, publicId INTO remaining_ancestor_resource_type, remaining_anncestor_public_id
         FROM Resources 
-        WHERE internalId = deleted_row.parentId
-            AND EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_row.parentId);
+        WHERE internalId = deleted_resource_row.parentId
+            AND EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_resource_row.parentId);
 
+	IF deleted_resource_row.resourceType > 0 THEN
+        -- If this resource is the latest child, delete the parent
+        DELETE FROM Resources WHERE internalId = deleted_resource_row.parentId
+                                    AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_resource_row.parentId)
+                                    RETURNING * INTO deleted_parent_row;
+        IF FOUND THEN
+            INSERT INTO DeletedResources VALUES (deleted_parent_row.resourceType, deleted_parent_row.publicId);
+
+            IF deleted_parent_row.resourceType > 0 THEN
+                -- If this resource is the latest child, delete the parent
+                DELETE FROM Resources WHERE internalId = deleted_parent_row.parentId
+                                    AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_parent_row.parentId)
+                                    RETURNING * INTO deleted_grand_parent_row;
+                IF FOUND THEN
+                    INSERT INTO DeletedResources VALUES (deleted_grand_parent_row.resourceType, deleted_grand_parent_row.publicId);
+
+                    IF deleted_grand_parent_row.resourceType > 0 THEN
+                        -- If this resource is the latest child, delete the parent
+                        DELETE FROM Resources WHERE internalId = deleted_grand_parent_row.parentId
+                                            AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_grand_parent_row.parentId)
+                                            RETURNING * INTO deleted_grand_parent_row;
+                        IF FOUND THEN
+                            INSERT INTO DeletedResources VALUES (deleted_grand_parent_row.resourceType, deleted_grand_parent_row.publicId);
+                        END IF;
+                    END IF;
+                END IF;
+            END IF;
+        END IF;
+    END IF;
 END;
 
 $body$ LANGUAGE plpgsql;
@@ -258,7 +268,8 @@ END;
 
 $body$ LANGUAGE plpgsql;
 
-
+-- Keep track of deleted files such that the C++ code knows which files have been deleted.
+-- Attached files are deleted by cascade when the related resource is deleted.
 CREATE OR REPLACE FUNCTION AttachedFileDeletedFunc() 
 RETURNS TRIGGER AS $body$
 BEGIN

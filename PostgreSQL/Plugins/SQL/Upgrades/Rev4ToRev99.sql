@@ -45,3 +45,8 @@ DROP TABLE PatientRecyclingOrder;
 DROP TRIGGER IF EXISTS PatientAdded on Resources;
 DROP FUNCTION IF EXISTS PatientAddedFunc;
 DROP FUNCTION IF EXISTS PatientAddedOrUpdated;
+
+-- The DeletedResources trigger is not used anymore
+
+DROP TRIGGER IF EXISTS ResourceDeleted ON Resources;
+DROP FUNCTION IF EXISTS ResourceDeletedFunc();
