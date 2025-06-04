@@ -457,16 +457,33 @@ namespace OrthancDatabases
     uncompressedSize = statement.ReadInteger64(5);
   }
 
-  void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
+  void PostgreSQLIndex::DeleteAttachment(IDatabaseBackendOutput& output,
+                                         DatabaseManager& manager,
+                                         int64_t id,
+                                         int32_t attachment)
   {
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT CreateDeletedFilesTemporaryTable()"
-        );
-      statement.ExecuteWithoutResult();
+        "SELECT DeleteAttachment(${id}, ${type})");
+
+      statement.SetParameterType("id", ValueType_Integer64);
+      statement.SetParameterType("type", ValueType_Integer32);
+
+      Dictionary args;
+      args.SetIntegerValue("id", id);
+      args.SetInteger32Value("type", attachment);
+    
+      statement.ExecuteWithoutResult(args);
     }
 
+    SignalDeletedFiles(output, manager);
+  }
+
+
+  void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
+  {
+    // not used anymore in PostgreSQL
   }
 
   void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)

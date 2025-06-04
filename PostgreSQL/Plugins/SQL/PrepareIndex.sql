@@ -288,6 +288,19 @@ FOR EACH ROW
 EXECUTE PROCEDURE AttachedFileDeletedFunc();
 
 
+CREATE OR REPLACE FUNCTION DeleteAttachment(
+    IN resource_id BIGINT,
+    IN file_type INTEGER) 
+RETURNS VOID AS $body$
+BEGIN
+    -- create/clear the DeletedFiles temporary table
+    PERFORM CreateDeletedFilesTemporaryTable();
+
+    DELETE FROM AttachedFiles WHERE id = resource_id AND fileType = file_type;
+END;
+$body$ LANGUAGE plpgsql;
+
+
 ------------------- Fast Statistics -------------------
 
 -- initial population of GlobalIntegers if not already there

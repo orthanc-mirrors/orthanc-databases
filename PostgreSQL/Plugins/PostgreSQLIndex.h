@@ -80,6 +80,11 @@ namespace OrthancDatabases
                                 DatabaseManager& manager,
                                 int64_t id) ORTHANC_OVERRIDE;
 
+    virtual void DeleteAttachment(IDatabaseBackendOutput& output,
+                                  DatabaseManager& manager,
+                                  int64_t id,
+                                  int32_t attachment) ORTHANC_OVERRIDE;
+
     virtual void SetResourcesContent(DatabaseManager& manager,
                                      uint32_t countIdentifierTags,
                                      const OrthancPluginResourcesContentTags* identifierTags,

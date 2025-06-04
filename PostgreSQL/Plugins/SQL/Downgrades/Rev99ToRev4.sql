@@ -247,6 +247,10 @@ FOR EACH ROW
 EXECUTE PROCEDURE ResourceDeletedFunc();
 
 
+-- remove the new DeleteAttachment function
+
+DROP FUNCTION IF EXISTS DeleteAttachment;
+
 ----------
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
