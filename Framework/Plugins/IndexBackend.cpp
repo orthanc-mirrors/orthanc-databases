@@ -273,6 +273,8 @@ namespace OrthancDatabases
     statement.SetReadOnly(true);
     statement.Execute();
 
+    statement.SetResultFieldType(8, ValueType_BinaryString);
+
     while (!statement.IsDone())
     {
       output.SignalDeletedAttachment(statement.ReadString(0),
@@ -362,7 +364,8 @@ namespace OrthancDatabases
                                    int32_t     compressionType,
                                    uint64_t    compressedSize,
                                    const char* compressedHash,
-                                   const char* customData,
+                                   const void* customData,
+                                   size_t      customDataSize,
                                    int64_t     revision)
   {
     DatabaseManager::CachedStatement statement(
@@ -392,14 +395,7 @@ namespace OrthancDatabases
     args.SetUtf8Value("hash", uncompressedHash);
     args.SetUtf8Value("hash-compressed", compressedHash);
     args.SetIntegerValue("revision", revision);
-    if (customData != NULL && strlen(customData) > 0)
-    {
-      args.SetUtf8Value("custom-data", customData);
-    }
-    else
-    {
-      args.SetUtf8NullValue("custom-data");
-    }
+    args.SetBinaryValue("custom-data", customData, customDataSize);
 
     statement.Execute(args);
   }
@@ -412,7 +408,7 @@ namespace OrthancDatabases
   {
     assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins support these features now
     ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
-                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash, "", revision);
+                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash, NULL, 0, revision);
   }
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
@@ -430,7 +426,8 @@ namespace OrthancDatabases
                          request.attachment().compression_type(),
                          request.attachment().compressed_size(),
                          request.attachment().compressed_hash().c_str(),
-                         request.attachment().custom_data().c_str(),
+                         request.attachment().custom_data().empty() ? NULL : request.attachment().custom_data().c_str(),
+                         request.attachment().custom_data().size(),
                          request.revision());
   }
 #endif
@@ -1223,6 +1220,7 @@ namespace OrthancDatabases
     args.SetIntegerValue("type", static_cast<int>(contentType));
 
     statement.Execute(args);
+    statement.SetResultFieldType(7, ValueType_BinaryString);
 
     if (statement.IsDone())
     {
@@ -1242,10 +1240,7 @@ namespace OrthancDatabases
       }
 
       std::string customData;
-      if (statement.GetResultField(7).GetType() == ValueType_Utf8String) // column has been added in 1.12.0
-      {
-        customData = statement.ReadString(7);
-      }
+      customData = statement.ReadStringOrNull(7);
 
       output.AnswerAttachment(statement.ReadString(0),
                               contentType,
@@ -3447,7 +3442,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           "  Lookup.publicId AS c3_string1, "
           "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
           "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-          "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+          "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
           "  " + formatter.FormatNull("INT") + " AS c7_int1, "
           "  " + formatter.FormatNull("INT") + " AS c8_int2, "
           "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3465,7 +3460,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  value AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
              "  tagGroup AS c7_int1, "
              "  tagElement AS c8_int2, "
              "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3485,7 +3480,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  value AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
              "  type AS c7_int1, "
              + revisionInC7 +
              "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3525,7 +3520,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  label AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
              "  " + formatter.FormatNull("INT") + " AS c7_int1, "
              "  " + formatter.FormatNull("INT") + " AS c8_int2, "
              "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3564,7 +3559,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                "  tagGroup AS c7_int1, "
                "  tagElement AS c8_int2, "
                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3584,7 +3579,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                "  type AS c7_int1, "
                + revisionInC7 +
                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3621,7 +3616,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                "  tagGroup AS c7_int1, "
                "  tagElement AS c8_int2, "
                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3642,7 +3637,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  value AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                 "  type AS c7_int1, "
                 + revisionInC7 +
                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3670,7 +3665,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                "  tagGroup AS c7_int1, "
                "  tagElement AS c8_int2, "
                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3691,7 +3686,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  childLevel.publicId AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3727,7 +3722,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                 "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                 "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3750,7 +3745,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                 "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                 "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3770,7 +3765,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  value AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                 "  type AS c7_int1, "
                 + revisionInC7 +
                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3795,7 +3790,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  grandChildLevel.publicId AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                 "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                 "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3839,7 +3834,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                     "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                     "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                    "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                     "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                     "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                     "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3862,7 +3857,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                   "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                   "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                   "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                  "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                   "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                   "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                   "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3883,7 +3878,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  value AS c3_string1, "
                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                 "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                 "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                  "  tagGroup AS c7_int1, "
                  "  tagElement AS c8_int2, "
                  "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3904,7 +3899,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  value AS c3_string1, "
                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                 "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                 "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                  "  type AS c7_int1, "
                  + revisionInC7 +
                  "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3930,7 +3925,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                   "  grandGrandChildLevel.publicId AS c3_string1, "
                   "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                   "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                  "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                  "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                   "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                   "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                   "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3975,7 +3970,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                     "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                     "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                    "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                     "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                     "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                     "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -3999,7 +3994,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                     "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                     "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                    "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
                     "  " + formatter.FormatNull("INT") + " AS c7_int1, "
                     "  " + formatter.FormatNull("INT") + " AS c8_int2, "
                     "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -4025,7 +4020,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  parentLevel.publicId AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
              "  " + formatter.FormatNull("INT") + " AS c7_int1, "
              "  " + formatter.FormatNull("INT") + " AS c8_int2, "
              "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -4047,7 +4042,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    instancePublicId AS c3_string1, "
              "    " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "    " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+             "    " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
              "    " + formatter.FormatNull("INT") + " AS c7_int1, "
              "    " + formatter.FormatNull("INT") + " AS c8_int2, "
              "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -4062,7 +4057,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    Metadata.value AS c3_string1, "
              "    " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "    " + formatter.FormatNull("TEXT") + " AS c6_string4, "
+             "    " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
              "    Metadata.type AS c7_int1, "
              + revisionInC7 +
              "  " + formatter.FormatNull("INT") + " AS c9_int3, "
@@ -4107,7 +4102,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
     
     statement->Execute(formatter.GetDictionary());
-    
+
+    statement->SetResultFieldType(C6_STRING_4, ValueType_BinaryString);
+
     // LOG(INFO) << sql;
 
     std::map<int64_t, Orthanc::DatabasePluginMessages::Find_Response*> responses;
@@ -4614,6 +4611,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       args.SetUtf8Value("uuid", request.uuid());
 
       statement.Execute(args);
+      statement.SetResultFieldType(8, ValueType_BinaryString);
 
       if (statement.IsDone())
       {
@@ -4649,16 +4647,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       Dictionary args;
       args.SetUtf8Value("uuid", attachmentUuid);
+      args.SetBinaryValue("customData", customData);
 
-      if (customData.empty())
-      {
-        args.SetUtf8NullValue("customData");
-      }
-      else
-      {
-        args.SetUtf8Value("customData", customData);
-      }
-      
       statement.Execute(args);
     }
 #endif

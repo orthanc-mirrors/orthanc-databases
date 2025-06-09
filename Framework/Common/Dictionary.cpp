@@ -106,6 +106,14 @@ namespace OrthancDatabases
   }
 
   
+  void Dictionary::SetBinaryValue(const std::string& key,
+                                  const void* data,
+                                  size_t size)
+  {
+    SetValue(key, new BinaryStringValue(data, size));
+  }
+
+
   void Dictionary::SetFileValue(const std::string& key,
                                 const std::string& file)
   {

@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS AttachedFiles(
        uncompressedHash VARCHAR(40),
        compressedHash VARCHAR(40),
        revision INTEGER,
-       customData TEXT,              -- new in schema rev 5
+       customData BYTEA,           -- new in schema rev 5
        PRIMARY KEY(id, fileType)
        );              
 
@@ -733,7 +733,7 @@ CREATE TABLE KeyValueStores(
 CREATE TABLE Queues (
        id BIGSERIAL NOT NULL PRIMARY KEY,
        queueId TEXT NOT NULL,
-       value BYTEA
+       value BYTEA NOT NULL
 );
 
 CREATE INDEX QueuesIndex ON Queues (queueId, id);

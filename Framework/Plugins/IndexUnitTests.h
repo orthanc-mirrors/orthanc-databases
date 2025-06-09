@@ -314,7 +314,7 @@ TEST(IndexBackend, Basic)
 #elif ORTHANC_ENABLE_ODBC == 1
   OdbcIndex db(&context, connectionString_, false);
 #elif ORTHANC_ENABLE_SQLITE == 1  // Must be the last one
-  SQLiteIndex db(&context, "tutu.db");  // Open in memory
+  SQLiteIndex db(&context);  // Open in memory
 #else
 #  error Unsupported database backend
 #endif

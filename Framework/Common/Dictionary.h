@@ -63,6 +63,10 @@ namespace OrthancDatabases
     void SetBinaryValue(const std::string& key,
                         const std::string& binary);
 
+    void SetBinaryValue(const std::string& key,
+                        const void* data,
+                        size_t size);
+
     void SetFileValue(const std::string& key,
                       const std::string& file);
 

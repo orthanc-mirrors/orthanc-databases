@@ -31,6 +31,20 @@
 
 namespace OrthancDatabases
 {
+  BinaryStringValue::BinaryStringValue(const void* data,
+                                       size_t size)
+  {
+    if (data == NULL && size > 0)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
+    }
+    else
+    {
+      content_.assign(reinterpret_cast<const char*>(data), size);
+    }
+  }
+
+
   IValue* BinaryStringValue::Convert(ValueType target) const
   {
     switch (target)

@@ -44,6 +44,9 @@ namespace OrthancDatabases
     {
     }
 
+    BinaryStringValue(const void* data,
+                      size_t size);
+
     const std::string& GetContent() const
     {
       return content_;

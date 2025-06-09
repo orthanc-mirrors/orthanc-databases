@@ -11,7 +11,7 @@ DO $body$
 BEGIN
 
     BEGIN
-        ALTER TABLE AttachedFiles ADD COLUMN customData TEXT;
+        ALTER TABLE AttachedFiles ADD COLUMN customData BYTEA;
     EXCEPTION
         WHEN duplicate_column THEN RAISE NOTICE 'column customData already exists in AttachedFiles.';
     END;
