@@ -1437,11 +1437,11 @@ namespace OrthancDatabases
         response.mutable_get_attachment()->set_found(found);
       }; break;
 
-      case Orthanc::DatabasePluginMessages::OPERATION_UPDATE_ATTACHMENT_CUSTOM_DATA:
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_ATTACHMENT_CUSTOM_DATA:
       {
         backend.UpdateAttachmentCustomData(manager,
-                                           request.update_attachment_custom_data().uuid(),
-                                           request.update_attachment_custom_data().custom_data());
+                                           request.set_attachment_custom_data().uuid(),
+                                           request.set_attachment_custom_data().custom_data());
       }; break;
 
 #endif
