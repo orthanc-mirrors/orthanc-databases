@@ -62,12 +62,12 @@ namespace OrthancDatabases
 
     virtual bool HasKeyValueStores() const ORTHANC_OVERRIDE
     {
-      return false;
+      return true;
     }
 
     virtual bool HasQueues() const ORTHANC_OVERRIDE
     {
-      return false;
+      return true;
     }
 
     virtual int64_t CreateResource(DatabaseManager& manager,

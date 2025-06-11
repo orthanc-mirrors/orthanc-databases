@@ -84,6 +84,13 @@ namespace OrthancDatabases
                                        const Dictionary& args,
                                        uint32_t limit);
 
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    bool DequeueValueSQLite(std::string& value,
+                            DatabaseManager& manager,
+                            const std::string& queueId,
+                            bool fromFront);
+#endif
+
   public:
     explicit IndexBackend(OrthancPluginContext* context,
                           bool readOnly,

@@ -169,7 +169,7 @@ CREATE TABLE KeyValueStores(
 CREATE TABLE Queues (
        id INTEGER PRIMARY KEY AUTOINCREMENT,
        queueId TEXT NOT NULL,
-       value BLOB
+       value BLOB NOT NULL
 );
 
 CREATE INDEX QueuesIndex ON Queues (queueId, id);

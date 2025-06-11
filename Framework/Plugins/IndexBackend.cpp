@@ -4511,53 +4511,31 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement.Execute(args);
     }
 
-    bool IndexBackend::DequeueValue(std::string& value,
-                                    DatabaseManager& manager,
-                                    const std::string& queueId,
-                                    bool fromFront)
+
+    bool IndexBackend::DequeueValueSQLite(std::string& value,
+                                          DatabaseManager& manager,
+                                          const std::string& queueId,
+                                          bool fromFront)
     {
+      assert(manager.GetDialect() == Dialect_SQLite);
+
       LookupFormatter formatter(manager.GetDialect());
 
       std::unique_ptr<DatabaseManager::CachedStatement> statement;
-      
+
       std::string queueIdParameter = formatter.GenerateParameter(queueId);
 
-      switch (manager.GetDialect())
+      if (fromFront)
       {
-        case Dialect_PostgreSQL:
-          if (fromFront)
-          {
-            statement.reset(new DatabaseManager::CachedStatement(
-                              STATEMENT_FROM_HERE, manager,
-                              "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
-                              "SELECT value FROM poppedRows"));
-          }
-          else
-          {
-            statement.reset(new DatabaseManager::CachedStatement(
-                              STATEMENT_FROM_HERE, manager,
-                              "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
-                              "SELECT value FROM poppedRows"));
-          }
-          break;
-
-        case Dialect_SQLite:
-          if (fromFront)
-          {
-            statement.reset(new DatabaseManager::CachedStatement(
-                              STATEMENT_FROM_HERE, manager,
-                              "DELETE FROM Queues WHERE id = (SELECT id FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id ASC LIMIT 1) RETURNING value"));
-          }
-          else
-          {
-            statement.reset(new DatabaseManager::CachedStatement(
-                              STATEMENT_FROM_HERE, manager,
-                              "DELETE FROM Queues WHERE id = (SELECT id FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1) RETURNING value"));
-          }
-          break;
-
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id ASC LIMIT 1"));
+      }
+      else
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1"));
       }
 
       statement->Execute(formatter.GetDictionary());
@@ -4565,12 +4543,83 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       if (statement->IsDone())
       {
         return false;
-      }        
+      }
       else
       {
-        statement->SetResultFieldType(0, ValueType_BinaryString);
-        value = statement->ReadString(0);
+        statement->SetResultFieldType(0, ValueType_Integer64);
+        statement->SetResultFieldType(1, ValueType_BinaryString);
+
+        value = statement->ReadString(1);
+
+        {
+          DatabaseManager::CachedStatement s2(STATEMENT_FROM_HERE, manager,
+                                              "DELETE FROM Queues WHERE id=${id}");
+
+          s2.SetParameterType("id", ValueType_Integer64);
+
+          Dictionary args;
+          args.SetIntegerValue("id", statement->ReadInteger64(0));
+
+          s2.Execute(args);
+        }
+
         return true;
+      }
+    }
+
+
+    bool IndexBackend::DequeueValue(std::string& value,
+                                    DatabaseManager& manager,
+                                    const std::string& queueId,
+                                    bool fromFront)
+    {
+      if (manager.GetDialect() == Dialect_SQLite)
+      {
+        return DequeueValueSQLite(value, manager, queueId, fromFront);
+      }
+      else
+      {
+        LookupFormatter formatter(manager.GetDialect());
+
+        std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+        std::string queueIdParameter = formatter.GenerateParameter(queueId);
+
+        switch (manager.GetDialect())
+        {
+          case Dialect_PostgreSQL:
+            if (fromFront)
+            {
+              statement.reset(new DatabaseManager::CachedStatement(
+                                STATEMENT_FROM_HERE, manager,
+                                "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                                "SELECT value FROM poppedRows"));
+            }
+            else
+            {
+              statement.reset(new DatabaseManager::CachedStatement(
+                                STATEMENT_FROM_HERE, manager,
+                                "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                                "SELECT value FROM poppedRows"));
+            }
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        }
+
+        statement->Execute(formatter.GetDictionary());
+
+        if (statement->IsDone())
+        {
+          return false;
+        }
+        else
+        {
+          statement->SetResultFieldType(0, ValueType_BinaryString);
+          value = statement->ReadString(0);
+          return true;
+        }
       }
     }
 
