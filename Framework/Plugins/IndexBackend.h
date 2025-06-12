@@ -111,10 +111,12 @@ namespace OrthancDatabases
                                int64_t revision) ORTHANC_OVERRIDE;
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-    // New in Orthanc 1.12.7
-    virtual void AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                               DatabaseManager& manager,
-                               const Orthanc::DatabasePluginMessages::AddAttachment_Request& request) ORTHANC_OVERRIDE;
+    // New in Orthanc 1.12.8
+    virtual void AddAttachment(DatabaseManager& manager,
+                               int64_t id,
+                               const OrthancPluginAttachment& attachment,
+                               int64_t revision,
+                               const std::string& customData) ORTHANC_OVERRIDE;
 #endif
 
     virtual void AttachChild(DatabaseManager& manager,
@@ -509,13 +511,13 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-    virtual bool GetAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                                DatabaseManager& manager,
-                                const Orthanc::DatabasePluginMessages::GetAttachment_Request& request) ORTHANC_OVERRIDE;
+    virtual void GetAttachmentCustomData(std::string& customData,
+                                         DatabaseManager& manager,
+                                         const std::string& attachmentUuid) ORTHANC_OVERRIDE;
 
-    virtual void UpdateAttachmentCustomData(DatabaseManager& manager,
-                                            const std::string& attachmentUuid,
-                                            const std::string& customData) ORTHANC_OVERRIDE;
+    virtual void SetAttachmentCustomData(DatabaseManager& manager,
+                                         const std::string& attachmentUuid,
+                                         const std::string& customData) ORTHANC_OVERRIDE;
 
 #endif
 

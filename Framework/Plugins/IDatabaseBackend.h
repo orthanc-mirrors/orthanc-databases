@@ -71,10 +71,12 @@ namespace OrthancDatabases
                                int64_t revision) = 0;
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-    // New in Orthanc 1.12.7
-    virtual void AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                               DatabaseManager& manager,
-                               const Orthanc::DatabasePluginMessages::AddAttachment_Request& request) = 0;
+    // New in Orthanc 1.12.8
+    virtual void AddAttachment(DatabaseManager& manager,
+                               int64_t id,
+                               const OrthancPluginAttachment& attachment,
+                               int64_t revision,
+                               const std::string& customData) = 0;
 #endif
 
     virtual void AttachChild(DatabaseManager& manager,
@@ -448,13 +450,13 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-    virtual bool GetAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                               DatabaseManager& manager,
-                               const Orthanc::DatabasePluginMessages::GetAttachment_Request& request) = 0;
+    virtual void GetAttachmentCustomData(std::string& customData,
+                                         DatabaseManager& manager,
+                                         const std::string& attachmentUuid) = 0;
 
-    virtual void UpdateAttachmentCustomData(DatabaseManager& manager,
-                                            const std::string& attachmentUuid,
-                                            const std::string& customData) = 0;
+    virtual void SetAttachmentCustomData(DatabaseManager& manager,
+                                         const std::string& attachmentUuid,
+                                         const std::string& customData) = 0;
 #endif
 
     virtual bool HasPerformDbHousekeeping() = 0;

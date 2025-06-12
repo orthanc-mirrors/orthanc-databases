@@ -406,29 +406,23 @@ namespace OrthancDatabases
                                    const OrthancPluginAttachment& attachment,
                                    int64_t revision)
   {
-    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins support these features now
+    assert(HasRevisionsSupport()); // all plugins support these features now
     ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
                          attachment.compressionType, attachment.compressedSize, attachment.compressedHash, NULL, 0, revision);
   }
 
+
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-  void IndexBackend::AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                                   DatabaseManager& manager,
-                                   const Orthanc::DatabasePluginMessages::AddAttachment_Request& request)
+  void IndexBackend::AddAttachment(DatabaseManager& manager,
+                                   int64_t id,
+                                   const OrthancPluginAttachment& attachment,
+                                   int64_t revision,
+                                   const std::string& customData)
   {
-    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // all plugins support these features now
-    ExecuteAddAttachment(manager, 
-                         request.id(), 
-                         request.attachment().uuid().c_str(),
-                         request.attachment().content_type(),
-                         request.attachment().uncompressed_size(),
-                         request.attachment().uncompressed_hash().c_str(),
-                         request.attachment().compression_type(),
-                         request.attachment().compressed_size(),
-                         request.attachment().compressed_hash().c_str(),
-                         request.attachment().custom_data().empty() ? NULL : request.attachment().custom_data().c_str(),
-                         request.attachment().custom_data().size(),
-                         request.revision());
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport());
+    ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
+                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash,
+                         customData.empty() ? NULL : customData.c_str(), customData.size(), revision);
   }
 #endif
 
@@ -976,7 +970,7 @@ namespace OrthancDatabases
 
     if (statement.IsDone())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No resource type found for internal id.");
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No resource type found for internal id");
     }
     else
     {
@@ -4644,48 +4638,36 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-    bool IndexBackend::GetAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
-                                     DatabaseManager& manager,
-                                     const Orthanc::DatabasePluginMessages::GetAttachment_Request& request)
+    void IndexBackend::GetAttachmentCustomData(std::string& customData,
+                                               DatabaseManager& manager,
+                                               const std::string& attachmentUuid)
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "SELECT uuid, fileType, uncompressedSize, uncompressedHash, compressionType, "
-        "compressedSize, compressedHash, revision, customData FROM AttachedFiles WHERE uuid = ${uuid}");
+        "SELECT customData FROM AttachedFiles WHERE uuid = ${uuid}");
 
       statement.SetReadOnly(true);
       statement.SetParameterType("uuid", ValueType_Utf8String);
 
       Dictionary args;
-      args.SetUtf8Value("uuid", request.uuid());
+      args.SetUtf8Value("uuid", attachmentUuid);
 
       statement.Execute(args);
       statement.SetResultFieldType(8, ValueType_BinaryString);
 
       if (statement.IsDone())
       {
-        return false;
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "Nonexistent attachment: " + attachmentUuid);
       }
       else
       {
-        response.mutable_get_attachment()->set_revision(statement.ReadInteger64(7));
-        response.mutable_get_attachment()->mutable_attachment()->set_uuid(statement.ReadString(0));
-        response.mutable_get_attachment()->mutable_attachment()->set_content_type(statement.ReadInteger32(1));
-        response.mutable_get_attachment()->mutable_attachment()->set_uncompressed_size(statement.ReadInteger64(2));
-        response.mutable_get_attachment()->mutable_attachment()->set_uncompressed_hash(statement.ReadString(3));
-        response.mutable_get_attachment()->mutable_attachment()->set_compression_type(statement.ReadInteger32(4));
-        response.mutable_get_attachment()->mutable_attachment()->set_compressed_size(statement.ReadInteger64(5));
-        response.mutable_get_attachment()->mutable_attachment()->set_compressed_hash(statement.ReadString(6));
-        response.mutable_get_attachment()->mutable_attachment()->set_custom_data(statement.ReadStringOrNull(8));
-
-        return true;        
+        customData = statement.ReadStringOrNull(0);
       }
-
     }
 
-    void  IndexBackend::UpdateAttachmentCustomData(DatabaseManager& manager,
-                                                   const std::string& attachmentUuid,
-                                                   const std::string& customData)
+    void  IndexBackend::SetAttachmentCustomData(DatabaseManager& manager,
+                                                const std::string& attachmentUuid,
+                                                const std::string& customData)
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,

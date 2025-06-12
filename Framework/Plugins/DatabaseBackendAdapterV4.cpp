@@ -225,6 +225,7 @@ namespace OrthancDatabases
       attachment->set_compression_type(compressionType);
       attachment->set_compressed_size(compressedSize);
       attachment->set_compressed_hash(compressedHash);
+
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
       attachment->set_custom_data(customData);
 #endif
@@ -702,9 +703,6 @@ namespace OrthancDatabases
       
       case Orthanc::DatabasePluginMessages::OPERATION_ADD_ATTACHMENT:
       {
-#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-        backend.AddAttachment(response, manager, request.add_attachment());
-#else
         OrthancPluginAttachment attachment;
         attachment.uuid = request.add_attachment().attachment().uuid().c_str();
         attachment.contentType = request.add_attachment().attachment().content_type();
@@ -713,9 +711,14 @@ namespace OrthancDatabases
         attachment.compressionType = request.add_attachment().attachment().compression_type();
         attachment.compressedSize = request.add_attachment().attachment().compressed_size();
         attachment.compressedHash = request.add_attachment().attachment().compressed_hash().c_str();
-        
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+        backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision(),
+                              request.add_attachment().attachment().custom_data());
+#else
         backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision());
 #endif
+
         break;
       }
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_CHANGES:
@@ -1429,19 +1432,18 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
-      case Orthanc::DatabasePluginMessages::OPERATION_GET_ATTACHMENT:
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ATTACHMENT_CUSTOM_DATA:
       {
-        bool found = backend.GetAttachment(response,
-                                           manager,
-                                           request.get_attachment());
-        response.mutable_get_attachment()->set_found(found);
+        std::string customData;
+        backend.GetAttachmentCustomData(customData, manager, request.get_attachment_custom_data().uuid());
+        response.mutable_get_attachment_custom_data()->set_custom_data(customData);
       }; break;
 
       case Orthanc::DatabasePluginMessages::OPERATION_SET_ATTACHMENT_CUSTOM_DATA:
       {
-        backend.UpdateAttachmentCustomData(manager,
-                                           request.set_attachment_custom_data().uuid(),
-                                           request.set_attachment_custom_data().custom_data());
+        backend.SetAttachmentCustomData(manager,
+                                        request.set_attachment_custom_data().uuid(),
+                                        request.set_attachment_custom_data().custom_data());
       }; break;
 
 #endif
