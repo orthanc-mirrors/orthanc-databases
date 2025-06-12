@@ -293,6 +293,26 @@ static void ListKeys(std::set<std::string>& keys,
 #endif
 
 
+static void FillBlob(std::string& blob)
+{
+  blob.clear();
+  blob.push_back(0);
+  blob.push_back(1);
+  blob.push_back(0);
+  blob.push_back(2);
+}
+
+
+static void CheckBlob(const std::string& s)
+{
+  ASSERT_EQ(4u, s.size());
+  ASSERT_EQ(0u, static_cast<uint8_t>(s[0]));
+  ASSERT_EQ(1u, static_cast<uint8_t>(s[1]));
+  ASSERT_EQ(0u, static_cast<uint8_t>(s[2]));
+  ASSERT_EQ(2u, static_cast<uint8_t>(s[3]));
+}
+
+
 TEST(IndexBackend, Basic)
 {
   using namespace OrthancDatabases;
@@ -325,6 +345,13 @@ TEST(IndexBackend, Basic)
   std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db, false, identifierTags));
   
   std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());
+
+  {
+    // Sanity check
+    std::string blob;
+    FillBlob(blob);
+    CheckBlob(blob);
+  }
 
   std::string s;
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
@@ -498,7 +525,12 @@ TEST(IndexBackend, Basic)
   a2.compressedSize = 4242;
   a2.compressedHash = "md5_2";
     
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+  db.AddAttachment(*manager, a, a1, 42, "my_custom_data");
+#else
   db.AddAttachment(*manager, a, a1, 42);
+#endif
+
   db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(1u, fc.size());
   ASSERT_EQ(Orthanc::FileContentType_Dicom, fc.front());
@@ -506,6 +538,32 @@ TEST(IndexBackend, Basic)
   db.ListAvailableAttachments(fc, *manager, a);
   ASSERT_EQ(2u, fc.size());
   ASSERT_FALSE(db.LookupAttachment(*output, revision, *manager, b, Orthanc::FileContentType_Dicom));
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+  {
+    std::string s;
+    ASSERT_THROW(db.GetAttachmentCustomData(s, *manager, "nope"), Orthanc::OrthancException);
+
+    db.GetAttachmentCustomData(s, *manager, "uuid1");
+    ASSERT_EQ("my_custom_data", s);
+
+    db.GetAttachmentCustomData(s, *manager, "uuid2");
+    ASSERT_TRUE(s.empty());
+
+    {
+      std::string blob;
+      FillBlob(blob);
+      db.SetAttachmentCustomData(*manager, "uuid1", blob);
+    }
+
+    db.GetAttachmentCustomData(s, *manager, "uuid1");
+    CheckBlob(s);
+
+    db.SetAttachmentCustomData(*manager, "uuid1", "");
+    db.GetAttachmentCustomData(s, *manager, "uuid1");
+    ASSERT_TRUE(s.empty());
+  }
+#endif
 
   ASSERT_EQ(4284u, db.GetTotalCompressedSize(*manager));
   ASSERT_EQ(4284u, db.GetTotalUncompressedSize(*manager));
@@ -936,19 +994,12 @@ TEST(IndexBackend, Basic)
 
     {
       std::string blob;
-      blob.push_back(0);
-      blob.push_back(1);
-      blob.push_back(0);
-      blob.push_back(2);
+      FillBlob(blob);
       db.StoreKeyValue(*manager, "test", "blob", blob); // Storing binary values
     }
 
     ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "blob"));
-    ASSERT_EQ(4u, s.size());
-    ASSERT_EQ(0u, static_cast<uint8_t>(s[0]));
-    ASSERT_EQ(1u, static_cast<uint8_t>(s[1]));
-    ASSERT_EQ(0u, static_cast<uint8_t>(s[2]));
-    ASSERT_EQ(2u, static_cast<uint8_t>(s[3]));
+    CheckBlob(s);
     db.DeleteKeyValue(*manager, "test", "blob");
     ASSERT_FALSE(db.GetKeyValue(s, *manager, "test", "blob"));
 
@@ -991,19 +1042,12 @@ TEST(IndexBackend, Basic)
 
     {
       std::string blob;
-      blob.push_back(0);
-      blob.push_back(1);
-      blob.push_back(0);
-      blob.push_back(2);
+      FillBlob(blob);
       db.EnqueueValue(*manager, "test", blob); // Storing binary values
     }
 
     ASSERT_TRUE(db.DequeueValue(s, *manager, "test", true));
-    ASSERT_EQ(4u, s.size());
-    ASSERT_EQ(0u, static_cast<uint8_t>(s[0]));
-    ASSERT_EQ(1u, static_cast<uint8_t>(s[1]));
-    ASSERT_EQ(0u, static_cast<uint8_t>(s[2]));
-    ASSERT_EQ(2u, static_cast<uint8_t>(s[3]));
+    CheckBlob(s);
 
     ASSERT_FALSE(db.DequeueValue(s, *manager, "test", true));
 
