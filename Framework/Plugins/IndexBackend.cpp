@@ -411,7 +411,7 @@ namespace OrthancDatabases
                          attachment.compressionType, attachment.compressedSize, attachment.compressedHash, NULL, 0, revision);
   }
 
-#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
   void IndexBackend::AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                    DatabaseManager& manager,
                                    const Orthanc::DatabasePluginMessages::AddAttachment_Request& request)

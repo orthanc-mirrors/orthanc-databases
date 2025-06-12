@@ -291,7 +291,7 @@ namespace OrthancDatabases
         lookupAttachment_->mutable_attachment()->set_compression_type(compressionType);
         lookupAttachment_->mutable_attachment()->set_compressed_size(compressedSize);
         lookupAttachment_->mutable_attachment()->set_compressed_hash(compressedHash);
-#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA==1
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
         lookupAttachment_->mutable_attachment()->set_custom_data(customData);
 #endif
       }
@@ -702,7 +702,7 @@ namespace OrthancDatabases
       
       case Orthanc::DatabasePluginMessages::OPERATION_ADD_ATTACHMENT:
       {
-#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
         backend.AddAttachment(response, manager, request.add_attachment());
 #else
         OrthancPluginAttachment attachment;

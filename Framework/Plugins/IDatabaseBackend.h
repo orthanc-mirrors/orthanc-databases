@@ -70,7 +70,7 @@ namespace OrthancDatabases
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) = 0;
 
-#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
     // New in Orthanc 1.12.7
     virtual void AddAttachment(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                DatabaseManager& manager,
