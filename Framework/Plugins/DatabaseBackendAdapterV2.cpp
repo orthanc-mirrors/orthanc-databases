@@ -187,7 +187,8 @@ namespace OrthancDatabases
                                          const std::string& uncompressedHash,
                                          int32_t            compressionType,
                                          uint64_t           compressedSize,
-                                         const std::string& compressedHash) ORTHANC_OVERRIDE
+                                         const std::string& compressedHash,
+                                         const std::string& /*customData*/) ORTHANC_OVERRIDE
     {
       OrthancPluginAttachment attachment;
       attachment.uuid = uuid.c_str();
@@ -219,7 +220,8 @@ namespace OrthancDatabases
                                   const std::string& uncompressedHash,
                                   int32_t            compressionType,
                                   uint64_t           compressedSize,
-                                  const std::string& compressedHash) ORTHANC_OVERRIDE
+                                  const std::string& compressedHash,
+                                  const std::string& /*customData*/) ORTHANC_OVERRIDE
     {
       if (allowedAnswers_ != AllowedAnswers_All &&
           allowedAnswers_ != AllowedAnswers_Attachment)

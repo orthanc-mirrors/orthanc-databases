@@ -99,7 +99,7 @@ namespace OrthancDatabases
                                                          const Query& query)
   {
     LOG(TRACE) << "Caching statement from " << statementId.GetFile() << ":" << statementId.GetLine() << "" << statementId.GetDynamicStatement();
-      
+    
     std::unique_ptr<IPrecompiledStatement> statement(GetDatabase().Compile(query));
       
     IPrecompiledStatement* tmp = statement.get();
@@ -394,6 +394,17 @@ namespace OrthancDatabases
   }
 
 
+  void DatabaseManager::StatementBase::SetParametersTypes(const Dictionary& parameters)
+  {
+    Dictionary::Types parametersTypes;
+    parameters.GetParametersType(parametersTypes);
+
+    for (Dictionary::Types::const_iterator it = parametersTypes.begin(); it != parametersTypes.end(); ++it)
+    {
+      SetParameterType(it->first, it->second);
+    }
+  }
+
   void DatabaseManager::StatementBase::SetParameterType(const std::string& parameter,
                                                         ValueType type)
   {
@@ -550,6 +561,18 @@ namespace OrthancDatabases
     }
   }
   
+  std::string DatabaseManager::StatementBase::ReadStringOrNull(size_t field) const
+  {
+    if (IsNull(field))
+    {
+      return std::string();
+    }
+    else
+    {
+      return ReadString(field);
+    }
+  }
+  
   DatabaseManager::CachedStatement::CachedStatement(const StatementId& statementId,
                                                     DatabaseManager& manager,
                                                     const std::string& sql) :
@@ -589,6 +612,9 @@ namespace OrthancDatabases
 
   void DatabaseManager::CachedStatement::ExecuteInternal(const Dictionary& parameters, bool withResults)
   {
+    // the query parameters_ type can not be trusted (they are all Utf8String by default), we need a parameters dico with the actual types
+    SetParametersTypes(parameters);
+
     try
     {
       std::unique_ptr<Query> query(ReleaseQuery());
@@ -597,7 +623,7 @@ namespace OrthancDatabases
       {
         // Register the newly-created statement
         assert(statement_ == NULL);
-        statement_ = &GetManager().CacheStatement(statementId_, *query);
+        statement_ = &GetManager().CacheStatement(statementId_, *query);  
       }
         
       assert(statement_ != NULL);
@@ -679,6 +705,9 @@ namespace OrthancDatabases
 
   void DatabaseManager::StandaloneStatement::ExecuteInternal(const Dictionary& parameters, bool withResults)
   {
+    // the query parameters_ type can not be trusted (they are all Utf8String by default), we need a parameters dico with the actual types
+    SetParametersTypes(parameters);
+
     try
     {
       std::unique_ptr<Query> query(ReleaseQuery());

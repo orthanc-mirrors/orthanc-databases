@@ -74,6 +74,9 @@ namespace OrthancDatabases
 
     std::string GetString(unsigned int column) const;
 
+    void GetBinaryString(std::string& target,
+                         unsigned int column) const;
+
     std::string GetLargeObjectOid(unsigned int column) const;
 
     void GetLargeObjectContent(std::string& content,

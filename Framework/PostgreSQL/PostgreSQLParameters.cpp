@@ -44,6 +44,7 @@ namespace OrthancDatabases
     maxConnectionRetries_ = 10;
     connectionRetryInterval_ = 5;
     isVerboseEnabled_ = false;
+    allowInconsistentChildCounts_ = false;
     isolationMode_ = IsolationMode_Serializable;
   }
 

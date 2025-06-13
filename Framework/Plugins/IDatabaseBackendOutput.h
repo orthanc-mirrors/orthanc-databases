@@ -56,7 +56,8 @@ namespace OrthancDatabases
                                          const std::string& uncompressedHash,
                                          int32_t            compressionType,
                                          uint64_t           compressedSize,
-                                         const std::string& compressedHash) = 0;
+                                         const std::string& compressedHash,
+                                         const std::string& customData) = 0;
 
     virtual void SignalDeletedResource(const std::string& publicId,
                                        OrthancPluginResourceType resourceType) = 0;
@@ -70,7 +71,8 @@ namespace OrthancDatabases
                                   const std::string& uncompressedHash,
                                   int32_t            compressionType,
                                   uint64_t           compressedSize,
-                                  const std::string& compressedHash) = 0;
+                                  const std::string& compressedHash,
+                                  const std::string& customData) = 0;
 
     virtual void AnswerChange(int64_t                    seq,
                               int32_t                    changeType,

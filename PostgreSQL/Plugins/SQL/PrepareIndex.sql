@@ -1,4 +1,4 @@
--- This SQL file creates a DB in Rev2 directly
+-- This SQL file creates a DB in Rev5 directly
 -- It is also run after upgrade scripts to create new tables and or create/replace triggers and functions.
 -- This script is self contained, it contains everything that needs to be run to create an Orthanc DB.
 -- Note to developers: 
@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS AttachedFiles(
        uncompressedHash VARCHAR(40),
        compressedHash VARCHAR(40),
        revision INTEGER,
+       customData BYTEA,           -- new in schema rev 5
        PRIMARY KEY(id, fileType)
        );              
 
@@ -305,7 +306,9 @@ BEGIN
         uncompressedSize BIGINT,
         compressionType INTEGER,
         uncompressedHash VARCHAR(40),
-        compressedHash VARCHAR(40)
+        compressedHash VARCHAR(40),
+        revision INTEGER,
+        customData BYTEA
         );
 
     RESET client_min_messages;
@@ -323,7 +326,8 @@ BEGIN
   INSERT INTO DeletedFiles VALUES
     (old.uuid, old.filetype, old.compressedSize,
      old.uncompressedSize, old.compressionType,
-     old.uncompressedHash, old.compressedHash);
+     old.uncompressedHash, old.compressedHash,
+     old.revision, old.customData);
   RETURN NULL;
 END;
 $body$ LANGUAGE plpgsql;
@@ -717,11 +721,28 @@ WHEN (OLD.parentId IS NOT NULL)
 EXECUTE PROCEDURE UpdateChildCount();
 
 
+-- new in 1.12.8 (rev 5 ?)
+
+CREATE TABLE KeyValueStores(
+       storeId TEXT NOT NULL,
+       key TEXT NOT NULL,
+       value BYTEA NOT NULL,
+       PRIMARY KEY(storeId, key)  -- Prevents duplicates
+       );
+
+CREATE TABLE Queues (
+       id BIGSERIAL NOT NULL PRIMARY KEY,
+       queueId TEXT NOT NULL,
+       value BYTEA NOT NULL
+);
+
+CREATE INDEX QueuesIndex ON Queues (queueId, id);
+
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 4); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 5); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance

@@ -23,8 +23,6 @@
 
 #include "IndexBackend.h"
 
-#include "../Common/BinaryStringValue.h"
-#include "../Common/Integer64Value.h"
 #include "../Common/Utf8StringValue.h"
 #include "DatabaseBackendAdapterV2.h"
 #include "DatabaseBackendAdapterV3.h"
@@ -270,10 +268,12 @@ namespace OrthancDatabases
     DatabaseManager::CachedStatement statement(
       STATEMENT_FROM_HERE, manager,
       "SELECT uuid, fileType, uncompressedSize, uncompressedHash, compressionType, "
-      "compressedSize, compressedHash FROM DeletedFiles");
+      "compressedSize, compressedHash, revision, customData FROM DeletedFiles");
 
     statement.SetReadOnly(true);
     statement.Execute();
+
+    statement.SetResultFieldType(8, ValueType_BinaryString);
 
     while (!statement.IsDone())
     {
@@ -283,7 +283,8 @@ namespace OrthancDatabases
                                      statement.ReadString(3),
                                      statement.ReadInteger32(4),
                                      statement.ReadInteger64(5),
-                                     statement.ReadString(6));
+                                     statement.ReadString(6),
+                                     statement.ReadStringOrNull(8));
       
       statement.Next();
     }
@@ -354,12 +355,26 @@ namespace OrthancDatabases
     }
   }
 
-
-  static void ExecuteAddAttachment(DatabaseManager::CachedStatement& statement,
-                                   Dictionary& args,
+  static void ExecuteAddAttachment(DatabaseManager& manager,
                                    int64_t id,
-                                   const OrthancPluginAttachment& attachment)
+                                   const char* uuid,
+                                   int32_t     contentType,
+                                   uint64_t    uncompressedSize,
+                                   const char* uncompressedHash,
+                                   int32_t     compressionType,
+                                   uint64_t    compressedSize,
+                                   const char* compressedHash,
+                                   const void* customData,
+                                   size_t      customDataSize,
+                                   int64_t     revision)
   {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
+      "${uncompressed}, ${compression}, ${hash}, ${hash-compressed}, ${revision}, ${custom-data})");
+
+    Dictionary args;
+
     statement.SetParameterType("id", ValueType_Integer64);
     statement.SetParameterType("type", ValueType_Integer64);
     statement.SetParameterType("uuid", ValueType_Utf8String);
@@ -368,52 +383,50 @@ namespace OrthancDatabases
     statement.SetParameterType("compression", ValueType_Integer64);
     statement.SetParameterType("hash", ValueType_Utf8String);
     statement.SetParameterType("hash-compressed", ValueType_Utf8String);
+    statement.SetParameterType("revision", ValueType_Integer64);
+    statement.SetParameterType("custom-data", ValueType_Utf8String);
 
     args.SetIntegerValue("id", id);
-    args.SetIntegerValue("type", attachment.contentType);
-    args.SetUtf8Value("uuid", attachment.uuid);
-    args.SetIntegerValue("compressed", attachment.compressedSize);
-    args.SetIntegerValue("uncompressed", attachment.uncompressedSize);
-    args.SetIntegerValue("compression", attachment.compressionType);
-    args.SetUtf8Value("hash", attachment.uncompressedHash);
-    args.SetUtf8Value("hash-compressed", attachment.compressedHash);
+    args.SetIntegerValue("type", contentType);
+    args.SetUtf8Value("uuid", uuid);
+    args.SetIntegerValue("compressed", compressedSize);
+    args.SetIntegerValue("uncompressed", uncompressedSize);
+    args.SetIntegerValue("compression", compressionType);
+    args.SetUtf8Value("hash", uncompressedHash);
+    args.SetUtf8Value("hash-compressed", compressedHash);
+    args.SetIntegerValue("revision", revision);
+    args.SetBinaryValue("custom-data", customData, customDataSize);
 
     statement.Execute(args);
   }
 
-  
+
   void IndexBackend::AddAttachment(DatabaseManager& manager,
                                    int64_t id,
                                    const OrthancPluginAttachment& attachment,
                                    int64_t revision)
   {
-    if (HasRevisionsSupport())
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
-        "${uncompressed}, ${compression}, ${hash}, ${hash-compressed}, ${revision})");
-
-      Dictionary args;
-
-      statement.SetParameterType("revision", ValueType_Integer64);
-      args.SetIntegerValue("revision", revision);
-      
-      ExecuteAddAttachment(statement, args, id, attachment);
-    }
-    else
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "INSERT INTO AttachedFiles VALUES(${id}, ${type}, ${uuid}, ${compressed}, "
-        "${uncompressed}, ${compression}, ${hash}, ${hash-compressed})");
-
-      Dictionary args;
-      ExecuteAddAttachment(statement, args, id, attachment);
-    }
+    assert(HasRevisionsSupport()); // all plugins support these features now
+    ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
+                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash, NULL, 0, revision);
   }
 
-    
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+  void IndexBackend::AddAttachment(DatabaseManager& manager,
+                                   int64_t id,
+                                   const OrthancPluginAttachment& attachment,
+                                   int64_t revision,
+                                   const std::string& customData)
+  {
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport());
+    ExecuteAddAttachment(manager, id, attachment.uuid, attachment.contentType, attachment.uncompressedSize, attachment.uncompressedHash,
+                         attachment.compressionType, attachment.compressedSize, attachment.compressedHash,
+                         customData.empty() ? NULL : customData.c_str(), customData.size(), revision);
+  }
+#endif
+
+
   void IndexBackend::AttachChild(DatabaseManager& manager,
                                  int64_t parent,
                                  int64_t child)
@@ -957,7 +970,7 @@ namespace OrthancDatabases
 
     if (statement.IsDone())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No resource type found for internal id.");
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "No resource type found for internal id");
     }
     else
     {
@@ -1178,12 +1191,20 @@ namespace OrthancDatabases
     statement.Execute(args);
   }
 
-
-  static bool ExecuteLookupAttachment(DatabaseManager::CachedStatement& statement,
-                                      IDatabaseBackendOutput& output,
+    
+  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
+                                      int64_t& revision /*out*/,
+                                      DatabaseManager& manager,
                                       int64_t id,
                                       int32_t contentType)
   {
+    assert(HasRevisionsSupport() && HasAttachmentCustomDataSupport()); // we have forced all v4 plugins to support both ! 
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
+      "compressedHash, revision, customData FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
+
+
     statement.SetReadOnly(true);
     statement.SetParameterType("id", ValueType_Integer64);
     statement.SetParameterType("type", ValueType_Integer64);
@@ -1193,6 +1214,7 @@ namespace OrthancDatabases
     args.SetIntegerValue("type", static_cast<int>(contentType));
 
     statement.Execute(args);
+    statement.SetResultFieldType(7, ValueType_BinaryString);
 
     if (statement.IsDone())
     {
@@ -1200,64 +1222,31 @@ namespace OrthancDatabases
     }
     else
     {
+      if (statement.GetResultField(6).GetType() == ValueType_Null)
+      {
+        // "NULL" can happen with a database created by PostgreSQL
+        // plugin <= 3.3 (because of "ALTER TABLE AttachedFiles")
+        revision = 0;
+      }
+      else
+      {
+        revision = statement.ReadInteger64(6);
+      }
+
+      std::string customData;
+      customData = statement.ReadStringOrNull(7);
+
       output.AnswerAttachment(statement.ReadString(0),
                               contentType,
                               statement.ReadInteger64(1),
                               statement.ReadString(4),
                               statement.ReadInteger32(2),
                               statement.ReadInteger64(3),
-                              statement.ReadString(5));
+                              statement.ReadString(5),
+                              customData);
       return true;
     }
-  }
-                                      
-  
-    
-  /* Use GetOutput().AnswerAttachment() */
-  bool IndexBackend::LookupAttachment(IDatabaseBackendOutput& output,
-                                      int64_t& revision /*out*/,
-                                      DatabaseManager& manager,
-                                      int64_t id,
-                                      int32_t contentType)
-  {
-    if (HasRevisionsSupport())
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
-        "compressedHash, revision FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
-      
-      if (ExecuteLookupAttachment(statement, output, id, contentType))
-      {
-        if (statement.GetResultField(6).GetType() == ValueType_Null)
-        {
-          // "NULL" can happen with a database created by PostgreSQL
-          // plugin <= 3.3 (because of "ALTER TABLE AttachedFiles")
-          revision = 0;
-        }
-        else
-        {
-          revision = statement.ReadInteger64(6);
-        }
-        
-        return true;
-      }
-      else
-      {
-        return false;
-      }
-    }
-    else
-    {
-      DatabaseManager::CachedStatement statement(
-        STATEMENT_FROM_HERE, manager,
-        "SELECT uuid, uncompressedSize, compressionType, compressedSize, uncompressedHash, "
-        "compressedHash FROM AttachedFiles WHERE id=${id} AND fileType=${type}");
-      
-      revision = 0;
 
-      return ExecuteLookupAttachment(statement, output, id, contentType);
-    }
   }
 
 
@@ -3253,11 +3242,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #define C3_STRING_1 3
 #define C4_STRING_2 4
 #define C5_STRING_3 5
-#define C6_INT_1 6
-#define C7_INT_2 7
-#define C8_INT_3 8
-#define C9_BIG_INT_1 9
-#define C10_BIG_INT_2 10
+#define C6_STRING_4 6
+#define C7_INT_1 7
+#define C8_INT_2 8
+#define C9_INT_3 9
+#define C10_BIG_INT_1 10
+#define C11_BIG_INT_2 11
 
 #define QUERY_LOOKUP 1
 #define QUERY_MAIN_DICOM_TAGS 2
@@ -3431,11 +3421,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     std::string revisionInC7;
     if (HasRevisionsSupport())
     {
-      revisionInC7 = "  revision AS c7_int2, ";
+      revisionInC7 = "  revision AS c8_int2, ";
     }
     else
     {
-      revisionInC7 = "  0 AS C7_int2, ";
+      revisionInC7 = "  0 AS c8_int2, ";
     }
 
 
@@ -3446,11 +3436,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           "  Lookup.publicId AS c3_string1, "
           "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
           "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-          "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-          "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-          "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-          "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-          "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+          "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+          "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+          "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+          "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+          "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+          "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
           "  FROM Lookup ";
 
     // need MainDicomTags from resource ?
@@ -3463,11 +3454,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  value AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  tagGroup AS c6_int1, "
-             "  tagElement AS c7_int2, "
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+             "  tagGroup AS c7_int1, "
+             "  tagElement AS c8_int2, "
+             "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
              "FROM Lookup "
              "INNER JOIN MainDicomTags ON MainDicomTags.id = Lookup.internalId ";
     }
@@ -3482,11 +3474,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  value AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  type AS c6_int1, "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+             "  type AS c7_int1, "
              + revisionInC7 +
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
              "FROM Lookup "
              "INNER JOIN Metadata ON Metadata.id = Lookup.internalId ";
     }
@@ -3501,11 +3494,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  uuid AS c3_string1, "
              "  uncompressedHash AS c4_string2, "
              "  compressedHash AS c5_string3, "
-             "  fileType AS c6_int1, "
+             "  customData AS c6_string4, "
+             "  fileType AS c7_int1, "
              + revisionInC7 +
-             "  compressionType AS c8_int3, "
-             "  compressedSize AS c9_big_int1, "
-             "  uncompressedSize AS c10_big_int2 "
+             "  compressionType AS c9_int3, "
+             "  compressedSize AS c10_big_int1, "
+             "  uncompressedSize AS c11_big_int2 "
              "FROM Lookup "
              "INNER JOIN AttachedFiles ON AttachedFiles.id = Lookup.internalId ";
     }
@@ -3520,11 +3514,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  label AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-             "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+             "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+             "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+             "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
              "FROM Lookup "
              "INNER JOIN Labels ON Labels.id = Lookup.internalId ";
     }
@@ -3558,11 +3553,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  tagGroup AS c6_int1, "
-               "  tagElement AS c7_int2, "
-               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+               "  tagGroup AS c7_int1, "
+               "  tagElement AS c8_int2, "
+               "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                "FROM Lookup "
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN MainDicomTags ON MainDicomTags.id = currentLevel.parentId ";
@@ -3577,11 +3573,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  type AS c6_int1, "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+               "  type AS c7_int1, "
                + revisionInC7 +
-               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+               "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                "FROM Lookup "
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN Metadata ON Metadata.id = currentLevel.parentId ";
@@ -3613,11 +3610,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  tagGroup AS c6_int1, "
-               "  tagElement AS c7_int2, "
-               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+               "  tagGroup AS c7_int1, "
+               "  tagElement AS c8_int2, "
+               "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                "FROM Lookup "
                "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
@@ -3633,11 +3631,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  value AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  type AS c6_int1, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                "  type AS c7_int1, "
                 + revisionInC7 +
-                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                 "FROM Lookup "
                 "INNER JOIN Resources currentLevel ON Lookup.internalId = currentLevel.internalId "
                 "INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId "
@@ -3660,11 +3659,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  value AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  tagGroup AS c6_int1, "
-               "  tagElement AS c7_int2, "
-               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+               "  tagGroup AS c7_int1, "
+               "  tagElement AS c8_int2, "
+               "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                "FROM Lookup "
                "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                "  INNER JOIN MainDicomTags ON MainDicomTags.id = childLevel.internalId AND (tagGroup, tagElement) IN (" + JoinRequestedTags(childrenSpec) + ")";
@@ -3680,11 +3680,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                "  childLevel.publicId AS c3_string1, "
                "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-               "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-               "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-               "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+               "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+               "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+               "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+               "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+               "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                "FROM Lookup "
                "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId ";
       }
@@ -3715,16 +3716,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
                 "  COALESCE("
                 "           (" + getResourcesChildCount + "),"
                 "        		(SELECT COUNT(childLevel.internalId)"
                 "            FROM Resources AS childLevel"
                 "            WHERE Lookup.internalId = childLevel.parentId"
-                "           )) AS c9_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "           )) AS c10_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                 "FROM Lookup "
                 "LEFT JOIN Resources ON Lookup.internalId = Resources.internalId ";
         }
@@ -3737,11 +3739,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                "  COUNT(childLevel.internalId) AS c9_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                "  COUNT(childLevel.internalId) AS c10_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                 "FROM Lookup "
                 "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId GROUP BY Lookup.internalId ";
         }
@@ -3756,11 +3759,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  value AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  type AS c6_int1, "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                "  type AS c7_int1, "
                 + revisionInC7 +
-                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                 "FROM Lookup "
                 "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                 "  INNER JOIN Metadata ON Metadata.id = childLevel.internalId AND Metadata.type IN (" + JoinRequestedMetadata(childrenSpec) + ") ";
@@ -3780,11 +3784,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "  grandChildLevel.publicId AS c3_string1, "
                 "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                 "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+                "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                 "FROM Lookup "
                 "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                 "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId ";
@@ -3793,6 +3798,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         {
           if (HasChildCountColumn())
           {
+
             // we get the count value either from the childCount column if it has been computed or from the Resources table
             std::string getResourcesGrandChildCount;
             
@@ -3815,23 +3821,25 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
             // we get the count value either from the childCount column if it has been computed or from the Resources table
             sql += "UNION ALL SELECT "
+
                     "  " TOSTRING(QUERY_GRAND_CHILDREN_COUNT) " AS c0_queryId, "
                     "  Lookup.internalId AS c1_internalId, "
                     "  " + formatter.FormatNull("BIGINT") + " AS c2_rowNumber, "
                     "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                     "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                     "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                    "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                    "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                    "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                    "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                    "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                    "  " + formatter.FormatNull("INT") + " AS c9_int3, "
                     "  COALESCE("
                     "           (" + getResourcesGrandChildCount + "),"
                     "        		(SELECT COUNT(grandChildLevel.internalId)"
                     "            FROM Resources AS childLevel"
                     "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
                     "            WHERE Lookup.internalId = childLevel.parentId"
-                    "           )) AS c9_big_int1, "
-                    "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                    "           )) AS c10_big_int1, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                     "FROM Lookup ";
           }
           else
@@ -3843,11 +3851,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                   "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                   "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                   "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                  "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                  "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                  "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                  "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                  "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                  "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                  "  COUNT(grandChildLevel.internalId) AS c10_big_int1, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                   "FROM Lookup "
                   "  INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                   "  INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId GROUP BY Lookup.internalId ";
@@ -3863,11 +3872,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  value AS c3_string1, "
                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                 "  tagGroup AS c6_int1, "
-                 "  tagElement AS c7_int2, "
-                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                 "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                 "  tagGroup AS c7_int1, "
+                 "  tagElement AS c8_int2, "
+                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                  "FROM Lookup "
                  "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                  "  INNER JOIN Resources grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
@@ -3883,11 +3893,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                  "  value AS c3_string1, "
                  "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                  "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                 "  type AS c6_int1, "
+                 "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                 "  type AS c7_int1, "
                  + revisionInC7 +
-                 "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                 "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+                 "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                  "FROM Lookup "
                  "  INNER JOIN Resources childLevel ON childLevel.parentId = Lookup.internalId "
                  "  INNER JOIN Resources grandChildLevel ON grandChildLevel.parentId = childLevel.internalId "
@@ -3908,11 +3919,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                   "  grandGrandChildLevel.publicId AS c3_string1, "
                   "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                   "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                  "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                  "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                  "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                  "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                  "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                  "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                  "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+                  "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                   "FROM Lookup "
                   "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                   "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
@@ -3952,9 +3964,10 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                     "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                     "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                    "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                    "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                    "  " + formatter.FormatNull("INT") + " AS c8_int3, "
+                    "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                    "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                    "  " + formatter.FormatNull("INT") + " AS c9_int3, "
                     "  COALESCE("
                     "           (" + getResourcesGrandGrandChildCount + "),"
                     "        		(SELECT COUNT(grandGrandChildLevel.internalId)"
@@ -3962,8 +3975,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "            INNER JOIN Resources AS grandChildLevel ON childLevel.internalId = grandChildLevel.parentId"
                     "            INNER JOIN Resources AS grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId"
                     "            WHERE Lookup.internalId = childLevel.parentId"
-                    "           )) AS c9_big_int1, "
-                    "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                    "           )) AS c10_big_int1, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                     "FROM Lookup ";
             }
             else
@@ -3975,11 +3988,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                     "  " + formatter.FormatNull("TEXT") + " AS c3_string1, "
                     "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
                     "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-                    "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-                    "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-                    "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-                    "  COUNT(grandChildLevel.internalId) AS c9_big_int1, "
-                    "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+                    "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+                    "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+                    "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+                    "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+                    "  COUNT(grandChildLevel.internalId) AS c10_big_int1, "
+                    "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
                     "FROM Lookup "
                     "INNER JOIN Resources childLevel ON Lookup.internalId = childLevel.parentId "
                     "INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId "
@@ -4000,11 +4014,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "  parentLevel.publicId AS c3_string1, "
              "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "  " + formatter.FormatNull("INT") + " AS c6_int1, "
-             "  " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+             "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+             "  " + formatter.FormatNull("INT") + " AS c7_int1, "
+             "  " + formatter.FormatNull("INT") + " AS c8_int2, "
+             "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+             "  " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
              "FROM Lookup "
              "  INNER JOIN Resources currentLevel ON currentLevel.internalId = Lookup.internalId "
              "  INNER JOIN Resources parentLevel ON currentLevel.parentId = parentLevel.internalId ";
@@ -4021,11 +4036,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    instancePublicId AS c3_string1, "
              "    " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "    " + formatter.FormatNull("INT") + " AS c6_int1, "
-             "    " + formatter.FormatNull("INT") + " AS c7_int2, "
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-             "    instanceInternalId AS c9_big_int1, "
-             "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+             "    " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+             "    " + formatter.FormatNull("INT") + " AS c7_int1, "
+             "    " + formatter.FormatNull("INT") + " AS c8_int2, "
+             "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+             "    instanceInternalId AS c10_big_int1, "
+             "    " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
              "   FROM OneInstance ";
 
       sql += "   UNION ALL SELECT"
@@ -4035,11 +4051,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    Metadata.value AS c3_string1, "
              "    " + formatter.FormatNull("TEXT") + " AS c4_string2, "
              "    " + formatter.FormatNull("TEXT") + " AS c5_string3, "
-             "    Metadata.type AS c6_int1, "
+             "    " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
+             "    Metadata.type AS c7_int1, "
              + revisionInC7 +
-             "  " + formatter.FormatNull("INT") + " AS c8_int3, "
-             "    " + formatter.FormatNull("BIGINT") + " AS c9_big_int1, "
-             "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int2 "
+             "  " + formatter.FormatNull("INT") + " AS c9_int3, "
+             "    " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
+             "    " + formatter.FormatNull("BIGINT") + " AS c11_big_int2 "
              "   FROM Metadata "
              "   INNER JOIN OneInstance ON Metadata.id = OneInstance.instanceInternalId";
              
@@ -4050,11 +4067,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
              "    uuid AS c3_string1, "
              "    uncompressedHash AS c4_string2, "
              "    compressedHash AS c5_string3, "
-             "    fileType AS c6_int1, "
+             "    customData AS c6_string4, "
+             "    fileType AS c7_int1, "
              + revisionInC7 +
-             "    compressionType AS c8_int3, "
-             "    compressedSize AS c9_big_int1, "
-             "    uncompressedSize AS c10_big_int2 "
+             "    compressionType AS c9_int3, "
+             "    compressedSize AS c10_big_int1, "
+             "    uncompressedSize AS c11_big_int2 "
              "   FROM AttachedFiles "
              "   INNER JOIN OneInstance ON AttachedFiles.id = OneInstance.instanceInternalId";
 
@@ -4078,7 +4096,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
     
     statement->Execute(formatter.GetDictionary());
-    
+
+    statement->SetResultFieldType(C6_STRING_4, ValueType_BinaryString);
+
     // LOG(INFO) << sql;
 
     std::map<int64_t, Orthanc::DatabasePluginMessages::Find_Response*> responses;
@@ -4110,8 +4130,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
           tag->set_value(statement->ReadString(C3_STRING_1));
-          tag->set_group(statement->ReadInteger32(C6_INT_1));
-          tag->set_element(statement->ReadInteger32(C7_INT_2));
+          tag->set_group(statement->ReadInteger32(C7_INT_1));
+          tag->set_element(statement->ReadInteger32(C8_INT_2));
           }; break;
 
         case QUERY_PARENT_MAIN_DICOM_TAGS:
@@ -4120,8 +4140,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
           tag->set_value(statement->ReadString(C3_STRING_1));
-          tag->set_group(statement->ReadInteger32(C6_INT_1));
-          tag->set_element(statement->ReadInteger32(C7_INT_2));
+          tag->set_group(statement->ReadInteger32(C7_INT_1));
+          tag->set_element(statement->ReadInteger32(C8_INT_2));
         }; break;
 
         case QUERY_GRAND_PARENT_MAIN_DICOM_TAGS:
@@ -4130,8 +4150,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
           tag->set_value(statement->ReadString(C3_STRING_1));
-          tag->set_group(statement->ReadInteger32(C6_INT_1));
-          tag->set_element(statement->ReadInteger32(C7_INT_2));
+          tag->set_group(statement->ReadInteger32(C7_INT_1));
+          tag->set_element(statement->ReadInteger32(C8_INT_2));
         }; break;
 
         case QUERY_CHILDREN_IDENTIFIERS:
@@ -4144,7 +4164,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_CHILDREN_COUNT:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
-          content->set_count(statement->ReadInteger64(C9_BIG_INT_1));
+          content->set_count(statement->ReadInteger64(C10_BIG_INT_1));
         }; break;
 
         case QUERY_CHILDREN_MAIN_DICOM_TAGS:
@@ -4152,8 +4172,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 1));
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
           tag->set_value(statement->ReadString(C3_STRING_1)); // TODO: handle sequences ??
-          tag->set_group(statement->ReadInteger32(C6_INT_1));
-          tag->set_element(statement->ReadInteger32(C7_INT_2));
+          tag->set_group(statement->ReadInteger32(C7_INT_1));
+          tag->set_element(statement->ReadInteger32(C8_INT_2));
         }; break;
 
         case QUERY_CHILDREN_METADATA:
@@ -4162,7 +4182,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
-          metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_key(statement->ReadInteger32(C7_INT_1));
           metadata->set_revision(0);  // Setting a revision is not required in this case, as of Orthanc 1.12.5
         }; break;
 
@@ -4176,7 +4196,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_GRAND_CHILDREN_COUNT:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 2));
-          content->set_count(statement->ReadInteger64(C9_BIG_INT_1));
+          content->set_count(statement->ReadInteger64(C10_BIG_INT_1));
         }; break;
 
         case QUERY_GRAND_CHILDREN_MAIN_DICOM_TAGS:
@@ -4185,8 +4205,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Tag* tag = content->add_main_dicom_tags();
 
           tag->set_value(statement->ReadString(C3_STRING_1)); // TODO: handle sequences ??
-          tag->set_group(statement->ReadInteger32(C6_INT_1));
-          tag->set_element(statement->ReadInteger32(C7_INT_2));
+          tag->set_group(statement->ReadInteger32(C7_INT_1));
+          tag->set_element(statement->ReadInteger32(C8_INT_2));
         }; break;
 
         case QUERY_GRAND_CHILDREN_METADATA:
@@ -4195,7 +4215,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
-          metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_key(statement->ReadInteger32(C7_INT_1));
           metadata->set_revision(0);  // Setting a revision is not required in this case, as of Orthanc 1.12.5
         }; break;
 
@@ -4209,7 +4229,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         case QUERY_GRAND_GRAND_CHILDREN_COUNT:
         {
           Orthanc::DatabasePluginMessages::Find_Response_ChildrenContent* content = GetChildrenContent(responses[internalId], static_cast<Orthanc::DatabasePluginMessages::ResourceType>(request.level() + 3));
-          content->set_count(statement->ReadInteger64(C9_BIG_INT_1));
+          content->set_count(statement->ReadInteger64(C10_BIG_INT_1));
         }; break;
 
         case QUERY_ATTACHMENTS:
@@ -4219,14 +4239,19 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uuid(statement->ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
-          attachment->set_content_type(statement->ReadInteger32(C6_INT_1));
-          attachment->set_compression_type(statement->ReadInteger32(C8_INT_3));
-          attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
-          attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
 
-          if (!statement->IsNull(C7_INT_2))  // revision can be null for files that have been atttached by older Orthanc versions
+          attachment->set_content_type(statement->ReadInteger32(C7_INT_1));
+          attachment->set_compression_type(statement->ReadInteger32(C9_INT_3));
+          attachment->set_compressed_size(statement->ReadInteger64(C10_BIG_INT_1));
+          attachment->set_uncompressed_size(statement->ReadInteger64(C11_BIG_INT_2));
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 8)
+          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
+#endif
+
+          if (!statement->IsNull(C8_INT_2))  // revision can be null for files that have been atttached by older Orthanc versions
           {
-            responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C7_INT_2));
+            responses[internalId]->add_attachments_revisions(statement->ReadInteger32(C8_INT_2));
           }
           else
           {
@@ -4240,11 +4265,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
-          metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_key(statement->ReadInteger32(C7_INT_1));
           
-          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          if (!statement->IsNull(C8_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
           {
-            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+            metadata->set_revision(statement->ReadInteger32(C8_INT_2));
           }
           else
           {
@@ -4258,11 +4283,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
-          metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_key(statement->ReadInteger32(C7_INT_1));
 
-          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          if (!statement->IsNull(C8_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
           {
-            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+            metadata->set_revision(statement->ReadInteger32(C8_INT_2));
           }
           else
           {
@@ -4276,11 +4301,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = content->add_metadata();
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
-          metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_key(statement->ReadInteger32(C7_INT_1));
 
-          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          if (!statement->IsNull(C8_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
           {
-            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+            metadata->set_revision(statement->ReadInteger32(C8_INT_2));
           }
           else
           {
@@ -4302,11 +4327,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           Orthanc::DatabasePluginMessages::Find_Response_Metadata* metadata = responses[internalId]->add_one_instance_metadata();
 
           metadata->set_value(statement->ReadString(C3_STRING_1));
-          metadata->set_key(statement->ReadInteger32(C6_INT_1));
+          metadata->set_key(statement->ReadInteger32(C7_INT_1));
 
-          if (!statement->IsNull(C7_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
+          if (!statement->IsNull(C8_INT_2))  // revision can be null for metadata that have been created by older Orthanc versions
           {
-            metadata->set_revision(statement->ReadInteger32(C7_INT_2));
+            metadata->set_revision(statement->ReadInteger32(C8_INT_2));
           }
           else
           {
@@ -4320,10 +4345,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           attachment->set_uuid(statement->ReadString(C3_STRING_1));
           attachment->set_uncompressed_hash(statement->ReadString(C4_STRING_2));
           attachment->set_compressed_hash(statement->ReadString(C5_STRING_3));
-          attachment->set_content_type(statement->ReadInteger32(C6_INT_1));
-          attachment->set_compression_type(statement->ReadInteger32(C8_INT_3));
-          attachment->set_compressed_size(statement->ReadInteger64(C9_BIG_INT_1));
-          attachment->set_uncompressed_size(statement->ReadInteger64(C10_BIG_INT_2));
+          attachment->set_content_type(statement->ReadInteger32(C7_INT_1));
+          attachment->set_compression_type(statement->ReadInteger32(C9_INT_3));
+          attachment->set_compressed_size(statement->ReadInteger64(C10_BIG_INT_1));
+          attachment->set_uncompressed_size(statement->ReadInteger64(C11_BIG_INT_2));
+
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 8)
+          attachment->set_custom_data(statement->ReadStringOrNull(C6_STRING_4));
+#endif
         }; break;
 
         default:
@@ -4332,5 +4361,326 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement->Next();
     }    
   }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+    void IndexBackend::StoreKeyValue(DatabaseManager& manager,
+                                     const std::string& storeId,
+                                     const std::string& key,
+                                     const std::string& value)
+    {
+      // TODO: that probably needs to be adapted in ODBC and MySQL
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO KeyValueStores VALUES(${storeId}, ${key}, ${value}) ON CONFLICT (storeId, key) DO UPDATE SET value = EXCLUDED.value;");
+
+      statement.SetParameterType("storeId", ValueType_Utf8String);
+      statement.SetParameterType("key", ValueType_Utf8String);
+      statement.SetParameterType("value", ValueType_BinaryString);
+
+      Dictionary args;
+      args.SetUtf8Value("storeId", storeId);
+      args.SetUtf8Value("key", key);
+      args.SetBinaryValue("value", value);
+
+      statement.Execute(args);
+    }
+
+    void IndexBackend::DeleteKeyValue(DatabaseManager& manager,
+                                      const std::string& storeId,
+                                      const std::string& key)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM KeyValueStores WHERE storeId = ${storeId} AND key = ${key}");
+
+      statement.SetParameterType("storeId", ValueType_Utf8String);
+      statement.SetParameterType("key", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("storeId", storeId);
+      args.SetUtf8Value("key", key);
+
+      statement.Execute(args);
+    }
+
+    bool IndexBackend::GetKeyValue(std::string& value,
+                                   DatabaseManager& manager,
+                                   const std::string& storeId,
+                                   const std::string& key)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT value FROM KeyValueStores WHERE storeId = ${storeId} AND key = ${key}");
+        
+      statement.SetReadOnly(true);
+      statement.SetParameterType("storeId", ValueType_Utf8String);
+      statement.SetParameterType("key", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("storeId", storeId);
+      args.SetUtf8Value("key", key);
+
+      statement.Execute(args);
+      statement.SetResultFieldType(0, ValueType_BinaryString);
+
+      if (statement.IsDone())
+      {
+        return false;
+      }
+      else
+      {
+        value = statement.ReadString(0);
+        return true;
+      }
+    }                  
+
+    void IndexBackend::ListKeysValues(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                      DatabaseManager& manager,
+                                      const Orthanc::DatabasePluginMessages::ListKeysValues_Request& request)
+    {
+      response.mutable_list_keys_values()->Clear();
+
+      LookupFormatter formatter(manager.GetDialect());
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+      
+      std::string storeIdParameter = formatter.GenerateParameter(request.store_id());
+
+      if (request.from_first())
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " ORDER BY key ASC " + formatter.FormatLimits(0, request.limit())));
+      }
+      else
+      {
+        std::string fromKeyParameter = formatter.GenerateParameter(request.from_key());
+        statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT key, value FROM KeyValueStores WHERE storeId= " + storeIdParameter + " AND key > " + fromKeyParameter + " ORDER BY key ASC " + formatter.FormatLimits(0, request.limit())));
+      }
+
+      statement->Execute(formatter.GetDictionary());
+
+      if (!statement->IsDone())
+      {
+        if (statement->GetResultFieldsCount() != 2)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        
+        statement->SetResultFieldType(0, ValueType_Utf8String);
+        statement->SetResultFieldType(1, ValueType_BinaryString);
+
+        while (!statement->IsDone())
+        {
+          Orthanc::DatabasePluginMessages::ListKeysValues_Response_KeyValue* kv = response.mutable_list_keys_values()->add_keys_values();
+          kv->set_key(statement->ReadString(0));
+          kv->set_value(statement->ReadString(1));
+
+          statement->Next();
+        }
+      }
+
+    }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    void IndexBackend::EnqueueValue(DatabaseManager& manager,
+                                    const std::string& queueId,
+                                    const std::string& value)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO Queues VALUES(${AUTOINCREMENT} ${queueId}, ${value})");
+
+      statement.SetParameterType("queueId", ValueType_Utf8String);
+      statement.SetParameterType("value", ValueType_BinaryString);
+
+      Dictionary args;
+      args.SetUtf8Value("queueId", queueId);
+      args.SetBinaryValue("value", value);
+
+      statement.Execute(args);
+    }
+
+
+    bool IndexBackend::DequeueValueSQLite(std::string& value,
+                                          DatabaseManager& manager,
+                                          const std::string& queueId,
+                                          bool fromFront)
+    {
+      assert(manager.GetDialect() == Dialect_SQLite);
+
+      LookupFormatter formatter(manager.GetDialect());
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+      std::string queueIdParameter = formatter.GenerateParameter(queueId);
+
+      if (fromFront)
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id ASC LIMIT 1"));
+      }
+      else
+      {
+        statement.reset(new DatabaseManager::CachedStatement(
+                          STATEMENT_FROM_HERE, manager,
+                          "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1"));
+      }
+
+      statement->Execute(formatter.GetDictionary());
+
+      if (statement->IsDone())
+      {
+        return false;
+      }
+      else
+      {
+        statement->SetResultFieldType(0, ValueType_Integer64);
+        statement->SetResultFieldType(1, ValueType_BinaryString);
+
+        value = statement->ReadString(1);
+
+        {
+          DatabaseManager::CachedStatement s2(STATEMENT_FROM_HERE, manager,
+                                              "DELETE FROM Queues WHERE id=${id}");
+
+          s2.SetParameterType("id", ValueType_Integer64);
+
+          Dictionary args;
+          args.SetIntegerValue("id", statement->ReadInteger64(0));
+
+          s2.Execute(args);
+        }
+
+        return true;
+      }
+    }
+
+
+    bool IndexBackend::DequeueValue(std::string& value,
+                                    DatabaseManager& manager,
+                                    const std::string& queueId,
+                                    bool fromFront)
+    {
+      if (manager.GetDialect() == Dialect_SQLite)
+      {
+        return DequeueValueSQLite(value, manager, queueId, fromFront);
+      }
+      else
+      {
+        LookupFormatter formatter(manager.GetDialect());
+
+        std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+        std::string queueIdParameter = formatter.GenerateParameter(queueId);
+
+        switch (manager.GetDialect())
+        {
+          case Dialect_PostgreSQL:
+            if (fromFront)
+            {
+              statement.reset(new DatabaseManager::CachedStatement(
+                                STATEMENT_FROM_HERE, manager,
+                                "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                                "SELECT value FROM poppedRows"));
+            }
+            else
+            {
+              statement.reset(new DatabaseManager::CachedStatement(
+                                STATEMENT_FROM_HERE, manager,
+                                "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
+                                "SELECT value FROM poppedRows"));
+            }
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        }
+
+        statement->Execute(formatter.GetDictionary());
+
+        if (statement->IsDone())
+        {
+          return false;
+        }
+        else
+        {
+          statement->SetResultFieldType(0, ValueType_BinaryString);
+          value = statement->ReadString(0);
+          return true;
+        }
+      }
+    }
+
+    uint64_t IndexBackend::GetQueueSize(DatabaseManager& manager,
+                                        const std::string& queueId)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT COUNT(*) FROM Queues WHERE queueId = ${queueId}");
+        
+      statement.SetReadOnly(true);
+      statement.SetParameterType("queueId", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("queueId", queueId);
+
+      statement.Execute(args);
+      statement.SetResultFieldType(0, ValueType_Integer64);
+
+      return statement.ReadInteger64(0);
+    }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    void IndexBackend::GetAttachmentCustomData(std::string& customData,
+                                               DatabaseManager& manager,
+                                               const std::string& attachmentUuid)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT customData FROM AttachedFiles WHERE uuid = ${uuid}");
+
+      statement.SetReadOnly(true);
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("uuid", attachmentUuid);
+
+      statement.Execute(args);
+      statement.SetResultFieldType(8, ValueType_BinaryString);
+
+      if (statement.IsDone())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "Nonexistent attachment: " + attachmentUuid);
+      }
+      else
+      {
+        customData = statement.ReadStringOrNull(0);
+      }
+    }
+
+    void  IndexBackend::SetAttachmentCustomData(DatabaseManager& manager,
+                                                const std::string& attachmentUuid,
+                                                const std::string& customData)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "UPDATE AttachedFiles SET customData = ${customData} WHERE uuid = ${uuid}");
+
+      statement.SetParameterType("uuid", ValueType_Utf8String);
+      statement.SetParameterType("customData", ValueType_Utf8String);
+
+      Dictionary args;
+      args.SetUtf8Value("uuid", attachmentUuid);
+      args.SetBinaryValue("customData", customData);
+
+      statement.Execute(args);
+    }
 #endif
 }

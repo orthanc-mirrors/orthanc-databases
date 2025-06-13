@@ -19,7 +19,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(OrthancMySQL)
 
 set(ORTHANC_PLUGIN_VERSION "mainline")
@@ -91,6 +91,7 @@ EmbedResources(
   MYSQL_PREPARE_INDEX          ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
   MYSQL_GET_LAST_CHANGE_INDEX  ${CMAKE_SOURCE_DIR}/Plugins/GetLastChangeIndex.sql
   MYSQL_CREATE_INSTANCE        ${CMAKE_SOURCE_DIR}/Plugins/CreateInstance.sql
+  MYSQL_INSTALL_REVISION_AND_CUSTOM_DATA  ${CMAKE_SOURCE_DIR}/Plugins/InstallRevisionAndCustomData.sql
   MYSQL_DELETE_RESOURCES       ${CMAKE_SOURCE_DIR}/Plugins/DeleteResources.sql
   )
 

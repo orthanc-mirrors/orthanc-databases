@@ -1,4 +1,4 @@
--- This file contains an SQL procedure to downgrade from schema Rev3 to Rev2 (version = 6, revision = 1).
+-- This file contains an SQL procedure to downgrade from schema Rev3 to Rev2 (version = 6).
   -- It actually deletes the ChildCount table and triggers
   -- It actually does not uninstall ChildrenIndex2 because it is anyway more efficient than 
      -- ChildrenIndex and is not incompatible with previous revisions.

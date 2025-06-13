@@ -84,6 +84,13 @@ namespace OrthancDatabases
                                        const Dictionary& args,
                                        uint32_t limit);
 
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    bool DequeueValueSQLite(std::string& value,
+                            DatabaseManager& manager,
+                            const std::string& queueId,
+                            bool fromFront);
+#endif
+
   public:
     explicit IndexBackend(OrthancPluginContext* context,
                           bool readOnly,
@@ -102,7 +109,16 @@ namespace OrthancDatabases
                                int64_t id,
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) ORTHANC_OVERRIDE;
-    
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    // New in Orthanc 1.12.8
+    virtual void AddAttachment(DatabaseManager& manager,
+                               int64_t id,
+                               const OrthancPluginAttachment& attachment,
+                               int64_t revision,
+                               const std::string& customData) ORTHANC_OVERRIDE;
+#endif
+
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,
                              int64_t child) ORTHANC_OVERRIDE;
@@ -457,6 +473,52 @@ namespace OrthancDatabases
     virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                               DatabaseManager& manager,
                               const Orthanc::DatabasePluginMessages::Find_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+    virtual void StoreKeyValue(DatabaseManager& manager,
+                               const std::string& storeId,
+                               const std::string& key,
+                               const std::string& value) ORTHANC_OVERRIDE;
+
+    virtual void DeleteKeyValue(DatabaseManager& manager,
+                                const std::string& storeId,
+                                const std::string& key) ORTHANC_OVERRIDE;
+
+    virtual bool GetKeyValue(std::string& value,
+                             DatabaseManager& manager,
+                             const std::string& storeId,
+                             const std::string& key) ORTHANC_OVERRIDE;
+
+    virtual void ListKeysValues(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                DatabaseManager& manager,
+                                const Orthanc::DatabasePluginMessages::ListKeysValues_Request& request) ORTHANC_OVERRIDE;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    virtual void EnqueueValue(DatabaseManager& manager,
+                              const std::string& queueId,
+                              const std::string& value) ORTHANC_OVERRIDE;
+
+    virtual bool DequeueValue(std::string& value,
+                              DatabaseManager& manager,
+                              const std::string& queueId,
+                              bool fromFront) ORTHANC_OVERRIDE;
+
+    virtual uint64_t GetQueueSize(DatabaseManager& manager,
+                                  const std::string& queueId) ORTHANC_OVERRIDE;
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    virtual void GetAttachmentCustomData(std::string& customData,
+                                         DatabaseManager& manager,
+                                         const std::string& attachmentUuid) ORTHANC_OVERRIDE;
+
+    virtual void SetAttachmentCustomData(DatabaseManager& manager,
+                                         const std::string& attachmentUuid,
+                                         const std::string& customData) ORTHANC_OVERRIDE;
+
 #endif
 
     virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE

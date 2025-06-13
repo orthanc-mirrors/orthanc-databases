@@ -19,7 +19,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(OrthancPostgreSQL)
 
 set(ORTHANC_PLUGIN_VERSION "mainline")
@@ -94,6 +94,7 @@ EmbedResources(
   POSTGRESQL_UPGRADE_REV1_TO_REV2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev1ToRev2.sql
   POSTGRESQL_UPGRADE_REV2_TO_REV3    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev2ToRev3.sql
   POSTGRESQL_UPGRADE_REV3_TO_REV4    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev3ToRev4.sql
+  POSTGRESQL_UPGRADE_REV4_TO_REV5    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev4ToRev5.sql
   )
 
 

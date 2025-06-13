@@ -19,7 +19,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(OrthancSQLite)
 
 set(ORTHANC_PLUGIN_VERSION "mainline")
@@ -55,6 +55,7 @@ include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginConfiguration.cmak
 
 EmbedResources(
   SQLITE_PREPARE_INDEX ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
+  SQLITE_INSTALL_CUSTOM_DATA ${CMAKE_SOURCE_DIR}/Plugins/InstallCustomData.sql
   )
 
 if (EXISTS ${ORTHANC_SDK_ROOT}/orthanc/OrthancDatabasePlugin.proto)

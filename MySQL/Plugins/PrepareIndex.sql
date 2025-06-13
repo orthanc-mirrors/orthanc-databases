@@ -48,6 +48,8 @@ CREATE TABLE AttachedFiles(
        compressionType INTEGER,
        uncompressedHash VARCHAR(40),
        compressedHash VARCHAR(40),
+       -- revision INTEGER,          -- new in v 4.X, added in MySQLIndex::ConfigureDatabase
+       -- customData LONGTEXT,       -- new in v 4.X, added in MySQLIndex::ConfigureDatabase
        PRIMARY KEY(id, fileType),
        CONSTRAINT AttachedFiles1 FOREIGN KEY (id) REFERENCES Resources(internalId) ON DELETE CASCADE
        );              
@@ -104,6 +106,8 @@ CREATE TABLE DeletedFiles(
        compressionType INTEGER,        -- 4
        uncompressedHash VARCHAR(40),   -- 5
        compressedHash VARCHAR(40)      -- 6
+       -- revision INTEGER,          -- new in v 4.X, added in MySQLIndex::ConfigureDatabase
+       -- customData LONGTEXT,       -- new in v 4.X, added in MySQLIndex::ConfigureDatabase
        );
 -- End of differences
 
@@ -119,6 +123,8 @@ BEGIN
   INSERT INTO DeletedFiles VALUES(old.uuid, old.filetype, old.compressedSize,
                                   old.uncompressedSize, old.compressionType,
                                   old.uncompressedHash, old.compressedHash)@
+                                  -- old.revision, old.customData    -- new in v 4.X, added in MySQLIndex::ConfigureDatabase
+
 END;
 
 
@@ -127,6 +133,7 @@ BEFORE DELETE ON Resources   -- WARNING: Must be "BEFORE", otherwise the attache
 FOR EACH ROW
 BEGIN
    INSERT INTO DeletedFiles SELECT uuid, fileType, compressedSize, uncompressedSize, compressionType, uncompressedHash, compressedHash FROM AttachedFiles WHERE id=old.internalId@
+                                  -- revision, customData    -- new in v 4.X, added in MySQLIndex::ConfigureDatabase
 END;
 
 

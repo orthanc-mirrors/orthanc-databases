@@ -1,4 +1,4 @@
--- This file contains part of the changes required to upgrade from Revision 1 to Revision 2 (DB version 6 and revision 1)
+-- This file contains part of the changes required to upgrade from Revision 1 to Revision 2 (DB version 6)
 -- It actually contains only the changes that:
    -- can not be executed with an idempotent statement in SQL
    -- or would polute the PrepareIndex.sql

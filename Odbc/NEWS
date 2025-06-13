@@ -21,7 +21,6 @@ Release 1.2 (2024-03-06)
 * Now detecting communication link failure with the DB and retrying to connect.
 * Fixed "MaximumConnectionRetries" configuration that was not taken into account.
 
-
 Release 1.1 (2021-12-06)
 ========================
 

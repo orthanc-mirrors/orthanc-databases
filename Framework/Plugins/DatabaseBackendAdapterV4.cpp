@@ -195,7 +195,8 @@ namespace OrthancDatabases
                                          const std::string& uncompressedHash,
                                          int32_t            compressionType,
                                          uint64_t           compressedSize,
-                                         const std::string& compressedHash) ORTHANC_OVERRIDE
+                                         const std::string& compressedHash,
+                                         const std::string& customData) ORTHANC_OVERRIDE
     {
       Orthanc::DatabasePluginMessages::FileInfo* attachment;
 
@@ -224,6 +225,10 @@ namespace OrthancDatabases
       attachment->set_compression_type(compressionType);
       attachment->set_compressed_size(compressedSize);
       attachment->set_compressed_hash(compressedHash);
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+      attachment->set_custom_data(customData);
+#endif
     }
 
     virtual void SignalDeletedResource(const std::string& publicId,
@@ -269,7 +274,8 @@ namespace OrthancDatabases
                                   const std::string& uncompressedHash,
                                   int32_t            compressionType,
                                   uint64_t           compressedSize,
-                                  const std::string& compressedHash) ORTHANC_OVERRIDE
+                                  const std::string& compressedHash,
+                                  const std::string& customData) ORTHANC_OVERRIDE
     {
       if (lookupAttachment_ != NULL)
       {
@@ -286,6 +292,9 @@ namespace OrthancDatabases
         lookupAttachment_->mutable_attachment()->set_compression_type(compressionType);
         lookupAttachment_->mutable_attachment()->set_compressed_size(compressedSize);
         lookupAttachment_->mutable_attachment()->set_compressed_hash(compressedHash);
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+        lookupAttachment_->mutable_attachment()->set_custom_data(customData);
+#endif
       }
       else
       {
@@ -445,6 +454,18 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_has_extended_changes(accessor.GetBackend().HasExtendedChanges());
 #endif
 
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+        response.mutable_get_system_information()->set_has_attachment_custom_data(accessor.GetBackend().HasAttachmentCustomDataSupport());
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+        response.mutable_get_system_information()->set_supports_queues(accessor.GetBackend().HasQueues());
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+        response.mutable_get_system_information()->set_supports_key_value_stores(accessor.GetBackend().HasKeyValueStores());
+#endif
+
         break;
       }
 
@@ -472,16 +493,12 @@ namespace OrthancDatabases
       }
 
       case Orthanc::DatabasePluginMessages::OPERATION_CLOSE:
-      {
         pool.CloseConnections();
         break;
-      }
 
       case Orthanc::DatabasePluginMessages::OPERATION_FLUSH_TO_DISK:
-      {
         // Raise an exception since "set_supports_flush_to_disk(false)"
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
-      }
 
       case Orthanc::DatabasePluginMessages::OPERATION_START_TRANSACTION:
       {
@@ -669,16 +686,12 @@ namespace OrthancDatabases
     switch (request.operation())
     {
       case Orthanc::DatabasePluginMessages::OPERATION_ROLLBACK:
-      {
         manager.RollbackTransaction();
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_COMMIT:
-      {
         manager.CommitTransaction();
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_ADD_ATTACHMENT:
       {
@@ -690,22 +703,24 @@ namespace OrthancDatabases
         attachment.compressionType = request.add_attachment().attachment().compression_type();
         attachment.compressedSize = request.add_attachment().attachment().compressed_size();
         attachment.compressedHash = request.add_attachment().attachment().compressed_hash().c_str();
-        
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+        backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision(),
+                              request.add_attachment().attachment().custom_data());
+#else
         backend.AddAttachment(manager, request.add_attachment().id(), attachment, request.add_attachment().revision());
+#endif
+
         break;
       }
-      
+
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_CHANGES:
-      {
         backend.ClearChanges(manager);
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_EXPORTED_RESOURCES:
-      {
         backend.ClearExportedResources(manager);
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_DELETE_ATTACHMENT:
       {
@@ -715,10 +730,8 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_DELETE_METADATA:
-      {
         backend.DeleteMetadata(manager, request.delete_metadata().id(), request.delete_metadata().type());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_DELETE_RESOURCE:
       {
@@ -788,6 +801,7 @@ namespace OrthancDatabases
         response.mutable_get_changes()->set_done(done);
         break;
       }
+
 #if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
       case Orthanc::DatabasePluginMessages::OPERATION_GET_CHANGES_EXTENDED:
       {
@@ -895,16 +909,12 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_GET_TOTAL_COMPRESSED_SIZE:
-      {
         response.mutable_get_total_compressed_size()->set_size(backend.GetTotalCompressedSize(manager));
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_GET_TOTAL_UNCOMPRESSED_SIZE:
-      {
         response.mutable_get_total_uncompressed_size()->set_size(backend.GetTotalUncompressedSize(manager));
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_IS_PROTECTED_PATIENT:
       {
@@ -928,16 +938,13 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_LOG_CHANGE:
-      {
         backend.LogChange(manager, request.log_change().change_type(),
                           request.log_change().resource_id(),
                           Convert(request.log_change().resource_type()),
                           request.log_change().date().c_str());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_LOG_EXPORTED_RESOURCE:
-      {
         backend.LogExportedResource(manager,
                                     Convert(request.log_exported_resource().resource_type()),
                                     request.log_exported_resource().public_id().c_str(),
@@ -948,7 +955,6 @@ namespace OrthancDatabases
                                     request.log_exported_resource().series_instance_uid().c_str(),
                                     request.log_exported_resource().sop_instance_uid().c_str());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_ATTACHMENT:
       {
@@ -1094,34 +1100,26 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_SET_GLOBAL_PROPERTY:
-      {
         backend.SetGlobalProperty(manager, request.set_global_property().server_id().c_str(),
                                   request.set_global_property().property(),
                                   request.set_global_property().value().c_str());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_CLEAR_MAIN_DICOM_TAGS:
-      {
         backend.ClearMainDicomTags(manager, request.clear_main_dicom_tags().id());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_SET_METADATA:
-      {
         backend.SetMetadata(manager, request.set_metadata().id(),
                             request.set_metadata().metadata_type(),
                             request.set_metadata().value().c_str(),
                             request.set_metadata().revision());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_SET_PROTECTED_PATIENT:
-      {
         backend.SetProtectedPatient(manager, request.set_protected_patient().patient_id(),
                                     request.set_protected_patient().protected_patient());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_IS_DISK_SIZE_ABOVE:
       {
@@ -1131,10 +1129,8 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCES:
-      {
         ApplyLookupResources(*response.mutable_lookup_resources(), request.lookup_resources(), backend, manager);
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_CREATE_INSTANCE:
       {
@@ -1236,10 +1232,8 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_GET_LAST_CHANGE_INDEX:
-      {
         response.mutable_get_last_change_index()->set_result(backend.GetLastChangeIndex(manager));
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_LOOKUP_RESOURCE_AND_PARENT:
       {
@@ -1288,16 +1282,12 @@ namespace OrthancDatabases
       }
       
       case Orthanc::DatabasePluginMessages::OPERATION_ADD_LABEL:
-      {
         backend.AddLabel(manager, request.add_label().id(), request.add_label().label());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_REMOVE_LABEL:
-      {
         backend.RemoveLabel(manager, request.remove_label().id(), request.remove_label().label());
         break;
-      }
       
       case Orthanc::DatabasePluginMessages::OPERATION_LIST_LABELS:
       {
@@ -1323,16 +1313,96 @@ namespace OrthancDatabases
       
 #if ORTHANC_PLUGINS_HAS_INTEGRATED_FIND == 1
       case Orthanc::DatabasePluginMessages::OPERATION_FIND:
-      {
         backend.ExecuteFind(response, manager, request.find());
+        break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_COUNT_RESOURCES:
+        backend.ExecuteCount(response, manager, request.find());
+        break;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_STORE_KEY_VALUE:
+        backend.StoreKeyValue(manager, 
+                              request.store_key_value().store_id(),
+                              request.store_key_value().key(),
+                              request.store_key_value().value());
+        break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_KEY_VALUE:
+      {
+        std::string value;
+        bool found = backend.GetKeyValue(value, manager,
+                                         request.get_key_value().store_id(),
+                                         request.get_key_value().key());
+        response.mutable_get_key_value()->set_found(found);
+
+        if (found)
+        {
+          response.mutable_get_key_value()->set_value(value);
+        }
         break;
       }
 
-      case Orthanc::DatabasePluginMessages::OPERATION_COUNT_RESOURCES:
+      case Orthanc::DatabasePluginMessages::OPERATION_DELETE_KEY_VALUE:
+        backend.DeleteKeyValue(manager, 
+                               request.delete_key_value().store_id(),
+                               request.delete_key_value().key());
+        break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_LIST_KEY_VALUES:
+        backend.ListKeysValues(response, manager, request.list_keys_values());
+        break;
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_ENQUEUE_VALUE:
+        backend.EnqueueValue(manager,
+                             request.enqueue_value().queue_id(),
+                             request.enqueue_value().value());
+        break;
+
+      case Orthanc::DatabasePluginMessages::OPERATION_DEQUEUE_VALUE:
       {
-        backend.ExecuteCount(response, manager, request.find());
+        std::string value;
+        bool found = backend.DequeueValue(value, manager,
+                                          request.dequeue_value().queue_id(),
+                                          request.dequeue_value().origin() == Orthanc::DatabasePluginMessages::QUEUE_ORIGIN_FRONT);
+        response.mutable_dequeue_value()->set_found(found);
+        
+        if (found)
+        {
+          response.mutable_dequeue_value()->set_value(value);
+        }
+
         break;
       }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_QUEUE_SIZE:
+      {
+        uint64_t size = backend.GetQueueSize(manager,
+                                             request.get_queue_size().queue_id());
+        response.mutable_get_queue_size()->set_size(size);
+        break;
+      }
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_GET_ATTACHMENT_CUSTOM_DATA:
+      {
+        std::string customData;
+        backend.GetAttachmentCustomData(customData, manager, request.get_attachment_custom_data().uuid());
+        response.mutable_get_attachment_custom_data()->set_custom_data(customData);
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_SET_ATTACHMENT_CUSTOM_DATA:
+        backend.SetAttachmentCustomData(manager,
+                                        request.set_attachment_custom_data().uuid(),
+                                        request.set_attachment_custom_data().custom_data());
+        break;
 #endif
 
       default:
@@ -1381,8 +1451,8 @@ namespace OrthancDatabases
         }
           
         default:
-          LOG(ERROR) << "Not implemented request type from protobuf: " << request.type();
-          break;
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Not implemented request type from protobuf: " +
+                                          boost::lexical_cast<std::string>(request.type()));
       }
 
       std::string s;

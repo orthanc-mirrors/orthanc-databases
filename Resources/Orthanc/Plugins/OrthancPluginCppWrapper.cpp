@@ -26,6 +26,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/move/unique_ptr.hpp>
 #include <boost/thread.hpp>
+#include <boost/algorithm/string/join.hpp>
 
 
 #include <json/reader.h>
@@ -2051,6 +2052,26 @@ namespace OrthancPlugins
             DoPost(target, index, uri, body, headers));
   }
 
+  bool OrthancPeers::DoPost(Json::Value& target,
+                            size_t index,
+                            const std::string& uri,
+                            const std::string& body,
+                            const HttpHeaders& headers, 
+                            unsigned int timeout) const
+  {
+    MemoryBuffer buffer;
+
+    if (DoPost(buffer, index, uri, body, headers, timeout))
+    {
+      buffer.ToJson(target);
+      return true;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
 
   bool OrthancPeers::DoPost(Json::Value& target,
                             size_t index,
@@ -2098,6 +2119,17 @@ namespace OrthancPlugins
                             const std::string& body,
                             const HttpHeaders& headers) const
   {
+    return DoPost(target, index, uri, body, headers, timeout_);
+  }
+
+
+  bool OrthancPeers::DoPost(MemoryBuffer& target,
+                            size_t index,
+                            const std::string& uri,
+                            const std::string& body,
+                            const HttpHeaders& headers,
+                            unsigned int timeout) const
+  {
     if (index >= index_.size())
     {
       ORTHANC_PLUGINS_THROW_PLUGIN_ERROR_CODE(OrthancPluginErrorCode_ParameterOutOfRange);
@@ -2116,7 +2148,7 @@ namespace OrthancPlugins
     OrthancPluginErrorCode code = OrthancPluginCallPeerApi
       (GetGlobalContext(), *answer, NULL, &status, peers_,
        static_cast<uint32_t>(index), OrthancPluginHttpMethod_Post, uri.c_str(),
-       pluginHeaders.GetSize(), pluginHeaders.GetKeys(), pluginHeaders.GetValues(), body.empty() ? NULL : body.c_str(), body.size(), timeout_);
+       pluginHeaders.GetSize(), pluginHeaders.GetKeys(), pluginHeaders.GetValues(), body.empty() ? NULL : body.c_str(), body.size(), timeout);
 
     if (code == OrthancPluginErrorCode_Success)
     {
@@ -4077,6 +4109,26 @@ namespace OrthancPlugins
     }    
   }
 
+  void SerializeGetArguments(std::string& output, const OrthancPluginHttpRequest* request)
+  {
+    output.clear();
+    std::vector<std::string> arguments;
+    for (uint32_t i = 0; i < request->getCount; ++i)
+    {
+      if (request->getValues[i] && strlen(request->getValues[i]) > 0)
+      {
+        arguments.push_back(std::string(request->getKeys[i]) + "=" + std::string(request->getValues[i]));
+      }
+      else
+      {
+        arguments.push_back(std::string(request->getKeys[i]));
+      }
+    }
+
+    output = boost::algorithm::join(arguments, "&");
+  }
+
+
 #if !ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 4)
   static void SetPluginProperty(const std::string& pluginIdentifier,
                                 _OrthancPluginProperty property,
@@ -4129,6 +4181,24 @@ namespace OrthancPlugins
     afterPlugins_(false),
     httpStatus_(0)
   {
+  }
+
+  RestApiClient::RestApiClient(const char* url,
+                               const OrthancPluginHttpRequest* request) :
+    method_(request->method),
+    path_(url),
+    afterPlugins_(false),
+    httpStatus_(0)
+  {
+    OrthancPlugins::GetHttpHeaders(requestHeaders_, request);
+
+    std::string getArguments;
+    OrthancPlugins::SerializeGetArguments(getArguments, request);
+
+    if (!getArguments.empty())
+    {
+      path_ += "?" + getArguments;
+    }
   }
 #endif
 
@@ -4194,6 +4264,32 @@ namespace OrthancPlugins
         ORTHANC_PLUGINS_THROW_PLUGIN_ERROR_CODE(code);
       }
     }
+  }
+
+  void RestApiClient::Forward(OrthancPluginContext* context, OrthancPluginRestOutput* output)
+  {
+    if (Execute() && httpStatus_ == 200)
+    {
+      const char* mimeType = NULL;
+      for (HttpHeaders::const_iterator h = answerHeaders_.begin(); h != answerHeaders_.end(); ++h)
+      {
+        if (h->first == "content-type")
+        {
+          mimeType = h->second.c_str();
+        }
+      }
+      
+      AnswerString(answerBody_, mimeType, output);
+    }
+    else
+    {
+      AnswerHttpError(httpStatus_, output);
+    }
+  }
+
+  bool RestApiClient::GetAnswerJson(Json::Value& output) const
+  {
+    return ReadJson(output, answerBody_);
   }
 #endif
 

@@ -468,62 +468,64 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InexistentItem);
       }
 
-      ValueType type = formatter_.GetParameterType(i);
-
       const IValue& value = parameters.GetValue(name);
-      if (value.GetType() != type)
+
+      if (value.GetType() == ValueType_Null)
       {
-        LOG(ERROR) << "Bad type of argument provided to a SQL query: " << name;
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
+        inputs[i].buffer = NULL;
+        inputs[i].buffer_type = MYSQL_TYPE_NULL;
       }
-
-      // https://dev.mysql.com/doc/refman/8.0/en/c-api-prepared-statement-type-codes.html
-      switch (type)
+      else
       {
-        case ValueType_Integer64:
+        ValueType type = formatter_.GetParameterType(i);
+  
+        if (value.GetType() != type)
         {
-          int64Parameters.push_back(dynamic_cast<const Integer64Value&>(value).GetValue());
-          inputs[i].buffer = &int64Parameters.back();
-          inputs[i].buffer_type = MYSQL_TYPE_LONGLONG;
-          break;
+          LOG(ERROR) << "Bad type of argument provided to a SQL query: " << name;
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
         }
 
-        case ValueType_Utf8String:
+        // https://dev.mysql.com/doc/refman/8.0/en/c-api-prepared-statement-type-codes.html
+        switch (type)
         {
-          const std::string& utf8 = dynamic_cast<const Utf8StringValue&>(value).GetContent();
-          inputs[i].buffer = const_cast<char*>(utf8.c_str());
-          inputs[i].buffer_length = utf8.size();
-          inputs[i].buffer_type = MYSQL_TYPE_STRING;
-          break;
-        }
+          case ValueType_Integer64:
+          {
+            int64Parameters.push_back(dynamic_cast<const Integer64Value&>(value).GetValue());
+            inputs[i].buffer = &int64Parameters.back();
+            inputs[i].buffer_type = MYSQL_TYPE_LONGLONG;
+            break;
+          }
 
-        case ValueType_BinaryString:
-        {
-          const std::string& content = dynamic_cast<const BinaryStringValue&>(value).GetContent();
-          inputs[i].buffer = const_cast<char*>(content.c_str());
-          inputs[i].buffer_length = content.size();
-          inputs[i].buffer_type = MYSQL_TYPE_BLOB;
-          break;
-        }
+          case ValueType_Utf8String:
+          {
+            const std::string& utf8 = dynamic_cast<const Utf8StringValue&>(value).GetContent();
+            inputs[i].buffer = const_cast<char*>(utf8.c_str());
+            inputs[i].buffer_length = utf8.size();
+            inputs[i].buffer_type = MYSQL_TYPE_STRING;
+            break;
+          }
 
-        case ValueType_InputFile:
-        {
-          const std::string& content = dynamic_cast<const InputFileValue&>(value).GetContent();
-          inputs[i].buffer = const_cast<char*>(content.c_str());
-          inputs[i].buffer_length = content.size();
-          inputs[i].buffer_type = MYSQL_TYPE_BLOB;
-          break;
-        }
+          case ValueType_BinaryString:
+          {
+            const std::string& content = dynamic_cast<const BinaryStringValue&>(value).GetContent();
+            inputs[i].buffer = const_cast<char*>(content.c_str());
+            inputs[i].buffer_length = content.size();
+            inputs[i].buffer_type = MYSQL_TYPE_BLOB;
+            break;
+          }
 
-        case ValueType_Null:
-        {
-          inputs[i].buffer = NULL;
-          inputs[i].buffer_type = MYSQL_TYPE_NULL;
-          break;
-        }
+          case ValueType_InputFile:
+          {
+            const std::string& content = dynamic_cast<const InputFileValue&>(value).GetContent();
+            inputs[i].buffer = const_cast<char*>(content.c_str());
+            inputs[i].buffer_length = content.size();
+            inputs[i].buffer_type = MYSQL_TYPE_BLOB;
+            break;
+          }
 
-        default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        }
       }
     }
 
