@@ -308,7 +308,7 @@ BEGIN
         uncompressedHash VARCHAR(40),
         compressedHash VARCHAR(40),
         revision INTEGER,
-        customData TEXT
+        customData BYTEA
         );
 
     RESET client_min_messages;
