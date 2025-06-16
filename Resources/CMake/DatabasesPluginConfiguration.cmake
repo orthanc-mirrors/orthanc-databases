@@ -124,3 +124,6 @@ list(APPEND DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Plugins/OrthancPluginCppWrapper.cpp
   )
+
+
+set(EMBED_RESOURCES_PYTHON ${CMAKE_CURRENT_LIST_DIR}/../Orthanc/CMake/EmbedResources.py CACHE INTERNAL "" FORCE)
