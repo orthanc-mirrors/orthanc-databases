@@ -397,8 +397,6 @@ namespace OrthancDatabases
     args.SetIntegerValue("revision", revision);
     args.SetBinaryValue("custom-data", customData, customDataSize);
 
-    LOG(INFO) << "custom data size: " << customDataSize;
-
     statement.Execute(args);
   }
 
