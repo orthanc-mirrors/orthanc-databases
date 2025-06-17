@@ -384,7 +384,7 @@ namespace OrthancDatabases
     statement.SetParameterType("hash", ValueType_Utf8String);
     statement.SetParameterType("hash-compressed", ValueType_Utf8String);
     statement.SetParameterType("revision", ValueType_Integer64);
-    statement.SetParameterType("custom-data", ValueType_Utf8String);
+    statement.SetParameterType("custom-data", ValueType_BinaryString);
 
     args.SetIntegerValue("id", id);
     args.SetIntegerValue("type", contentType);
@@ -4674,7 +4674,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         "UPDATE AttachedFiles SET customData = ${customData} WHERE uuid = ${uuid}");
 
       statement.SetParameterType("uuid", ValueType_Utf8String);
-      statement.SetParameterType("customData", ValueType_Utf8String);
+      statement.SetParameterType("customData", ValueType_BinaryString);
 
       Dictionary args;
       args.SetUtf8Value("uuid", attachmentUuid);
