@@ -10,6 +10,16 @@ Optimal Orthanc runtime: 1.12.6
 Minimal Postgresql Server version: 9
 Optimal Postgresql Server version: 11+
 
+* New configuration "UseDynamicConnectionPool" to dynamically create/release
+  connections to the PostgreSQL database.  
+  When this option is disabled (default), the connections are created once
+  at the start of the plugin and are kept alive for the whole execution.
+  Using the dynamic mode enables cleanup of some temporary tables that
+  could otherwise accumulate dead rows.
+  When using a dynamic pool, connections are released either after 60 seconds
+  of being idle or one hour after their creation.
+* New metrics "orthanc_index_active_connections_count" showing the current number
+  of active connections.
 
 Maintenance:
 * Optimized the CreateInstance SQL query.

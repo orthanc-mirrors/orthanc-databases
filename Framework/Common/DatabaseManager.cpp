@@ -160,12 +160,28 @@ namespace OrthancDatabases
     
   DatabaseManager::DatabaseManager(IDatabaseFactory* factory) :
     factory_(factory),
-    dialect_(Dialect_Unknown)
+    dialect_(Dialect_Unknown),
+    creationTime_(boost::posix_time::second_clock::universal_time()),
+    lastUseTime_(boost::posix_time::second_clock::universal_time())
   {
     if (factory == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
     }
+  }
+
+  uint64_t DatabaseManager::GetElapsedSecondsSinceCreation() const
+  {
+    boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
+    boost::posix_time::time_duration diff = now - creationTime_;
+    return static_cast<uint64_t>(diff.total_seconds());    
+  }
+
+  uint64_t DatabaseManager::GetElapsedSecondsSinceLastUse() const
+  {
+    boost::posix_time::ptime now = boost::posix_time::second_clock::universal_time();
+    boost::posix_time::time_duration diff = now - lastUseTime_;
+    return static_cast<uint64_t>(diff.total_seconds());    
   }
 
   
@@ -218,6 +234,8 @@ namespace OrthancDatabases
       }
 
       transaction_.reset(GetDatabase().CreateTransaction(type));
+      
+      lastUseTime_= boost::posix_time::second_clock::universal_time();
     }
     catch (Orthanc::OrthancException& e)
     {

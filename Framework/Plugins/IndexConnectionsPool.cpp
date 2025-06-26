@@ -47,62 +47,16 @@ namespace OrthancDatabases
   };
 
 
-  void IndexConnectionsPool::HousekeepingThread(IndexConnectionsPool* that)
-  {
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 2)
-    OrthancPluginSetCurrentThreadName(OrthancPlugins::GetGlobalContext(), "DB HOUSEKEEPING");    
-#endif
-
-    boost::posix_time::ptime lastInvocation = boost::posix_time::second_clock::local_time();
-
-    while (that->housekeepingContinue_)
-    {
-      if (boost::posix_time::second_clock::local_time() - lastInvocation >= that->housekeepingDelay_)
-      {
-        try
-        {
-          Accessor accessor(*that);
-          accessor.GetBackend().PerformDbHousekeeping(accessor.GetManager());
-        }
-        catch (Orthanc::OrthancException& e)
-        {
-          LOG(ERROR) << "Exception during the database housekeeping: " << e.What();
-        }
-        catch (...)
-        {
-          LOG(ERROR) << "Native exception during the database houskeeping";
-        }
-
-        lastInvocation = boost::posix_time::second_clock::local_time();
-      }
-
-      boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-    }
-  }
-
-
   IndexConnectionsPool::IndexConnectionsPool(IndexBackend* backend,
                                              size_t countConnections,
                                              unsigned int houseKeepingDelaySeconds) :
-    backend_(backend),
-    countConnections_(countConnections),
-    housekeepingContinue_(true),
-    housekeepingDelay_(boost::posix_time::seconds(houseKeepingDelaySeconds))
+    BaseIndexConnectionsPool(backend, houseKeepingDelaySeconds),
+    countConnections_(countConnections)
   {
     if (countConnections == 0)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange,
                                       "There must be a non-zero number of connections to the database");
-    }
-    else if (backend == NULL)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NullPointer);
-    }
-    else if (backend->HasPerformDbHousekeeping() &&
-             houseKeepingDelaySeconds == 0)
-    {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange,
-                                      "The delay between two executions of housekeeping cannot be zero second");
     }
     else
     {
@@ -119,6 +73,13 @@ namespace OrthancDatabases
       assert(*it != NULL);
       delete *it;
     }
+  }
+
+
+  void IndexConnectionsPool::PerformPoolHousekeeping()
+  {
+    // this is actually a fixed value !
+    OrthancPluginSetMetricsValue(OrthancPlugins::GetGlobalContext(), "orthanc_index_active_connections_count", countConnections_, OrthancPluginMetricsType_Default);
   }
 
 
@@ -152,13 +113,7 @@ namespace OrthancDatabases
         availableConnections_.Enqueue(new ManagerReference(**it));
       }
 
-      // Start the housekeeping thread
-      housekeepingContinue_ = true;
-
-      if (backend_->HasPerformDbHousekeeping())
-      {
-        housekeepingThread_ = boost::thread(HousekeepingThread, this);
-      }
+      StartHousekeepingThread();
     }
     else
     {
@@ -169,14 +124,7 @@ namespace OrthancDatabases
 
   void IndexConnectionsPool::CloseConnections()
   {
-    {
-      // Stop the housekeeping thread
-      housekeepingContinue_ = false;
-      if (housekeepingThread_.joinable())
-      {
-        housekeepingThread_.join();
-      }
-    }
+    StopHousekeepingThread();
 
     boost::unique_lock<boost::shared_mutex>  lock(connectionsMutex_);
 
@@ -199,40 +147,20 @@ namespace OrthancDatabases
     }
   }
 
-
-  IndexConnectionsPool::Accessor::Accessor(IndexConnectionsPool& pool) :
-    lock_(pool.connectionsMutex_),
-    pool_(pool),
-    manager_(NULL)
+  DatabaseManager* IndexConnectionsPool::GetConnection()
   {
-    for (;;)
+    std::unique_ptr<Orthanc::IDynamicObject> manager(availableConnections_.Dequeue(1));
+    if (manager.get() != NULL)
     {
-      std::unique_ptr<Orthanc::IDynamicObject> manager(pool.availableConnections_.Dequeue(100));
-      if (manager.get() != NULL)
-      {
-        manager_ = &dynamic_cast<ManagerReference&>(*manager).GetManager();
-        return;
-      }
+      return &dynamic_cast<ManagerReference&>(*manager).GetManager();
     }
+    return NULL;
   }
 
-  
-  IndexConnectionsPool::Accessor::~Accessor()
+  void IndexConnectionsPool::ReleaseConnection(DatabaseManager* manager)
   {
-    assert(manager_ != NULL);
-    pool_.availableConnections_.Enqueue(new ManagerReference(*manager_));
+    assert(manager != NULL);
+    availableConnections_.Enqueue(new ManagerReference(*manager));
   }
 
-  
-  IndexBackend& IndexConnectionsPool::Accessor::GetBackend() const
-  {
-    return *pool_.backend_;
-  }
-
-  
-  DatabaseManager& IndexConnectionsPool::Accessor::GetManager() const
-  {
-    assert(manager_ != NULL);
-    return *manager_;
-  }
 }

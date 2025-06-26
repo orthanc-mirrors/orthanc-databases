@@ -477,6 +477,7 @@ namespace OrthancDatabases
      **/
     static void Register(IndexBackend* backend,
                          size_t countConnections,
+                         bool useDynamicConnectionPool,
                          unsigned int maxDatabaseRetries,
                          unsigned int housekeepingDelaySeconds);
 

@@ -26,6 +26,7 @@
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 
+#include "DynamicIndexConnectionsPool.h"
 #include "IndexConnectionsPool.h"
 #include "MessagesToolbox.h"
 
@@ -422,13 +423,13 @@ namespace OrthancDatabases
 
   static void ProcessDatabaseOperation(Orthanc::DatabasePluginMessages::DatabaseResponse& response,
                                        const Orthanc::DatabasePluginMessages::DatabaseRequest& request,
-                                       IndexConnectionsPool& pool)
+                                       BaseIndexConnectionsPool& pool)
   {
     switch (request.operation())
     {
       case Orthanc::DatabasePluginMessages::OPERATION_GET_SYSTEM_INFORMATION:
       {
-        IndexConnectionsPool::Accessor accessor(pool);
+        BaseIndexConnectionsPool::Accessor accessor(pool);
         response.mutable_get_system_information()->set_database_version(accessor.GetBackend().GetDatabaseVersion(accessor.GetManager()));
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
@@ -485,7 +486,7 @@ namespace OrthancDatabases
 
       case Orthanc::DatabasePluginMessages::OPERATION_START_TRANSACTION:
       {
-        std::unique_ptr<IndexConnectionsPool::Accessor> transaction(new IndexConnectionsPool::Accessor(pool));
+        std::unique_ptr<BaseIndexConnectionsPool::Accessor> transaction(new BaseIndexConnectionsPool::Accessor(pool));
 
         switch (request.start_transaction().type())
         {
@@ -507,7 +508,7 @@ namespace OrthancDatabases
         
       case Orthanc::DatabasePluginMessages::OPERATION_UPGRADE:
       {
-        IndexConnectionsPool::Accessor accessor(pool);
+        BaseIndexConnectionsPool::Accessor accessor(pool);
         OrthancPluginStorageArea* storageArea = reinterpret_cast<OrthancPluginStorageArea*>(request.upgrade().storage_area());
         accessor.GetBackend().UpgradeDatabase(accessor.GetManager(), request.upgrade().target_version(), storageArea);
         break;
@@ -515,7 +516,7 @@ namespace OrthancDatabases
               
       case Orthanc::DatabasePluginMessages::OPERATION_FINALIZE_TRANSACTION:
       {
-        IndexConnectionsPool::Accessor* transaction = reinterpret_cast<IndexConnectionsPool::Accessor*>(request.finalize_transaction().transaction());
+        BaseIndexConnectionsPool::Accessor* transaction = reinterpret_cast<BaseIndexConnectionsPool::Accessor*>(request.finalize_transaction().transaction());
         
         if (transaction == NULL)
         {
@@ -532,7 +533,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
       case Orthanc::DatabasePluginMessages::OPERATION_MEASURE_LATENCY:
       {
-        IndexConnectionsPool::Accessor accessor(pool);
+        BaseIndexConnectionsPool::Accessor accessor(pool);
         response.mutable_measure_latency()->set_latency_us(accessor.GetBackend().MeasureLatency(accessor.GetManager()));
         break;
       }
@@ -1360,7 +1361,7 @@ namespace OrthancDatabases
       return OrthancPluginErrorCode_InternalError;
     }
 
-    IndexConnectionsPool& pool = *reinterpret_cast<IndexConnectionsPool*>(rawPool);
+    BaseIndexConnectionsPool& pool = *reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
 
     try
     {
@@ -1374,7 +1375,7 @@ namespace OrthancDatabases
           
         case Orthanc::DatabasePluginMessages::REQUEST_TRANSACTION:
         {
-          IndexConnectionsPool::Accessor& transaction = *reinterpret_cast<IndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
+          BaseIndexConnectionsPool::Accessor& transaction = *reinterpret_cast<BaseIndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
           ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(),
                                       transaction.GetBackend(), transaction.GetManager());
           break;
@@ -1432,7 +1433,7 @@ namespace OrthancDatabases
   {
     if (rawPool != NULL)
     {
-      IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(rawPool);
+      BaseIndexConnectionsPool* pool = reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
       
       if (isBackendInUse_)
       {
@@ -1454,10 +1455,20 @@ namespace OrthancDatabases
   
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
+                                          bool useDynamicConnectionPool,
                                           unsigned int maxDatabaseRetries,
                                           unsigned int housekeepingDelaySeconds)
   {
-    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+    std::unique_ptr<BaseIndexConnectionsPool> pool;
+
+    if (useDynamicConnectionPool)
+    {
+      pool.reset(new DynamicIndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+    }
+    else
+    {
+      pool.reset(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+    }
     
     if (isBackendInUse_)
     {

@@ -2080,9 +2080,7 @@ namespace OrthancDatabases
         break;
         
       case Dialect_PostgreSQL:
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "SELECT CAST(COUNT(*) AS BIGINT) FROM PatientRecyclingOrder"));
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
         break;
 
       case Dialect_MSSQL:
@@ -3035,6 +3033,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
+                              bool useDynamicConnectionPool,
                               unsigned int maxDatabaseRetries,
                               unsigned int housekeepingDelaySeconds)
   {
@@ -3050,7 +3049,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries, housekeepingDelaySeconds);
+      DatabaseBackendAdapterV4::Register(backend, countConnections, useDynamicConnectionPool, maxDatabaseRetries, housekeepingDelaySeconds);
       return;
     }
 #  endif

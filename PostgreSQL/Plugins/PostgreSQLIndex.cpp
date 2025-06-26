@@ -49,7 +49,7 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
-#define CURRENT_DB_REVISION 99
+#define CURRENT_DB_REVISION 499
 
 namespace OrthancDatabases
 {
@@ -242,10 +242,10 @@ namespace OrthancDatabases
             std::string query;
 
             Orthanc::EmbeddedResources::GetFileResource
-              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV4_TO_REV99);
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV4_TO_REV499);
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
             hasAppliedAnUpgrade = true;
-            currentRevision = 99;
+            currentRevision = 499;
           }
 
           if (hasAppliedAnUpgrade)
@@ -483,12 +483,35 @@ namespace OrthancDatabases
 
   void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
   {
-    // not used anymore in PostgreSQL
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT CreateDeletedFilesTemporaryTable()"
+        );
+      statement.ExecuteWithoutResult();
+    }
   }
 
   void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)
   {
-    // not used anymore in PostgreSQL
+    { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "CREATE TEMPORARY TABLE IF NOT EXISTS  DeletedResources("
+        "resourceType INTEGER NOT NULL,"
+        "publicId VARCHAR(64) NOT NULL"
+        ");"
+        );
+      statement.Execute();
+    }
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "DELETE FROM DeletedResources;"
+        );
+
+      statement.Execute();
+    }
   }
 
   void PostgreSQLIndex::ClearRemainingAncestor(DatabaseManager& manager)

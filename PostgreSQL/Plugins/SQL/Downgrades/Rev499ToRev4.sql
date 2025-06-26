@@ -1,4 +1,4 @@
--- This file contains an SQL procedure to downgrade from schema Rev99 to Rev4 (version = 6).
+-- This file contains an SQL procedure to downgrade from schema Rev499 to Rev4 (version = 6).
 
 
 -- Re-installs the old PatientRecycling
@@ -141,8 +141,8 @@ BEGIN
 END;
 $body$ LANGUAGE plpgsql;
 
--- Restore these 2 functions that have been optimized
------------
+-- Restore the DeleteResource function that has been optimized
+
 ------------------- DeleteResource function -------------------
 
 CREATE OR REPLACE FUNCTION DeleteResource(
@@ -194,31 +194,6 @@ END;
 
 $body$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION CreateDeletedFilesTemporaryTable(
-) RETURNS VOID AS $body$
-
-BEGIN
-
-    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
-    
-    -- note: temporary tables are created at session (connection) level -> they are likely to exist
-    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles(
-        uuid VARCHAR(64) NOT NULL,
-        fileType INTEGER,
-        compressedSize BIGINT,
-        uncompressedSize BIGINT,
-        compressionType INTEGER,
-        uncompressedHash VARCHAR(40),
-        compressedHash VARCHAR(40)
-        );
-
-    RESET client_min_messages;
-
-    -- clear the temporary table in case it has been created earlier in the session
-    DELETE FROM DeletedFiles;
-END;
-
-$body$ LANGUAGE plpgsql;
 
 -- restore the DeletedResource trigger
 
@@ -250,6 +225,13 @@ EXECUTE PROCEDURE ResourceDeletedFunc();
 -- remove the new DeleteAttachment function
 
 DROP FUNCTION IF EXISTS DeleteAttachment;
+
+-- Restore the ON DELETE CASCADE on the Resources.parentId 
+-- Drop the existing foreign key constraint and add a new one without ON DELETE CASCADE in a single command
+ALTER TABLE Resources
+DROP CONSTRAINT IF EXISTS resources_parentid_fkey,
+ADD CONSTRAINT resources_parentid_fkey FOREIGN KEY (parentId) REFERENCES Resources(internalId) ON DELETE CASCADE;
+
 
 ----------
 

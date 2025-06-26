@@ -28,21 +28,24 @@
 #include "BaseIndexConnectionsPool.h"
 
 #include <MultiThreading/SharedMessageQueue.h>
+#include <MultiThreading/Semaphore.h>
 
 #include <list>
 #include <boost/thread.hpp>
 
 namespace OrthancDatabases
 {
-  class IndexConnectionsPool : public BaseIndexConnectionsPool
+  class DynamicIndexConnectionsPool : public BaseIndexConnectionsPool
   {
   private:
-    class ManagerReference;
-
-    boost::shared_mutex            connectionsMutex_;
-    size_t                         countConnections_;
+    boost::mutex                   connectionsMutex_;
+    size_t                         maxConnectionsCount_;
+    Orthanc::Semaphore             connectionsSemaphore_;
     std::list<DatabaseManager*>    connections_;
-    Orthanc::SharedMessageQueue    availableConnections_;
+    Orthanc::Semaphore             availableConnectionsSemaphore_;
+    std::list<DatabaseManager*>    availableConnections_;
+
+    void CleanupOldConnections();
 
   protected:
 
@@ -53,15 +56,16 @@ namespace OrthancDatabases
     virtual void PerformPoolHousekeeping() ORTHANC_OVERRIDE;
 
   public:
-    IndexConnectionsPool(IndexBackend* backend /* takes ownership */,
-                         size_t countConnections,
-                         unsigned int houseKeepingDelaySeconds);
+    DynamicIndexConnectionsPool(IndexBackend* backend /* takes ownership */,
+                                size_t maxConnectionsCount,
+                                unsigned int houseKeepingDelaySeconds);
 
-    virtual ~IndexConnectionsPool();
+    virtual ~DynamicIndexConnectionsPool();
 
     virtual void OpenConnections(bool hasIdentifierTags,
                                  const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;
 
     virtual void CloseConnections() ORTHANC_OVERRIDE;
+
   };
 }

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS Resources(
        internalId BIGSERIAL NOT NULL PRIMARY KEY,
        resourceType INTEGER NOT NULL,
        publicId VARCHAR(64) NOT NULL,
-       parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+    --    parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+       parentId BIGINT REFERENCES Resources(internalId),
 	   childCount INTEGER,
        CONSTRAINT UniquePublicId UNIQUE (publicId)
        );
@@ -182,25 +183,78 @@ DECLARE
     deleted_parent_row RECORD;
     deleted_grand_parent_row RECORD;
     deleted_grand_grand_parent_row RECORD;
-    locked_row RECORD;
+
+    locked_parent_row RECORD;
+    locked_resource_row RECORD;
 
 BEGIN
 
-    -- note: temporary tables are now created at transaction level and are dropped on commit
-    CREATE TEMPORARY TABLE DeletedResources(
+    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
+
+    -- note: temporary tables are created at connection level -> they are likely to exist.
+    -- These tables are used by the triggers
+    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedResources(
         resourceType INTEGER NOT NULL,
         publicId VARCHAR(64) NOT NULL
-        ) ON COMMIT DROP;
+        );
 
-    
+    RESET client_min_messages;
+
+    -- clear the temporary table in case it has been created earlier in the connection
+    DELETE FROM DeletedResources;
+
     -- create/clear the DeletedFiles temporary table
     PERFORM CreateDeletedFilesTemporaryTable();
+
 
     -- Before deleting an object, we need to lock its parent until the end of the transaction to avoid that
     -- 2 threads deletes the last 2 instances of a series at the same time -> none of them would realize
     -- that they are deleting the last instance and the parent resources would not be deleted.
     -- Locking only the immediate parent is sufficient to prevent from this.
-    SELECT * INTO locked_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
+    SELECT * INTO locked_parent_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
+
+    -- Before deleting the resource itself, we lock it to retrieve the resourceType and to make sure not 2 connections try to
+    -- delete it at the same time
+    SELECT * INTO locked_resource_row FROM resources WHERE internalid = id FOR UPDATE;
+
+    -- before delete the resource itself, we must delete its grand-grand-children, the grand-children and its children no to violate 
+    -- the parentId referencing an existing primary key constrain.  This is actually implementing the ON DELETE CASCADE that was on the parentId in previous revisions.
+    
+    -- If this resource has grand-grand-children, delete them
+    if locked_resource_row.resourceType < 1 THEN
+        WITH grand_grand_children_to_delete AS (SELECT grandGrandChildLevel.internalId, grandGrandChildLevel.resourceType, grandGrandChildLevel.publicId
+                                                FROM Resources childLevel
+                                                INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId
+                                                INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId
+                                                WHERE childLevel.parentId = id),
+        
+        deleted_grand_grand_children_rows AS (DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM grand_grand_children_to_delete)
+                                              RETURNING resourceType, publicId)
+
+        INSERT INTO DeletedResources SELECT resourceType, publicId FROM deleted_grand_grand_children_rows; 
+    END IF;
+
+    -- If this resource has grand-children, delete them
+    if locked_resource_row.resourceType < 2 THEN
+        WITH grand_children_to_delete AS (SELECT grandChildLevel.internalId, grandChildLevel.resourceType, grandChildLevel.publicId
+                                          FROM Resources childLevel
+                                          INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId
+                                          WHERE childLevel.parentId = id),
+        
+        deleted_grand_children_rows AS (DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM grand_children_to_delete)
+                                        RETURNING resourceType, publicId)
+
+        INSERT INTO DeletedResources SELECT resourceType, publicId FROM deleted_grand_children_rows; 
+    END IF;
+
+    -- If this resource has children, delete them
+    if locked_resource_row.resourceType < 3 THEN
+        WITH deleted_children AS (DELETE FROM Resources 
+                                  WHERE parentId = id
+                                  RETURNING resourceType, publicId)
+        INSERT INTO DeletedResources SELECT resourceType, publicId FROM deleted_children; 
+    END IF;
+
 
     -- delete the resource itself
     DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_resource_row;
@@ -244,6 +298,7 @@ BEGIN
             END IF;
         END IF;
     END IF;
+
 END;
 
 $body$ LANGUAGE plpgsql;
@@ -253,8 +308,10 @@ CREATE OR REPLACE FUNCTION CreateDeletedFilesTemporaryTable(
 
 BEGIN
 
-    -- note: temporary tables are now created at transaction level and are dropped on commit
-    CREATE TEMPORARY TABLE DeletedFiles(
+    SET client_min_messages = warning;   -- suppress NOTICE:  relation "DeletedFiles" already exists, skipping
+
+    -- note: temporary tables created at connection level -> they are likely to exist
+    CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles(
         uuid VARCHAR(64) NOT NULL,
         fileType INTEGER,
         compressedSize BIGINT,
@@ -262,8 +319,12 @@ BEGIN
         compressionType INTEGER,
         uncompressedHash VARCHAR(40),
         compressedHash VARCHAR(40)
-        ) ON COMMIT DROP;
+        );
 
+    RESET client_min_messages;
+
+    -- clear the temporary table in case it has been created earlier in the connection
+    DELETE FROM DeletedFiles;
 END;
 
 $body$ LANGUAGE plpgsql;
@@ -747,7 +808,7 @@ $$ LANGUAGE plpgsql;
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 99); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 499); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance
