@@ -19,17 +19,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(OrthancSQLite)
 
 set(ORTHANC_PLUGIN_VERSION "mainline")
 
 # This is the preferred version of the Orthanc SDK for this plugin
-set(ORTHANC_SDK_DEFAULT_VERSION "1.12.5")
+set(ORTHANC_SDK_DEFAULT_VERSION "1.12.8")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
-set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3" "1.12.4" "1.12.5")
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.12.0" "1.12.3" "1.12.4" "1.12.5" "1.12.8")
 
 # This is the minimal version of the Orthanc runtime that will provide
 # best performance. If the version of the Orthanc runtime is below
@@ -37,13 +37,13 @@ set(ORTHANC_SDK_COMPATIBLE_VERSIONS "0.9.5" "1.4.0" "1.5.2" "1.5.4" "1.9.2" "1.1
 # plugin will still start).
 set(ORTHANC_OPTIMAL_VERSION_MAJOR    1)
 set(ORTHANC_OPTIMAL_VERSION_MINOR    12)
-set(ORTHANC_OPTIMAL_VERSION_REVISION 5)
+set(ORTHANC_OPTIMAL_VERSION_REVISION 8)
 
 if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.12.5")
+  set(ORTHANC_FRAMEWORK_VERSION "1.12.8")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
@@ -55,6 +55,7 @@ include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginConfiguration.cmak
 
 EmbedResources(
   SQLITE_PREPARE_INDEX ${CMAKE_SOURCE_DIR}/Plugins/PrepareIndex.sql
+  SQLITE_INSTALL_CUSTOM_DATA ${CMAKE_SOURCE_DIR}/Plugins/InstallCustomData.sql
   )
 
 if (EXISTS ${ORTHANC_SDK_ROOT}/orthanc/OrthancDatabasePlugin.proto)

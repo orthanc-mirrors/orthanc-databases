@@ -338,8 +338,26 @@ namespace OrthancDatabases
         t.Commit();
       }
 
+      if (revision == 8)
+      {
+        DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
+        
+        // Install revision and customData extension
+        std::string query;
+        
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::MYSQL_INSTALL_REVISION_AND_CUSTOM_DATA);
 
-      if (revision != 8)
+        // Need to escape arobases: Don't use "t.GetDatabaseTransaction().ExecuteMultiLines()" here
+        db.ExecuteMultiLines(query, true);
+        
+        revision = 9;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+
+        t.Commit();
+      }
+
+      if (revision != 9)
       {
         LOG(ERROR) << "MySQL plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        

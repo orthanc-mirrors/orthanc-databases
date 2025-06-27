@@ -149,7 +149,22 @@ namespace OrthancDatabases
         SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
       }
 
-      if (revision != 1)
+      // install customData
+      if (!LookupGlobalIntegerProperty(revision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel)
+          || revision == 1)
+      {
+        std::string query;
+
+        Orthanc::EmbeddedResources::GetFileResource
+          (query, Orthanc::EmbeddedResources::SQLITE_INSTALL_CUSTOM_DATA);
+
+        t.GetDatabaseTransaction().ExecuteMultiLines(query);
+
+        revision = 2;
+        SetGlobalIntegerProperty(manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel, revision);
+      }
+
+      if (revision != 2)
       {
         LOG(ERROR) << "SQLite plugin is incompatible with database schema revision: " << revision;
         throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);        

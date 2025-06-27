@@ -19,17 +19,17 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(OrthancPostgreSQL)
 
 set(ORTHANC_PLUGIN_VERSION "mainline")
 
 # This is the preferred version of the Orthanc SDK for this plugin
-set(ORTHANC_SDK_DEFAULT_VERSION "1.12.5")
+set(ORTHANC_SDK_DEFAULT_VERSION "1.12.8")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
-set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4" "1.12.5")
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4" "1.12.5" "1.12.8")
 
 # This is the minimal version of the Orthanc runtime that will provide
 # best performance. If the version of the Orthanc runtime is below
@@ -43,7 +43,7 @@ if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "1.12.5")
+  set(ORTHANC_FRAMEWORK_VERSION "1.12.8")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
@@ -94,7 +94,8 @@ EmbedResources(
   POSTGRESQL_UPGRADE_REV1_TO_REV2    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev1ToRev2.sql
   POSTGRESQL_UPGRADE_REV2_TO_REV3    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev2ToRev3.sql
   POSTGRESQL_UPGRADE_REV3_TO_REV4    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev3ToRev4.sql
-  POSTGRESQL_UPGRADE_REV4_TO_REV499  ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev4ToRev499.sql
+  POSTGRESQL_UPGRADE_REV4_TO_REV5    ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev4ToRev5.sql
+  POSTGRESQL_UPGRADE_REV5_TO_REV599  ${CMAKE_SOURCE_DIR}/Plugins/SQL/Upgrades/Rev5ToRev599.sql
   )
 
 

@@ -161,6 +161,8 @@ namespace OrthancDatabases
         return query_.release();
       }
 
+      void SetParametersTypes(const Dictionary& parameters);
+      
     public:
       explicit StatementBase(DatabaseManager& manager);
 
@@ -193,6 +195,8 @@ namespace OrthancDatabases
       int64_t ReadInteger64(size_t field) const;
 
       std::string ReadString(size_t field) const;
+
+      std::string ReadStringOrNull(size_t field) const;
 
       bool IsNull(size_t field) const;
 

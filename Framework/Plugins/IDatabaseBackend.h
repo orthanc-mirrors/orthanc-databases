@@ -59,10 +59,25 @@ namespace OrthancDatabases
 
     virtual bool HasRevisionsSupport() const = 0;
 
+    virtual bool HasAttachmentCustomDataSupport() const = 0;
+
+    virtual bool HasKeyValueStores() const = 0;
+
+    virtual bool HasQueues() const = 0;
+
     virtual void AddAttachment(DatabaseManager& manager,
                                int64_t id,
                                const OrthancPluginAttachment& attachment,
                                int64_t revision) = 0;
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    // New in Orthanc 1.12.8
+    virtual void AddAttachment(DatabaseManager& manager,
+                               int64_t id,
+                               const OrthancPluginAttachment& attachment,
+                               int64_t revision,
+                               const std::string& customData) = 0;
+#endif
 
     virtual void AttachChild(DatabaseManager& manager,
                              int64_t parent,
@@ -398,6 +413,50 @@ namespace OrthancDatabases
     virtual void ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                               DatabaseManager& manager,
                               const Orthanc::DatabasePluginMessages::Find_Request& request) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+    virtual void StoreKeyValue(DatabaseManager& manager,
+                               const std::string& storeId,
+                               const std::string& key,
+                               const std::string& value) = 0;
+
+    virtual void DeleteKeyValue(DatabaseManager& manager,
+                                const std::string& storeId,
+                                const std::string& key) = 0;
+
+    virtual bool GetKeyValue(std::string& value,
+                             DatabaseManager& manager,
+                             const std::string& storeId,
+                             const std::string& key) = 0;
+
+    virtual void ListKeysValues(Orthanc::DatabasePluginMessages::TransactionResponse& response,
+                                DatabaseManager& manager,
+                                const Orthanc::DatabasePluginMessages::ListKeysValues_Request& request) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    virtual void EnqueueValue(DatabaseManager& manager,
+                              const std::string& queueId,
+                              const std::string& value) = 0;
+
+    virtual bool DequeueValue(std::string& value,
+                              DatabaseManager& manager,
+                              const std::string& queueId,
+                              bool fromFront) = 0;
+
+    virtual uint64_t GetQueueSize(DatabaseManager& manager,
+                                  const std::string& queueId) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+    virtual void GetAttachmentCustomData(std::string& customData,
+                                         DatabaseManager& manager,
+                                         const std::string& attachmentUuid) = 0;
+
+    virtual void SetAttachmentCustomData(DatabaseManager& manager,
+                                         const std::string& attachmentUuid,
+                                         const std::string& customData) = 0;
 #endif
 
     virtual bool HasPerformDbHousekeeping() = 0;

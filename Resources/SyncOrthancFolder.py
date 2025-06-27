@@ -17,8 +17,8 @@ else:
 
 TARGET = os.path.join(os.path.dirname(__file__), 'Orthanc')
 PLUGIN_SDK_VERSION_OLD = [ '0.9.5', '1.4.0', '1.5.2', '1.5.4' ]
-PLUGIN_SDK_VERSION_NEW = [ '1.9.2', '1.12.0', '1.12.3', '1.12.4', '1.12.5' ]
-HAS_PROTOCOL_BUFFERS = [ '1.12.0', '1.12.3', '1.12.4', '1.12.5' ]
+PLUGIN_SDK_VERSION_NEW = [ '1.9.2', '1.12.0', '1.12.3', '1.12.4', '1.12.5', '1.12.8' ]
+HAS_PROTOCOL_BUFFERS = [ '1.12.0', '1.12.3', '1.12.4', '1.12.5', '1.12.8' ]
 REPOSITORY = 'https://orthanc.uclouvain.be/hg/orthanc/raw-file'
 
 FILES = [
@@ -29,11 +29,11 @@ FILES = [
     ('default', 'OrthancFramework/Resources/CMake/GoogleTestConfiguration.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/CMake/OpenSslConfiguration.cmake', 'CMake'),
     ('default', 'OrthancFramework/Resources/CMake/ProtobufConfiguration.cmake', 'CMake'),
-    ('default', 'OrthancFramework/Resources/EmbedResources.py', '.'),
-    ('default', 'OrthancFramework/Resources/Toolchains/LinuxStandardBaseToolchain.cmake', '.'),
-    ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain32.cmake', '.'),
-    ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain64.cmake', '.'),
-    ('default', 'OrthancFramework/Resources/Toolchains/MinGWToolchain.cmake', '.'),
+    ('default', 'OrthancFramework/Resources/EmbedResources.py', 'CMake'),
+    ('default', 'OrthancFramework/Resources/Toolchains/LinuxStandardBaseToolchain.cmake', 'Toolchains'),
+    ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain32.cmake', 'Toolchains'),
+    ('default', 'OrthancFramework/Resources/Toolchains/MinGW-W64-Toolchain64.cmake', 'Toolchains'),
+    ('default', 'OrthancFramework/Resources/Toolchains/MinGWToolchain.cmake', 'Toolchains'),
     ('default', 'OrthancServer/Plugins/Samples/Common/ExportedSymbolsPlugins.list', 'Plugins'),
     ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginCppWrapper.cpp', 'Plugins'),
     ('default', 'OrthancServer/Plugins/Samples/Common/OrthancPluginCppWrapper.h', 'Plugins'),

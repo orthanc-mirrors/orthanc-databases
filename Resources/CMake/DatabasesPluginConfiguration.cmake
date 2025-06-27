@@ -50,6 +50,8 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_ORTHANC_SDK)
     set(ORTHANC_SDK_ROOT ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.12.4)
   elseif (ORTHANC_SDK_VERSION STREQUAL "1.12.5")
     set(ORTHANC_SDK_ROOT ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.12.5)
+  elseif (ORTHANC_SDK_VERSION STREQUAL "1.12.8")
+    set(ORTHANC_SDK_ROOT ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Sdk-1.12.8)
   elseif (ORTHANC_SDK_VERSION STREQUAL "framework")
     set(tmp ${ORTHANC_FRAMEWORK_ROOT}/../../OrthancServer/Plugins/Include/)
     message(${tmp})
@@ -124,3 +126,6 @@ list(APPEND DATABASES_SOURCES
   ${ORTHANC_DATABASES_ROOT}/Framework/Plugins/StorageBackend.cpp
   ${ORTHANC_DATABASES_ROOT}/Resources/Orthanc/Plugins/OrthancPluginCppWrapper.cpp
   )
+
+
+set(EMBED_RESOURCES_PYTHON ${CMAKE_CURRENT_LIST_DIR}/../Orthanc/CMake/EmbedResources.py CACHE INTERNAL "" FORCE)

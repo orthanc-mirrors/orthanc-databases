@@ -1,5 +1,5 @@
 -- This file contains an SQL procedure to downgrade from schema Rev4 to Rev3 (version = 6).
-  -- It re-installs the old childcount trigger mechanisms
+-- It re-installs the old childcount trigger mechanisms
 
 DO $$
 DECLARE

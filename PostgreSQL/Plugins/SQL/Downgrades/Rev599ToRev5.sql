@@ -1,4 +1,4 @@
--- This file contains an SQL procedure to downgrade from schema Rev499 to Rev4 (version = 6).
+-- This file contains an SQL procedure to downgrade from schema Rev599 to Rev5 (version = 6).
 
 
 -- Re-installs the old PatientRecycling
@@ -238,4 +238,4 @@ ADD CONSTRAINT resources_parentid_fkey FOREIGN KEY (parentId) REFERENCES Resourc
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 -- modify only the ones that have changed
 DELETE FROM GlobalProperties WHERE property IN (4, 11);
-INSERT INTO GlobalProperties VALUES (4, 4); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 5); -- GlobalProperty_DatabasePatchLevel

@@ -34,13 +34,25 @@ namespace OrthancDatabases
   {
   private:
     std::string  utf8_;
+    bool isNull_;
 
   public:
     explicit Utf8StringValue(const std::string& utf8) :
-      utf8_(utf8)
+      utf8_(utf8),
+      isNull_(false)
     {
     }
 
+    explicit Utf8StringValue() :
+      isNull_(true)
+    {
+    }
+
+    virtual bool IsNull() const ORTHANC_OVERRIDE
+    {
+      return isNull_;
+    }
+    
     const std::string& GetContent() const
     {
       return utf8_;

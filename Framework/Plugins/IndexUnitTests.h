@@ -222,6 +222,102 @@ static OrthancPluginErrorCode InvokeService(struct _OrthancPluginContext_t* cont
 }
 
 
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+static void ListKeys(std::set<std::string>& keys,
+                     OrthancDatabases::IndexBackend& db,
+                     OrthancDatabases::DatabaseManager& manager,
+                     const std::string& storeId)
+{
+  {
+    Orthanc::DatabasePluginMessages::ListKeysValues_Request request;
+    request.set_store_id(storeId);
+    request.set_from_first(true);
+    request.set_limit(0);
+
+    Orthanc::DatabasePluginMessages::TransactionResponse response;
+    db.ListKeysValues(response, manager, request);
+
+    keys.clear();
+
+    for (int i = 0; i < response.list_keys_values().keys_values_size(); i++)
+    {
+      const Orthanc::DatabasePluginMessages::ListKeysValues_Response_KeyValue& item = response.list_keys_values().keys_values(i);
+      keys.insert(item.key());
+
+      std::string value;
+      if (!db.GetKeyValue(value, manager, storeId, item.key()) ||
+          value != item.value())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      }
+    }
+  }
+
+  {
+    std::set<std::string> keys2;
+
+    // Alternative implementation using an iterator
+    Orthanc::DatabasePluginMessages::ListKeysValues_Request request;
+    request.set_store_id(storeId);
+    request.set_from_first(true);
+    request.set_limit(1);
+
+    Orthanc::DatabasePluginMessages::TransactionResponse response;
+    db.ListKeysValues(response, manager, request);
+
+    while (response.list_keys_values().keys_values_size() > 0)
+    {
+      int count = response.list_keys_values().keys_values_size();
+
+      for (int i = 0; i < count; i++)
+      {
+        keys2.insert(response.list_keys_values().keys_values(i).key());
+      }
+
+      request.set_from_first(false);
+      request.set_from_key(response.list_keys_values().keys_values(count - 1).key());
+      db.ListKeysValues(response, manager, request);
+    }
+
+    if (keys.size() != keys2.size())
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+    }
+    else
+    {
+      for (std::set<std::string>::const_iterator it = keys.begin(); it != keys.end(); ++it)
+      {
+        if (keys2.find(*it) == keys2.end())
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+      }
+    }
+  }
+}
+#endif
+
+
+static void FillBlob(std::string& blob)
+{
+  blob.clear();
+  blob.push_back(0);
+  blob.push_back(1);
+  blob.push_back(0);
+  blob.push_back(2);
+}
+
+
+static void CheckBlob(const std::string& s)
+{
+  ASSERT_EQ(4u, s.size());
+  ASSERT_EQ(0u, static_cast<uint8_t>(s[0]));
+  ASSERT_EQ(1u, static_cast<uint8_t>(s[1]));
+  ASSERT_EQ(0u, static_cast<uint8_t>(s[2]));
+  ASSERT_EQ(2u, static_cast<uint8_t>(s[3]));
+}
+
+
 TEST(IndexBackend, Basic)
 {
   using namespace OrthancDatabases;
@@ -254,6 +350,13 @@ TEST(IndexBackend, Basic)
   std::unique_ptr<DatabaseManager> manager(IndexBackend::CreateSingleDatabaseManager(db, false, identifierTags));
   
   std::unique_ptr<IDatabaseBackendOutput> output(db.CreateOutput());
+
+  {
+    // Sanity check
+    std::string blob;
+    FillBlob(blob);
+    CheckBlob(blob);
+  }
 
   std::string s;
   ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
@@ -426,7 +529,13 @@ TEST(IndexBackend, Basic)
   att2.compressedSize = 4242;
   att2.compressedHash = "md5_2";
     
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+  db.AddAttachment(*manager, studyId, att1, 42, "my_custom_data");
+  db.ListAvailableAttachments(fc, *manager, studyId);
+#else
   db.AddAttachment(*manager, studyId, att1, 42);
+#endif
+
   db.ListAvailableAttachments(fc, *manager, studyId);
   ASSERT_EQ(1u, fc.size());
   ASSERT_EQ(Orthanc::FileContentType_Dicom, fc.front());
@@ -434,6 +543,32 @@ TEST(IndexBackend, Basic)
   db.ListAvailableAttachments(fc, *manager, studyId);
   ASSERT_EQ(2u, fc.size());
   ASSERT_FALSE(db.LookupAttachment(*output, revision, *manager, seriesId, Orthanc::FileContentType_Dicom));
+
+#if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
+  {
+    std::string s;
+    ASSERT_THROW(db.GetAttachmentCustomData(s, *manager, "nope"), Orthanc::OrthancException);
+
+    db.GetAttachmentCustomData(s, *manager, "uuid1");
+    ASSERT_EQ("my_custom_data", s);
+
+    db.GetAttachmentCustomData(s, *manager, "uuid2");
+    ASSERT_TRUE(s.empty());
+
+    {
+      std::string blob;
+      FillBlob(blob);
+      db.SetAttachmentCustomData(*manager, "uuid1", blob);
+    }
+
+    db.GetAttachmentCustomData(s, *manager, "uuid1");
+    CheckBlob(s);
+
+    db.SetAttachmentCustomData(*manager, "uuid1", "");
+    db.GetAttachmentCustomData(s, *manager, "uuid1");
+    ASSERT_TRUE(s.empty());
+  }
+#endif
 
   ASSERT_EQ(4284u, db.GetTotalCompressedSize(*manager));
   ASSERT_EQ(4284u, db.GetTotalUncompressedSize(*manager));
@@ -808,6 +943,126 @@ TEST(IndexBackend, Basic)
         manager->CommitTransaction();
       }
     }
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
+  {
+    manager->StartTransaction(TransactionType_ReadWrite);
+
+    std::set<std::string> keys;
+    ListKeys(keys, db, *manager, "test");
+    ASSERT_EQ(0u, keys.size());
+
+    std::string s;
+    ASSERT_FALSE(db.GetKeyValue(s, *manager, "test", "hello"));
+    db.DeleteKeyValue(*manager, s, "test");
+
+    db.StoreKeyValue(*manager, "test", "hello", "world");
+    db.StoreKeyValue(*manager, "another", "hello", "world");
+    ListKeys(keys, db, *manager, "test");
+    ASSERT_EQ(1u, keys.size());
+    ASSERT_EQ("hello", *keys.begin());
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello"));  ASSERT_EQ("world", s);
+
+    db.StoreKeyValue(*manager, "test", "hello", "overwritten");
+    ListKeys(keys, db, *manager, "test");
+    ASSERT_EQ(1u, keys.size());
+    ASSERT_EQ("hello", *keys.begin());
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello"));  ASSERT_EQ("overwritten", s);
+
+    db.StoreKeyValue(*manager, "test", "hello2", "world2");
+    db.StoreKeyValue(*manager, "test", "hello3", "world3");
+
+    ListKeys(keys, db, *manager, "test");
+    ASSERT_EQ(3u, keys.size());
+    ASSERT_TRUE(keys.find("hello") != keys.end());
+    ASSERT_TRUE(keys.find("hello2") != keys.end());
+    ASSERT_TRUE(keys.find("hello3") != keys.end());
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello"));   ASSERT_EQ("overwritten", s);
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello2"));  ASSERT_EQ("world2", s);
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello3"));  ASSERT_EQ("world3", s);
+
+    db.DeleteKeyValue(*manager, "test", "hello2");
+
+    ListKeys(keys, db, *manager, "test");
+    ASSERT_EQ(2u, keys.size());
+    ASSERT_TRUE(keys.find("hello") != keys.end());
+    ASSERT_TRUE(keys.find("hello3") != keys.end());
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello"));   ASSERT_EQ("overwritten", s);
+    ASSERT_FALSE(db.GetKeyValue(s, *manager, "test", "hello2"));
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "hello3"));  ASSERT_EQ("world3", s);
+
+    db.DeleteKeyValue(*manager, "test", "nope");
+    db.DeleteKeyValue(*manager, "test", "hello");
+    db.DeleteKeyValue(*manager, "test", "hello3");
+
+    ListKeys(keys, db, *manager, "test");
+    ASSERT_EQ(0u, keys.size());
+
+    {
+      std::string blob;
+      FillBlob(blob);
+      db.StoreKeyValue(*manager, "test", "blob", blob); // Storing binary values
+    }
+
+    ASSERT_TRUE(db.GetKeyValue(s, *manager, "test", "blob"));
+    CheckBlob(s);
+    db.DeleteKeyValue(*manager, "test", "blob");
+    ASSERT_FALSE(db.GetKeyValue(s, *manager, "test", "blob"));
+
+    manager->CommitTransaction();
+  }
+#endif
+
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+  {
+    manager->StartTransaction(TransactionType_ReadWrite);
+
+    ASSERT_EQ(0u, db.GetQueueSize(*manager, "test"));
+    db.EnqueueValue(*manager, "test", "a");
+    db.EnqueueValue(*manager, "another", "hello");
+    ASSERT_EQ(1u, db.GetQueueSize(*manager, "test"));
+    db.EnqueueValue(*manager, "test", "b");
+    ASSERT_EQ(2u, db.GetQueueSize(*manager, "test"));
+    db.EnqueueValue(*manager, "test", "c");
+    ASSERT_EQ(3u, db.GetQueueSize(*manager, "test"));
+
+    std::string s;
+    ASSERT_FALSE(db.DequeueValue(s, *manager, "nope", false));
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", true));  ASSERT_EQ("a", s);
+    ASSERT_EQ(2u, db.GetQueueSize(*manager, "test"));
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", true));  ASSERT_EQ("b", s);
+    ASSERT_EQ(1u, db.GetQueueSize(*manager, "test"));
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", true));  ASSERT_EQ("c", s);
+    ASSERT_EQ(0u, db.GetQueueSize(*manager, "test"));
+    ASSERT_FALSE(db.DequeueValue(s, *manager, "test", true));
+
+    db.EnqueueValue(*manager, "test", "a");
+    db.EnqueueValue(*manager, "test", "b");
+    db.EnqueueValue(*manager, "test", "c");
+
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", false));  ASSERT_EQ("c", s);
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", false));  ASSERT_EQ("b", s);
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", false));  ASSERT_EQ("a", s);
+    ASSERT_FALSE(db.DequeueValue(s, *manager, "test", false));
+
+    {
+      std::string blob;
+      FillBlob(blob);
+      db.EnqueueValue(*manager, "test", blob); // Storing binary values
+    }
+
+    ASSERT_TRUE(db.DequeueValue(s, *manager, "test", true));
+    CheckBlob(s);
+
+    ASSERT_FALSE(db.DequeueValue(s, *manager, "test", true));
+
+    ASSERT_EQ(1u, db.GetQueueSize(*manager, "another"));
+
+    manager->CommitTransaction();
   }
 #endif
 

@@ -421,7 +421,8 @@ namespace OrthancDatabases
                                          const std::string& uncompressedHash,
                                          int32_t            compressionType,
                                          uint64_t           compressedSize,
-                                         const std::string& compressedHash) ORTHANC_OVERRIDE
+                                         const std::string& compressedHash,
+                                         const std::string& /*customData*/) ORTHANC_OVERRIDE
     {
       OrthancPluginDatabaseEvent event;
       event.type = OrthancPluginDatabaseEventType_DeletedAttachment;
@@ -467,7 +468,8 @@ namespace OrthancDatabases
                                   const std::string& uncompressedHash,
                                   int32_t            compressionType,
                                   uint64_t           compressedSize,
-                                  const std::string& compressedHash) ORTHANC_OVERRIDE
+                                  const std::string& compressedHash,
+                                  const std::string& /*customData*/) ORTHANC_OVERRIDE
     {
       SetupAnswerType(_OrthancPluginDatabaseAnswerType_Attachment);
 

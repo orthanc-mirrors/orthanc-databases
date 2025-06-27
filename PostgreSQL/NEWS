@@ -28,6 +28,27 @@ Maintenance:
     Patient metadata (18: IsProtected, 19: PatientRecyclingOrder)
 
 
+
+Release 8.0 (2025-06-16)
+========================
+
+DB schema revision: 5
+
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK: 1.12.8
+
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.8
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+
+* Added support for customData in AttachedFiles
+* Added support for key-value stores and queues.
+
+
+
 Release 7.2 (2025-02-27)
 ========================
 
@@ -42,7 +63,7 @@ Optimal Postgresql Server version: 11+
 
 
 Maintenance:
-* Optimized the SQL query that is maintaing the childCount
+* Optimized the SQL query that is maintaining the childCount
   when new instances are ingested.
 * New configuration "AllowInconsistentChildCounts" to speed
   up childCount computation.  If set to true, childCount values
