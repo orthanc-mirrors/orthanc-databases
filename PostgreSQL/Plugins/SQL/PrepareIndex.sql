@@ -715,7 +715,7 @@ BEGIN
     SELECT ARRAY(SELECT internalId
                  FROM Resources
                  WHERE internalId IN (SELECT DISTINCT id FROM InvalidChildCounts)
-                 FOR UPDATE)
+                 FOR UPDATE SKIP LOCKED)
     INTO locked_resources_ids;
 
     -- New rows can be added in the meantime, they won't be taken into account this time.
