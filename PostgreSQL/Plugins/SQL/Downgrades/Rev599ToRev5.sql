@@ -233,6 +233,14 @@ DROP CONSTRAINT IF EXISTS resources_parentid_fkey,
 ADD CONSTRAINT resources_parentid_fkey FOREIGN KEY (parentId) REFERENCES Resources(internalId) ON DELETE CASCADE;
 
 
+-- Remove the AuditLogs table
+-----------
+
+DROP INDEX IF EXISTS AuditLogsUserId;
+DROP INDEX IF EXISTS AuditLogsResourceId;
+DROP TABLE IF EXISTS AuditLogs;
+
+
 ----------
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities

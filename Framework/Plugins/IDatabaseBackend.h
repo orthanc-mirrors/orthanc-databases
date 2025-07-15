@@ -65,6 +65,8 @@ namespace OrthancDatabases
 
     virtual bool HasQueues() const = 0;
 
+    virtual bool HasAuditLogs() const = 0;
+
     virtual void AddAttachment(DatabaseManager& manager,
                                int64_t id,
                                const OrthancPluginAttachment& attachment,
@@ -457,6 +459,15 @@ namespace OrthancDatabases
     virtual void SetAttachmentCustomData(DatabaseManager& manager,
                                          const std::string& attachmentUuid,
                                          const std::string& customData) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    virtual void RecordAuditLog(DatabaseManager& manager,
+                                const std::string& userId,
+                                OrthancPluginResourceType type,
+                                const std::string& resourceId,
+                                const std::string& action,
+                                const std::string& value) = 0;
 #endif
 
     virtual bool HasPerformDbHousekeeping() = 0;

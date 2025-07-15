@@ -467,6 +467,10 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_key_value_stores(accessor.GetBackend().HasKeyValueStores());
 #endif
 
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+        response.mutable_get_system_information()->set_supports_audit_logs(accessor.GetBackend().HasAuditLogs());
+#endif
+
         break;
       }
 
@@ -1406,6 +1410,17 @@ namespace OrthancDatabases
         break;
 #endif
 
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_RECORD_AUDIT_LOG:
+        backend.RecordAuditLog(manager,
+                               request.record_audit_log().user_id(),
+                               Convert(request.record_audit_log().resource_type()),
+                               request.record_audit_log().resource_id(),
+                               request.record_audit_log().action(),
+                               request.record_audit_log().log_data());
+        break;
+
+#endif
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);

@@ -4682,4 +4682,37 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement.Execute(args);
     }
 #endif
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    void IndexBackend::RecordAuditLog(DatabaseManager& manager,
+                                      const std::string& userId,
+                                      OrthancPluginResourceType resourceType,
+                                      const std::string& resourceId,
+                                      const std::string& action,
+                                      const std::string& value)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO AuditLogs (userId, resourceType, resourceId, action, logData) "
+        "VALUES(${userId}, ${resourceType}, ${resourceId}, ${action}, ${logData})");
+
+      statement.SetParameterType("userId", ValueType_Utf8String);
+      statement.SetParameterType("resourceId", ValueType_Utf8String);
+      statement.SetParameterType("resourceType", ValueType_Integer64);
+      statement.SetParameterType("action", ValueType_Utf8String);
+      statement.SetParameterType("userId", ValueType_Utf8String);
+      statement.SetParameterType("logData", ValueType_BinaryString);
+
+      Dictionary args;
+      args.SetUtf8Value("userId", userId);
+      args.SetIntegerValue("resourceType", static_cast<int>(resourceType));
+      args.SetUtf8Value("resourceId", resourceId);
+      args.SetUtf8Value("action", action);
+      args.SetUtf8Value("userId", userId);
+      args.SetBinaryValue("logData", value);
+
+      statement.Execute(args);
+    }
+#endif
+
 }

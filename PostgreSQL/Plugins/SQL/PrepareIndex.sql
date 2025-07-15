@@ -782,20 +782,20 @@ EXECUTE PROCEDURE UpdateChildCount();
 
 -- new in 1.12.8 (rev 5)
 
-CREATE TABLE KeyValueStores(
+CREATE TABLE IF NOT EXISTS KeyValueStores(
        storeId TEXT NOT NULL,
        key TEXT NOT NULL,
        value BYTEA NOT NULL,
        PRIMARY KEY(storeId, key)  -- Prevents duplicates
        );
 
-CREATE TABLE Queues (
+CREATE TABLE IF NOT EXISTS Queues (
        id BIGSERIAL NOT NULL PRIMARY KEY,
        queueId TEXT NOT NULL,
        value BYTEA NOT NULL
 );
 
-CREATE INDEX QueuesIndex ON Queues (queueId, id);
+CREATE INDEX IF NOT EXISTS QueuesIndex ON Queues (queueId, id);
 
 -- new in rev 599
 
@@ -823,6 +823,19 @@ BEGIN
     DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS AuditLogs (
+    ts TIMESTAMP DEFAULT NOW(),
+    userId TEXT NOT NULL,
+    resourceType INTEGER NOT NULL,
+    resourceId VARCHAR(64) NOT NULL,
+    action TEXT NOT NULL,
+    logData BYTEA
+);
+
+CREATE INDEX IF NOT EXISTS AuditLogsUserId ON AuditLogs (userId);
+CREATE INDEX IF NOT EXISTS AuditLogsResourceId ON AuditLogs (resourceId);
+
 
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities

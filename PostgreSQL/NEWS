@@ -20,6 +20,7 @@ Optimal Postgresql Server version: 11+
   of being idle or one hour after their creation.
 * New metrics "orthanc_index_active_connections_count" showing the current number
   of active connections.
+* Added support for AuditLogs.
 
 Maintenance:
 * Optimized the CreateInstance SQL query.
