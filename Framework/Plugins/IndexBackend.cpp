@@ -4689,7 +4689,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                       OrthancPluginResourceType resourceType,
                                       const std::string& resourceId,
                                       const std::string& action,
-                                      const std::string& value)
+                                      const void* logData,
+                                      uint32_t logDataSize)
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
@@ -4709,7 +4710,15 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       args.SetUtf8Value("resourceId", resourceId);
       args.SetUtf8Value("action", action);
       args.SetUtf8Value("userId", userId);
-      args.SetBinaryValue("logData", value);
+      
+      if (logData != NULL && logDataSize > 0)
+      {
+        args.SetBinaryValue("logData", logData, logDataSize);
+      }
+      else
+      {
+        args.SetBinaryNullValue("logData");
+      }
 
       statement.Execute(args);
     }

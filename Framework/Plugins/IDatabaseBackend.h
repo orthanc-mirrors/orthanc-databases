@@ -467,7 +467,8 @@ namespace OrthancDatabases
                                 OrthancPluginResourceType type,
                                 const std::string& resourceId,
                                 const std::string& action,
-                                const std::string& value) = 0;
+                                const void* logData,
+                                uint32_t logDataSize) = 0;
 #endif
 
     virtual bool HasPerformDbHousekeeping() = 0;

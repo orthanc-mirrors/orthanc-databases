@@ -32,7 +32,8 @@
 namespace OrthancDatabases
 {
   BinaryStringValue::BinaryStringValue(const void* data,
-                                       size_t size)
+                                       size_t size) :
+    isNull_(false)
   {
     if (data == NULL && size > 0)
     {

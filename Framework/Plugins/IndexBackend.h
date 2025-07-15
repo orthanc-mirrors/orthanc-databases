@@ -527,7 +527,8 @@ namespace OrthancDatabases
                                 OrthancPluginResourceType type,
                                 const std::string& resourceId,
                                 const std::string& action,
-                                const std::string& value) ORTHANC_OVERRIDE;
+                                const void* logData,
+                                uint32_t logDataSize) ORTHANC_OVERRIDE;
 #endif
 
 

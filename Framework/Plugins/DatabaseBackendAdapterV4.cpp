@@ -47,7 +47,7 @@
 namespace OrthancDatabases
 {
   static bool isBackendInUse_ = false;  // Only for sanity checks
-
+  static BaseIndexConnectionsPool* connectionPool_ = NULL;  // Only for the AuditLogHandler
 
   static Orthanc::DatabasePluginMessages::ResourceType Convert(OrthancPluginResourceType resourceType)
   {
@@ -465,10 +465,6 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
         response.mutable_get_system_information()->set_supports_key_value_stores(accessor.GetBackend().HasKeyValueStores());
-#endif
-
-#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
-        response.mutable_get_system_information()->set_supports_audit_logs(accessor.GetBackend().HasAuditLogs());
 #endif
 
         break;
@@ -1410,17 +1406,6 @@ namespace OrthancDatabases
         break;
 #endif
 
-#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
-      case Orthanc::DatabasePluginMessages::OPERATION_RECORD_AUDIT_LOG:
-        backend.RecordAuditLog(manager,
-                               request.record_audit_log().user_id(),
-                               Convert(request.record_audit_log().resource_type()),
-                               request.record_audit_log().resource_id(),
-                               request.record_audit_log().action(),
-                               request.record_audit_log().log_data());
-        break;
-
-#endif
       default:
         LOG(ERROR) << "Not implemented transaction operation from protobuf: " << request.operation();
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
@@ -1523,6 +1508,7 @@ namespace OrthancDatabases
       if (isBackendInUse_)
       {
         isBackendInUse_ = false;
+        connectionPool_ = NULL;
       }
       else
       {
@@ -1537,6 +1523,29 @@ namespace OrthancDatabases
     }
   }
 
+
+  OrthancPluginErrorCode AuditLogHandler(const char*               userId,
+                                         OrthancPluginResourceType resourceType,
+                                         const char*               resourceId,
+                                         const char*               action,
+                                         const void*               logData,
+                                         uint32_t                  logDataSize)
+  {
+    if (!isBackendInUse_ || connectionPool_ == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+    BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+    accessor.GetBackend().RecordAuditLog(accessor.GetManager(),
+                                         userId,
+                                         resourceType,
+                                         resourceId,
+                                         action,
+                                         logData,
+                                         logDataSize);
+    return OrthancPluginErrorCode_Success;                                     
+  }
   
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
@@ -1561,6 +1570,7 @@ namespace OrthancDatabases
     }
 
     OrthancPluginContext* context = backend->GetContext();
+    connectionPool_ = pool.get(); // we need to keep a pointer on the connectionPool for the static Audit log handler
  
     if (OrthancPluginRegisterDatabaseBackendV4(context, pool.release(), maxDatabaseRetries,
                                                CallBackend, FinalizeBackend) != OrthancPluginErrorCode_Success)
@@ -1570,6 +1580,10 @@ namespace OrthancDatabases
     }
 
     isBackendInUse_ = true;
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    OrthancPluginRegisterAuditLogHandler(context, AuditLogHandler);
+#endif
   }
 
 
