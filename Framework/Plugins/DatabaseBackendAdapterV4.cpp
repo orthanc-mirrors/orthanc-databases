@@ -29,6 +29,7 @@
 #include "DynamicIndexConnectionsPool.h"
 #include "IndexConnectionsPool.h"
 #include "MessagesToolbox.h"
+#include <Toolbox.h>
 
 #include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages
 
@@ -1547,6 +1548,105 @@ namespace OrthancDatabases
     return OrthancPluginErrorCode_Success;                                     
   }
   
+  void GetAuditLogs(OrthancPluginRestOutput* output,
+                    const char* /*url*/,
+                    const OrthancPluginHttpRequest* request)
+  {
+    OrthancPluginContext* context = OrthancPlugins::GetGlobalContext();
+
+    if (request->method != OrthancPluginHttpMethod_Get)
+    {
+      OrthancPluginSendMethodNotAllowed(context, output, "GET");
+    }
+
+    OrthancPlugins::GetArguments getArguments;
+    OrthancPlugins::GetGetArguments(getArguments, request);
+
+    std::string userIdFilter;
+    std::string resourceIdFilter;
+    std::string actionFilter;
+    uint64_t since = 0;
+    uint64_t limit = 0;
+
+    uint64_t fromTs = 0;
+    uint64_t toTs = 0;
+
+    if (getArguments.find("user-id") != getArguments.end())
+    {
+      userIdFilter = getArguments["user-id"];
+    }
+
+    if (getArguments.find("resource-id") != getArguments.end())
+    {
+      resourceIdFilter = getArguments["resource-id"];
+    }
+
+    if (getArguments.find("action") != getArguments.end())
+    {
+      actionFilter = getArguments["action"];
+    }
+
+    if (getArguments.find("limit") != getArguments.end())
+    {
+      limit = boost::lexical_cast<uint64_t>(getArguments["limit"]);
+    }
+
+    if (getArguments.find("since") != getArguments.end())
+    {
+      since = boost::lexical_cast<uint64_t>(getArguments["since"]);
+    }
+
+    if (getArguments.find("from-timestamp") != getArguments.end())
+    {
+      fromTs = boost::lexical_cast<uint64_t>(getArguments["from-timestamp"]);
+    }
+
+    if (getArguments.find("to-timestamp") != getArguments.end())
+    {
+      toTs = boost::lexical_cast<uint64_t>(getArguments["to-timestamp"]);
+    }
+
+    std::list<IDatabaseBackend::AuditLog> logs;
+
+    BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+    accessor.GetBackend().GetAuditLogs(accessor.GetManager(),
+                                       logs,
+                                       userIdFilter,
+                                       resourceIdFilter,
+                                       actionFilter,
+                                       fromTs, toTs,
+                                       since, limit);
+
+    // note: right now, we assume the logData is always Json
+    Json::Value jsonLogs;
+    
+    for (std::list<IDatabaseBackend::AuditLog>::const_iterator it = logs.begin(); it != logs.end(); ++it)
+    {
+      Json::Value serializedAuditLog;
+      serializedAuditLog["Timestamp"] = it->timeStamp;
+      serializedAuditLog["UserId"] = it->userId;
+      serializedAuditLog["ResourceId"] = it->resourceId;
+      serializedAuditLog["ResourceType"] = it->resourceType;
+      serializedAuditLog["Action"] = it->action;
+      
+      if (it->logData.empty())
+      {
+        serializedAuditLog["LogData"] = Json::nullValue;
+      }
+      else
+      {
+        Json::Value logData;
+        Orthanc::Toolbox::ReadJson(logData, it->logData);
+        serializedAuditLog["LogData"] = logData;
+      }
+      
+      jsonLogs.append(serializedAuditLog);
+    }
+
+    OrthancPlugins::AnswerJson(jsonLogs, output);
+
+  }
+
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
                                           bool useDynamicConnectionPool,
@@ -1583,6 +1683,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
     OrthancPluginRegisterAuditLogHandler(context, AuditLogHandler);
+    OrthancPlugins::RegisterRestCallback<GetAuditLogs>("/plugins/postgresql/audit-logs", true);
 #endif
   }
 

@@ -529,6 +529,17 @@ namespace OrthancDatabases
                                 const std::string& action,
                                 const void* logData,
                                 uint32_t logDataSize) ORTHANC_OVERRIDE;
+
+    virtual void GetAuditLogs(DatabaseManager& manager,
+                              std::list<AuditLog>& logs,
+                              const std::string& userIdFilter,
+                              const std::string& resourceIdFilter,
+                              const std::string& actionFilter,
+                              uint64_t fromTs,
+                              uint64_t toTs,
+                              uint64_t since,
+                              uint64_t limit) ORTHANC_OVERRIDE;
+
 #endif
 
 

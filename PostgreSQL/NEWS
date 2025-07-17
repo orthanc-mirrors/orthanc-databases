@@ -22,6 +22,7 @@ Optimal Postgresql Server version: 11+
   of active connections.
 * Added support for AuditLogs.  The PostgreSQL plugin is listening to audit logs
   and is storing them in the SQL Database.
+  They can be browsed through the API route /plugins/postgresql/audit-logs
 
 Maintenance:
 * Optimized the CreateInstance SQL query.

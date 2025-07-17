@@ -4722,6 +4722,93 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       statement.Execute(args);
     }
+
+    void IndexBackend::GetAuditLogs(DatabaseManager& manager,
+                                    std::list<AuditLog>& logs,
+                                    const std::string& userIdFilter,
+                                    const std::string& resourceIdFilter,
+                                    const std::string& actionFilter,
+                                    uint64_t fromTs,
+                                    uint64_t toTs,
+                                    uint64_t since,
+                                    uint64_t limit)
+    {
+      LookupFormatter formatter(manager.GetDialect());
+      std::vector<std::string> filters;
+
+      std::string sql = "SELECT ts, userId, resourceType, resourceId, action, logData FROM AuditLogs ";
+
+      if (!userIdFilter.empty())
+      {
+        filters.push_back("userId = " + formatter.GenerateParameter(userIdFilter));
+      }
+
+      if (!resourceIdFilter.empty())
+      {
+        filters.push_back("resourceId = " + formatter.GenerateParameter(resourceIdFilter));
+      }
+
+      if (!actionFilter.empty())
+      {
+        filters.push_back("action = " + formatter.GenerateParameter(actionFilter));
+      }
+
+      if (fromTs > 0)
+      {
+        filters.push_back("ts >= " + formatter.GenerateParameter(fromTs));
+      }
+
+      if (toTs > 0)
+      {
+        filters.push_back("ts < " + formatter.GenerateParameter(toTs));
+      }
+
+      if (filters.size() > 0)
+      {
+        std::string joinedFilters;
+        Orthanc::Toolbox::JoinStrings(joinedFilters, filters, " AND ");
+        sql += " WHERE " + joinedFilters;
+      }
+
+      if (since > 0 || limit > 0)
+      {
+        sql += formatter.FormatLimits(since, limit);
+      }
+
+      sql += " ORDER BY ts ASC";
+
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+      statement.SetReadOnly(true);
+
+      statement.Execute(formatter.GetDictionary());
+
+      if (!statement.IsDone())
+      {
+        if (statement.GetResultFieldsCount() != 6)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        
+        statement.SetResultFieldType(0, ValueType_Integer64);
+        statement.SetResultFieldType(1, ValueType_Utf8String);
+        statement.SetResultFieldType(2, ValueType_Integer64);
+        statement.SetResultFieldType(3, ValueType_Utf8String);
+        statement.SetResultFieldType(4, ValueType_Utf8String);
+        statement.SetResultFieldType(5, ValueType_BinaryString);
+
+        while (!statement.IsDone())
+        {
+          logs.push_back(AuditLog(statement.ReadInteger64(0),
+                                  statement.ReadString(1),
+                                  static_cast<OrthancPluginResourceType>(statement.ReadInteger64(2)),
+                                  statement.ReadString(3),
+                                  statement.ReadString(4),
+                                  statement.ReadStringOrNull(5)));
+
+          statement.Next();
+        }
+      }
+    }
 #endif
 
 }

@@ -238,6 +238,7 @@ ADD CONSTRAINT resources_parentid_fkey FOREIGN KEY (parentId) REFERENCES Resourc
 
 DROP INDEX IF EXISTS AuditLogsUserId;
 DROP INDEX IF EXISTS AuditLogsResourceId;
+DROP INDEX IF EXISTS AuditLogsAction;
 DROP TABLE IF EXISTS AuditLogs;
 
 

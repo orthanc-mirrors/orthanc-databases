@@ -37,6 +37,32 @@ namespace OrthancDatabases
   class IDatabaseBackend : public boost::noncopyable
   {
   public:
+    struct AuditLog
+    {
+      uint64_t timeStamp;
+      std::string userId;
+      OrthancPluginResourceType resourceType;
+      std::string resourceId;
+      std::string action;
+      std::string logData;
+
+      AuditLog(uint64_t timeStamp,
+               const std::string& userId,
+               OrthancPluginResourceType resourceType,
+               const std::string& resourceId,
+               const std::string& action,
+               const std::string& logData) :
+        timeStamp(timeStamp),
+        userId(userId),
+        resourceType(resourceType),
+        resourceId(resourceId),
+        action(action),
+        logData(logData)
+      {
+      }
+    };
+
+  public:
     virtual ~IDatabaseBackend()
     {
     }
@@ -469,6 +495,16 @@ namespace OrthancDatabases
                                 const std::string& action,
                                 const void* logData,
                                 uint32_t logDataSize) = 0;
+
+    virtual void GetAuditLogs(DatabaseManager& manager,
+                              std::list<AuditLog>& logs,
+                              const std::string& userIdFilter,
+                              const std::string& resourceIdFilter,
+                              const std::string& actionFilter,
+                              uint64_t fromTs,
+                              uint64_t toTs,
+                              uint64_t since,
+                              uint64_t limit) = 0;
 #endif
 
     virtual bool HasPerformDbHousekeeping() = 0;
