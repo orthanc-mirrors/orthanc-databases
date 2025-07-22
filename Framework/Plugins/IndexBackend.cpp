@@ -4736,7 +4736,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       LookupFormatter formatter(manager.GetDialect());
       std::vector<std::string> filters;
 
-      std::string sql = "SELECT ts, userId, resourceType, resourceId, action, logData FROM AuditLogs ";
+      std::string sql = "SELECT to_char(ts, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), userId, resourceType, resourceId, action, logData FROM AuditLogs ";
 
       if (!userIdFilter.empty())
       {
@@ -4789,7 +4789,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
         }
         
-        statement.SetResultFieldType(0, ValueType_Integer64);
+        statement.SetResultFieldType(0, ValueType_Utf8String);
         statement.SetResultFieldType(1, ValueType_Utf8String);
         statement.SetResultFieldType(2, ValueType_Integer64);
         statement.SetResultFieldType(3, ValueType_Utf8String);
@@ -4798,7 +4798,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
         while (!statement.IsDone())
         {
-          logs.push_back(AuditLog(statement.ReadInteger64(0),
+          logs.push_back(AuditLog(statement.ReadString(0),
                                   statement.ReadString(1),
                                   static_cast<OrthancPluginResourceType>(statement.ReadInteger64(2)),
                                   statement.ReadString(3),

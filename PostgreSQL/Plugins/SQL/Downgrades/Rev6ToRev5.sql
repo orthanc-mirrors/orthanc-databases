@@ -1,4 +1,4 @@
--- This file contains an SQL procedure to downgrade from schema Rev599 to Rev5 (version = 6).
+-- This file contains an SQL procedure to downgrade from schema 6 to Rev5 (version = 6).
 
 
 -- Re-installs the old PatientRecycling

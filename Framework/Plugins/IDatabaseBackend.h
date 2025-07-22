@@ -39,14 +39,14 @@ namespace OrthancDatabases
   public:
     struct AuditLog
     {
-      uint64_t timeStamp;
+      std::string timeStamp;
       std::string userId;
       OrthancPluginResourceType resourceType;
       std::string resourceId;
       std::string action;
       std::string logData;
 
-      AuditLog(uint64_t timeStamp,
+      AuditLog(const std::string& timeStamp,
                const std::string& userId,
                OrthancPluginResourceType resourceType,
                const std::string& resourceId,
