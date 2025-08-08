@@ -1593,6 +1593,9 @@ void GetGetArguments(GetArguments& result, const OrthancPluginHttpRequest* reque
     void AddRequestHeader(const std::string& key,
                           const std::string& value);
 
+    void SetRequestHeader(const std::string& key,
+                          const std::string& value);
+
     const HttpHeaders& GetRequestHeaders() const
     {
       return requestHeaders_;
@@ -1623,10 +1626,14 @@ void GetGetArguments(GetArguments& result, const OrthancPluginHttpRequest* reque
       return requestBody_;
     }
 
+    // Execute only
     bool Execute();
 
+    // Forward response as is
+    void ForwardAnswer(OrthancPluginContext* context, OrthancPluginRestOutput* output);
+
     // Execute and forward the response as is
-    void Forward(OrthancPluginContext* context, OrthancPluginRestOutput* output);
+    void ExecuteAndForwardAnswer(OrthancPluginContext* context, OrthancPluginRestOutput* output);
 
     uint16_t GetHttpStatus() const;
 
@@ -1650,7 +1657,7 @@ void GetGetArguments(GetArguments& result, const OrthancPluginHttpRequest* reque
       OrthancPluginKeysValuesIterator  *iterator_;
 
     public:
-      Iterator(OrthancPluginKeysValuesIterator  *iterator);
+      explicit Iterator(OrthancPluginKeysValuesIterator *iterator);
 
       ~Iterator();
 
