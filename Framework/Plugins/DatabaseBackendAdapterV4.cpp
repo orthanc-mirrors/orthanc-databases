@@ -1532,19 +1532,25 @@ namespace OrthancDatabases
                                          const void*               logData,
                                          uint32_t                  logDataSize)
   {
-    if (!isBackendInUse_ || connectionPool_ == NULL)
+    if (!isBackendInUse_ ||
+        connectionPool_ == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
-    BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
-    accessor.GetBackend().RecordAuditLog(accessor.GetManager(),
-                                         userId,
-                                         resourceType,
-                                         resourceId,
-                                         action,
-                                         logData,
-                                         logDataSize);
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    {
+      BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+      accessor.GetBackend().RecordAuditLog(accessor.GetManager(),
+                                           userId,
+                                           resourceType,
+                                           resourceId,
+                                           action,
+                                           logData,
+                                           logDataSize);
+    }
+#endif
+
     return OrthancPluginErrorCode_Success;                                     
   }
   
@@ -1565,9 +1571,9 @@ namespace OrthancDatabases
     std::string userIdFilter;
     std::string resourceIdFilter;
     std::string actionFilter;
+
     uint64_t since = 0;
     uint64_t limit = 0;
-
     uint64_t fromTs = 0;
     uint64_t toTs = 0;
 
@@ -1606,45 +1612,56 @@ namespace OrthancDatabases
       toTs = boost::lexical_cast<uint64_t>(getArguments["to-timestamp"]);
     }
 
-    std::list<IDatabaseBackend::AuditLog> logs;
-
-    BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
-    accessor.GetBackend().GetAuditLogs(accessor.GetManager(),
-                                       logs,
-                                       userIdFilter,
-                                       resourceIdFilter,
-                                       actionFilter,
-                                       fromTs, toTs,
-                                       since, limit);
-
-    // note: right now, we assume the logData is always Json
+    // note: right now, we assume the logData is always JSON
     Json::Value jsonLogs;
-    
-    for (std::list<IDatabaseBackend::AuditLog>::const_iterator it = logs.begin(); it != logs.end(); ++it)
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
     {
-      Json::Value serializedAuditLog;
-      serializedAuditLog["Timestamp"] = it->timeStamp;
-      serializedAuditLog["UserId"] = it->userId;
-      serializedAuditLog["ResourceId"] = it->resourceId;
-      serializedAuditLog["ResourceType"] = it->resourceType;
-      serializedAuditLog["Action"] = it->action;
-      
-      if (it->logData.empty())
+      std::list<IDatabaseBackend::AuditLog> logs;
+
+      BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+      accessor.GetBackend().GetAuditLogs(accessor.GetManager(),
+                                         logs,
+                                         userIdFilter,
+                                         resourceIdFilter,
+                                         actionFilter,
+                                         fromTs, toTs,
+                                         since, limit);
+
+      for (std::list<IDatabaseBackend::AuditLog>::const_iterator it = logs.begin(); it != logs.end(); ++it)
       {
-        serializedAuditLog["LogData"] = Json::nullValue;
+        Json::Value serializedAuditLog;
+        serializedAuditLog["Timestamp"] = it->timeStamp;
+        serializedAuditLog["UserId"] = it->userId;
+        serializedAuditLog["ResourceId"] = it->resourceId;
+        serializedAuditLog["ResourceType"] = it->resourceType;
+        serializedAuditLog["Action"] = it->action;
+
+        if (it->logData.empty())
+        {
+          serializedAuditLog["LogData"] = Json::nullValue;
+        }
+        else
+        {
+          Json::Value logData;
+          Orthanc::Toolbox::ReadJson(logData, it->logData);
+          serializedAuditLog["LogData"] = logData;
+        }
+
+        jsonLogs.append(serializedAuditLog);
       }
-      else
-      {
-        Json::Value logData;
-        Orthanc::Toolbox::ReadJson(logData, it->logData);
-        serializedAuditLog["LogData"] = logData;
-      }
-      
-      jsonLogs.append(serializedAuditLog);
     }
+#else
+    {
+      // Disable warnings about unused variables if audit logs are unavailable in the SDK
+      (void) since;
+      (void) limit;
+      (void) fromTs;
+      (void) toTs;
+    }
+#endif
 
     OrthancPlugins::AnswerJson(jsonLogs, output);
-
   }
 
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
