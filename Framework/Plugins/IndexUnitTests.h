@@ -785,13 +785,12 @@ TEST(IndexBackend, Basic)
     // column in "ServerProperties" is "TEXT" instead of "LONGTEXT"
     db.SetGlobalProperty(*manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8, longProperty.c_str());
 
-    std::string tmp;
-    ASSERT_TRUE(db.LookupGlobalProperty(tmp, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8));
-    ASSERT_EQ(longProperty, tmp);
+    ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8));
+    ASSERT_EQ(longProperty, s);
 
-    tmp.clear();
-    ASSERT_TRUE(db.LookupGlobalProperty(tmp, *manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8));
-    ASSERT_EQ(longProperty, tmp);
+    s.clear();
+    ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8));
+    ASSERT_EQ(longProperty, s);
   }
 
   for (size_t level = 0; level < 4; level++)

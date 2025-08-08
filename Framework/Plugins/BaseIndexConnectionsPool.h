@@ -37,10 +37,8 @@ namespace OrthancDatabases
   class BaseIndexConnectionsPool : public boost::noncopyable
   {
   protected:
-
     std::unique_ptr<IndexBackend>  backend_;
     OrthancPluginContext*          context_;
-    boost::mutex                   connectionsMutex_;
 
     bool                           housekeepingContinue_;
     boost::thread                  housekeepingThread_;
