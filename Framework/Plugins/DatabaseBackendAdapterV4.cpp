@@ -1525,7 +1525,8 @@ namespace OrthancDatabases
   }
 
 
-  OrthancPluginErrorCode AuditLogHandler(const char*               userId,
+  OrthancPluginErrorCode AuditLogHandler(const char*               sourcePlugin,
+                                         const char*               userId,
                                          OrthancPluginResourceType resourceType,
                                          const char*               resourceId,
                                          const char*               action,
@@ -1542,6 +1543,7 @@ namespace OrthancDatabases
     {
       BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
       accessor.GetBackend().RecordAuditLog(accessor.GetManager(),
+                                           sourcePlugin,
                                            userId,
                                            resourceType,
                                            resourceId,
@@ -1612,7 +1614,6 @@ namespace OrthancDatabases
       toTs = boost::lexical_cast<uint64_t>(getArguments["to-timestamp"]);
     }
 
-    // note: right now, we assume the logData is always JSON
     Json::Value jsonLogs;
 
 #if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
@@ -1631,20 +1632,51 @@ namespace OrthancDatabases
       for (std::list<IDatabaseBackend::AuditLog>::const_iterator it = logs.begin(); it != logs.end(); ++it)
       {
         Json::Value serializedAuditLog;
-        serializedAuditLog["Timestamp"] = it->timeStamp;
-        serializedAuditLog["UserId"] = it->userId;
-        serializedAuditLog["ResourceId"] = it->resourceId;
-        serializedAuditLog["ResourceType"] = it->resourceType;
-        serializedAuditLog["Action"] = it->action;
+        serializedAuditLog["SourcePlugin"] = it->GetSourcePlugin();
+        serializedAuditLog["Timestamp"] = it->GetTimestamp();
+        serializedAuditLog["UserId"] = it->GetUserId();
+        serializedAuditLog["ResourceId"] = it->GetResourceId();
+        serializedAuditLog["Action"] = it->GetAction();
 
-        if (it->logData.empty())
+        std::string level;
+        switch (it->GetResourceType())
+        {
+          case OrthancPluginResourceType_Patient:
+            level = "Patient";
+            break;
+
+          case OrthancPluginResourceType_Study:
+            level = "Study";
+            break;
+
+          case OrthancPluginResourceType_Series:
+            level = "Series";
+            break;
+
+          case OrthancPluginResourceType_Instance:
+            level = "Instance";
+            break;
+
+          case OrthancPluginResourceType_None:
+            level = "None";
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+        }
+
+        serializedAuditLog["ResourceType"] = level;
+
+        // TODO - Shouldn't the "LogData" information be Base64-encoded?
+        // Plugins are not required to write JSON (e.g., could be Protocol Buffers)
+        if (it->GetLogData().empty())
         {
           serializedAuditLog["LogData"] = Json::nullValue;
         }
         else
         {
           Json::Value logData;
-          Orthanc::Toolbox::ReadJson(logData, it->logData);
+          Orthanc::Toolbox::ReadJson(logData, it->GetLogData());
           serializedAuditLog["LogData"] = logData;
         }
 

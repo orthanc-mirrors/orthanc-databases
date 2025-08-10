@@ -86,8 +86,11 @@ extern "C"
 
       OrthancDatabases::MySQLParameters parameters(mysql, configuration);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::MySQLIndex(context, parameters, readOnly), countConnections,
-        parameters.GetMaxConnectionRetries(), housekeepingDelaySeconds);
+        new OrthancDatabases::MySQLIndex(context, parameters, readOnly),
+        countConnections,
+        false /* useDynamicConnectionPool */,
+        parameters.GetMaxConnectionRetries(),
+        housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {

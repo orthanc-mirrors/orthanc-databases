@@ -37,28 +37,68 @@ namespace OrthancDatabases
   class IDatabaseBackend : public boost::noncopyable
   {
   public:
-    struct AuditLog
+    class AuditLog
     {
-      std::string timeStamp;
-      std::string userId;
-      OrthancPluginResourceType resourceType;
-      std::string resourceId;
-      std::string action;
-      std::string logData;
+    private:
+      std::string timestamp_;
+      std::string sourcePlugin_;
+      std::string userId_;
+      OrthancPluginResourceType resourceType_;
+      std::string resourceId_;
+      std::string action_;
+      std::string logData_;
 
-      AuditLog(const std::string& timeStamp,
+    public:
+      AuditLog(const std::string& timestamp,
+               const std::string& sourcePlugin,
                const std::string& userId,
                OrthancPluginResourceType resourceType,
                const std::string& resourceId,
                const std::string& action,
                const std::string& logData) :
-        timeStamp(timeStamp),
-        userId(userId),
-        resourceType(resourceType),
-        resourceId(resourceId),
-        action(action),
-        logData(logData)
+        timestamp_(timestamp),
+        sourcePlugin_(sourcePlugin),
+        userId_(userId),
+        resourceType_(resourceType),
+        resourceId_(resourceId),
+        action_(action),
+        logData_(logData)
       {
+      }
+
+      const std::string& GetTimestamp() const
+      {
+        return timestamp_;
+      }
+
+      const std::string& GetSourcePlugin() const
+      {
+        return sourcePlugin_;
+      }
+
+      const std::string& GetUserId() const
+      {
+        return userId_;
+      }
+
+      OrthancPluginResourceType GetResourceType() const
+      {
+        return resourceType_;
+      }
+
+      const std::string& GetResourceId() const
+      {
+        return resourceId_;
+      }
+
+      const std::string& GetAction() const
+      {
+        return action_;
+      }
+
+      const std::string& GetLogData() const
+      {
+        return logData_;
       }
     };
 
@@ -489,6 +529,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
     virtual void RecordAuditLog(DatabaseManager& manager,
+                                const std::string& sourcePlugin,
                                 const std::string& userId,
                                 OrthancPluginResourceType type,
                                 const std::string& resourceId,

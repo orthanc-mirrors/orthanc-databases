@@ -130,7 +130,11 @@ extern "C"
       index->SetMaxConnectionRetries(maxConnectionRetries);
       index->SetConnectionRetryInterval(connectionRetryInterval);
 
-      OrthancDatabases::IndexBackend::Register(index.release(), countConnections, maxConnectionRetries, housekeepingDelaySeconds);
+      OrthancDatabases::IndexBackend::Register(index.release(),
+                                               countConnections,
+                                               false /* useDynamicConnectionPool */,
+                                               maxConnectionRetries,
+                                               housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)
     {

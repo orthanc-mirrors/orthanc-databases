@@ -826,6 +826,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE TABLE IF NOT EXISTS AuditLogs (
     ts TIMESTAMP DEFAULT NOW(),
+    sourcePlugin TEXT NOT NULL,
     userId TEXT NOT NULL,
     resourceType INTEGER NOT NULL,
     resourceId VARCHAR(64) NOT NULL,

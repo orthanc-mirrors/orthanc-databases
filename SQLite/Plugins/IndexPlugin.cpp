@@ -75,6 +75,7 @@ extern "C"
       OrthancDatabases::IndexBackend::Register(
         new OrthancDatabases::SQLiteIndex(context, "index.db"),   // TODO parameter
         1 /* only 1 connection is possible with SQLite */,
+        false /* useDynamicConnectionPool */,
         0 /* no collision is possible, as SQLite has a global lock */,
         0 /* housekeeping delay, unused for SQLite */);
     }

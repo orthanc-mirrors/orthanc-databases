@@ -4685,6 +4685,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
 #if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
     void IndexBackend::RecordAuditLog(DatabaseManager& manager,
+                                      const std::string& sourcePlugin,
                                       const std::string& userId,
                                       OrthancPluginResourceType resourceType,
                                       const std::string& resourceId,
@@ -4694,22 +4695,22 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       DatabaseManager::CachedStatement statement(
         STATEMENT_FROM_HERE, manager,
-        "INSERT INTO AuditLogs (userId, resourceType, resourceId, action, logData) "
-        "VALUES(${userId}, ${resourceType}, ${resourceId}, ${action}, ${logData})");
+        "INSERT INTO AuditLogs (sourcePlugin, userId, resourceType, resourceId, action, logData) "
+        "VALUES(${sourcePlugin}, ${userId}, ${resourceType}, ${resourceId}, ${action}, ${logData})");
 
+      statement.SetParameterType("sourcePlugin", ValueType_Utf8String);
       statement.SetParameterType("userId", ValueType_Utf8String);
-      statement.SetParameterType("resourceId", ValueType_Utf8String);
       statement.SetParameterType("resourceType", ValueType_Integer64);
+      statement.SetParameterType("resourceId", ValueType_Utf8String);
       statement.SetParameterType("action", ValueType_Utf8String);
-      statement.SetParameterType("userId", ValueType_Utf8String);
       statement.SetParameterType("logData", ValueType_BinaryString);
 
       Dictionary args;
+      args.SetUtf8Value("sourcePlugin", sourcePlugin);
       args.SetUtf8Value("userId", userId);
       args.SetIntegerValue("resourceType", static_cast<int>(resourceType));
       args.SetUtf8Value("resourceId", resourceId);
       args.SetUtf8Value("action", action);
-      args.SetUtf8Value("userId", userId);
       
       if (logData != NULL && logDataSize > 0)
       {
@@ -4736,7 +4737,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       LookupFormatter formatter(manager.GetDialect());
       std::vector<std::string> filters;
 
-      std::string sql = "SELECT to_char(ts, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), userId, resourceType, resourceId, action, logData FROM AuditLogs ";
+      std::string sql = "SELECT to_char(ts, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), sourcePlugin, userId, resourceType, resourceId, action, logData FROM AuditLogs ";
 
       if (!userIdFilter.empty())
       {
@@ -4791,19 +4792,21 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         
         statement.SetResultFieldType(0, ValueType_Utf8String);
         statement.SetResultFieldType(1, ValueType_Utf8String);
-        statement.SetResultFieldType(2, ValueType_Integer64);
-        statement.SetResultFieldType(3, ValueType_Utf8String);
+        statement.SetResultFieldType(2, ValueType_Utf8String);
+        statement.SetResultFieldType(3, ValueType_Integer64);
         statement.SetResultFieldType(4, ValueType_Utf8String);
-        statement.SetResultFieldType(5, ValueType_BinaryString);
+        statement.SetResultFieldType(5, ValueType_Utf8String);
+        statement.SetResultFieldType(6, ValueType_BinaryString);
 
         while (!statement.IsDone())
         {
           logs.push_back(AuditLog(statement.ReadString(0),
                                   statement.ReadString(1),
-                                  static_cast<OrthancPluginResourceType>(statement.ReadInteger64(2)),
-                                  statement.ReadString(3),
+                                  statement.ReadString(2),
+                                  static_cast<OrthancPluginResourceType>(statement.ReadInteger64(3)),
                                   statement.ReadString(4),
-                                  statement.ReadStringOrNull(5)));
+                                  statement.ReadString(5),
+                                  statement.ReadStringOrNull(6)));
 
           statement.Next();
         }

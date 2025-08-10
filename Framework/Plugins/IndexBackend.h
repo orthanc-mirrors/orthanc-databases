@@ -523,6 +523,7 @@ namespace OrthancDatabases
 
 #if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
     virtual void RecordAuditLog(DatabaseManager& manager,
+                                const std::string& sourcePlugin,
                                 const std::string& userId,
                                 OrthancPluginResourceType type,
                                 const std::string& resourceId,
@@ -539,9 +540,7 @@ namespace OrthancDatabases
                               uint64_t toTs,
                               uint64_t since,
                               uint64_t limit) ORTHANC_OVERRIDE;
-
 #endif
-
 
     virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE
     {
