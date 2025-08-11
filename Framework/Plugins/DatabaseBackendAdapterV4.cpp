@@ -1617,7 +1617,19 @@ namespace OrthancDatabases
 
     if (getArguments.find("log-data-format") != getArguments.end())
     {
-       logDataInJson = getArguments["log-data-format"] == "json";
+      const std::string format = getArguments["log-data-format"];
+      if (format == "json")
+      {
+        logDataInJson = true;
+      }
+      else if (format == "base64")
+      {
+        logDataInJson = false;
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange, "Unsupported value for log-data-format: " + format);
+      }
     }
 
     Json::Value jsonLogs;
@@ -1673,11 +1685,13 @@ namespace OrthancDatabases
 
         serializedAuditLog["ResourceType"] = level;
 
+        bool fillBase64;
         if (logDataInJson)
         {
           if (it->GetLogData().empty())
           {
             serializedAuditLog["JsonLogData"] = Json::nullValue;
+            fillBase64 = false;  // TODO - Shouldn't this be the same behavior as (*) below?
           }
           else
           {
@@ -1685,23 +1699,25 @@ namespace OrthancDatabases
             if (Orthanc::Toolbox::ReadJson(logData, it->GetLogData()))
             {
               serializedAuditLog["JsonLogData"] = logData;
+              fillBase64 = false;
             }
-            else // if the data is not json compatible, export it in b64 anyway
+            else
             {
-              std::string b64logData;
-              Orthanc::Toolbox::EncodeBase64(b64logData, it->GetLogData());
-              serializedAuditLog["Base64LogData"] = b64logData;
+              // If the data is not JSON compatible, export it in base64 anyway (*)
+              fillBase64 = true;
             }
           }
         }
         else
         {
-          std::string b64logData;
-          if (!it->GetLogData().empty())
-          {
-            Orthanc::Toolbox::EncodeBase64(b64logData, it->GetLogData());
-          }
-          serializedAuditLog["Base64LogData"] = b64logData;
+          fillBase64 = true;
+        }
+
+        if (fillBase64)
+        {
+          std::string b64;
+          Orthanc::Toolbox::EncodeBase64(b64, it->GetLogData());
+          serializedAuditLog["Base64LogData"] = b64;
         }
 
         jsonLogs.append(serializedAuditLog);
