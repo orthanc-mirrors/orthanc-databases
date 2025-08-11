@@ -1578,6 +1578,7 @@ namespace OrthancDatabases
     uint64_t limit = 0;
     uint64_t fromTs = 0;
     uint64_t toTs = 0;
+    bool logDataInJson = false;
 
     if (getArguments.find("user-id") != getArguments.end())
     {
@@ -1612,6 +1613,11 @@ namespace OrthancDatabases
     if (getArguments.find("to-timestamp") != getArguments.end())
     {
       toTs = boost::lexical_cast<uint64_t>(getArguments["to-timestamp"]);
+    }
+
+    if (getArguments.find("log-data-format") != getArguments.end())
+    {
+       logDataInJson = getArguments["log-data-format"] == "json";
     }
 
     Json::Value jsonLogs;
@@ -1669,15 +1675,27 @@ namespace OrthancDatabases
 
         // TODO - Shouldn't the "LogData" information be Base64-encoded?
         // Plugins are not required to write JSON (e.g., could be Protocol Buffers)
-        if (it->GetLogData().empty())
+        if (logDataInJson)
         {
-          serializedAuditLog["LogData"] = Json::nullValue;
+          if (it->GetLogData().empty())
+          {
+            serializedAuditLog["LogData"] = Json::nullValue;
+          }
+          else
+          {
+            Json::Value logData;
+            Orthanc::Toolbox::ReadJson(logData, it->GetLogData());
+            serializedAuditLog["LogData"] = logData;
+          }
         }
         else
         {
-          Json::Value logData;
-          Orthanc::Toolbox::ReadJson(logData, it->GetLogData());
-          serializedAuditLog["LogData"] = logData;
+          std::string b64logData;
+          if (!it->GetLogData().empty())
+          {
+            Orthanc::Toolbox::EncodeBase64(b64logData, it->GetLogData());
+          }
+          serializedAuditLog["LogData"] = b64logData;
         }
 
         jsonLogs.append(serializedAuditLog);
