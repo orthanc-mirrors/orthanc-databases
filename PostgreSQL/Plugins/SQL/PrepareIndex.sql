@@ -837,6 +837,7 @@ CREATE TABLE IF NOT EXISTS AuditLogs (
 CREATE INDEX IF NOT EXISTS AuditLogsUserId ON AuditLogs (userId);
 CREATE INDEX IF NOT EXISTS AuditLogsResourceId ON AuditLogs (resourceId);
 CREATE INDEX IF NOT EXISTS AuditLogsAction ON AuditLogs (action);
+CREATE INDEX IF NOT EXISTS AuditLogsSourcePlugin ON AuditLogs (sourcePlugin);
 
 
 
