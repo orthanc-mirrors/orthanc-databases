@@ -1673,19 +1673,25 @@ namespace OrthancDatabases
 
         serializedAuditLog["ResourceType"] = level;
 
-        // TODO - Shouldn't the "LogData" information be Base64-encoded?
-        // Plugins are not required to write JSON (e.g., could be Protocol Buffers)
         if (logDataInJson)
         {
           if (it->GetLogData().empty())
           {
-            serializedAuditLog["LogData"] = Json::nullValue;
+            serializedAuditLog["JsonLogData"] = Json::nullValue;
           }
           else
           {
             Json::Value logData;
-            Orthanc::Toolbox::ReadJson(logData, it->GetLogData());
-            serializedAuditLog["LogData"] = logData;
+            if (Orthanc::Toolbox::ReadJson(logData, it->GetLogData()))
+            {
+              serializedAuditLog["JsonLogData"] = logData;
+            }
+            else // if the data is not json compatible, export it in b64 anyway
+            {
+              std::string b64logData;
+              Orthanc::Toolbox::EncodeBase64(b64logData, it->GetLogData());
+              serializedAuditLog["Base64LogData"] = b64logData;
+            }
           }
         }
         else
@@ -1695,7 +1701,7 @@ namespace OrthancDatabases
           {
             Orthanc::Toolbox::EncodeBase64(b64logData, it->GetLogData());
           }
-          serializedAuditLog["LogData"] = b64logData;
+          serializedAuditLog["Base64LogData"] = b64logData;
         }
 
         jsonLogs.append(serializedAuditLog);
