@@ -34,6 +34,12 @@
 
 namespace OrthancDatabases
 {
+  /**
+   * This class corresponds to "IndexConnectionsPool.h" in
+   * OrthancPostgreSQL-8.0, but with a base class that is shared with
+   * a new class "DynamicIndexConnectionsPool":
+   * https://orthanc.uclouvain.be/hg/orthanc-databases/file/OrthancPostgreSQL-8.0/Framework/Plugins/IndexConnectionsPool.h
+   **/
   class IndexConnectionsPool : public BaseIndexConnectionsPool
   {
   private:
@@ -45,7 +51,6 @@ namespace OrthancDatabases
     Orthanc::SharedMessageQueue    availableConnections_;
 
   protected:
-
     virtual DatabaseManager* GetConnection() ORTHANC_OVERRIDE;
     
     virtual void ReleaseConnection(DatabaseManager* manager) ORTHANC_OVERRIDE;

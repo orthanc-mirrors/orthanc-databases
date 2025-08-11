@@ -48,7 +48,6 @@ namespace OrthancDatabases
     void CleanupOldConnections();
 
   protected:
-
     virtual DatabaseManager* GetConnection() ORTHANC_OVERRIDE;
     
     virtual void ReleaseConnection(DatabaseManager* manager) ORTHANC_OVERRIDE;
@@ -66,6 +65,5 @@ namespace OrthancDatabases
                                  const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;
 
     virtual void CloseConnections() ORTHANC_OVERRIDE;
-
   };
 }
