@@ -4785,7 +4785,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
       if (!statement.IsDone())
       {
-        if (statement.GetResultFieldsCount() != 6)
+        if (statement.GetResultFieldsCount() != 7)
         {
           throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
         }
