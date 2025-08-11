@@ -46,8 +46,7 @@ namespace OrthancDatabases
 
     static void HousekeepingThread(BaseIndexConnectionsPool* that);
 
-    virtual void PerformPoolHousekeeping()
-    {}
+    virtual void PerformPoolHousekeeping() = 0;
 
     void StartHousekeepingThread();
 
