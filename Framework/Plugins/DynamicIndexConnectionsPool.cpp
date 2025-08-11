@@ -154,45 +154,4 @@ namespace OrthancDatabases
     availableConnectionsSemaphore_.Release(1);
   }
 
-  // DynamicIndexConnectionsPool::Accessor::Accessor(DynamicIndexConnectionsPool& pool) :
-  //   // lock_(pool.connectionsMutex_),
-  //   pool_(pool),
-  //   manager_(NULL)
-  // {
-  //   for (;;)
-  //   {
-  //     std::unique_ptr<DatabaseManager> manager(pool.GetConnection());
-  //     if (manager.get() != NULL)
-  //     {
-  //       manager_ = manager.release();
-  //       return;
-  //     }
-  //     boost::this_thread::sleep(boost::posix_time::millisec(100));
-  //   }
-  // }
-
-  
-  // DynamicIndexConnectionsPool::Accessor::~Accessor()
-  // {
-  //   assert(manager_ != NULL);
-  //   pool_.ReleaseConnection(manager_);
-  //   // boost::unique_lock<boost::shared_mutex>  lock(pool_.connectionsMutex_);
-  //   // pool_.availableConnections_.push_front(manager_);
-  //   // pool_.availableConnectionsSemaphore_.Release(1);
-
-
-  // }
-
-  
-  // IndexBackend& DynamicIndexConnectionsPool::Accessor::GetBackend() const
-  // {
-  //   return *pool_.backend_;
-  // }
-
-  
-  // DatabaseManager& DynamicIndexConnectionsPool::Accessor::GetManager() const
-  // {
-  //   assert(manager_ != NULL);
-  //   return *manager_;
-  // }
 }

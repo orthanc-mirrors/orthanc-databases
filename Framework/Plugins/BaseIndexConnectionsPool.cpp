@@ -28,25 +28,6 @@
 
 namespace OrthancDatabases
 {
-//   class BaseIndexConnectionsPool::ManagerReference : public Orthanc::IDynamicObject
-//   {
-//   private:
-//     DatabaseManager*  manager_;
-
-//   public:
-//     explicit ManagerReference(DatabaseManager& manager) :
-//       manager_(&manager)
-//     {
-//     }
-
-//     DatabaseManager& GetManager()
-//     {
-//       assert(manager_ != NULL);
-//       return *manager_;
-//     }
-//   };
-
-
   void BaseIndexConnectionsPool::HousekeepingThread(BaseIndexConnectionsPool* that)
   {
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 2)
@@ -134,7 +115,6 @@ namespace OrthancDatabases
 
 
   BaseIndexConnectionsPool::Accessor::Accessor(BaseIndexConnectionsPool& pool) :
-    // lock_(pool.connectionsMutex_),
     pool_(pool),
     manager_(NULL)
   {
@@ -155,11 +135,6 @@ namespace OrthancDatabases
   {
     assert(manager_ != NULL);
     pool_.ReleaseConnection(manager_);
-    // boost::unique_lock<boost::shared_mutex>  lock(pool_.connectionsMutex_);
-    // pool_.availableConnections_.push_front(manager_);
-    // pool_.availableConnectionsSemaphore_.Release(1);
-
-
   }
 
   
