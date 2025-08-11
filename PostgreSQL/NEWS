@@ -26,6 +26,8 @@ Optimal Postgresql Server version: 11+
 
 Maintenance:
 * Optimized the CreateInstance SQL query.
+* Optimized UpdateStatistics and DeleteResource as described in 
+  https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6
 * Internals: 
   - The PatientRecyclingOrder has been refactored and is now stored in
     Patient metadata (18: IsProtected, 19: PatientRecyclingOrder)

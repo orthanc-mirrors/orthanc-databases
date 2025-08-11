@@ -242,6 +242,34 @@ DROP INDEX IF EXISTS AuditLogsAction;
 DROP INDEX IF EXISTS AuditLogsSourcePlugin;
 DROP TABLE IF EXISTS AuditLogs;
 
+-- Remove the InvlalidChildCountsId index
+DROP INDEX IF EXISTS InvlalidChildCountsId;
+
+-- Restore the previous UpdateSingleStatistics function
+CREATE OR REPLACE FUNCTION UpdateSingleStatistic(
+    IN statistics_key INTEGER,
+    OUT new_value BIGINT
+) AS $body$
+BEGIN
+
+  -- Delete the current changes, sum them and update the GlobalIntegers row.
+  -- New rows can be added in the meantime, they won't be deleted or summed.
+  WITH deleted_rows AS (
+      DELETE FROM GlobalIntegersChanges
+      WHERE GlobalIntegersChanges.key = statistics_key
+      RETURNING value
+  )
+  UPDATE GlobalIntegers
+  SET value = value + (
+      SELECT COALESCE(SUM(value), 0)
+      FROM deleted_rows
+  )
+  WHERE GlobalIntegers.key = statistics_key
+  RETURNING value INTO new_value;
+
+END;
+$body$ LANGUAGE plpgsql;
+
 
 ----------
 

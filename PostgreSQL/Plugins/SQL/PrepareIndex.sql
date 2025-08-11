@@ -411,9 +411,15 @@ BEGIN
 
   -- Delete the current changes, sum them and update the GlobalIntegers row.
   -- New rows can be added in the meantime, they won't be deleted or summed.
-  WITH deleted_rows AS (
+  WITH rows_to_delete AS (
+    SELECT ctid
+    FROM GlobalIntegersChanges
+    WHERE GlobalIntegersChanges.key = statistics_key
+    LIMIT 10000                  -- by default, the UpdateSingleStatistics is called every seconds -> we should never get more than 10000 entries to compute so this is mainly useful to catch up with long standing entries from previous plugins version without the Housekeeping thread (see https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6)
+  ), 
+  deleted_rows AS (
       DELETE FROM GlobalIntegersChanges
-      WHERE GlobalIntegersChanges.key = statistics_key
+      WHERE GlobalIntegersChanges.ctid IN (SELECT ctid FROM rows_to_delete)
       RETURNING value
   )
   UPDATE GlobalIntegers
@@ -701,6 +707,8 @@ CREATE TABLE IF NOT EXISTS InvalidChildCounts(
     id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
     updatedAt TIMESTAMP DEFAULT NOW());
 
+-- note: an index has been added in rev6
+
 -- Updates the Resources.childCount column with the delta that have not been committed yet.
 -- A thread will call this function at regular interval to update all pending values.
 CREATE OR REPLACE FUNCTION UpdateInvalidChildCounts(
@@ -838,6 +846,8 @@ CREATE INDEX IF NOT EXISTS AuditLogsUserId ON AuditLogs (userId);
 CREATE INDEX IF NOT EXISTS AuditLogsResourceId ON AuditLogs (resourceId);
 CREATE INDEX IF NOT EXISTS AuditLogsAction ON AuditLogs (action);
 CREATE INDEX IF NOT EXISTS AuditLogsSourcePlugin ON AuditLogs (sourcePlugin);
+
+CREATE INDEX IF NOT EXISTS InvalidChildCountsId ON InvalidChildCounts (id); -- see https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6
 
 
 
