@@ -32,7 +32,7 @@ namespace OrthancDatabases
   {
     CleanupOldConnections();
 
-    OrthancPluginSetMetricsValue(OrthancPlugins::GetGlobalContext(), "orthanc_index_active_connections_count", maxConnectionsCount_ - connectionsSemaphore_.GetAvailableResourcesCount(), OrthancPluginMetricsType_Default);
+    OrthancPluginSetMetricsValue(OrthancPlugins::GetGlobalContext(), "orthanc_index_active_connections", maxConnectionsCount_ - connectionsSemaphore_.GetAvailableResourcesCount(), OrthancPluginMetricsType_Default);
   }
 
 

@@ -78,8 +78,8 @@ namespace OrthancDatabases
 
   void IndexConnectionsPool::PerformPoolHousekeeping()
   {
-    // this is actually a fixed value !
-    OrthancPluginSetMetricsValue(OrthancPlugins::GetGlobalContext(), "orthanc_index_active_connections_count", countConnections_, OrthancPluginMetricsType_Default);
+    // this is actually a fixed value with this pool !
+    OrthancPluginSetMetricsValue(OrthancPlugins::GetGlobalContext(), "orthanc_index_active_connections", countConnections_, OrthancPluginMetricsType_Default);
   }
 
 

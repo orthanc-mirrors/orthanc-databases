@@ -18,7 +18,7 @@ Optimal Postgresql Server version: 11+
   could otherwise accumulate dead rows.
   When using a dynamic pool, connections are released either after 60 seconds
   of being idle or one hour after their creation.
-* New metrics "orthanc_index_active_connections_count" showing the current number
+* New metrics "orthanc_index_active_connections" showing the current number
   of active connections.
 * Added support for AuditLogs.  The PostgreSQL plugin is listening to audit logs
   and is storing them in the SQL Database.
