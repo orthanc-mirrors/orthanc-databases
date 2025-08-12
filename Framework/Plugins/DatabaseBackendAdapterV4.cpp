@@ -1688,10 +1688,10 @@ namespace OrthancDatabases
         bool fillBase64;
         if (logDataInJson)
         {
-          if (it->GetLogData().empty())
+          if (!it->HasLogData())
           {
             serializedAuditLog["JsonLogData"] = Json::nullValue;
-            fillBase64 = false;  // TODO - Shouldn't this be the same behavior as (*) below?
+            fillBase64 = false;
           }
           else
           {
@@ -1703,7 +1703,7 @@ namespace OrthancDatabases
             }
             else
             {
-              // If the data is not JSON compatible, export it in base64 anyway (*)
+              // If the data is not JSON compatible, export it in base64 anyway
               fillBase64 = true;
             }
           }
@@ -1715,9 +1715,16 @@ namespace OrthancDatabases
 
         if (fillBase64)
         {
-          std::string b64;
-          Orthanc::Toolbox::EncodeBase64(b64, it->GetLogData());
-          serializedAuditLog["Base64LogData"] = b64;
+          if (it->HasLogData())
+          {
+            std::string b64;
+            Orthanc::Toolbox::EncodeBase64(b64, it->GetLogData());
+            serializedAuditLog["Base64LogData"] = b64;
+          }
+          else
+          {
+            serializedAuditLog["Base64LogData"] = Json::nullValue;
+          }
         }
 
         jsonLogs.append(serializedAuditLog);

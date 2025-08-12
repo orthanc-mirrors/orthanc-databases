@@ -4806,7 +4806,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                   static_cast<OrthancPluginResourceType>(statement.ReadInteger64(3)),
                                   statement.ReadString(4),
                                   statement.ReadString(5),
-                                  statement.ReadStringOrNull(6)));
+                                  statement.ReadStringOrNull(6),
+                                  !statement.IsNull(6)));
 
           statement.Next();
         }

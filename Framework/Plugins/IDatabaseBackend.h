@@ -47,6 +47,7 @@ namespace OrthancDatabases
       std::string resourceId_;
       std::string action_;
       std::string logData_;
+      bool hasLogData_;
 
     public:
       AuditLog(const std::string& timestamp,
@@ -55,14 +56,16 @@ namespace OrthancDatabases
                OrthancPluginResourceType resourceType,
                const std::string& resourceId,
                const std::string& action,
-               const std::string& logData) :
+               const std::string& logData,
+               bool hasLogData) :
         timestamp_(timestamp),
         sourcePlugin_(sourcePlugin),
         userId_(userId),
         resourceType_(resourceType),
         resourceId_(resourceId),
         action_(action),
-        logData_(logData)
+        logData_(logData),
+        hasLogData_(hasLogData)
       {
       }
 
@@ -99,6 +102,11 @@ namespace OrthancDatabases
       const std::string& GetLogData() const
       {
         return logData_;
+      }
+
+      bool HasLogData() const
+      {
+        return hasLogData_;
       }
     };
 
