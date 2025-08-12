@@ -1,6 +1,36 @@
 Pending changes in the mainline
 ===============================
 
+DB schema revision: 5
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.5
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.6
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+* New configuration "UseDynamicConnectionPool" to dynamically create/release
+  connections to the PostgreSQL database.  
+  When this option is disabled (default), the connections are created once
+  at the start of the plugin and are kept alive for the whole execution.
+  Using the dynamic mode enables cleanup of some temporary tables that
+  could otherwise accumulate dead rows.
+  When using a dynamic pool, connections are released either after 60 seconds
+  of being idle or one hour after their creation.
+* New metrics "orthanc_index_active_connections" showing the current number
+  of active connections.
+* Added support for AuditLogs.  The PostgreSQL plugin is listening to audit logs
+  and is storing them in the SQL Database.
+  They can be browsed through the API route /plugins/postgresql/audit-logs
+
+Maintenance:
+* Optimized the CreateInstance SQL query.
+* Optimized UpdateStatistics and DeleteResource as described in 
+  https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6
+* Internals: 
+  - The PatientRecyclingOrder has been refactored and is now stored in
+    Patient metadata (18: IsProtected, 19: PatientRecyclingOrder)
 
 
 

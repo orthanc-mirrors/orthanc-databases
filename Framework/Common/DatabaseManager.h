@@ -30,6 +30,7 @@
 #include <Enumerations.h>
 
 #include <memory>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 
 namespace OrthancDatabases
@@ -56,6 +57,8 @@ namespace OrthancDatabases
     std::unique_ptr<ITransaction>  transaction_;
     CachedStatements               cachedStatements_;
     Dialect                        dialect_;
+    boost::posix_time::ptime       creationTime_;
+    boost::posix_time::ptime       lastUseTime_;
 
     void CloseIfUnavailable(Orthanc::ErrorCode e);
 
@@ -88,6 +91,9 @@ namespace OrthancDatabases
     
     void RollbackTransaction();
 
+    uint64_t GetElapsedSecondsSinceCreation() const;
+
+    uint64_t GetElapsedSecondsSinceLastUse() const;
 
     // This class is only used in the "StorageBackend" and in
     // "IDatabaseBackend::ConfigureDatabase()"

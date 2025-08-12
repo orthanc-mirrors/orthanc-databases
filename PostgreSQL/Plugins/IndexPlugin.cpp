@@ -80,11 +80,12 @@ extern "C"
     try
     {
       const size_t countConnections = postgresql.GetUnsignedIntegerValue("IndexConnectionsCount", 50);
+      const bool useDynamicConnectionPool = postgresql.GetBooleanValue("UseDynamicConnectionPool", false);
       const unsigned int housekeepingDelaySeconds = postgresql.GetUnsignedIntegerValue("HousekeepingInterval", 1);
 
       OrthancDatabases::PostgreSQLParameters parameters(postgresql);
       OrthancDatabases::IndexBackend::Register(
-        new OrthancDatabases::PostgreSQLIndex(context, parameters, readOnly), countConnections,
+        new OrthancDatabases::PostgreSQLIndex(context, parameters, readOnly), countConnections, useDynamicConnectionPool,
         parameters.GetMaxConnectionRetries(), housekeepingDelaySeconds);
     }
     catch (Orthanc::OrthancException& e)

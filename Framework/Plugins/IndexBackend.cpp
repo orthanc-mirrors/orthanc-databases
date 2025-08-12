@@ -2069,9 +2069,7 @@ namespace OrthancDatabases
         break;
         
       case Dialect_PostgreSQL:
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "SELECT CAST(COUNT(*) AS BIGINT) FROM PatientRecyclingOrder"));
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
         break;
 
       case Dialect_MSSQL:
@@ -3024,6 +3022,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   
   void IndexBackend::Register(IndexBackend* backend,
                               size_t countConnections,
+                              bool useDynamicConnectionPool,
                               unsigned int maxDatabaseRetries,
                               unsigned int housekeepingDelaySeconds)
   {
@@ -3039,7 +3038,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     if (OrthancPluginCheckVersionAdvanced(backend->GetContext(), 1, 12, 0) == 1)
     {
-      DatabaseBackendAdapterV4::Register(backend, countConnections, maxDatabaseRetries, housekeepingDelaySeconds);
+      DatabaseBackendAdapterV4::Register(backend, countConnections, useDynamicConnectionPool, maxDatabaseRetries, housekeepingDelaySeconds);
       return;
     }
 #  endif
@@ -4683,4 +4682,137 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement.Execute(args);
     }
 #endif
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    void IndexBackend::RecordAuditLog(DatabaseManager& manager,
+                                      const std::string& sourcePlugin,
+                                      const std::string& userId,
+                                      OrthancPluginResourceType resourceType,
+                                      const std::string& resourceId,
+                                      const std::string& action,
+                                      const void* logData,
+                                      uint32_t logDataSize)
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "INSERT INTO AuditLogs (sourcePlugin, userId, resourceType, resourceId, action, logData) "
+        "VALUES(${sourcePlugin}, ${userId}, ${resourceType}, ${resourceId}, ${action}, ${logData})");
+
+      statement.SetParameterType("sourcePlugin", ValueType_Utf8String);
+      statement.SetParameterType("userId", ValueType_Utf8String);
+      statement.SetParameterType("resourceType", ValueType_Integer64);
+      statement.SetParameterType("resourceId", ValueType_Utf8String);
+      statement.SetParameterType("action", ValueType_Utf8String);
+      statement.SetParameterType("logData", ValueType_BinaryString);
+
+      Dictionary args;
+      args.SetUtf8Value("sourcePlugin", sourcePlugin);
+      args.SetUtf8Value("userId", userId);
+      args.SetIntegerValue("resourceType", static_cast<int>(resourceType));
+      args.SetUtf8Value("resourceId", resourceId);
+      args.SetUtf8Value("action", action);
+      
+      if (logData != NULL && logDataSize > 0)
+      {
+        args.SetBinaryValue("logData", logData, logDataSize);
+      }
+      else
+      {
+        args.SetBinaryNullValue("logData");
+      }
+
+      statement.Execute(args);
+    }
+
+    void IndexBackend::GetAuditLogs(DatabaseManager& manager,
+                                    std::list<AuditLog>& logs,
+                                    const std::string& userIdFilter,
+                                    const std::string& resourceIdFilter,
+                                    const std::string& actionFilter,
+                                    uint64_t fromTs,
+                                    uint64_t toTs,
+                                    uint64_t since,
+                                    uint64_t limit)
+    {
+      LookupFormatter formatter(manager.GetDialect());
+      std::vector<std::string> filters;
+
+      std::string sql = "SELECT to_char(ts, 'YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"'), sourcePlugin, userId, resourceType, resourceId, action, logData FROM AuditLogs ";
+
+      if (!userIdFilter.empty())
+      {
+        filters.push_back("userId = " + formatter.GenerateParameter(userIdFilter));
+      }
+
+      if (!resourceIdFilter.empty())
+      {
+        filters.push_back("resourceId = " + formatter.GenerateParameter(resourceIdFilter));
+      }
+
+      if (!actionFilter.empty())
+      {
+        filters.push_back("action = " + formatter.GenerateParameter(actionFilter));
+      }
+
+      if (fromTs > 0)
+      {
+        filters.push_back("ts >= " + formatter.GenerateParameter(fromTs));
+      }
+
+      if (toTs > 0)
+      {
+        filters.push_back("ts < " + formatter.GenerateParameter(toTs));
+      }
+
+      if (filters.size() > 0)
+      {
+        std::string joinedFilters;
+        Orthanc::Toolbox::JoinStrings(joinedFilters, filters, " AND ");
+        sql += " WHERE " + joinedFilters;
+      }
+
+      if (since > 0 || limit > 0)
+      {
+        sql += formatter.FormatLimits(since, limit);
+      }
+
+      sql += " ORDER BY ts ASC";
+
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+      statement.SetReadOnly(true);
+
+      statement.Execute(formatter.GetDictionary());
+
+      if (!statement.IsDone())
+      {
+        if (statement.GetResultFieldsCount() != 7)
+        {
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        }
+        
+        statement.SetResultFieldType(0, ValueType_Utf8String);
+        statement.SetResultFieldType(1, ValueType_Utf8String);
+        statement.SetResultFieldType(2, ValueType_Utf8String);
+        statement.SetResultFieldType(3, ValueType_Integer64);
+        statement.SetResultFieldType(4, ValueType_Utf8String);
+        statement.SetResultFieldType(5, ValueType_Utf8String);
+        statement.SetResultFieldType(6, ValueType_BinaryString);
+
+        while (!statement.IsDone())
+        {
+          logs.push_back(AuditLog(statement.ReadString(0),
+                                  statement.ReadString(1),
+                                  statement.ReadString(2),
+                                  static_cast<OrthancPluginResourceType>(statement.ReadInteger64(3)),
+                                  statement.ReadString(4),
+                                  statement.ReadString(5),
+                                  statement.ReadStringOrNull(6),
+                                  !statement.IsNull(6)));
+
+          statement.Next();
+        }
+      }
+    }
+#endif
+
 }

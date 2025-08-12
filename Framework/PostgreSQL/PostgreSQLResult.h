@@ -72,6 +72,8 @@ namespace OrthancDatabases
 
     int64_t GetInteger64(unsigned int column) const;
 
+    int64_t GetTimestamp(unsigned int column) const;
+
     std::string GetString(unsigned int column) const;
 
     void GetBinaryString(std::string& target,

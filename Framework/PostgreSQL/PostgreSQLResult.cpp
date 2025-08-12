@@ -162,6 +162,13 @@ namespace OrthancDatabases
     return htobe64(*reinterpret_cast<int64_t*>(v));
   }
 
+  int64_t PostgreSQLResult::GetTimestamp(unsigned int column) const
+  {
+    CheckColumn(column, TIMESTAMPOID);
+    assert(PQfsize(reinterpret_cast<PGresult*>(result_), column) == 8);
+    char *v = PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column);
+    return htobe64(*reinterpret_cast<int64_t*>(v));
+  }
 
   std::string PostgreSQLResult::GetString(unsigned int column) const
   {
@@ -286,6 +293,9 @@ namespace OrthancDatabases
 
       case VOIDOID:
         return NULL;
+
+      case TIMESTAMPOID:
+        return new Integer64Value(GetTimestamp(column));
 
       default:
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);

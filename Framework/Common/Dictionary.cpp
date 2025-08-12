@@ -147,6 +147,10 @@ namespace OrthancDatabases
     SetValue(key, new Utf8StringValue());
   }
 
+  void Dictionary::SetBinaryNullValue(const std::string& key)
+  {
+    SetValue(key, new BinaryStringValue());
+  }
   
   const IValue& Dictionary::GetValue(const std::string& key) const
   {

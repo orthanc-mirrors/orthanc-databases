@@ -26,8 +26,10 @@
 #if defined(ORTHANC_PLUGINS_VERSION_IS_ABOVE)         // Macro introduced in Orthanc 1.3.1
 #  if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 
+#include "DynamicIndexConnectionsPool.h"
 #include "IndexConnectionsPool.h"
 #include "MessagesToolbox.h"
+#include <Toolbox.h>
 
 #include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages
 
@@ -46,7 +48,7 @@
 namespace OrthancDatabases
 {
   static bool isBackendInUse_ = false;  // Only for sanity checks
-
+  static BaseIndexConnectionsPool* connectionPool_ = NULL;  // Only for the AuditLogHandler
 
   static Orthanc::DatabasePluginMessages::ResourceType Convert(OrthancPluginResourceType resourceType)
   {
@@ -431,13 +433,13 @@ namespace OrthancDatabases
 
   static void ProcessDatabaseOperation(Orthanc::DatabasePluginMessages::DatabaseResponse& response,
                                        const Orthanc::DatabasePluginMessages::DatabaseRequest& request,
-                                       IndexConnectionsPool& pool)
+                                       BaseIndexConnectionsPool& pool)
   {
     switch (request.operation())
     {
       case Orthanc::DatabasePluginMessages::OPERATION_GET_SYSTEM_INFORMATION:
       {
-        IndexConnectionsPool::Accessor accessor(pool);
+        BaseIndexConnectionsPool::Accessor accessor(pool);
         response.mutable_get_system_information()->set_database_version(accessor.GetBackend().GetDatabaseVersion(accessor.GetManager()));
         response.mutable_get_system_information()->set_supports_flush_to_disk(false);
         response.mutable_get_system_information()->set_supports_revisions(accessor.GetBackend().HasRevisionsSupport());
@@ -502,7 +504,7 @@ namespace OrthancDatabases
 
       case Orthanc::DatabasePluginMessages::OPERATION_START_TRANSACTION:
       {
-        std::unique_ptr<IndexConnectionsPool::Accessor> transaction(new IndexConnectionsPool::Accessor(pool));
+        std::unique_ptr<BaseIndexConnectionsPool::Accessor> transaction(new BaseIndexConnectionsPool::Accessor(pool));
 
         switch (request.start_transaction().type())
         {
@@ -524,7 +526,7 @@ namespace OrthancDatabases
         
       case Orthanc::DatabasePluginMessages::OPERATION_UPGRADE:
       {
-        IndexConnectionsPool::Accessor accessor(pool);
+        BaseIndexConnectionsPool::Accessor accessor(pool);
         OrthancPluginStorageArea* storageArea = reinterpret_cast<OrthancPluginStorageArea*>(request.upgrade().storage_area());
         accessor.GetBackend().UpgradeDatabase(accessor.GetManager(), request.upgrade().target_version(), storageArea);
         break;
@@ -532,7 +534,7 @@ namespace OrthancDatabases
               
       case Orthanc::DatabasePluginMessages::OPERATION_FINALIZE_TRANSACTION:
       {
-        IndexConnectionsPool::Accessor* transaction = reinterpret_cast<IndexConnectionsPool::Accessor*>(request.finalize_transaction().transaction());
+        BaseIndexConnectionsPool::Accessor* transaction = reinterpret_cast<BaseIndexConnectionsPool::Accessor*>(request.finalize_transaction().transaction());
         
         if (transaction == NULL)
         {
@@ -549,7 +551,7 @@ namespace OrthancDatabases
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 3)
       case Orthanc::DatabasePluginMessages::OPERATION_MEASURE_LATENCY:
       {
-        IndexConnectionsPool::Accessor accessor(pool);
+        BaseIndexConnectionsPool::Accessor accessor(pool);
         response.mutable_measure_latency()->set_latency_us(accessor.GetBackend().MeasureLatency(accessor.GetManager()));
         break;
       }
@@ -1430,7 +1432,7 @@ namespace OrthancDatabases
       return OrthancPluginErrorCode_InternalError;
     }
 
-    IndexConnectionsPool& pool = *reinterpret_cast<IndexConnectionsPool*>(rawPool);
+    BaseIndexConnectionsPool& pool = *reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
 
     try
     {
@@ -1444,7 +1446,7 @@ namespace OrthancDatabases
           
         case Orthanc::DatabasePluginMessages::REQUEST_TRANSACTION:
         {
-          IndexConnectionsPool::Accessor& transaction = *reinterpret_cast<IndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
+          BaseIndexConnectionsPool::Accessor& transaction = *reinterpret_cast<BaseIndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
           ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(),
                                       transaction.GetBackend(), transaction.GetManager());
           break;
@@ -1502,11 +1504,12 @@ namespace OrthancDatabases
   {
     if (rawPool != NULL)
     {
-      IndexConnectionsPool* pool = reinterpret_cast<IndexConnectionsPool*>(rawPool);
+      BaseIndexConnectionsPool* pool = reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
       
       if (isBackendInUse_)
       {
         isBackendInUse_ = false;
+        connectionPool_ = NULL;
       }
       else
       {
@@ -1521,13 +1524,241 @@ namespace OrthancDatabases
     }
   }
 
+
+  OrthancPluginErrorCode AuditLogHandler(const char*               sourcePlugin,
+                                         const char*               userId,
+                                         OrthancPluginResourceType resourceType,
+                                         const char*               resourceId,
+                                         const char*               action,
+                                         const void*               logData,
+                                         uint32_t                  logDataSize)
+  {
+    if (!isBackendInUse_ ||
+        connectionPool_ == NULL)
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
+    }
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    {
+      BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+      accessor.GetBackend().RecordAuditLog(accessor.GetManager(),
+                                           sourcePlugin,
+                                           userId,
+                                           resourceType,
+                                           resourceId,
+                                           action,
+                                           logData,
+                                           logDataSize);
+    }
+#endif
+
+    return OrthancPluginErrorCode_Success;                                     
+  }
   
+  void GetAuditLogs(OrthancPluginRestOutput* output,
+                    const char* /*url*/,
+                    const OrthancPluginHttpRequest* request)
+  {
+    OrthancPluginContext* context = OrthancPlugins::GetGlobalContext();
+
+    if (request->method != OrthancPluginHttpMethod_Get)
+    {
+      OrthancPluginSendMethodNotAllowed(context, output, "GET");
+    }
+
+    OrthancPlugins::GetArguments getArguments;
+    OrthancPlugins::GetGetArguments(getArguments, request);
+
+    std::string userIdFilter;
+    std::string resourceIdFilter;
+    std::string actionFilter;
+
+    uint64_t since = 0;
+    uint64_t limit = 0;
+    uint64_t fromTs = 0;
+    uint64_t toTs = 0;
+    bool logDataInJson = false;
+
+    if (getArguments.find("user-id") != getArguments.end())
+    {
+      userIdFilter = getArguments["user-id"];
+    }
+
+    if (getArguments.find("resource-id") != getArguments.end())
+    {
+      resourceIdFilter = getArguments["resource-id"];
+    }
+
+    if (getArguments.find("action") != getArguments.end())
+    {
+      actionFilter = getArguments["action"];
+    }
+
+    if (getArguments.find("limit") != getArguments.end())
+    {
+      limit = boost::lexical_cast<uint64_t>(getArguments["limit"]);
+    }
+
+    if (getArguments.find("since") != getArguments.end())
+    {
+      since = boost::lexical_cast<uint64_t>(getArguments["since"]);
+    }
+
+    if (getArguments.find("from-timestamp") != getArguments.end())
+    {
+      fromTs = boost::lexical_cast<uint64_t>(getArguments["from-timestamp"]);
+    }
+
+    if (getArguments.find("to-timestamp") != getArguments.end())
+    {
+      toTs = boost::lexical_cast<uint64_t>(getArguments["to-timestamp"]);
+    }
+
+    if (getArguments.find("log-data-format") != getArguments.end())
+    {
+      const std::string format = getArguments["log-data-format"];
+      if (format == "json")
+      {
+        logDataInJson = true;
+      }
+      else if (format == "base64")
+      {
+        logDataInJson = false;
+      }
+      else
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange, "Unsupported value for log-data-format: " + format);
+      }
+    }
+
+    Json::Value jsonLogs;
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    {
+      std::list<IDatabaseBackend::AuditLog> logs;
+
+      BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+      accessor.GetBackend().GetAuditLogs(accessor.GetManager(),
+                                         logs,
+                                         userIdFilter,
+                                         resourceIdFilter,
+                                         actionFilter,
+                                         fromTs, toTs,
+                                         since, limit);
+
+      for (std::list<IDatabaseBackend::AuditLog>::const_iterator it = logs.begin(); it != logs.end(); ++it)
+      {
+        Json::Value serializedAuditLog;
+        serializedAuditLog["SourcePlugin"] = it->GetSourcePlugin();
+        serializedAuditLog["Timestamp"] = it->GetTimestamp();
+        serializedAuditLog["UserId"] = it->GetUserId();
+        serializedAuditLog["ResourceId"] = it->GetResourceId();
+        serializedAuditLog["Action"] = it->GetAction();
+
+        std::string level;
+        switch (it->GetResourceType())
+        {
+          case OrthancPluginResourceType_Patient:
+            level = "Patient";
+            break;
+
+          case OrthancPluginResourceType_Study:
+            level = "Study";
+            break;
+
+          case OrthancPluginResourceType_Series:
+            level = "Series";
+            break;
+
+          case OrthancPluginResourceType_Instance:
+            level = "Instance";
+            break;
+
+          case OrthancPluginResourceType_None:
+            level = "None";
+            break;
+
+          default:
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
+        }
+
+        serializedAuditLog["ResourceType"] = level;
+
+        bool fillBase64;
+        if (logDataInJson)
+        {
+          if (!it->HasLogData())
+          {
+            serializedAuditLog["JsonLogData"] = Json::nullValue;
+            fillBase64 = false;
+          }
+          else
+          {
+            Json::Value logData;
+            if (Orthanc::Toolbox::ReadJson(logData, it->GetLogData()))
+            {
+              serializedAuditLog["JsonLogData"] = logData;
+              fillBase64 = false;
+            }
+            else
+            {
+              // If the data is not JSON compatible, export it in base64 anyway
+              fillBase64 = true;
+            }
+          }
+        }
+        else
+        {
+          fillBase64 = true;
+        }
+
+        if (fillBase64)
+        {
+          if (it->HasLogData())
+          {
+            std::string b64;
+            Orthanc::Toolbox::EncodeBase64(b64, it->GetLogData());
+            serializedAuditLog["Base64LogData"] = b64;
+          }
+          else
+          {
+            serializedAuditLog["Base64LogData"] = Json::nullValue;
+          }
+        }
+
+        jsonLogs.append(serializedAuditLog);
+      }
+    }
+#else
+    {
+      // Disable warnings about unused variables if audit logs are unavailable in the SDK
+      (void) since;
+      (void) limit;
+      (void) fromTs;
+      (void) toTs;
+    }
+#endif
+
+    OrthancPlugins::AnswerJson(jsonLogs, output);
+  }
+
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
+                                          bool useDynamicConnectionPool,
                                           unsigned int maxDatabaseRetries,
                                           unsigned int housekeepingDelaySeconds)
   {
-    std::unique_ptr<IndexConnectionsPool> pool(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+    std::unique_ptr<BaseIndexConnectionsPool> pool;
+
+    if (useDynamicConnectionPool)
+    {
+      pool.reset(new DynamicIndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+    }
+    else
+    {
+      pool.reset(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+    }
     
     if (isBackendInUse_)
     {
@@ -1535,6 +1766,7 @@ namespace OrthancDatabases
     }
 
     OrthancPluginContext* context = backend->GetContext();
+    connectionPool_ = pool.get(); // we need to keep a pointer on the connectionPool for the static Audit log handler
  
     if (OrthancPluginRegisterDatabaseBackendV4(context, pool.release(), maxDatabaseRetries,
                                                CallBackend, FinalizeBackend) != OrthancPluginErrorCode_Success)
@@ -1544,6 +1776,11 @@ namespace OrthancDatabases
     }
 
     isBackendInUse_ = true;
+
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    OrthancPluginRegisterAuditLogHandler(context, AuditLogHandler);
+    OrthancPlugins::RegisterRestCallback<GetAuditLogs>("/plugins/postgresql/audit-logs", true);
+#endif
   }
 
 

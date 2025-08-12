@@ -33,14 +33,17 @@ namespace OrthancDatabases
   {
   private:
     std::string  content_;
+    bool isNull_;
 
   public:
-    BinaryStringValue()
+    BinaryStringValue() :
+      isNull_(true)
     {
     }
 
     explicit BinaryStringValue(const std::string& content) :
-      content_(content)
+      content_(content),
+      isNull_(false)
     {
     }
 
@@ -73,5 +76,10 @@ namespace OrthancDatabases
     }
     
     virtual IValue* Convert(ValueType target) const ORTHANC_OVERRIDE;
+
+    virtual bool IsNull() const ORTHANC_OVERRIDE
+    {
+      return isNull_;
+    }
   };
 }

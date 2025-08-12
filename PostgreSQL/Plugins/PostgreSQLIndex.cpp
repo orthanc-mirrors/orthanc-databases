@@ -49,7 +49,7 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
-#define CURRENT_DB_REVISION 5
+#define CURRENT_DB_REVISION 6
 
 namespace OrthancDatabases
 {
@@ -246,6 +246,19 @@ namespace OrthancDatabases
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
             hasAppliedAnUpgrade = true;
             currentRevision = 5;
+          }
+
+          if (currentRevision == 5)
+          {
+            LOG(WARNING) << "Upgrading DB schema from revision 5 to revision 6";
+
+            std::string query;
+
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV5_TO_REV6);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            hasAppliedAnUpgrade = true;
+            currentRevision = 6;
           }
 
           if (hasAppliedAnUpgrade)
@@ -457,6 +470,30 @@ namespace OrthancDatabases
     uncompressedSize = statement.ReadInteger64(5);
   }
 
+  void PostgreSQLIndex::DeleteAttachment(IDatabaseBackendOutput& output,
+                                         DatabaseManager& manager,
+                                         int64_t id,
+                                         int32_t attachment)
+  {
+    {
+      DatabaseManager::CachedStatement statement(
+        STATEMENT_FROM_HERE, manager,
+        "SELECT DeleteAttachment(${id}, ${type})");
+
+      statement.SetParameterType("id", ValueType_Integer64);
+      statement.SetParameterType("type", ValueType_Integer32);
+
+      Dictionary args;
+      args.SetIntegerValue("id", id);
+      args.SetInteger32Value("type", attachment);
+    
+      statement.ExecuteWithoutResult(args);
+    }
+
+    SignalDeletedFiles(output, manager);
+  }
+
+
   void PostgreSQLIndex::ClearDeletedFiles(DatabaseManager& manager)
   {
     { // note: the temporary table lifespan is the session, not the transaction -> that's why we need the IF NOT EXISTS
@@ -466,7 +503,6 @@ namespace OrthancDatabases
         );
       statement.ExecuteWithoutResult();
     }
-
   }
 
   void PostgreSQLIndex::ClearDeletedResources(DatabaseManager& manager)
@@ -489,11 +525,11 @@ namespace OrthancDatabases
 
       statement.Execute();
     }
-
   }
 
   void PostgreSQLIndex::ClearRemainingAncestor(DatabaseManager& manager)
   {
+    // not used anymore in PostgreSQL
   }
 
   void PostgreSQLIndex::DeleteResource(IDatabaseBackendOutput& output,
@@ -782,6 +818,111 @@ namespace OrthancDatabases
     // backward compatibility is necessary
     throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
   }
+
+  void PostgreSQLIndex::SetProtectedPatient(DatabaseManager& manager,
+                                            int64_t internalId, 
+                                            bool isProtected)
+  {
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+    Dictionary args;
+
+    if (isProtected)
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT ProtectPatient(${id})"));
+    }
+    else
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT UnprotectPatient(${id})"));
+    }        
+
+    statement->SetParameterType("id", ValueType_Integer64);
+    args.SetIntegerValue("id", internalId);
+      
+    statement->Execute(args);
+  }
+
+  bool PostgreSQLIndex::IsProtectedPatient(DatabaseManager& manager,
+                                        int64_t internalId)
+  {
+    std::string value;
+    int64_t revision;
+    
+    if (LookupMetadata(value, revision, manager, internalId, 18)) // 18 = IsProtected
+    {
+      return value == "true";
+    }
+
+    return false;
+  }
+
+  bool PostgreSQLIndex::SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                               DatabaseManager& manager)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT r.internalId "
+      "FROM Resources r "
+      "JOIN Metadata m ON r.internalId = m.id AND m.type = 19 " // 19 = PatientRecyclingOrder
+      "WHERE r.resourceType = 0 "
+      "  AND NOT EXISTS "
+      "   (SELECT 1 FROM Metadata m "
+      "    WHERE m.id = r.internalId AND m.type = 18 AND m.value = 'true') "  // 18 = IsProtected
+      " ORDER BY CAST(m.value AS INTEGER) ASC LIMIT 1;");
+    
+    statement.SetReadOnly(true);
+    statement.Execute();
+
+    if (statement.IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      internalId = statement.ReadInteger64(0);
+      return true;
+    }
+  }
+
+    
+  bool PostgreSQLIndex::SelectPatientToRecycle(int64_t& internalId /*out*/,
+                                               DatabaseManager& manager,
+                                               int64_t patientIdToAvoid)
+  {
+    DatabaseManager::CachedStatement statement(
+      STATEMENT_FROM_HERE, manager,
+      "SELECT r.internalId "
+      "FROM Resources r "
+      "JOIN Metadata m ON r.internalId = m.id AND m.type = 19 " // 19 = PatientRecyclingOrder
+      "WHERE r.resourceType = 0 "
+      "  AND r.internalId != ${id} "
+      "  AND NOT EXISTS "
+      "   (SELECT 1 FROM Metadata m "
+      "    WHERE m.id = r.internalId AND m.type = 18 AND m.value = 'true') "  // 18 = IsProtected
+      " ORDER BY CAST(m.value AS INTEGER) ASC LIMIT 1;");
+
+    statement.SetReadOnly(true);
+    statement.SetParameterType("id", ValueType_Integer64);
+
+    Dictionary args;
+    args.SetIntegerValue("id", patientIdToAvoid);
+
+    statement.Execute(args);
+
+    if (statement.IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      internalId = statement.ReadInteger64(0);
+      return true;
+    }
+  }
+
 
   bool PostgreSQLIndex::HasPerformDbHousekeeping()
   {

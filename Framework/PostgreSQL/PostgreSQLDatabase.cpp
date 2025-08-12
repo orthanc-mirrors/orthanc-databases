@@ -63,7 +63,7 @@ namespace OrthancDatabases
   {
     if (pg_ != NULL)
     {
-      LOG(INFO) << "Closing connection to PostgreSQL";
+      LOG(TRACE) << "Closing connection to PostgreSQL";
       PQfinish(reinterpret_cast<PGconn*>(pg_));
       pg_ = NULL;
     }

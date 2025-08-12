@@ -28,27 +28,24 @@
 #include "BaseIndexConnectionsPool.h"
 
 #include <MultiThreading/SharedMessageQueue.h>
+#include <MultiThreading/Semaphore.h>
 
 #include <list>
 #include <boost/thread.hpp>
 
 namespace OrthancDatabases
 {
-  /**
-   * This class corresponds to "IndexConnectionsPool.h" in
-   * OrthancPostgreSQL-8.0, but with a base class that is shared with
-   * a new class "DynamicIndexConnectionsPool":
-   * https://orthanc.uclouvain.be/hg/orthanc-databases/file/OrthancPostgreSQL-8.0/Framework/Plugins/IndexConnectionsPool.h
-   **/
-  class IndexConnectionsPool : public BaseIndexConnectionsPool
+  class DynamicIndexConnectionsPool : public BaseIndexConnectionsPool
   {
   private:
-    class ManagerReference;
-
-    boost::shared_mutex            connectionsMutex_;
-    size_t                         countConnections_;
+    boost::mutex                   connectionsMutex_;
+    size_t                         maxConnectionsCount_;
+    Orthanc::Semaphore             connectionsSemaphore_;
     std::list<DatabaseManager*>    connections_;
-    Orthanc::SharedMessageQueue    availableConnections_;
+    Orthanc::Semaphore             availableConnectionsSemaphore_;
+    std::list<DatabaseManager*>    availableConnections_;
+
+    void CleanupOldConnections();
 
   protected:
     virtual DatabaseManager* GetConnection() ORTHANC_OVERRIDE;
@@ -58,11 +55,11 @@ namespace OrthancDatabases
     virtual void PerformPoolHousekeeping() ORTHANC_OVERRIDE;
 
   public:
-    IndexConnectionsPool(IndexBackend* backend /* takes ownership */,
-                         size_t countConnections,
-                         unsigned int houseKeepingDelaySeconds);
+    DynamicIndexConnectionsPool(IndexBackend* backend /* takes ownership */,
+                                size_t maxConnectionsCount,
+                                unsigned int houseKeepingDelaySeconds);
 
-    virtual ~IndexConnectionsPool();
+    virtual ~DynamicIndexConnectionsPool();
 
     virtual void OpenConnections(bool hasIdentifierTags,
                                  const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;

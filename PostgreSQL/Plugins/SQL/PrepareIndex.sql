@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS Resources(
        internalId BIGSERIAL NOT NULL PRIMARY KEY,
        resourceType INTEGER NOT NULL,
        publicId VARCHAR(64) NOT NULL,
-       parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+    --    parentId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
+       parentId BIGINT REFERENCES Resources(internalId),
 	   childCount INTEGER,
        CONSTRAINT UniquePublicId UNIQUE (publicId)
        );
@@ -77,12 +78,6 @@ CREATE TABLE IF NOT EXISTS ExportedResources(
        date VARCHAR(64)
        ); 
 
-CREATE TABLE IF NOT EXISTS PatientRecyclingOrder(
-       seq BIGSERIAL NOT NULL PRIMARY KEY,
-       patientId BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
-       CONSTRAINT UniquePatientId UNIQUE (patientId)
-       );
-
 CREATE TABLE IF NOT EXISTS Labels(
         id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
         label TEXT, 
@@ -127,7 +122,6 @@ END $$;
 
 CREATE INDEX IF NOT EXISTS PublicIndex ON Resources(publicId);
 CREATE INDEX IF NOT EXISTS ResourceTypeIndex ON Resources(resourceType);
-CREATE INDEX IF NOT EXISTS PatientRecyclingIndex ON PatientRecyclingOrder(patientId);
 
 CREATE INDEX IF NOT EXISTS MainDicomTagsIndex ON MainDicomTags(id);
 CREATE INDEX IF NOT EXISTS DicomIdentifiersIndex1 ON DicomIdentifiers(id);
@@ -159,85 +153,23 @@ begin
 END $body$;
 
 
-------------------- PatientAdded trigger & PatientRecyclingOrder -------------------
-DROP TRIGGER IF EXISTS PatientAdded ON Resources;
-
+--------------------- PatientRecyclingOrder -------------------
+-- from rev 99, we always maintain a PatientRecyclingOrder metadata, no matter if the patient is protected or not
 CREATE OR REPLACE FUNCTION PatientAddedOrUpdated(
-    IN patient_id BIGINT,
-    IN is_update BIGINT
+    IN patient_id BIGINT
     )
 RETURNS VOID AS $body$
 BEGIN
     DECLARE
         newSeq BIGINT;
     BEGIN
-        IF is_update > 0 THEN
-            -- Note: Protected patients are not listed in this table !  So, they won't be updated
-            WITH deleted_rows AS (
-                DELETE FROM PatientRecyclingOrder
-                WHERE PatientRecyclingOrder.patientId = patient_id
-                RETURNING patientId
-            )
-            INSERT INTO PatientRecyclingOrder (patientId)
-            SELECT patientID FROM deleted_rows
-            WHERE EXISTS(SELECT 1 FROM deleted_rows);
-        ELSE
-            INSERT INTO PatientRecyclingOrder VALUES (DEFAULT, patient_id);
-        END IF;
+        INSERT INTO Metadata (id, type, value, revision)
+        VALUES (patient_id, 19, nextval('PatientRecyclingOrderSequence')::TEXT, 0)
+        ON CONFLICT (id, type)
+        DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
     END;
 END;
 $body$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION PatientAddedFunc() 
-RETURNS TRIGGER AS $body$
-BEGIN
-  -- The "0" corresponds to "OrthancPluginResourceType_Patient"
-  IF new.resourceType = 0 THEN
-    PERFORM PatientAddedOrUpdated(new.internalId, 0);
-  END IF;
-  RETURN NULL;
-END;
-$body$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS PatientAdded on Resources;
-CREATE TRIGGER PatientAdded
-AFTER INSERT ON Resources
-FOR EACH ROW
-EXECUTE PROCEDURE PatientAddedFunc();
-
--- initial population of 
-SELECT setval('patientrecyclingorder_seq_seq', MAX(seq)) FROM PatientRecyclingOrder;
-DELETE FROM GlobalIntegers WHERE key = 7;
-        -- UPDATE GlobalIntegers SET value = value + 1 WHERE key = 7 RETURNING value INTO newSeq;
-
--- INSERT INTO GlobalIntegers
---     SELECT 7, CAST(COALESCE(MAX(seq), 0) AS BIGINT) FROM PatientRecyclingOrder
---     ON CONFLICT DO NOTHING;
-
-
-------------------- ResourceDeleted trigger -------------------
-DROP TRIGGER IF EXISTS ResourceDeleted ON Resources;
-
--- The following trigger combines 2 triggers from SQLite:
--- ResourceDeleted + ResourceDeletedParentCleaning
-CREATE OR REPLACE FUNCTION ResourceDeletedFunc() 
-RETURNS TRIGGER AS $body$
-BEGIN
-  -- RAISE NOTICE 'ResourceDeletedFunc %', old.publicId;
-  INSERT INTO DeletedResources VALUES (old.resourceType, old.publicId);
-  
-  -- If this resource is the latest child, delete the parent
-  DELETE FROM Resources WHERE internalId = old.parentId
-                              AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = old.parentId);
-  RETURN NULL;
-END;
-$body$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS ResourceDeleted on Resources;
-CREATE TRIGGER ResourceDeleted
-AFTER DELETE ON Resources
-FOR EACH ROW
-EXECUTE PROCEDURE ResourceDeletedFunc();
 
 
 ------------------- DeleteResource function -------------------
@@ -248,15 +180,20 @@ CREATE OR REPLACE FUNCTION DeleteResource(
     OUT remaining_anncestor_public_id TEXT) AS $body$
 
 DECLARE
-    deleted_row RECORD;
-    locked_row RECORD;
+    deleted_resource_row RECORD;
+    deleted_parent_row RECORD;
+    deleted_grand_parent_row RECORD;
+    deleted_grand_grand_parent_row RECORD;
+
+    locked_parent_row RECORD;
+    locked_resource_row RECORD;
 
 BEGIN
 
     SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
-    
-    -- note: temporary tables are created at session (connection) level -> they are likely to exist
-    -- these tables are used by the triggers
+
+    -- note: temporary tables are created at connection level -> they are likely to exist.
+    -- These tables are used by the triggers
     CREATE TEMPORARY TABLE IF NOT EXISTS DeletedResources(
         resourceType INTEGER NOT NULL,
         publicId VARCHAR(64) NOT NULL
@@ -264,28 +201,104 @@ BEGIN
 
     RESET client_min_messages;
 
-    -- clear the temporary table in case it has been created earlier in the session
+    -- clear the temporary table in case it has been created earlier in the connection
     DELETE FROM DeletedResources;
-    
+
     -- create/clear the DeletedFiles temporary table
     PERFORM CreateDeletedFilesTemporaryTable();
+
 
     -- Before deleting an object, we need to lock its parent until the end of the transaction to avoid that
     -- 2 threads deletes the last 2 instances of a series at the same time -> none of them would realize
     -- that they are deleting the last instance and the parent resources would not be deleted.
     -- Locking only the immediate parent is sufficient to prevent from this.
-    SELECT * INTO locked_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
+    SELECT * INTO locked_parent_row FROM resources WHERE internalid = (SELECT parentid FROM resources WHERE internalid = id) FOR UPDATE;
+
+    -- Before deleting the resource itself, we lock it to retrieve the resourceType and to make sure not 2 connections try to
+    -- delete it at the same time
+    SELECT * INTO locked_resource_row FROM resources WHERE internalid = id FOR UPDATE;
+
+    -- before delete the resource itself, we must delete its grand-grand-children, the grand-children and its children no to violate 
+    -- the parentId referencing an existing primary key constrain.  This is actually implementing the ON DELETE CASCADE that was on the parentId in previous revisions.
+    
+    -- If this resource has grand-grand-children, delete them
+    if locked_resource_row.resourceType < 1 THEN
+        WITH grand_grand_children_to_delete AS (SELECT grandGrandChildLevel.internalId, grandGrandChildLevel.resourceType, grandGrandChildLevel.publicId
+                                                FROM Resources childLevel
+                                                INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId
+                                                INNER JOIN Resources grandGrandChildLevel ON grandChildLevel.internalId = grandGrandChildLevel.parentId
+                                                WHERE childLevel.parentId = id),
+        
+        deleted_grand_grand_children_rows AS (DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM grand_grand_children_to_delete)
+                                              RETURNING resourceType, publicId)
+
+        INSERT INTO DeletedResources SELECT resourceType, publicId FROM deleted_grand_grand_children_rows; 
+    END IF;
+
+    -- If this resource has grand-children, delete them
+    if locked_resource_row.resourceType < 2 THEN
+        WITH grand_children_to_delete AS (SELECT grandChildLevel.internalId, grandChildLevel.resourceType, grandChildLevel.publicId
+                                          FROM Resources childLevel
+                                          INNER JOIN Resources grandChildLevel ON childLevel.internalId = grandChildLevel.parentId
+                                          WHERE childLevel.parentId = id),
+        
+        deleted_grand_children_rows AS (DELETE FROM Resources WHERE internalId IN (SELECT internalId FROM grand_children_to_delete)
+                                        RETURNING resourceType, publicId)
+
+        INSERT INTO DeletedResources SELECT resourceType, publicId FROM deleted_grand_children_rows; 
+    END IF;
+
+    -- If this resource has children, delete them
+    if locked_resource_row.resourceType < 3 THEN
+        WITH deleted_children AS (DELETE FROM Resources 
+                                  WHERE parentId = id
+                                  RETURNING resourceType, publicId)
+        INSERT INTO DeletedResources SELECT resourceType, publicId FROM deleted_children; 
+    END IF;
+
 
     -- delete the resource itself
-    DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_row;
-    -- note: there is a ResourceDeletedFunc trigger that will execute here and delete the parents if there are no remaining children + 
+    DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_resource_row;
 
+    -- keep track of the deleted resources for C++ code
+    INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId);
+  
     -- If this resource still has siblings, keep track of the remaining parent
     -- (a parent that must not be deleted but whose LastUpdate must be updated)
     SELECT resourceType, publicId INTO remaining_ancestor_resource_type, remaining_anncestor_public_id
         FROM Resources 
-        WHERE internalId = deleted_row.parentId
-            AND EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_row.parentId);
+        WHERE internalId = deleted_resource_row.parentId
+            AND EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_resource_row.parentId);
+
+	IF deleted_resource_row.resourceType > 0 THEN
+        -- If this resource is the latest child, delete the parent
+        DELETE FROM Resources WHERE internalId = deleted_resource_row.parentId
+                                    AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_resource_row.parentId)
+                                    RETURNING * INTO deleted_parent_row;
+        IF FOUND THEN
+            INSERT INTO DeletedResources VALUES (deleted_parent_row.resourceType, deleted_parent_row.publicId);
+
+            IF deleted_parent_row.resourceType > 0 THEN
+                -- If this resource is the latest child, delete the parent
+                DELETE FROM Resources WHERE internalId = deleted_parent_row.parentId
+                                    AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_parent_row.parentId)
+                                    RETURNING * INTO deleted_grand_parent_row;
+                IF FOUND THEN
+                    INSERT INTO DeletedResources VALUES (deleted_grand_parent_row.resourceType, deleted_grand_parent_row.publicId);
+
+                    IF deleted_grand_parent_row.resourceType > 0 THEN
+                        -- If this resource is the latest child, delete the parent
+                        DELETE FROM Resources WHERE internalId = deleted_grand_parent_row.parentId
+                                            AND NOT EXISTS (SELECT 1 FROM Resources WHERE parentId = deleted_grand_parent_row.parentId)
+                                            RETURNING * INTO deleted_grand_parent_row;
+                        IF FOUND THEN
+                            INSERT INTO DeletedResources VALUES (deleted_grand_parent_row.resourceType, deleted_grand_parent_row.publicId);
+                        END IF;
+                    END IF;
+                END IF;
+            END IF;
+        END IF;
+    END IF;
 
 END;
 
@@ -296,9 +309,9 @@ CREATE OR REPLACE FUNCTION CreateDeletedFilesTemporaryTable(
 
 BEGIN
 
-    SET client_min_messages = warning;   -- suppress NOTICE:  relation "deletedresources" already exists, skipping
-    
-    -- note: temporary tables are created at session (connection) level -> they are likely to exist
+    SET client_min_messages = warning;   -- suppress NOTICE:  relation "DeletedFiles" already exists, skipping
+
+    -- note: temporary tables created at connection level -> they are likely to exist
     CREATE TEMPORARY TABLE IF NOT EXISTS DeletedFiles(
         uuid VARCHAR(64) NOT NULL,
         fileType INTEGER,
@@ -313,13 +326,14 @@ BEGIN
 
     RESET client_min_messages;
 
-    -- clear the temporary table in case it has been created earlier in the session
+    -- clear the temporary table in case it has been created earlier in the connection
     DELETE FROM DeletedFiles;
 END;
 
 $body$ LANGUAGE plpgsql;
 
-
+-- Keep track of deleted files such that the C++ code knows which files have been deleted.
+-- Attached files are deleted by cascade when the related resource is deleted.
 CREATE OR REPLACE FUNCTION AttachedFileDeletedFunc() 
 RETURNS TRIGGER AS $body$
 BEGIN
@@ -337,6 +351,19 @@ CREATE TRIGGER AttachedFileDeleted
 AFTER DELETE ON AttachedFiles
 FOR EACH ROW
 EXECUTE PROCEDURE AttachedFileDeletedFunc();
+
+
+CREATE OR REPLACE FUNCTION DeleteAttachment(
+    IN resource_id BIGINT,
+    IN file_type INTEGER) 
+RETURNS VOID AS $body$
+BEGIN
+    -- create/clear the DeletedFiles temporary table
+    PERFORM CreateDeletedFilesTemporaryTable();
+
+    DELETE FROM AttachedFiles WHERE id = resource_id AND fileType = file_type;
+END;
+$body$ LANGUAGE plpgsql;
 
 
 ------------------- Fast Statistics -------------------
@@ -384,9 +411,15 @@ BEGIN
 
   -- Delete the current changes, sum them and update the GlobalIntegers row.
   -- New rows can be added in the meantime, they won't be deleted or summed.
-  WITH deleted_rows AS (
+  WITH rows_to_delete AS (
+    SELECT ctid
+    FROM GlobalIntegersChanges
+    WHERE GlobalIntegersChanges.key = statistics_key
+    LIMIT 10000                  -- by default, the UpdateSingleStatistics is called every seconds -> we should never get more than 10000 entries to compute so this is mainly useful to catch up with long standing entries from previous plugins version without the Housekeeping thread (see https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6)
+  ), 
+  deleted_rows AS (
       DELETE FROM GlobalIntegersChanges
-      WHERE GlobalIntegersChanges.key = statistics_key
+      WHERE GlobalIntegersChanges.ctid IN (SELECT ctid FROM rows_to_delete)
       RETURNING value
   )
   UPDATE GlobalIntegers
@@ -538,49 +571,81 @@ CREATE OR REPLACE FUNCTION CreateInstance(
   OUT instance_internal_id BIGINT) AS $body$
 
 BEGIN
+	-- Assume the parent series already exists to minimize exceptions.  
+    -- Most of the instances are not the first of their series - especially when we need high performances.
+
 	is_new_patient := 1;
 	is_new_study := 1;
 	is_new_series := 1;
 	is_new_instance := 1;
 
-	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_patient := 0;
-            SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
-    END;
+	-- First, check if the series already exists
+	SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
 
-	BEGIN
-        INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_study := 0;
-            SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction    END;
-    END;
+	IF series_internal_id IS NOT NULL THEN
+	    -- RAISE NOTICE 'series-found %', series_internal_id;
+		is_new_patient := 0;
+		is_new_study := 0;
+		is_new_series := 0;
 
-	BEGIN
-	    INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_series := 0;
-            SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction    END;
-    END;
+		-- If the series exists, insert the instance directly
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_instance := 0;
+				SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
+		END;
 
-  	BEGIN
-		INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
-    EXCEPTION
-        WHEN unique_violation THEN
-            is_new_instance := 0;
-            SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id FOR UPDATE;  -- also locks the resource and its parent to prevent from deletion while we complete this transaction
-    END;
+    	SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
+		SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
 
-    IF is_new_instance > 0 THEN
-        -- Move the patient to the end of the recycling order.
-        PERFORM PatientAddedOrUpdated(patient_internal_id, 1);
-    END IF;  
+	ELSE
+	    -- RAISE NOTICE 'series-not-found';
+
+		-- If the series does not exist, execute the "full" steps
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 0, patient_public_id, NULL, 0) RETURNING internalid INTO patient_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_patient := 0;
+				SELECT internalid INTO patient_internal_id FROM "resources" WHERE publicId = patient_public_id;
+		END;
+	
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 1, study_public_id, patient_internal_id, 0) RETURNING internalid INTO study_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_study := 0;
+				SELECT internalid INTO study_internal_id FROM "resources" WHERE publicId = study_public_id;
+		END;
+	
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 2, series_public_id, study_internal_id, 0) RETURNING internalid INTO series_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_series := 0;
+				SELECT internalid INTO series_internal_id FROM "resources" WHERE publicId = series_public_id;
+		END;
+	
+		BEGIN
+			INSERT INTO "resources" VALUES (DEFAULT, 3, instance_public_id, series_internal_id, 0) RETURNING internalid INTO instance_internal_id;
+		EXCEPTION
+			WHEN unique_violation THEN
+				is_new_instance := 0;
+				SELECT internalid INTO instance_internal_id FROM "resources" WHERE publicId = instance_public_id;
+		END;
+
+	END IF;
+
+
+	IF is_new_instance > 0 THEN
+		-- Move the patient to the end of the recycling order.
+		PERFORM PatientAddedOrUpdated(patient_internal_id);
+	END IF;
 END;
 $body$ LANGUAGE plpgsql;
+
 
 -- function to compute a statistic in a ReadOnly transaction
 CREATE OR REPLACE FUNCTION ComputeStatisticsReadOnly(
@@ -642,6 +707,8 @@ CREATE TABLE IF NOT EXISTS InvalidChildCounts(
     id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
     updatedAt TIMESTAMP DEFAULT NOW());
 
+-- note: an index has been added in rev6
+
 -- Updates the Resources.childCount column with the delta that have not been committed yet.
 -- A thread will call this function at regular interval to update all pending values.
 CREATE OR REPLACE FUNCTION UpdateInvalidChildCounts(
@@ -656,7 +723,7 @@ BEGIN
     SELECT ARRAY(SELECT internalId
                  FROM Resources
                  WHERE internalId IN (SELECT DISTINCT id FROM InvalidChildCounts)
-                 FOR UPDATE)
+                 FOR UPDATE SKIP LOCKED)
     INTO locked_resources_ids;
 
     -- New rows can be added in the meantime, they won't be taken into account this time.
@@ -723,26 +790,71 @@ EXECUTE PROCEDURE UpdateChildCount();
 
 -- new in 1.12.8 (rev 5)
 
-CREATE TABLE KeyValueStores(
+CREATE TABLE IF NOT EXISTS KeyValueStores(
        storeId TEXT NOT NULL,
        key TEXT NOT NULL,
        value BYTEA NOT NULL,
        PRIMARY KEY(storeId, key)  -- Prevents duplicates
        );
 
-CREATE TABLE Queues (
+CREATE TABLE IF NOT EXISTS Queues (
        id BIGSERIAL NOT NULL PRIMARY KEY,
        queueId TEXT NOT NULL,
        value BYTEA NOT NULL
 );
 
-CREATE INDEX QueuesIndex ON Queues (queueId, id);
+CREATE INDEX IF NOT EXISTS QueuesIndex ON Queues (queueId, id);
+
+-- new in rev 6
+
+CREATE SEQUENCE IF NOT EXISTS PatientRecyclingOrderSequence INCREMENT 1 START 1;
+
+CREATE OR REPLACE FUNCTION ProtectPatient(patient_id BIGINT)
+RETURNS VOID AS $$
+BEGIN
+    INSERT INTO Metadata (id, type, value, revision) -- 18 = IsProtected
+    VALUES (patient_id, 18, 'true', 0)
+    ON CONFLICT (id, type)
+    DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
+END;
+$$ LANGUAGE plpgsql;
+
+-- remove IsProtected and update PatientRecyclingOrder
+CREATE OR REPLACE FUNCTION UnprotectPatient(patient_id BIGINT)
+RETURNS VOID AS $$
+BEGIN
+    DELETE FROM Metadata WHERE id = patient_id AND type = 18; -- 18 = IsProtected
+
+    INSERT INTO Metadata (id, type, value, revision)
+    VALUES (patient_id, 19, nextval('PatientRecyclingOrderSequence')::TEXT, 0)
+    ON CONFLICT (id, type)
+    DO UPDATE SET value = EXCLUDED.value, revision = EXCLUDED.revision;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS AuditLogs (
+    ts TIMESTAMP DEFAULT NOW(),
+    sourcePlugin TEXT NOT NULL,
+    userId TEXT NOT NULL,
+    resourceType INTEGER NOT NULL,
+    resourceId VARCHAR(64) NOT NULL,
+    action TEXT NOT NULL,
+    logData BYTEA
+);
+
+CREATE INDEX IF NOT EXISTS AuditLogsUserId ON AuditLogs (userId);
+CREATE INDEX IF NOT EXISTS AuditLogsResourceId ON AuditLogs (resourceId);
+CREATE INDEX IF NOT EXISTS AuditLogsAction ON AuditLogs (action);
+CREATE INDEX IF NOT EXISTS AuditLogsSourcePlugin ON AuditLogs (sourcePlugin);
+
+CREATE INDEX IF NOT EXISTS InvalidChildCountsId ON InvalidChildCounts (id); -- see https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6
+
 
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 5); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 6); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance

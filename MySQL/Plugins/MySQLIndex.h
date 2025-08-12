@@ -76,6 +76,11 @@ namespace OrthancDatabases
       return false;
     }
 
+    virtual bool HasAuditLogs() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
     virtual int64_t CreateResource(DatabaseManager& manager,
                                    const char* publicId,
                                    OrthancPluginResourceType type)

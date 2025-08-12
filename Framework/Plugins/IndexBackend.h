@@ -521,6 +521,27 @@ namespace OrthancDatabases
 
 #endif
 
+#if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
+    virtual void RecordAuditLog(DatabaseManager& manager,
+                                const std::string& sourcePlugin,
+                                const std::string& userId,
+                                OrthancPluginResourceType type,
+                                const std::string& resourceId,
+                                const std::string& action,
+                                const void* logData,
+                                uint32_t logDataSize) ORTHANC_OVERRIDE;
+
+    virtual void GetAuditLogs(DatabaseManager& manager,
+                              std::list<AuditLog>& logs,
+                              const std::string& userIdFilter,
+                              const std::string& resourceIdFilter,
+                              const std::string& actionFilter,
+                              uint64_t fromTs,
+                              uint64_t toTs,
+                              uint64_t since,
+                              uint64_t limit) ORTHANC_OVERRIDE;
+#endif
+
     virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE
     {
       return false;
@@ -539,6 +560,7 @@ namespace OrthancDatabases
      **/
     static void Register(IndexBackend* backend,
                          size_t countConnections,
+                         bool useDynamicConnectionPool,
                          unsigned int maxDatabaseRetries,
                          unsigned int housekeepingDelaySeconds);
 
