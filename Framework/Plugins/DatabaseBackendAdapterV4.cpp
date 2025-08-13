@@ -1735,8 +1735,8 @@ namespace OrthancDatabases
       // Disable warnings about unused variables if audit logs are unavailable in the SDK
       (void) since;
       (void) limit;
-      (void) fromTs;
-      (void) toTs;
+      (void) fromTsIsoFormat;
+      (void) toTsIsoFormat;
     }
 #endif
 
