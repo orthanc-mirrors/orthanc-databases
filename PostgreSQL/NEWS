@@ -1,11 +1,11 @@
-Pending changes in the mainline
-===============================
+Release 9.0 (2025-08-13)
+========================
 
-DB schema revision: 5
+DB schema revision: 6
 Minimum plugin SDK (for build): 1.12.5
-Optimal plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.9
 Minimum Orthanc runtime: 1.12.5
-Optimal Orthanc runtime: 1.12.6
+Optimal Orthanc runtime: 1.12.9
 
 Minimal Postgresql Server version: 9
 Optimal Postgresql Server version: 11+
@@ -21,8 +21,8 @@ Optimal Postgresql Server version: 11+
 * New metrics "orthanc_index_active_connections" showing the current number
   of active connections.
 * Added support for AuditLogs.  The PostgreSQL plugin is listening to audit logs
-  and is storing them in the SQL Database.
-  They can be browsed through the API route /plugins/postgresql/audit-logs
+  that other plugins can emit and is storing them in the SQL Database.
+  They can be browsed through the API route /plugins/postgresql/audit-logs?user-id=x&since=1&limit=100&log-data-format=json&from-timestamp=2025-08-11T11:25:55.639Z&to-timestamp=2025-08-11T14:25:55.639Z&resource-id=y&action=z
 
 Maintenance:
 * Optimized the CreateInstance SQL query.
