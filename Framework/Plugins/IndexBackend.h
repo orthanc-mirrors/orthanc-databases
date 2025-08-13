@@ -536,8 +536,8 @@ namespace OrthancDatabases
                               const std::string& userIdFilter,
                               const std::string& resourceIdFilter,
                               const std::string& actionFilter,
-                              uint64_t fromTs,
-                              uint64_t toTs,
+                              const std::string& fromTsIsoFormat,
+                              const std::string& toTsIsoFormat,
                               uint64_t since,
                               uint64_t limit) ORTHANC_OVERRIDE;
 #endif

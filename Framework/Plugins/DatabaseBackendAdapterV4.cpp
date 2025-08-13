@@ -1576,8 +1576,8 @@ namespace OrthancDatabases
 
     uint64_t since = 0;
     uint64_t limit = 0;
-    uint64_t fromTs = 0;
-    uint64_t toTs = 0;
+    std::string fromTsIsoFormat;
+    std::string toTsIsoFormat;
     bool logDataInJson = false;
 
     if (getArguments.find("user-id") != getArguments.end())
@@ -1607,12 +1607,12 @@ namespace OrthancDatabases
 
     if (getArguments.find("from-timestamp") != getArguments.end())
     {
-      fromTs = boost::lexical_cast<uint64_t>(getArguments["from-timestamp"]);
+      fromTsIsoFormat = getArguments["from-timestamp"];
     }
 
     if (getArguments.find("to-timestamp") != getArguments.end())
     {
-      toTs = boost::lexical_cast<uint64_t>(getArguments["to-timestamp"]);
+      toTsIsoFormat = getArguments["to-timestamp"];
     }
 
     if (getArguments.find("log-data-format") != getArguments.end())
@@ -1644,7 +1644,7 @@ namespace OrthancDatabases
                                          userIdFilter,
                                          resourceIdFilter,
                                          actionFilter,
-                                         fromTs, toTs,
+                                         fromTsIsoFormat, toTsIsoFormat,
                                          since, limit);
 
       for (std::list<IDatabaseBackend::AuditLog>::const_iterator it = logs.begin(); it != logs.end(); ++it)

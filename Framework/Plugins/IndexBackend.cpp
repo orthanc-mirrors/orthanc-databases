@@ -4729,8 +4729,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                                     const std::string& userIdFilter,
                                     const std::string& resourceIdFilter,
                                     const std::string& actionFilter,
-                                    uint64_t fromTs,
-                                    uint64_t toTs,
+                                    const std::string& fromTsIsoFormat,
+                                    const std::string& toTsIsoFormat,
                                     uint64_t since,
                                     uint64_t limit)
     {
@@ -4754,14 +4754,14 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         filters.push_back("action = " + formatter.GenerateParameter(actionFilter));
       }
 
-      if (fromTs > 0)
+      if (!fromTsIsoFormat.empty())
       {
-        filters.push_back("ts >= " + formatter.GenerateParameter(fromTs));
+        filters.push_back("ts >= " + formatter.GenerateParameter(fromTsIsoFormat) + "::TIMESTAMPTZ");
       }
 
-      if (toTs > 0)
+      if (!toTsIsoFormat.empty())
       {
-        filters.push_back("ts < " + formatter.GenerateParameter(toTs));
+        filters.push_back("ts < " + formatter.GenerateParameter(toTsIsoFormat) + "::TIMESTAMPTZ");
       }
 
       if (filters.size() > 0)
@@ -4771,12 +4771,12 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         sql += " WHERE " + joinedFilters;
       }
 
+      sql += " ORDER BY ts ASC ";
+
       if (since > 0 || limit > 0)
       {
         sql += formatter.FormatLimits(since, limit);
       }
-
-      sql += " ORDER BY ts ASC";
 
       DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
       statement.SetReadOnly(true);
