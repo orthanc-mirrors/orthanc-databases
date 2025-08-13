@@ -1,6 +1,6 @@
 CREATE SEQUENCE IF NOT EXISTS PatientRecyclingOrderSequence INCREMENT 1 START 1;
 
--- the protection mechanisms changed in rev 499.  We now use a metadata (18: IsProtected)
+-- the protection mechanisms changed in rev 6.  We now use a metadata (18: IsProtected)
 -- while, in the past, patients where protected by not appearing in the PatientRecyclingOrder
 
 -- Step 1: Identify all patients that are not in PatientRecyclingOrder (those are the protected patients)
