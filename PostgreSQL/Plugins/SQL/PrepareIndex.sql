@@ -1,4 +1,4 @@
--- This SQL file creates a DB in Rev5 directly
+-- This SQL file creates a DB in Rev6 directly
 -- It is also run after upgrade scripts to create new tables and or create/replace triggers and functions.
 -- This script is self contained, it contains everything that needs to be run to create an Orthanc DB.
 -- Note to developers: 
