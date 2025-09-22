@@ -279,22 +279,7 @@ namespace OrthancDatabases
             LOG(WARNING) << "Upgrading DB schema by applying PrepareIndex.sql";
             // apply all idempotent changes that are in the PrepareIndex.sql
             ApplyPrepareIndex(t, manager);
-
-            if (!LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
-            {
-              LOG(ERROR) << "No Database revision found after the upgrade !";
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-            }
-
-            LOG(WARNING) << "Database revision after the upgrade is " << currentRevision;
-
-            if (currentRevision != CURRENT_DB_REVISION)
-            {
-              LOG(ERROR) << "Invalid database revision after the upgrade !";
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
-            }
           }
-
         }
 
         t.Commit();
