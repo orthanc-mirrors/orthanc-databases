@@ -85,7 +85,6 @@ CREATE TABLE IF NOT EXISTS Labels(
         );
 
 CREATE TABLE IF NOT EXISTS GlobalIntegers(
-       pk BIGSERIAL PRIMARY KEY,   -- new in rev699 required for pg_repack to be able to reclaim space
        key INTEGER PRIMARY KEY,
        value BIGINT);
 -- GlobalIntegers keys:
@@ -401,6 +400,7 @@ INSERT INTO GlobalIntegers
 -- These changes will be applied at regular interval by an external thread or when someone
 -- requests the statistics
 CREATE TABLE IF NOT EXISTS GlobalIntegersChanges(
+    pk BIGSERIAL PRIMARY KEY,   -- new in rev699 required for pg_repack to be able to reclaim space
     key INTEGER,
     value BIGINT);
 
