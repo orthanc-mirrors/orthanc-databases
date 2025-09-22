@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS Labels(
         );
 
 CREATE TABLE IF NOT EXISTS GlobalIntegers(
+       pk BIGSERIAL PRIMARY KEY,   -- new in rev699 required for pg_repack to be able to reclaim space
        key INTEGER PRIMARY KEY,
        value BIGINT);
 -- GlobalIntegers keys:
@@ -704,6 +705,7 @@ $body$ LANGUAGE plpgsql;
 -- At regular interval, the DB housekeeping thread updates the childCount column of
 -- resources with an entry in this table.
 CREATE TABLE IF NOT EXISTS InvalidChildCounts(
+    pk BIGSERIAL PRIMARY KEY,   -- new in rev699 required for pg_repack to be able to reclaim space
     id BIGINT REFERENCES Resources(internalId) ON DELETE CASCADE,
     updatedAt TIMESTAMP DEFAULT NOW());
 
@@ -854,7 +856,7 @@ CREATE INDEX IF NOT EXISTS InvalidChildCountsId ON InvalidChildCounts (id); -- s
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 6); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 699); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance
