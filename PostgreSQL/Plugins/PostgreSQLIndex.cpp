@@ -277,6 +277,9 @@ namespace OrthancDatabases
         {
           int currentRevision = 0;
 
+          // wait 1s before reading the patch level in case you are using read-replicas
+          boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+
           if (!LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
           {
             LOG(ERROR) << "No Database revision found after the upgrade !";
