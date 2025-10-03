@@ -1,3 +1,21 @@
+Pending changes in the mainline
+===============================
+
+DB schema revision: 6
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.9
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.9
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+
+Maintenance:
+* Now verifying the DatabasePatchLevel (revision) in another transaction than
+  the one that upgrades the schema.
+
+
 Release 9.0 (2025-08-13)
 ========================
 

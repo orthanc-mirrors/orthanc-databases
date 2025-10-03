@@ -154,7 +154,7 @@ END $body$;
 
 
 --------------------- PatientRecyclingOrder -------------------
--- from rev 99, we always maintain a PatientRecyclingOrder metadata, no matter if the patient is protected or not
+-- from rev 6, we always maintain a PatientRecyclingOrder metadata, no matter if the patient is protected or not
 CREATE OR REPLACE FUNCTION PatientAddedOrUpdated(
     IN patient_id BIGINT
     )
