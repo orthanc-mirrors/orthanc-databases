@@ -125,6 +125,12 @@ namespace OrthancDatabases
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
         bool hasAppliedAnUpgrade = false;
 
+        if (!t.GetDatabaseTransaction().DoesSchemaExist(parameters_.GetSchema()))
+        {
+          LOG(ERROR) << "The schema '" << parameters_.GetSchema() << "' does not exist.  If you are not using the 'public' schema, you must create the schema manually before starting Orthanc.";
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
+        }
+
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
           LOG(WARNING) << "PostgreSQL is creating the database schema";

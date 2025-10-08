@@ -145,8 +145,8 @@ CREATE INDEX IF NOT EXISTS LabelsIndex2 ON LABELS(label);
 DO $body$
 begin
 	IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name='pg_trgm') THEN
-		CREATE EXTENSION IF NOT EXISTS pg_trgm;
-        CREATE INDEX IF NOT EXISTS DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value gin_trgm_ops);
+		CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+        CREATE INDEX IF NOT EXISTS DicomIdentifiersIndexValues2 ON DicomIdentifiers USING gin(value public.gin_trgm_ops);
 	ELSE
 		RAISE NOTICE 'pg_trgm extension is not available on you system';
 	END IF;

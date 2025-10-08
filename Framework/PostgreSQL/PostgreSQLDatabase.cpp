@@ -111,6 +111,10 @@ namespace OrthancDatabases
       LOG(ERROR) << "PostgreSQL error: " << message;
       throw Orthanc::OrthancException(Orthanc::ErrorCode_DatabaseUnavailable);
     }
+
+    // select the schema each time we open a connection
+    PostgreSQLStatement setSchema(*this, "SET search_path TO " + parameters_.GetSchema());
+    setSchema.Run();
   }
 
 
@@ -189,22 +193,38 @@ namespace OrthancDatabases
     }
   }
 
-
-  bool PostgreSQLDatabase::DoesTableExist(const std::string& name)
+  bool PostgreSQLDatabase::DoesSchemaExist(const std::string& schema)
   {
-    std::string lower;
-    Orthanc::Toolbox::ToLowerCase(lower, name);
+    PostgreSQLStatement statement(*this, 
+                                  "SELECT schema_name "
+                                  "FROM information_schema.schemata "
+                                  "WHERE schema_name = $1");
+
+    statement.DeclareInputName(0);
+    statement.BindString(0, schema);
+
+    PostgreSQLResult result(statement);
+    return !result.IsDone();
+  }
+
+  bool PostgreSQLDatabase::DoesTableExist(const std::string& tableName)
+  {
+    std::string lowerTableName;
+    Orthanc::Toolbox::ToLowerCase(lowerTableName, tableName);
 
     // http://stackoverflow.com/a/24089729/881731
 
     PostgreSQLStatement statement(*this, 
                                   "SELECT 1 FROM pg_catalog.pg_class c "
                                   "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
-                                  "WHERE n.nspname = 'public' AND c.relkind='r' "
-                                  "AND c.relname=$1");
+                                  "WHERE n.nspname = $1 AND c.relkind='r' "
+                                  "AND c.relname=$2");
 
-    statement.DeclareInputString(0);
-    statement.BindString(0, lower);
+    statement.DeclareInputName(0);
+    statement.BindString(0, parameters_.GetSchema());
+
+    statement.DeclareInputString(1);
+    statement.BindString(1, lowerTableName);
 
     PostgreSQLResult result(statement);
     return !result.IsDone();
@@ -220,11 +240,14 @@ namespace OrthancDatabases
     PostgreSQLStatement statement(*this, 
                                   "SELECT 1 FROM pg_catalog.pg_class c "
                                   "JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace "
-                                  "WHERE n.nspname = 'public' AND c.relkind='i' "
-                                  "AND c.relname=$1");
+                                  "WHERE n.nspname = $1 AND c.relkind='i' "
+                                  "AND c.relname=$2");
 
-    statement.DeclareInputString(0);
-    statement.BindString(0, lower);
+    statement.DeclareInputName(0);
+    statement.BindString(0, parameters_.GetSchema());
+
+    statement.DeclareInputString(1);
+    statement.BindString(1, lower);
 
     PostgreSQLResult result(statement);
     return !result.IsDone();
@@ -246,7 +269,7 @@ namespace OrthancDatabases
     statement.DeclareInputString(1);
     statement.DeclareInputString(2);
     
-    statement.BindString(0, "public" /* schema */);
+    statement.BindString(0, parameters_.GetSchema());
     statement.BindString(1, lowerTable);
     statement.BindString(2, lowerColumn);
     
@@ -263,11 +286,11 @@ namespace OrthancDatabases
     ExecuteMultiLines("SELECT lo_unlink(loid) FROM (SELECT DISTINCT loid FROM pg_catalog.pg_largeobject) as loids;");
 
     // http://stackoverflow.com/a/21247009/881731
-    ExecuteMultiLines("DROP SCHEMA public CASCADE;");
-    ExecuteMultiLines("CREATE SCHEMA public;");
-    ExecuteMultiLines("GRANT ALL ON SCHEMA public TO postgres;");
-    ExecuteMultiLines("GRANT ALL ON SCHEMA public TO public;");
-    ExecuteMultiLines("COMMENT ON SCHEMA public IS 'standard public schema';");
+    ExecuteMultiLines("DROP SCHEMA " + parameters_.GetSchema() + " CASCADE;");
+    ExecuteMultiLines("CREATE SCHEMA " + parameters_.GetSchema() + ";");
+    ExecuteMultiLines("GRANT ALL ON SCHEMA " + parameters_.GetSchema() + " TO postgres;");
+    ExecuteMultiLines("GRANT ALL ON SCHEMA " + parameters_.GetSchema() + " TO public;");
+    ExecuteMultiLines("COMMENT ON SCHEMA " + parameters_.GetSchema() + " IS 'standard orthanc schema';");
 
     transaction.Commit();
   }
@@ -308,6 +331,11 @@ namespace OrthancDatabases
       virtual bool DoesTableExist(const std::string& name) ORTHANC_OVERRIDE
       {
         return db_.DoesTableExist(name.c_str());
+      }
+
+      virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
+      {
+        return db_.DoesSchemaExist(name.c_str());
       }
 
       virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE

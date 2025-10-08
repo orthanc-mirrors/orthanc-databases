@@ -25,6 +25,7 @@
 
 #include <Logging.h>
 #include <OrthancException.h>
+#include <Toolbox.h>
 
 #include <boost/lexical_cast.hpp>
 
@@ -97,6 +98,8 @@ namespace OrthancDatabases
     }
 
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
+
+    SetSchema(configuration.GetStringValue("Schema", "public"));
 
     isVerboseEnabled_ = configuration.GetBooleanValue("EnableVerboseLogs", false);
     allowInconsistentChildCounts_ = configuration.GetBooleanValue("AllowInconsistentChildCounts", false);
@@ -200,6 +203,11 @@ namespace OrthancDatabases
   {
     uri_.clear();
     database_ = database;
+  }
+
+  void PostgreSQLParameters::SetSchema(const std::string& schema)
+  {
+    Orthanc::Toolbox::ToLowerCase(schema_, schema);
   }
 
   const std::string PostgreSQLParameters::GetReadWriteTransactionStatement() const

@@ -80,6 +80,8 @@ namespace OrthancDatabases
 
     void DeclareInputString(unsigned int param);
 
+    void DeclareInputName(unsigned int param);
+
     void DeclareInputBinary(unsigned int param);
 
     void DeclareInputLargeObject(unsigned int param);
