@@ -64,6 +64,11 @@ namespace OrthancDatabases
       return db_.DoesTableExist(*this, name);
     }
 
+    virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
+    {
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    }
+
     virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
     {
       return false;
