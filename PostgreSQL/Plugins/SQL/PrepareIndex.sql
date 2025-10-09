@@ -459,7 +459,7 @@ $body$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION IncrementResourcesTrackerFunc()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO GlobalIntegersChanges VALUES(new.resourceType + 2, 1);
+  INSERT INTO GlobalIntegersChanges (key, value) VALUES(new.resourceType + 2, 1);
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -467,7 +467,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION DecrementResourcesTrackerFunc()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO GlobalIntegersChanges VALUES(old.resourceType + 2, -1);
+  INSERT INTO GlobalIntegersChanges (key, value) VALUES(old.resourceType + 2, -1);
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -476,8 +476,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION AttachedFileIncrementSizeFunc()
 RETURNS TRIGGER AS $body$
 BEGIN
-  INSERT INTO GlobalIntegersChanges VALUES(0, new.compressedSize);
-  INSERT INTO GlobalIntegersChanges VALUES(1, new.uncompressedSize);
+  INSERT INTO GlobalIntegersChanges (key, value) VALUES(0, new.compressedSize);
+  INSERT INTO GlobalIntegersChanges (key, value) VALUES(1, new.uncompressedSize);
   RETURN NULL;
 END;
 $body$ LANGUAGE plpgsql;
@@ -485,8 +485,8 @@ $body$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION AttachedFileDecrementSizeFunc() 
 RETURNS TRIGGER AS $body$
 BEGIN
-  INSERT INTO GlobalIntegersChanges VALUES(0, -old.compressedSize);
-  INSERT INTO GlobalIntegersChanges VALUES(1, -old.uncompressedSize);
+  INSERT INTO GlobalIntegersChanges (key, value) VALUES(0, -old.compressedSize);
+  INSERT INTO GlobalIntegersChanges (key, value) VALUES(1, -old.uncompressedSize);
   RETURN NULL;
 END;
 $body$ LANGUAGE plpgsql;
@@ -758,7 +758,7 @@ BEGIN
     IF TG_OP = 'INSERT' THEN
 		IF new.parentId IS NOT NULL THEN
             -- mark the parent's childCount as invalid
-			INSERT INTO InvalidChildCounts VALUES(new.parentId);
+			INSERT INTO InvalidChildCounts (id) VALUES(new.parentId);
         END IF;
 	
     ELSIF TG_OP = 'DELETE' THEN
@@ -766,7 +766,7 @@ BEGIN
 		IF old.parentId IS NOT NULL THEN
             BEGIN
                 -- mark the parent's childCount as invalid
-                INSERT INTO InvalidChildCounts VALUES(old.parentId);
+                INSERT INTO InvalidChildCounts (id) VALUES(old.parentId);
             EXCEPTION
                 -- when deleting the last child of a parent, the insert will fail (this is expected)
                 WHEN foreign_key_violation THEN NULL;
