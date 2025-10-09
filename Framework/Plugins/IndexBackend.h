@@ -84,13 +84,6 @@ namespace OrthancDatabases
                                        const Dictionary& args,
                                        uint32_t limit);
 
-#if ORTHANC_PLUGINS_HAS_QUEUES == 1
-    bool DequeueValueSQLite(std::string& value,
-                            DatabaseManager& manager,
-                            const std::string& queueId,
-                            bool fromFront);
-#endif
-
   public:
     explicit IndexBackend(OrthancPluginContext* context,
                           bool readOnly,
@@ -507,6 +500,20 @@ namespace OrthancDatabases
 
     virtual uint64_t GetQueueSize(DatabaseManager& manager,
                                   const std::string& queueId) ORTHANC_OVERRIDE;
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+    virtual bool ReserveQueueValue(std::string& value,
+                                   uint64_t& valueId,
+                                   DatabaseManager& manager,
+                                   const std::string& queueId,
+                                   bool fromFront,
+                                   uint32_t reserveTimeout) ORTHANC_OVERRIDE;
+
+    virtual void AcknowledgeQueueValue(DatabaseManager& manager,
+                                       const std::string& queueId,
+                                       uint64_t valueId) ORTHANC_OVERRIDE;
 
 #endif
 

@@ -2,3 +2,6 @@
 
 ALTER TABLE InvalidChildCounts ADD COLUMN pk BIGSERIAL PRIMARY KEY;
 ALTER TABLE GlobalIntegersChanges ADD COLUMN pk BIGSERIAL PRIMARY KEY;
+
+-- Adding the queues timeout
+ALTER TABLE Queues ADD COLUMN reservedUntil TIMESTAMP DEFAULT NULL;

@@ -802,7 +802,8 @@ CREATE TABLE IF NOT EXISTS KeyValueStores(
 CREATE TABLE IF NOT EXISTS Queues (
        id BIGSERIAL NOT NULL PRIMARY KEY,
        queueId TEXT NOT NULL,
-       value BYTEA NOT NULL
+       value BYTEA NOT NULL,
+       reservedUntil TIMESTAMP DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS QueuesIndex ON Queues (queueId, id);
