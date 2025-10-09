@@ -39,6 +39,7 @@ namespace OrthancDatabases
     username_ = "";
     password_ = "";
     database_.clear();
+    schema_ = "public";
     uri_.clear();
     ssl_ = false;
     lock_ = true;
