@@ -1,6 +1,29 @@
 Pending changes in the mainline
 ===============================
 
+DB schema revision: 6
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.12.9
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.12.9
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
+Changes:
+* New configuration "Schema" (default value: 'public') to allow Orthanc
+  to use another schema.  Note that, if you are not using the default 'public'
+  value, you must create the schema manually before starting Orthanc and you
+  must make sure that the user has access to it.
+  Note that Orthanc might try to install the pg_trgm extension in the 'public'
+  schema so you should make sure that the user also has access to the 'public'
+  schema or that you install the pg_trgm extension manually in the public schema.
+  The plugin now calls 'SET search_path TO $schema' when opening a new connection
+  to the DB.
+
+Maintenance:
+* Now verifying the DatabasePatchLevel (revision) in another transaction than
+  the one that upgrades the schema.
 * Added a new primary key column in the InvalidChildCounts and GlobalIntegersChanges
   tables.  This new column is required for pg_repack to be able to reclaim space on
   these tables.

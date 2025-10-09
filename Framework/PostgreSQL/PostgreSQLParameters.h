@@ -45,6 +45,7 @@ namespace OrthancDatabases
     std::string  username_;
     std::string  password_;
     std::string  database_;
+    std::string  schema_;
     std::string  uri_;
     bool         ssl_;
     bool         lock_;
@@ -102,6 +103,13 @@ namespace OrthancDatabases
     const std::string& GetDatabase() const
     {
       return database_;
+    }
+
+    void SetSchema(const std::string& schema);
+
+    const std::string& GetSchema() const
+    {
+      return schema_;
     }
 
     void SetSsl(bool ssl)

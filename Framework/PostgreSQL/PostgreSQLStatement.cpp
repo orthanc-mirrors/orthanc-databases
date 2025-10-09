@@ -223,7 +223,7 @@ namespace OrthancDatabases
     }
 
     oids_[param] = type;
-    binary_[param] = (type == TEXTOID || type == OIDOID) ? 0 : 1;
+    binary_[param] = (type == TEXTOID || type == OIDOID ||type == NAMEOID) ? 0 : 1;
   }
 
 
@@ -242,6 +242,12 @@ namespace OrthancDatabases
   void PostgreSQLStatement::DeclareInputString(unsigned int param)
   {
     DeclareInputInternal(param, TEXTOID);
+  }
+
+
+  void PostgreSQLStatement::DeclareInputName(unsigned int param)
+  {
+    DeclareInputInternal(param, NAMEOID);
   }
 
 
@@ -464,6 +470,7 @@ namespace OrthancDatabases
     switch (oids_[param])
     {
       case TEXTOID:
+      case NAMEOID:
       {
         std::string s = value + '\0';  // Make sure that there is an end-of-string character
         inputs_->SetItem(param, s.c_str(), s.size());

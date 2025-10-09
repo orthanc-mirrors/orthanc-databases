@@ -175,7 +175,7 @@ namespace OrthancDatabases
     CheckColumn(column, 0);
 
     Oid oid = PQftype(reinterpret_cast<PGresult*>(result_), column);
-    if (oid != TEXTOID && oid != VARCHAROID)
+    if (oid != TEXTOID && oid != VARCHAROID && oid != NAMEOID)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadParameterType);
     }

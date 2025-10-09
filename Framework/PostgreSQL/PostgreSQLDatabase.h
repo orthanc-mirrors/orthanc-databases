@@ -81,6 +81,8 @@ namespace OrthancDatabases
     bool DoesColumnExist(const std::string& tableName,
                          const std::string& columnName);
 
+    bool DoesSchemaExist(const std::string& name);
+
     void ClearAll();   // Only for unit tests!
 
     virtual Dialect GetDialect() const ORTHANC_OVERRIDE

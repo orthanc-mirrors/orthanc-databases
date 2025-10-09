@@ -125,11 +125,18 @@ namespace OrthancDatabases
         DatabaseManager::Transaction t(manager, TransactionType_ReadWrite);
         bool hasAppliedAnUpgrade = false;
 
+        if (!t.GetDatabaseTransaction().DoesSchemaExist(parameters_.GetSchema()))
+        {
+          LOG(ERROR) << "The schema '" << parameters_.GetSchema() << "' does not exist.  If you are not using the 'public' schema, you must create the schema manually before starting Orthanc.";
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
+        }
+
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
         {
           LOG(WARNING) << "PostgreSQL is creating the database schema";
 
           ApplyPrepareIndex(t, manager);
+          hasAppliedAnUpgrade = true;
 
           if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
           {
@@ -279,6 +286,21 @@ namespace OrthancDatabases
             LOG(WARNING) << "Upgrading DB schema by applying PrepareIndex.sql";
             // apply all idempotent changes that are in the PrepareIndex.sql
             ApplyPrepareIndex(t, manager);
+
+            // first check that the patch level has been upgraded correctly before we commit the transaction !
+            if (!LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+            {
+              LOG(ERROR) << "No Database revision found after the upgrade !";
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+            }
+
+            LOG(WARNING) << "Database revision after the upgrade (1) is " << currentRevision;
+
+            if (currentRevision != CURRENT_DB_REVISION)
+            {
+              LOG(ERROR) << "Invalid database revision after the upgrade (1) !";
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+            }
           }
         }
 
@@ -287,9 +309,18 @@ namespace OrthancDatabases
         if (hasAppliedAnUpgrade)
         {
           int currentRevision = 0;
+
+          // wait 1s before reading the patch level in case you are using read-replicas
+          boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
+
+          if (!LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel))
+          {
+            LOG(ERROR) << "No Database revision found after the upgrade (2) !";
+            throw Orthanc::OrthancException(Orthanc::ErrorCode_Database);
+          }
           
           LookupGlobalIntegerProperty(currentRevision, manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabasePatchLevel);
-          LOG(WARNING) << "Database revision after the upgrade is " << currentRevision;
+          LOG(WARNING) << "Database revision after the upgrade (2) is " << currentRevision;
 
           if (currentRevision != CURRENT_DB_REVISION)
           {
