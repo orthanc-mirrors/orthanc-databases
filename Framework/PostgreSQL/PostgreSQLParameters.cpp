@@ -39,6 +39,7 @@ namespace OrthancDatabases
     username_ = "";
     password_ = "";
     database_.clear();
+    schema_ = "public";
     uri_.clear();
     ssl_ = false;
     lock_ = true;
@@ -100,6 +101,7 @@ namespace OrthancDatabases
     lock_ = configuration.GetBooleanValue("Lock", true);  // Use locking by default
 
     SetSchema(configuration.GetStringValue("Schema", "public"));
+    SetApplicationName(configuration.GetStringValue("ApplicationName", ""));
 
     isVerboseEnabled_ = configuration.GetBooleanValue("EnableVerboseLogs", false);
     allowInconsistentChildCounts_ = configuration.GetBooleanValue("AllowInconsistentChildCounts", false);
@@ -210,6 +212,11 @@ namespace OrthancDatabases
     Orthanc::Toolbox::ToLowerCase(schema_, schema);
   }
 
+  void PostgreSQLParameters::SetApplicationName(const std::string& applicationName)
+  {
+    applicationName_ = applicationName;
+  }
+
   const std::string PostgreSQLParameters::GetReadWriteTransactionStatement() const
   {
     switch (isolationMode_)
@@ -258,9 +265,14 @@ namespace OrthancDatabases
         target += " password=" + password_;
       }
 
-      if (database_.size() > 0)
+      if (!database_.empty())
       {
         target += " dbname=" + database_;
+      }
+
+      if (!applicationName_.empty())
+      {
+        target += " application_name=" + applicationName_;
       }
     }
     else
