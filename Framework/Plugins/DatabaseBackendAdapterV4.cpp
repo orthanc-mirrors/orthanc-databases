@@ -1737,6 +1737,7 @@ namespace OrthancDatabases
       (void) limit;
       (void) fromTsIsoFormat;
       (void) toTsIsoFormat;
+      (void) logDataInJson;
     }
 #endif
 
