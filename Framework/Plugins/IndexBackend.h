@@ -39,7 +39,9 @@ namespace OrthancDatabases
   class IndexBackend : public IDatabaseBackend
   {
   private:
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
     class LookupFormatter;
+#endif
 
     OrthancPluginContext*  context_;
     bool                   readOnly_;
@@ -49,7 +51,6 @@ namespace OrthancDatabases
     std::unique_ptr<IDatabaseBackendOutput::IFactory>  outputFactory_;
     
   protected:
-
     virtual void ClearDeletedFiles(DatabaseManager& manager);
 
     virtual void ClearDeletedResources(DatabaseManager& manager);
@@ -503,7 +504,7 @@ namespace OrthancDatabases
 
 #endif
 
-#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
     virtual bool ReserveQueueValue(std::string& value,
                                    uint64_t& valueId,
                                    DatabaseManager& manager,
@@ -514,7 +515,6 @@ namespace OrthancDatabases
     virtual void AcknowledgeQueueValue(DatabaseManager& manager,
                                        const std::string& queueId,
                                        uint64_t valueId) ORTHANC_OVERRIDE;
-
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1
@@ -525,7 +525,6 @@ namespace OrthancDatabases
     virtual void SetAttachmentCustomData(DatabaseManager& manager,
                                          const std::string& attachmentUuid,
                                          const std::string& customData) ORTHANC_OVERRIDE;
-
 #endif
 
 #if ORTHANC_PLUGINS_HAS_AUDIT_LOGS == 1
@@ -576,5 +575,9 @@ namespace OrthancDatabases
     static DatabaseManager* CreateSingleDatabaseManager(IDatabaseBackend& backend,
                                                         bool hasIdentifierTags,
                                                         const std::list<IdentifierTag>& identifierTags);
+
+#if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
+    ISqlLookupFormatter* CreateLookupFormatter(Dialect dialect);
+#endif
   };
 }

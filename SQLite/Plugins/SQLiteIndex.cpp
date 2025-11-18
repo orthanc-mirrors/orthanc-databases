@@ -301,19 +301,18 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_HAS_QUEUES == 1
-
-  bool IndexBackend::DequeueValue(std::string& value,
-                                  DatabaseManager& manager,
-                                  const std::string& queueId,
-                                  bool fromFront)
+  bool SQLiteIndex::DequeueValue(std::string& value,
+                                 DatabaseManager& manager,
+                                 const std::string& queueId,
+                                 bool fromFront)
   {
     assert(manager.GetDialect() == Dialect_SQLite);
 
-    LookupFormatter formatter(manager.GetDialect());
+    std::unique_ptr<ISqlLookupFormatter> formatter(CreateLookupFormatter(manager.GetDialect()));
 
     std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
-    std::string queueIdParameter = formatter.GenerateParameter(queueId);
+    std::string queueIdParameter = formatter->GenerateParameter(queueId);
 
     if (fromFront)
     {
@@ -328,7 +327,7 @@ namespace OrthancDatabases
                         "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1"));
     }
 
-    statement->Execute(formatter.GetDictionary());
+    statement->Execute(formatter->GetDictionary());
 
     if (statement->IsDone())
     {

@@ -1066,7 +1066,7 @@ TEST(IndexBackend, Basic)
   }
 #endif
 
-#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
   {
     manager->StartTransaction(TransactionType_ReadWrite);
 

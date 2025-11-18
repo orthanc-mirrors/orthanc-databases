@@ -464,7 +464,7 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_queues(accessor.GetBackend().HasQueues());
 #endif
 
-#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
         response.mutable_get_system_information()->set_supports_reserve_queue_value(accessor.GetBackend().HasReserveQueueValue());
 #endif
 
@@ -1395,7 +1395,7 @@ namespace OrthancDatabases
 
 #endif
 
-#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
       case Orthanc::DatabasePluginMessages::OPERATION_RESERVE_QUEUE_VALUE:
       {
         std::string value;
@@ -1772,6 +1772,7 @@ namespace OrthancDatabases
       (void) limit;
       (void) fromTsIsoFormat;
       (void) toTsIsoFormat;
+      (void) logDataInJson;
     }
 #endif
 

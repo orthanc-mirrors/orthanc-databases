@@ -527,7 +527,7 @@ namespace OrthancDatabases
                                   const std::string& queueId) = 0;
 #endif
 
-#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
     virtual bool ReserveQueueValue(std::string& value,
                                    uint64_t& valueId,
                                    DatabaseManager& manager,
@@ -538,7 +538,6 @@ namespace OrthancDatabases
     virtual void AcknowledgeQueueValue(DatabaseManager& manager,
                                        const std::string& queueId,
                                        uint64_t valueId) = 0;
-
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1

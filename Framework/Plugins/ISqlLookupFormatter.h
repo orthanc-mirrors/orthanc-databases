@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "../Common/Dictionary.h"
 #include "MessagesToolbox.h"
 
 #include <boost/noncopyable.hpp>
@@ -78,6 +79,8 @@ namespace OrthancDatabases
     virtual std::string FormatIntegerCast() const = 0;
 
     virtual std::string FormatFloatCast() const = 0;
+
+    virtual const Dictionary& GetDictionary() const = 0;
 
     static void GetLookupLevels(Orthanc::ResourceType& lowerLevel,
                                 Orthanc::ResourceType& upperLevel,

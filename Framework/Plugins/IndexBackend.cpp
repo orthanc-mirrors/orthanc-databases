@@ -4573,7 +4573,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 #endif
 
-#if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
     bool IndexBackend::ReserveQueueValue(std::string& value,
                                          uint64_t& valueId,
                                          DatabaseManager& manager,
@@ -4825,4 +4825,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 #endif
 
+  ISqlLookupFormatter* IndexBackend::CreateLookupFormatter(Dialect dialect)
+  {
+    return new LookupFormatter(dialect);
+  }
 }

@@ -115,12 +115,10 @@ namespace OrthancDatabases
     }
 
 #if ORTHANC_PLUGINS_HAS_QUEUES == 1
-
-virtual bool DequeueValue(std::string& value,
+    virtual bool DequeueValue(std::string& value,
                               DatabaseManager& manager,
                               const std::string& queueId,
                               bool fromFront) ORTHANC_OVERRIDE;
-
 #endif
   };
 }
