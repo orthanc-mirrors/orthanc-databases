@@ -87,7 +87,7 @@ namespace OrthancDatabases
       return true;
     }
 
-    virtual bool HasExtendedQueues() const ORTHANC_OVERRIDE
+    virtual bool HasReserveQueueValue() const ORTHANC_OVERRIDE
     {
       return true;
     }

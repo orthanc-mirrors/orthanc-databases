@@ -465,7 +465,7 @@ namespace OrthancDatabases
 #endif
 
 #if ORTHANC_PLUGINS_HAS_EXTENDED_QUEUES == 1
-        response.mutable_get_system_information()->set_supports_extended_queues(accessor.GetBackend().HasExtendedQueues());
+        response.mutable_get_system_information()->set_supports_reserve_queue_value(accessor.GetBackend().HasReserveQueueValue());
 #endif
 
 #if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1

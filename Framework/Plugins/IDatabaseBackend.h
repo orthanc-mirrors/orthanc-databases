@@ -139,7 +139,7 @@ namespace OrthancDatabases
 
     virtual bool HasQueues() const = 0;
 
-    virtual bool HasExtendedQueues() const = 0;
+    virtual bool HasReserveQueueValue() const = 0;
 
     virtual bool HasAuditLogs() const = 0;
 
