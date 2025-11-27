@@ -49,12 +49,12 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   add_definitions(-DORTHANC_POSTGRESQL_STATIC=1)
 
   SET(LIBPQ_MAJOR 13)
-  SET(LIBPQ_MINOR 23)
+  SET(LIBPQ_MINOR 1)
   SET(LIBPQ_VERSION ${LIBPQ_MAJOR}.${LIBPQ_MINOR})
 
   SET(LIBPQ_SOURCES_DIR ${CMAKE_BINARY_DIR}/postgresql-${LIBPQ_VERSION})
   DownloadPackage(
-    "86f7b1ace0dc43e993f29a6739a264d8"
+    "551302a823a1ab48b4ed14166beebba9"
     "https://orthanc.uclouvain.be/downloads/third-party-downloads/postgresql-${LIBPQ_VERSION}.tar.gz"
     "${LIBPQ_SOURCES_DIR}")
 
@@ -103,10 +103,8 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
 
   elseif (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     add_definitions(
-      -D_GNU_SOURCE
       -D_THREAD_SAFE
       -D_POSIX_PTHREAD_SEMANTICS
-      -DHAVE_STRERROR_R=1
       )
 
     configure_file(
