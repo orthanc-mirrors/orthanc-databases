@@ -106,6 +106,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
       -D_GNU_SOURCE
       -D_THREAD_SAFE
       -D_POSIX_PTHREAD_SEMANTICS
+      -DHAVE_STRERROR_R=1
       )
 
     configure_file(
