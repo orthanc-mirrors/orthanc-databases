@@ -1068,45 +1068,65 @@ TEST(IndexBackend, Basic)
 
 #if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
   {
-    manager->StartTransaction(TransactionType_ReadWrite);
-
-    db.EnqueueValue(*manager, "test", "a");
-    db.EnqueueValue(*manager, "test", "b");
-    db.EnqueueValue(*manager, "test", "c");
-    db.EnqueueValue(*manager, "test", "d");
-    db.EnqueueValue(*manager, "test", "e");
-
-
-    ASSERT_EQ(5u, db.GetQueueSize(*manager, "test"));
-
     std::string value;
     uint64_t valueIdA, valueIdB, valueIdC, valueIdD, valueIdE, valueIdFail;
 
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdA, *manager, "test", true, 1));
-    ASSERT_EQ("a", value);
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdB, *manager, "test", true, 1));
-    ASSERT_EQ("b", value);
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdE, *manager, "test", false, 1));
-    ASSERT_EQ("e", value);
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdD, *manager, "test", false, 1));
-    ASSERT_EQ("d", value);
+    {
+      manager->StartTransaction(TransactionType_ReadWrite);
 
-    db.AcknowledgeQueueValue(*manager, "test", valueIdA);
-    db.AcknowledgeQueueValue(*manager, "test", valueIdE);
-    manager->CommitTransaction();  // NOW() is constant during a transaction -> we need to commit it to get a new NOW() value for the second part of the test
+      db.EnqueueValue(*manager, "test", "a");
+      db.EnqueueValue(*manager, "test", "b");
+      db.EnqueueValue(*manager, "test", "c");
+      db.EnqueueValue(*manager, "test", "d");
+      db.EnqueueValue(*manager, "test", "e");
+
+      ASSERT_EQ(5u, db.GetQueueSize(*manager, "test"));
+
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdA, *manager, "test", true, 1000));
+      ASSERT_EQ("a", value);
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdB, *manager, "test", true, 1));
+      ASSERT_EQ("b", value);
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdE, *manager, "test", false, 1));
+      ASSERT_EQ("e", value);
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdD, *manager, "test", false, 1));
+      ASSERT_EQ("d", value);
+      manager->CommitTransaction(); 
+    }
+
+    {
+      manager->StartTransaction(TransactionType_ReadWrite);
+
+      db.AcknowledgeQueueValue(*manager, "test", valueIdA);
+      db.AcknowledgeQueueValue(*manager, "test", valueIdE);
+      manager->CommitTransaction(); 
+    }
 
     Orthanc::SystemToolbox::USleep(2000000);  // Wait 2 seconds -> b and d should be released
 
-    manager->StartTransaction(TransactionType_ReadWrite);
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdB, *manager, "test", true, 1));
-    ASSERT_EQ("b", value);
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdD, *manager, "test", false, 1));
-    ASSERT_EQ("d", value);
-    ASSERT_TRUE(db.ReserveQueueValue(value, valueIdC, *manager, "test", false, 1));
-    ASSERT_EQ("c", value);
-    ASSERT_FALSE(db.ReserveQueueValue(value, valueIdFail, *manager, "test", false, 1));
+    {
+      manager->StartTransaction(TransactionType_ReadWrite);
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdB, *manager, "test", true, 1));
+      ASSERT_EQ("b", value);
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdD, *manager, "test", false, 1));
+      ASSERT_EQ("d", value);
+      ASSERT_TRUE(db.ReserveQueueValue(value, valueIdC, *manager, "test", false, 1));
+      ASSERT_EQ("c", value);
+      ASSERT_FALSE(db.ReserveQueueValue(value, valueIdFail, *manager, "test", false, 1));
 
-    manager->CommitTransaction();
+      manager->CommitTransaction();
+    }
+
+    Orthanc::SystemToolbox::USleep(2000000);  // Wait 2 seconds -> b, c and d should be released
+
+    // try to acknowledge a value after it has expired
+    {
+      manager->StartTransaction(TransactionType_ReadWrite);
+
+      ASSERT_THROW(db.AcknowledgeQueueValue(*manager, "test", valueIdC), Orthanc::OrthancException);
+
+      manager->CommitTransaction();
+    }
+
   }
 #endif
 

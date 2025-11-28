@@ -803,7 +803,7 @@ CREATE TABLE IF NOT EXISTS Queues (
        id BIGSERIAL NOT NULL PRIMARY KEY,
        queueId TEXT NOT NULL,
        value BYTEA NOT NULL,
-       reservedUntil TIMESTAMP DEFAULT NULL
+       reservedUntil BIGINT DEFAULT NULL -- new in rev 699
 );
 
 CREATE INDEX IF NOT EXISTS QueuesIndex ON Queues (queueId, id);

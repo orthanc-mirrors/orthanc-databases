@@ -27,6 +27,7 @@ Common - Storage area
 PostgreSQL
 ----------
 
+* upgrade to libpq 18.1
 
 -----
 MySQL
