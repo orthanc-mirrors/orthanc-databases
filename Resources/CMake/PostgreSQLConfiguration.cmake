@@ -62,7 +62,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
 
   SET(LIBPQ_SOURCES_DIR ${CMAKE_BINARY_DIR}/postgresql-${LIBPQ_VERSION})
   DownloadPackage(
-    LIBPQ_MD5SUM
+    "${LIBPQ_MD5SUM}"
     "https://orthanc.uclouvain.be/downloads/third-party-downloads/postgresql-${LIBPQ_VERSION}.tar.gz"
     "${LIBPQ_SOURCES_DIR}")
 
