@@ -49,12 +49,12 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   add_definitions(-DORTHANC_POSTGRESQL_STATIC=1)
 
   SET(LIBPQ_MAJOR 13)
-  SET(LIBPQ_MINOR 1)
+  SET(LIBPQ_MINOR 23)
   SET(LIBPQ_VERSION ${LIBPQ_MAJOR}.${LIBPQ_MINOR})
 
   SET(LIBPQ_SOURCES_DIR ${CMAKE_BINARY_DIR}/postgresql-${LIBPQ_VERSION})
   DownloadPackage(
-    "551302a823a1ab48b4ed14166beebba9"
+    "86f7b1ace0dc43e993f29a6739a264d8"
     "https://orthanc.uclouvain.be/downloads/third-party-downloads/postgresql-${LIBPQ_VERSION}.tar.gz"
     "${LIBPQ_SOURCES_DIR}")
 
@@ -106,6 +106,11 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
       -D_THREAD_SAFE
       -D_POSIX_PTHREAD_SEMANTICS
       )
+
+    # this has been included in the OrthancFramework from 1.12.10+
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+      SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSTRERROR_R_INT=1 -D_POSIX_C_SOURCE=200112L")
+    endif()
 
     configure_file(
       ${LIBPQ_SOURCES_DIR}/src/include/port/darwin.h
