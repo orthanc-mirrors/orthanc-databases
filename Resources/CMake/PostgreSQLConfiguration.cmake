@@ -97,7 +97,24 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
 #  endif
 #endif
 ")
+
+  if (MSVC)
+    # Older versions of Microsoft Visual Studio (notably MSVC2008)
+    # don't have inttypes.h.
+    execute_process(
+      COMMAND ${PATCH_EXECUTABLE} -p0 -N -i
+      ${CMAKE_CURRENT_LIST_DIR}/../PostgreSQL/libpq-18.1-msvc.patch
+      WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+      RESULT_VARIABLE Failure
+      )
+
+    if (Failure)
+      message(FATAL_ERROR "Error while patching a file")
     endif()
+  endif()
+
+
+  endif()
 
   elseif (CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_definitions(
