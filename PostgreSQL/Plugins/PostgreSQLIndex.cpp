@@ -49,7 +49,7 @@ namespace Orthanc
   static const GlobalProperty GlobalProperty_HasComputeStatisticsReadOnly = GlobalProperty_DatabaseInternal4;
 }
 
-#define CURRENT_DB_REVISION 6
+#define CURRENT_DB_REVISION 10
 
 namespace OrthancDatabases
 {
@@ -266,6 +266,19 @@ namespace OrthancDatabases
             t.GetDatabaseTransaction().ExecuteMultiLines(query);
             hasAppliedAnUpgrade = true;
             currentRevision = 6;
+          }
+
+          if (currentRevision == 6)
+          {
+            LOG(WARNING) << "Upgrading DB schema from revision 6 to revision 10 (there are no versions 7, 8 and 9 !)";
+
+            std::string query;
+
+            Orthanc::EmbeddedResources::GetFileResource
+              (query, Orthanc::EmbeddedResources::POSTGRESQL_UPGRADE_REV6_TO_REV10);
+            t.GetDatabaseTransaction().ExecuteMultiLines(query);
+            hasAppliedAnUpgrade = true;
+            currentRevision = 10;
           }
 
           if (hasAppliedAnUpgrade)

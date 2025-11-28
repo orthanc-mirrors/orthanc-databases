@@ -23,40 +23,25 @@
 
 #pragma once
 
-// These includes are necessary for compilation on OS X
-#include <unistd.h>
-#include <vector>
-#include <map>
-#include <cmath>
-#include <Enumerations.h>
-
-// Get "ntohl()" defined
-#if defined(_WIN32)
-#  include <winsock.h>
-#else
-#  include <arpa/inet.h>
-#endif
-
-// PostgreSQL includes
-#include <pg_config.h>
-
-#if !defined(PG_VERSION_NUM)
-#  error PG_VERSION_NUM is not defined
-#endif
-
-
-
 #if PG_VERSION_NUM < 180000
-#  if PG_VERSION_NUM >= 110000
-#    include <catalog/pg_type_d.h>
-#  else
-#    include <postgres.h>
-#    undef LOG  // This one comes from <postgres.h>, and conflicts with <Core/Logging.h>
-#    include <catalog/pg_type.h>
-#  endif
-#else
-// from libpq 18, we avoid using server headers to simplify the "configure steps"
-#  include "PostgreSQLOids.h"
+#  error This file shall not be included if you are linking against libpq < 18
 #endif
+// Object ID type in PostgreSQL
+typedef unsigned int Oid;
 
-#include <libpq-fe.h>
+// Core built-in type OIDs.  
+// All these OIDs are guaranteed not to change.
+// By defining them here, we avoid including server only headers
+#define BOOLOID        16
+#define BYTEAOID       17
+#define CHAROID        18
+#define NAMEOID        19
+#define INT8OID        20
+#define INT2OID        21
+#define INT4OID        23
+#define TEXTOID        25
+#define OIDOID         26
+#define VARCHAROID     1043
+#define TIMESTAMPOID   1114
+#define TIMESTAMPTZOID 1184
+#define VOIDOID        2278

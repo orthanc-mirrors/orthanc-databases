@@ -1,14 +1,16 @@
 Pending changes in the mainline
 ===============================
 
-DB schema revision: 6
+DB schema revision: 10
 Minimum plugin SDK (for build): 1.12.5
-Optimal plugin SDK (for build): 1.12.9
+Optimal plugin SDK (for build): 1.12.10   (TODO: update once released !)
 Minimum Orthanc runtime: 1.12.5
-Optimal Orthanc runtime: 1.12.9
+Optimal Orthanc runtime: 1.12.10
 
 Minimal Postgresql Server version: 9
 Optimal Postgresql Server version: 11+
+
+TODO before release: update SDK to 1.12.10
 
 Changes:
 * New configuration "Schema" (default value: 'public') to allow Orthanc
@@ -23,11 +25,14 @@ Changes:
 * New configuration "ApplicationName" (default value is empty) that is copied in 
   the application_name argument in the connection string.  This name is used to
   identify the origin of queries in statistics and logs in the PostgreSQL server.
-
+* SDK: Added support for ReserveQueueValue and AcknowledgeQueueValue (new in SDK 1.12.10)
 
 Maintenance:
-* Now verifying the DatabasePatchLevel (revision) in another transaction than
-  the one that upgrades the schema.
+* Added a new primary key column in the InvalidChildCounts and GlobalIntegersChanges
+  tables.  This new column is required for pg_repack to be able to reclaim space on
+  these tables.
+* Upgraded dependencies for static builds (notably on Windows and LSB):
+  - libpq 18.1 (replacing libpq 13.1 - except for macOS universal binaries that still uses 13.1)
 
 
 Release 9.0 (2025-08-13)

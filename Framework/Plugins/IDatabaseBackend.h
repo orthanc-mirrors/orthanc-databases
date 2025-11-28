@@ -139,6 +139,8 @@ namespace OrthancDatabases
 
     virtual bool HasQueues() const = 0;
 
+    virtual bool HasReserveQueueValue() const = 0;
+
     virtual bool HasAuditLogs() const = 0;
 
     virtual void AddAttachment(DatabaseManager& manager,
@@ -523,6 +525,19 @@ namespace OrthancDatabases
 
     virtual uint64_t GetQueueSize(DatabaseManager& manager,
                                   const std::string& queueId) = 0;
+#endif
+
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
+    virtual bool ReserveQueueValue(std::string& value,
+                                   uint64_t& valueId,
+                                   DatabaseManager& manager,
+                                   const std::string& queueId,
+                                   bool fromFront,
+                                   uint32_t reserveTimeout) = 0;
+
+    virtual void AcknowledgeQueueValue(DatabaseManager& manager,
+                                       const std::string& queueId,
+                                       uint64_t valueId) = 0;
 #endif
 
 #if ORTHANC_PLUGINS_HAS_ATTACHMENTS_CUSTOM_DATA == 1

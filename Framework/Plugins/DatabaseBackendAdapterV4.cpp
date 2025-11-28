@@ -464,6 +464,10 @@ namespace OrthancDatabases
         response.mutable_get_system_information()->set_supports_queues(accessor.GetBackend().HasQueues());
 #endif
 
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
+        response.mutable_get_system_information()->set_supports_reserve_queue_value(accessor.GetBackend().HasReserveQueueValue());
+#endif
+
 #if ORTHANC_PLUGINS_HAS_KEY_VALUE_STORES == 1
         response.mutable_get_system_information()->set_supports_key_value_stores(accessor.GetBackend().HasKeyValueStores());
 #endif
@@ -1386,6 +1390,37 @@ namespace OrthancDatabases
         uint64_t size = backend.GetQueueSize(manager,
                                              request.get_queue_size().queue_id());
         response.mutable_get_queue_size()->set_size(size);
+        break;
+      }
+
+#endif
+
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
+      case Orthanc::DatabasePluginMessages::OPERATION_RESERVE_QUEUE_VALUE:
+      {
+        std::string value;
+        uint64_t valueId;
+        bool found = backend.ReserveQueueValue(value, valueId, manager,
+                                               request.reserve_queue_value().queue_id(),
+                                               request.reserve_queue_value().origin() == Orthanc::DatabasePluginMessages::QUEUE_ORIGIN_FRONT,
+                                               request.reserve_queue_value().release_timeout());
+        response.mutable_reserve_queue_value()->set_found(found);
+        
+        if (found)
+        {
+          response.mutable_reserve_queue_value()->set_value(value);
+          response.mutable_reserve_queue_value()->set_value_id(valueId);
+        }
+
+        break;
+      }
+
+      case Orthanc::DatabasePluginMessages::OPERATION_ACKNOWLEDGE_QUEUE_VALUE:
+      {
+        backend.AcknowledgeQueueValue(manager,
+                                      request.acknowledge_queue_value().queue_id(),
+                                      request.acknowledge_queue_value().value_id());
+
         break;
       }
 

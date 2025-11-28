@@ -39,6 +39,15 @@
 
 namespace OrthancDatabases
 {
+  static int64_t GetSecondsSinceEpoch()
+  {
+    // https://www.boost.org/doc/libs/1_69_0/doc/html/date_time/examples.html#date_time.examples.seconds_since_epoch
+    static const boost::posix_time::ptime EPOCH(boost::gregorian::date(1970, 1, 1));
+    const boost::posix_time::ptime now = boost::posix_time::microsec_clock::universal_time();
+    return (now - EPOCH).total_seconds();
+  }
+
+
   static std::string ConvertWildcardToLike(const std::string& query)
   {
     std::string s = query;
@@ -4505,30 +4514,38 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 
 
-    bool IndexBackend::DequeueValueSQLite(std::string& value,
-                                          DatabaseManager& manager,
-                                          const std::string& queueId,
-                                          bool fromFront)
+    bool IndexBackend::DequeueValue(std::string& value,
+                                    DatabaseManager& manager,
+                                    const std::string& queueId,
+                                    bool fromFront)
     {
-      assert(manager.GetDialect() == Dialect_SQLite);
-
       LookupFormatter formatter(manager.GetDialect());
 
       std::unique_ptr<DatabaseManager::CachedStatement> statement;
 
       std::string queueIdParameter = formatter.GenerateParameter(queueId);
+      std::string nowParameter = formatter.GenerateParameter(GetSecondsSinceEpoch());
 
-      if (fromFront)
+      switch (manager.GetDialect())
       {
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id ASC LIMIT 1"));
-      }
-      else
-      {
-        statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager,
-                          "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1"));
+        case Dialect_PostgreSQL:
+          if (fromFront)
+          {
+            statement.reset(new DatabaseManager::CachedStatement(
+                              STATEMENT_FROM_HERE, manager,
+                              "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + " AND (reservedUntil IS NULL OR reservedUntil <= " + nowParameter + ")) RETURNING value) "
+                              "SELECT value FROM poppedRows"));
+          }
+          else
+          {
+            statement.reset(new DatabaseManager::CachedStatement(
+                              STATEMENT_FROM_HERE, manager,
+                              "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + " AND (reservedUntil IS NULL OR reservedUntil <= " + nowParameter + ")) RETURNING value) "
+                              "SELECT value FROM poppedRows"));
+          }
+          break;
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
       }
 
       statement->Execute(formatter.GetDictionary());
@@ -4539,80 +4556,9 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       }
       else
       {
-        statement->SetResultFieldType(0, ValueType_Integer64);
-        statement->SetResultFieldType(1, ValueType_BinaryString);
-
-        value = statement->ReadString(1);
-
-        {
-          DatabaseManager::CachedStatement s2(STATEMENT_FROM_HERE, manager,
-                                              "DELETE FROM Queues WHERE id=${id}");
-
-          s2.SetParameterType("id", ValueType_Integer64);
-
-          Dictionary args;
-          args.SetIntegerValue("id", statement->ReadInteger64(0));
-
-          s2.Execute(args);
-        }
-
+        statement->SetResultFieldType(0, ValueType_BinaryString);
+        value = statement->ReadString(0);
         return true;
-      }
-    }
-
-
-    bool IndexBackend::DequeueValue(std::string& value,
-                                    DatabaseManager& manager,
-                                    const std::string& queueId,
-                                    bool fromFront)
-    {
-      if (manager.GetDialect() == Dialect_SQLite)
-      {
-        return DequeueValueSQLite(value, manager, queueId, fromFront);
-      }
-      else
-      {
-        LookupFormatter formatter(manager.GetDialect());
-
-        std::unique_ptr<DatabaseManager::CachedStatement> statement;
-
-        std::string queueIdParameter = formatter.GenerateParameter(queueId);
-
-        switch (manager.GetDialect())
-        {
-          case Dialect_PostgreSQL:
-            if (fromFront)
-            {
-              statement.reset(new DatabaseManager::CachedStatement(
-                                STATEMENT_FROM_HERE, manager,
-                                "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MIN(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
-                                "SELECT value FROM poppedRows"));
-            }
-            else
-            {
-              statement.reset(new DatabaseManager::CachedStatement(
-                                STATEMENT_FROM_HERE, manager,
-                                "WITH poppedRows AS (DELETE FROM Queues WHERE id = (SELECT MAX(id) FROM Queues WHERE queueId=" + queueIdParameter + ") RETURNING value) "
-                                "SELECT value FROM poppedRows"));
-            }
-            break;
-
-          default:
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
-        }
-
-        statement->Execute(formatter.GetDictionary());
-
-        if (statement->IsDone())
-        {
-          return false;
-        }
-        else
-        {
-          statement->SetResultFieldType(0, ValueType_BinaryString);
-          value = statement->ReadString(0);
-          return true;
-        }
       }
     }
 
@@ -4633,6 +4579,87 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       statement.SetResultFieldType(0, ValueType_Integer64);
 
       return statement.ReadInteger64(0);
+    }
+#endif
+
+#if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
+    bool IndexBackend::ReserveQueueValue(std::string& value,
+                                         uint64_t& valueId,
+                                         DatabaseManager& manager,
+                                         const std::string& queueId,
+                                         bool fromFront,
+                                         uint32_t reserveTimeout)
+    {
+      LookupFormatter formatter(manager.GetDialect());
+
+      std::string queueIdParameter = formatter.GenerateParameter(queueId);
+      std::string reserveTimeoutParameter = formatter.GenerateParameter(reserveTimeout);
+      std::string nowParameter = formatter.GenerateParameter(GetSecondsSinceEpoch());
+
+      std::string minMax = (fromFront ? "MIN" : "MAX");
+      std::string sql;
+
+      switch (manager.GetDialect())
+      {
+        case Dialect_PostgreSQL:
+          sql = "WITH RowToUpdate AS (SELECT " + minMax + "(id) FROM Queues WHERE queueId=" + queueIdParameter + " AND (reservedUntil IS NULL OR reservedUntil <= " + nowParameter + ")) "
+                "  UPDATE Queues SET reservedUntil = " + nowParameter + " + " + reserveTimeoutParameter + " WHERE id IN (SELECT * FROM RowToUpdate) "
+                "  RETURNING id, value;";
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+
+      DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
+      statement.Execute(formatter.GetDictionary());
+
+      if (statement.IsDone())
+      {
+        return false;
+      }
+      else
+      {
+        statement.SetResultFieldType(0, ValueType_Integer64);
+        valueId = statement.ReadInteger64(0);
+
+        statement.SetResultFieldType(1, ValueType_BinaryString);
+        value = statement.ReadString(1);
+        return true;
+      }
+    }
+
+    void IndexBackend::AcknowledgeQueueValue(DatabaseManager& manager,
+                                             const std::string& queueId,
+                                             uint64_t valueId)
+    {
+      LookupFormatter formatter(manager.GetDialect());
+
+      std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+      std::string queueIdParameter = formatter.GenerateParameter(queueId);
+      std::string valueIdParameter = formatter.GenerateParameter(valueId);
+      int64_t now = GetSecondsSinceEpoch();
+      std::string nowParameter = formatter.GenerateParameter(now);
+
+      switch (manager.GetDialect())
+      {
+        case Dialect_PostgreSQL:
+          statement.reset(new DatabaseManager::CachedStatement(
+                            STATEMENT_FROM_HERE, manager,
+                            "DELETE FROM Queues WHERE queueId=" + queueIdParameter + " AND id=" + valueIdParameter +
+                            " AND reservedUntil IS NOT NULL AND " + nowParameter + " < reservedUntil RETURNING id"));
+          break;
+
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+
+      statement->Execute(formatter.GetDictionary());
+      if (statement->IsDone())
+      {
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_UnknownResource, "Unable to acknowledge a queue value. Has it expired ?");
+      }
     }
 #endif
 
@@ -4815,4 +4842,8 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     }
 #endif
 
+  ISqlLookupFormatter* IndexBackend::CreateLookupFormatter(Dialect dialect)
+  {
+    return new LookupFormatter(dialect);
+  }
 }

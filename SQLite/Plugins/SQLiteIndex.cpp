@@ -299,4 +299,61 @@ namespace OrthancDatabases
     throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
   }
 #endif
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+  bool SQLiteIndex::DequeueValue(std::string& value,
+                                 DatabaseManager& manager,
+                                 const std::string& queueId,
+                                 bool fromFront)
+  {
+    assert(manager.GetDialect() == Dialect_SQLite);
+
+    std::unique_ptr<ISqlLookupFormatter> formatter(CreateLookupFormatter(manager.GetDialect()));
+
+    std::unique_ptr<DatabaseManager::CachedStatement> statement;
+
+    std::string queueIdParameter = formatter->GenerateParameter(queueId);
+
+    if (fromFront)
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id ASC LIMIT 1"));
+    }
+    else
+    {
+      statement.reset(new DatabaseManager::CachedStatement(
+                        STATEMENT_FROM_HERE, manager,
+                        "SELECT id, value FROM Queues WHERE queueId=" + queueIdParameter + " ORDER BY id DESC LIMIT 1"));
+    }
+
+    statement->Execute(formatter->GetDictionary());
+
+    if (statement->IsDone())
+    {
+      return false;
+    }
+    else
+    {
+      statement->SetResultFieldType(0, ValueType_Integer64);
+      statement->SetResultFieldType(1, ValueType_BinaryString);
+
+      value = statement->ReadString(1);
+
+      {
+        DatabaseManager::CachedStatement s2(STATEMENT_FROM_HERE, manager,
+                                            "DELETE FROM Queues WHERE id=${id}");
+
+        s2.SetParameterType("id", ValueType_Integer64);
+
+        Dictionary args;
+        args.SetIntegerValue("id", statement->ReadInteger64(0));
+
+        s2.Execute(args);
+      }
+
+      return true;
+    }
+  }
+#endif
 }

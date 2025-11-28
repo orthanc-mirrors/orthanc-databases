@@ -7,10 +7,6 @@
 Common - Database index
 -----------------------
 
-* Try to avoid the use of temporary tables:
-  https://discourse.orthanc-server.org/t/image-insert-are-too-slow-databse-performance-too-poor/3820
-
-
 * Implement "large queries" for:
   - updating all metadata of a resource at once
   - update all maindicomtags of 4 resource levels at once
@@ -31,19 +27,7 @@ Common - Storage area
 PostgreSQL
 ----------
 
-* Check if we can force the schema that is used.  By default, Orthanc
-  is using the 'public' schema but, after a wrong command, we have seen
-  a DB where there was a 'AttachedFiles' table in the public schema and another one in a
-  'MyPacs' schema and Orthanc was actually using the 'MyPacs.AttachedFiles' table !!!
-  Orthanc was then seeing only the most recent attached files !!!
-  We should also be able to use other schemas:
-  https://discourse.orthanc-server.org/t/orthanc-container-unable-to-connect-to-specified-postgresql-database/5471
-
-
-* Seems Orthanc might deadlock when there are plenty of conflicting transactions:
-  https://groups.google.com/g/orthanc-users/c/xQelEcKqL9U/m/HsvxwlkvAQAJ
-  https://groups.google.com/g/orthanc-users/c/1bkClfZ0KBA/m/s4AlwVh3CQAJ 
-
+* upgrade to libpq 18.1
 
 -----
 MySQL

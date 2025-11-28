@@ -88,6 +88,11 @@ namespace OrthancDatabases
       return false;
     }
 
+    virtual bool HasReserveQueueValue() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
     virtual bool HasAuditLogs() const ORTHANC_OVERRIDE
     {
       return false;

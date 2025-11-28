@@ -70,6 +70,11 @@ namespace OrthancDatabases
       return true;
     }
 
+    virtual bool HasReserveQueueValue() const ORTHANC_OVERRIDE
+    {
+      return false;
+    }
+
     virtual bool HasAuditLogs() const ORTHANC_OVERRIDE
     {
       return false;
@@ -108,5 +113,12 @@ namespace OrthancDatabases
     {
       return false;
     }
+
+#if ORTHANC_PLUGINS_HAS_QUEUES == 1
+    virtual bool DequeueValue(std::string& value,
+                              DatabaseManager& manager,
+                              const std::string& queueId,
+                              bool fromFront) ORTHANC_OVERRIDE;
+#endif
   };
 }
