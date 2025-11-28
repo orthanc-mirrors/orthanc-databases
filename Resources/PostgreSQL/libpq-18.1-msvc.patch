@@ -1,6 +1,6 @@
 diff -ruN postgresql-18.1-orig/src/include/c.h postgresql-18.1/src/include/c.h
 --- postgresql-18.1-orig/src/include/c.h	2025-11-28 18:54:52.627048100 +0100
-+++ postgresql-18.1/src/include/c.h	2025-11-28 18:56:22.269355100 +0100
++++ postgresql-18.1/src/include/c.h	2025-11-28 19:27:48.922101800 +0100
 @@ -59,7 +59,6 @@
  #include "pg_config_os.h"		/* config from include/port/PORTNAME.h */
  
@@ -9,3 +9,18 @@ diff -ruN postgresql-18.1-orig/src/include/c.h postgresql-18.1/src/include/c.h
  #include <stdio.h>
  #include <stdlib.h>
  #include <string.h>
+@@ -475,8 +474,13 @@
+  * static assertions around the code to prevent that.
+  */
+ 
++#if (_MSC_VER >= 1900)
+ #include <stdbool.h>
+-
++#else
++#define bool int
++#define false 0
++#define true 1
++#endif
+ 
+ /* ----------------------------------------------------------------
+  *				Section 3:	standard system types
