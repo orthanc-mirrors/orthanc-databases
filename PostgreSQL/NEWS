@@ -31,8 +31,6 @@ Maintenance:
 * Added a new primary key column in the InvalidChildCounts and GlobalIntegersChanges
   tables.  This new column is required for pg_repack to be able to reclaim space on
   these tables.
-* Upgraded dependencies for static builds (notably on Windows and LSB):
-  - libpq 13.23 (replacing libpq 13.1)
 
 
 Release 9.0 (2025-08-13)
