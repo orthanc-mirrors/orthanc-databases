@@ -1,3 +1,18 @@
+Pending changes in the mainline
+===============================
+
+Changes:
+* Small update of the "DeleteResource" function to avoid a warning when multiple
+  clients are trying to delete the same resource at the same time.
+  TODO: handle migration.
+  Warning:
+  test_concurrent_uploads_same_study (Concurrency.test_concurrency.TestConcurrency.test_concurrent_uploads_same_study) ... 2025-12-05 08:04:24.133 UTC [73] ERROR:  null value in column "resourcetype" of relation "deletedresources" violates not-null constraint
+  2025-12-05 08:04:24.133 UTC [73] DETAIL:  Failing row contains (null, null).
+  2025-12-05 08:04:24.133 UTC [73] CONTEXT:  SQL statement "INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId)"
+	PL/pgSQL function deleteresource(bigint) line 85 at SQL statement
+  2025-12-05 08:04:24.133 UTC [73] STATEMENT:  SELECT * FROM DeleteResource($1)
+
+
 Release 10.0 (2025-12-02)
 =========================
 

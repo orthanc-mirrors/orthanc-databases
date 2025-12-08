@@ -260,9 +260,11 @@ BEGIN
     -- delete the resource itself
     DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_resource_row;
 
-    -- keep track of the deleted resources for C++ code
-    INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId);
-  
+    IF FOUND THEN
+        -- keep track of the deleted resources for C++ code
+        INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId);
+    END IF;
+
     -- If this resource still has siblings, keep track of the remaining parent
     -- (a parent that must not be deleted but whose LastUpdate must be updated)
     SELECT resourceType, publicId INTO remaining_ancestor_resource_type, remaining_anncestor_public_id
