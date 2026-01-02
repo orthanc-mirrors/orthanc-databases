@@ -2,8 +2,8 @@
 # Copyright (C) 2012-2016 Sebastien Jodogne, Medical Physics
 # Department, University Hospital of Liege, Belgium
 # Copyright (C) 2017-2023 Osimis S.A., Belgium
-# Copyright (C) 2024-2025 Orthanc Team SRL, Belgium
-# Copyright (C) 2021-2025 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
+# Copyright (C) 2024-2026 Orthanc Team SRL, Belgium
+# Copyright (C) 2021-2026 Sebastien Jodogne, ICTEAM UCLouvain, Belgium
 #
 # This program is free software: you can redistribute it and/or
 # modify it under the terms of the GNU Affero General Public License
@@ -215,6 +215,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   endif()
   
   check_type_size("long long" SIZEOF_LONG_LONG)
+  check_type_size("socklen_t" SIZEOF_SOCKLEN_T)
 
   if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(ALIGNOF_DOUBLE 8)
