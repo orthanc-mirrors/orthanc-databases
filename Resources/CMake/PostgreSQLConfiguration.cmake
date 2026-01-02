@@ -215,6 +215,7 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_LIBPQ)
   endif()
   
   check_type_size("long long" SIZEOF_LONG_LONG)
+  check_type_size("socklen_t" SIZEOF_SOCKLEN_T)
 
   if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(ALIGNOF_DOUBLE 8)
