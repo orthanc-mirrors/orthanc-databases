@@ -2356,9 +2356,8 @@ namespace OrthancDatabases
     ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
-    bool enableNewStudyCode = true;
 
-    if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
+    if (lowerLevel == queryLevel && upperLevel == queryLevel)
     {
       ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
