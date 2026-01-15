@@ -1,3 +1,11 @@
+Pending changes in the mainline
+===============================
+
+Changes:
+* In tools/find, filtering against "LabelsConstraint": "None" with an empty "Labels" list
+  now returns all resources that do not have any labels attached instead of returning all resources.
+
+
 Release 10.0 (2025-12-02)
 =========================
 

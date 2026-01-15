@@ -811,6 +811,10 @@ namespace OrthancDatabases
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + FormatLevel(queryLevel) +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
+    else if (labelsConstraint == LabelsConstraint_None) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    {
+      where.push_back("(SELECT COUNT(1) FROM Labels WHERE id = " + FormatLevel(queryLevel) + ".internalId) = 0");
+    }
 
     sql += joins + Join(where, " WHERE ", " AND ");
 
@@ -1126,6 +1130,10 @@ namespace OrthancDatabases
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + strQueryLevel +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
+    else if (request.labels_constraint() == LabelsConstraint_None) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    {
+      where.push_back("(SELECT COUNT(1) FROM Labels WHERE id = " + FormatLevel(queryLevel) + ".internalId) = 0");
+    }
 
     sql += joins + orderingJoins + Join(where, " WHERE ", " AND ");
 
@@ -1245,6 +1253,11 @@ namespace OrthancDatabases
                                         ") AS temp "
                                  " WHERE labelsCount " + condition + ")");
     }
+    else if (labelsConstraint == LabelsConstraint_None) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    {
+      sql += (" AND (SELECT COUNT(1) FROM Labels WHERE id = internalId) = 0");
+    }
+
 
     if (limit != 0)
     {
