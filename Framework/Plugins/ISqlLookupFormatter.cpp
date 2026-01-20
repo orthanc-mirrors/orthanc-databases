@@ -228,17 +228,9 @@ namespace OrthancDatabases
           }
 
           std::string parameter = formatter.GenerateParameter(escaped);
-
-          if (isCaseSensitive)
-          {
-            comparison = (tag + ".value LIKE " + parameter + " " +
-                          formatter.FormatWildcardEscape());
-          }
-          else
-          {
-            comparison = ("lower(" + tag + ".value) LIKE lower(" +
-                          parameter + ") " + formatter.FormatWildcardEscape());
-          }
+          comparison = formatter.FormatLike(isCaseSensitive,
+                                            tag + ".value",
+                                            parameter);
         }
 
         break;
@@ -644,15 +636,9 @@ namespace OrthancDatabases
           }
 
           std::string parameter = formatter.GenerateParameter(escaped);
-
-          if (constraint.IsCaseSensitive())
-          {
-            comparison = " AND value LIKE " + parameter + " " + formatter.FormatWildcardEscape();
-          }
-          else
-          {
-            comparison = " AND lower(value) LIKE lower(" + parameter + ") " + formatter.FormatWildcardEscape();
-          }
+          comparison = " AND " + formatter.FormatLike(constraint.IsCaseSensitive(),
+                                                      "value",
+                                                      parameter);
         }
 
         break;
@@ -1130,7 +1116,7 @@ namespace OrthancDatabases
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + strQueryLevel +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
-    else if (request.labels_constraint() == LabelsConstraint_None) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    else if (request.labels_constraint() == ::Orthanc::DatabasePluginMessages::LabelsConstraintType::LABELS_CONSTRAINT_NONE) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
     {
       where.push_back("(SELECT COUNT(1) FROM Labels WHERE id = " + FormatLevel(queryLevel) + ".internalId) = 0");
     }

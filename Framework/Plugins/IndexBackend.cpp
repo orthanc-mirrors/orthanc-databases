@@ -2226,6 +2226,38 @@ namespace OrthancDatabases
       }
     }
 
+    virtual std::string FormatLike(bool isCaseSensitive, const std::string& a, const std::string& b)
+    {
+      switch (dialect_)
+      {
+        case Dialect_MySQL: // LIKE is case insensitive by default !
+        {
+          if (isCaseSensitive)
+          {
+            return a + " LIKE BINARY " + b + " " + FormatWildcardEscape();
+          }
+          else
+          {
+            return a + " LIKE " + b + " " + FormatWildcardEscape();
+          }
+        }; break;
+        case Dialect_PostgreSQL: // LIKE is case sensitive by default !
+        {
+          if (isCaseSensitive)
+          {
+            return a + " LIKE " + b + " " + FormatWildcardEscape();
+          }
+          else
+          {
+            return "lower(" + a + ") LIKE lower(" + b + ") " + FormatWildcardEscape();
+          }
+        }; break;
+        case Dialect_MSSQL:
+        case Dialect_SQLite:
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
 
     virtual std::string FormatLimits(uint64_t since, uint64_t count)
     {
