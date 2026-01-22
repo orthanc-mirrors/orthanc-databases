@@ -69,6 +69,10 @@ namespace OrthancDatabases
 
     virtual std::string FormatLike(bool isCaseSensitive, const std::string& a, const std::string& b) = 0;
 
+    virtual std::string FormatWildcardsForLike(const std::string& value) = 0;
+
+    virtual std::string FormatLower(const std::string& value) = 0;
+
     /**
      * Whether to escape '[' and ']', which is only needed for
      * MSSQL. New in Orthanc 1.10.0, from the following changeset:

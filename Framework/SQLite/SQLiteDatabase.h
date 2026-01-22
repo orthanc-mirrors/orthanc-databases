@@ -39,15 +39,9 @@ namespace OrthancDatabases
     Orthanc::SQLite::Connection  connection_;
     
   public:
-    void OpenInMemory()
-    {
-      connection_.OpenInMemory();
-    }
+    void OpenInMemory();
 
-    void Open(const std::string& path)
-    {
-      connection_.Open(path);
-    }
+    void Open(const std::string& path);
     
     Orthanc::SQLite::Connection& GetObject()
     {

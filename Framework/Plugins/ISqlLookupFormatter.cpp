@@ -135,7 +135,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = "lower(" + tag + ".value) " + op + " lower(" + parameter + ")";
+          comparison = formatter.FormatLower(tag + ".value") + op + formatter.FormatLower(parameter);
         }
 
         break;
@@ -158,7 +158,7 @@ namespace OrthancDatabases
           }
           else
           {
-            comparison += "lower(" + parameter + ")";
+            comparison += formatter.FormatLower(parameter);
           }
         }
 
@@ -168,7 +168,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = "lower(" +  tag + ".value) IN (" + comparison + ")";
+          comparison = formatter.FormatLower(tag + ".value") + " IN (" + comparison + ")";
         }
 
         break;
@@ -188,45 +188,7 @@ namespace OrthancDatabases
         }
         else
         {
-          std::string escaped;
-          escaped.reserve(value.size());
-
-          for (size_t i = 0; i < value.size(); i++)
-          {
-            if (value[i] == '*')
-            {
-              escaped += "%";
-            }
-            else if (value[i] == '?')
-            {
-              escaped += "_";
-            }
-            else if (value[i] == '%')
-            {
-              escaped += "\\%";
-            }
-            else if (value[i] == '_')
-            {
-              escaped += "\\_";
-            }
-            else if (value[i] == '\\')
-            {
-              escaped += "\\\\";
-            }
-            else if (escapeBrackets && value[i] == '[')
-            {
-              escaped += "\\[";
-            }
-            else if (escapeBrackets && value[i] == ']')
-            {
-              escaped += "\\]";
-            }
-            else
-            {
-              escaped += value[i];
-            }
-          }
-
+          std::string escaped = formatter.FormatWildcardsForLike(value);
           std::string parameter = formatter.GenerateParameter(escaped);
           comparison = formatter.FormatLike(isCaseSensitive,
                                             tag + ".value",
@@ -545,7 +507,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = " AND lower(value) " + op + " lower(" + parameter + ")";
+          comparison = " AND " + formatter.FormatLower("value") + op + formatter.FormatLower(parameter);
         }
 
         break;
@@ -564,7 +526,7 @@ namespace OrthancDatabases
           }
           else
           {
-            comparisonValues.push_back("lower(" + parameter + ")");
+            comparisonValues.push_back(formatter.FormatLower(parameter));
           }
         }
 
@@ -576,7 +538,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = " AND lower(value) IN (" + values + ")";
+          comparison = " AND " + formatter.FormatLower("value") + " IN (" + values + ")";
         }
 
         break;
@@ -596,45 +558,7 @@ namespace OrthancDatabases
         }
         else
         {
-          std::string escaped;
-          escaped.reserve(value.size());
-
-          for (size_t i = 0; i < value.size(); i++)
-          {
-            if (value[i] == '*')
-            {
-              escaped += "%";
-            }
-            else if (value[i] == '?')
-            {
-              escaped += "_";
-            }
-            else if (value[i] == '%')
-            {
-              escaped += "\\%";
-            }
-            else if (value[i] == '_')
-            {
-              escaped += "\\_";
-            }
-            else if (value[i] == '\\')
-            {
-              escaped += "\\\\";
-            }
-            else if (escapeBrackets && value[i] == '[')
-            {
-              escaped += "\\[";
-            }
-            else if (escapeBrackets && value[i] == ']')
-            {
-              escaped += "\\]";
-            }
-            else
-            {
-              escaped += value[i];
-            }
-          }
-
+          std::string escaped = formatter.FormatWildcardsForLike(value);
           std::string parameter = formatter.GenerateParameter(escaped);
           comparison = " AND " + formatter.FormatLike(constraint.IsCaseSensitive(),
                                                       "value",
