@@ -1040,7 +1040,7 @@ namespace OrthancDatabases
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + strQueryLevel +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
-    else if (request.labels_constraint() == ::Orthanc::DatabasePluginMessages::LabelsConstraintType::LABELS_CONSTRAINT_NONE) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    else if (request.labels_constraint() == Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
     {
       where.push_back("(SELECT COUNT(1) FROM Labels WHERE id = " + FormatLevel(queryLevel) + ".internalId) = 0");
     }
