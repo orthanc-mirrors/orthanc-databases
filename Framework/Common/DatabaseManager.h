@@ -269,7 +269,7 @@ namespace OrthancDatabases
                           const std::string& sql,
                           const Query::Parameters& parametersTypes);
 
-      virtual ~StandaloneStatement();
+      virtual ~StandaloneStatement() ORTHANC_OVERRIDE;
 
       void Execute()
       {

@@ -73,7 +73,7 @@ namespace OrthancDatabases
   private:
     void ReadChangesInternal(IDatabaseBackendOutput& output,
                              bool& done,
-                             DatabaseManager& manager,
+                             const DatabaseManager& manager,
                              DatabaseManager::CachedStatement& statement,
                              const Dictionary& args,
                              uint32_t limit,
@@ -577,7 +577,7 @@ namespace OrthancDatabases
                                                         const std::list<IdentifierTag>& identifierTags);
 
 #if ORTHANC_PLUGINS_HAS_DATABASE_CONSTRAINT == 1
-    ISqlLookupFormatter* CreateLookupFormatter(Dialect dialect);
+    static ISqlLookupFormatter* CreateLookupFormatter(Dialect dialect);
 #endif
   };
 }

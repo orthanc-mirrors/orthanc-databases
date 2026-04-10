@@ -155,7 +155,7 @@ namespace OrthancDatabases
                                std::string(isIndex ? "index" : "storage area") +
                                " into a " + dbms + " database");
     
-    OrthancPlugins::SetDescription(pluginName, description.c_str());
+    OrthancPlugins::SetDescription(pluginName, description);
 
     return true;
   }

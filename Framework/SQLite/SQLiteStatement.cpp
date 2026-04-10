@@ -105,7 +105,7 @@ namespace OrthancDatabases
   }
 
   
-  IResult* SQLiteStatement::Execute(ITransaction& transaction,
+  IResult* SQLiteStatement::Execute(const ITransaction& transaction,
                                     const Dictionary& parameters)
   {
     BindParameters(parameters);
@@ -113,7 +113,7 @@ namespace OrthancDatabases
   }
 
 
-  void SQLiteStatement::ExecuteWithoutResult(ITransaction& transaction,
+  void SQLiteStatement::ExecuteWithoutResult(const ITransaction& transaction,
                                              const Dictionary& parameters)
   {
     BindParameters(parameters);

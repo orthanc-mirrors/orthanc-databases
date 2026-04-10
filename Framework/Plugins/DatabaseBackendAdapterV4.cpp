@@ -129,63 +129,63 @@ namespace OrthancDatabases
     }
     
   public:
-    Output(Orthanc::DatabasePluginMessages::DeleteAttachment::Response& deleteAttachment)
+    explicit Output(Orthanc::DatabasePluginMessages::DeleteAttachment::Response& deleteAttachment)
     {
       Clear();
       deleteAttachment_ = &deleteAttachment;
     }
     
-    Output(Orthanc::DatabasePluginMessages::DeleteResource::Response& deleteResource)
+    explicit Output(Orthanc::DatabasePluginMessages::DeleteResource::Response& deleteResource)
     {
       Clear();
       deleteResource_ = &deleteResource;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetChanges::Response& getChanges)
+    explicit Output(Orthanc::DatabasePluginMessages::GetChanges::Response& getChanges)
     {
       Clear();
       getChanges_ = &getChanges;
     }
 
 #if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
-    Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
+    explicit Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
     {
       Clear();
       getChangesExtended_ = &getChangesExtended;
     }
 #endif
 
-    Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
+    explicit Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
     {
       Clear();
       getExportedResources_ = &getExportedResources;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetLastChange::Response& getLastChange)
+    explicit Output(Orthanc::DatabasePluginMessages::GetLastChange::Response& getLastChange)
     {
       Clear();
       getLastChange_ = &getLastChange;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetLastExportedResource::Response& getLastExportedResource)
+    explicit Output(Orthanc::DatabasePluginMessages::GetLastExportedResource::Response& getLastExportedResource)
     {
       Clear();
       getLastExportedResource_ = &getLastExportedResource;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetMainDicomTags::Response& getMainDicomTags)
+    explicit Output(Orthanc::DatabasePluginMessages::GetMainDicomTags::Response& getMainDicomTags)
     {
       Clear();
       getMainDicomTags_ = &getMainDicomTags;
     }
     
-    Output(Orthanc::DatabasePluginMessages::LookupAttachment::Response& lookupAttachment)
+    explicit Output(Orthanc::DatabasePluginMessages::LookupAttachment::Response& lookupAttachment)
     {
       Clear();
       lookupAttachment_ = &lookupAttachment;
     }
     
-    Output(Orthanc::DatabasePluginMessages::LookupResources::Response& lookupResources)
+    explicit Output(Orthanc::DatabasePluginMessages::LookupResources::Response& lookupResources)
     {
       Clear();
       lookupResources_ = &lookupResources;
@@ -1467,10 +1467,10 @@ namespace OrthancDatabases
       return OrthancPluginErrorCode_InternalError;
     }
 
-    BaseIndexConnectionsPool& pool = *reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
-
     try
     {
+      BaseIndexConnectionsPool& pool = *reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
+
       Orthanc::DatabasePluginMessages::Response response;
       
       switch (request.type())
@@ -1481,7 +1481,7 @@ namespace OrthancDatabases
           
         case Orthanc::DatabasePluginMessages::REQUEST_TRANSACTION:
         {
-          BaseIndexConnectionsPool::Accessor& transaction = *reinterpret_cast<BaseIndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
+          const BaseIndexConnectionsPool::Accessor& transaction = *reinterpret_cast<const BaseIndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
           ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(),
                                       transaction.GetBackend(), transaction.GetManager());
           break;

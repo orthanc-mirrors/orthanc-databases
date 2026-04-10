@@ -59,7 +59,7 @@ namespace OrthancDatabases
     OdbcResult(OdbcStatement& statement,
                Dialect dialect);
     
-    virtual ~OdbcResult();
+    virtual ~OdbcResult() ORTHANC_OVERRIDE;
       
     virtual void SetExpectedType(size_t field,
                                  ValueType type) ORTHANC_OVERRIDE;

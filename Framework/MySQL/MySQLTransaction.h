@@ -42,7 +42,7 @@ namespace OrthancDatabases
     explicit MySQLTransaction(MySQLDatabase& db,
                               TransactionType type);
 
-    virtual ~MySQLTransaction();
+    virtual ~MySQLTransaction() ORTHANC_OVERRIDE;
 
     virtual bool IsImplicit() const ORTHANC_OVERRIDE
     {

@@ -295,7 +295,7 @@ namespace OrthancDatabases
     MYSQL_RES*              metadata_;
       
   public:
-    ResultMetadata(MySQLDatabase& db,
+    ResultMetadata(const MySQLDatabase& db,
                    MySQLStatement& statement) :
       metadata_(NULL)
     {
@@ -405,7 +405,7 @@ namespace OrthancDatabases
     if (query.IsReadOnly())
     {
       unsigned long type = (unsigned long) CURSOR_TYPE_READ_ONLY;
-      mysql_stmt_attr_set(statement_, STMT_ATTR_CURSOR_TYPE, (void*) &type);
+      mysql_stmt_attr_set(statement_, STMT_ATTR_CURSOR_TYPE, reinterpret_cast<void*>(&type));
     }
   }
 
@@ -450,7 +450,7 @@ namespace OrthancDatabases
   }
 
 
-  IResult* MySQLStatement::Execute(ITransaction& transaction,
+  IResult* MySQLStatement::Execute(const ITransaction& transaction,
                                    const Dictionary& parameters)
   {
     std::list<long long int>  int64Parameters;
@@ -554,7 +554,7 @@ namespace OrthancDatabases
   }
 
 
-  void MySQLStatement::ExecuteWithoutResult(ITransaction& transaction,
+  void MySQLStatement::ExecuteWithoutResult(const ITransaction& transaction,
                                             const Dictionary& parameters)
   {
     std::unique_ptr<IResult> dummy(Execute(transaction, parameters));

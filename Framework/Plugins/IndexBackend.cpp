@@ -163,7 +163,7 @@ namespace OrthancDatabases
 
   void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
                                          bool& done,
-                                         DatabaseManager& manager,
+                                         const DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
                                          uint32_t limit,
@@ -1399,25 +1399,25 @@ namespace OrthancDatabases
       case OrthancPluginIdentifierConstraint_Equal:
         header += "d.value = ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       case OrthancPluginIdentifierConstraint_SmallerOrEqual:
         header += "d.value <= ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       case OrthancPluginIdentifierConstraint_GreaterOrEqual:
         header += "d.value >= ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       case OrthancPluginIdentifierConstraint_Wildcard:
         header += "d.value LIKE ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       default:

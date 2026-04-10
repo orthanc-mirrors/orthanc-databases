@@ -69,7 +69,8 @@ namespace OrthancDatabases
     return PostgreSQLDatabase::CreateDatabaseFactory(parameters_);
   }
 
-  void PostgreSQLIndex::ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager)
+  void PostgreSQLIndex::ApplyPrepareIndex(DatabaseManager::Transaction& t,
+                                          const DatabaseManager& manager)
   {
     std::string query;
 

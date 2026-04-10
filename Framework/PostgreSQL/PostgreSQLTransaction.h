@@ -45,7 +45,7 @@ namespace OrthancDatabases
     explicit PostgreSQLTransaction(PostgreSQLDatabase& database,
                                    TransactionType type);
 
-    ~PostgreSQLTransaction();
+    virtual ~PostgreSQLTransaction() ORTHANC_OVERRIDE;
 
     virtual bool IsImplicit() const ORTHANC_OVERRIDE
     {

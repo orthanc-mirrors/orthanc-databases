@@ -807,7 +807,7 @@ namespace OrthancDatabases
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
 
-    std::string ordering;
+    std::string orderingSql;
     std::string orderingJoins;
 
     if (request.ordering_size() > 0)
@@ -869,22 +869,22 @@ namespace OrthancDatabases
 
       if (formatter.SupportsNullsLast())
       {
-        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
+        orderingSql = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
       }
       else
       {
-        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + ") AS rowNumber";
+        orderingSql = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + ") AS rowNumber";
       }
     }
     else
     {
-      ordering = "ROW_NUMBER() OVER (ORDER BY " + strQueryLevel + ".publicId) AS rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
+      orderingSql = "ROW_NUMBER() OVER (ORDER BY " + strQueryLevel + ".publicId) AS rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
     }
 
     sql = ("SELECT " +
            strQueryLevel + ".publicId, " +
            strQueryLevel + ".internalId, " +
-           ordering +
+           orderingSql +
            " FROM Resources AS " + strQueryLevel);
 
 
