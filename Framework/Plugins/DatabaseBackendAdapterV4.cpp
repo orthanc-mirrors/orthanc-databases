@@ -583,8 +583,25 @@ namespace OrthancDatabases
       countValues += constraint.values().size();
     }
 
+    std::vector<size_t> valuesIndex;
+    valuesIndex.resize(request.lookup().size());
+
     std::vector<const char*> values;
     values.reserve(countValues);
+
+    for (int i = 0; i < request.lookup().size(); i++)
+    {
+      valuesIndex[i] = values.size();
+
+      const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint = request.lookup(i);
+
+      for (int j = 0; j < constraint.values().size(); j++)
+      {
+        values.push_back(constraint.values(j).c_str());
+      }
+    }
+
+    assert(values.size() == countValues);
 
     DatabaseConstraints lookup;
 
@@ -640,13 +657,7 @@ namespace OrthancDatabases
       }
       else
       {
-        c.values = &values[values.size()];
-            
-        for (int j = 0; j < constraint.values().size(); j++)
-        {
-          assert(values.size() < countValues);
-          values.push_back(constraint.values(j).c_str());
-        }
+        c.values = &values[valuesIndex[i]];
       }
 
       lookup.AddConstraint(new DatabaseConstraint(c));
