@@ -35,6 +35,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <sqlext.h>
+#include <cassert>
 
 
 namespace OrthancDatabases
