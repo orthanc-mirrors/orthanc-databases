@@ -48,7 +48,7 @@ namespace OrthancDatabases
     OdbcDatabase(OdbcEnvironment& environment,
                  const std::string& connectionString);
 
-    virtual ~OdbcDatabase();
+    virtual ~OdbcDatabase() ORTHANC_OVERRIDE;
 
     SQLHDBC GetHandle()
     {

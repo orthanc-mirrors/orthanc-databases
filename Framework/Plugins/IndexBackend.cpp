@@ -34,6 +34,10 @@
 #include <OrthancException.h>
 #include <Toolbox.h>
 
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 11)
+#  include <ElapsedTimer.h>
+#endif
+
 #include <boost/algorithm/string/join.hpp>
 
 
@@ -48,9 +52,14 @@ namespace OrthancDatabases
   }
 
 
-  static std::string ConvertWildcardToLike(const std::string& query)
+  static std::string ConvertWildcardToLike(const std::string& query, Dialect dialect)
   {
     std::string s = query;
+
+    if (dialect == Dialect_SQLite)
+    {
+      return s; // we are actually using GLOB that keeps the 'Unix' like wildcards
+    }
 
     for (size_t i = 0; i < s.size(); i++)
     {
@@ -158,7 +167,7 @@ namespace OrthancDatabases
 
   void IndexBackend::ReadChangesInternal(IDatabaseBackendOutput& output,
                                          bool& done,
-                                         DatabaseManager& manager,
+                                         const DatabaseManager& manager,
                                          DatabaseManager::CachedStatement& statement,
                                          const Dictionary& args,
                                          uint32_t limit,
@@ -1394,25 +1403,25 @@ namespace OrthancDatabases
       case OrthancPluginIdentifierConstraint_Equal:
         header += "d.value = ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       case OrthancPluginIdentifierConstraint_SmallerOrEqual:
         header += "d.value <= ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       case OrthancPluginIdentifierConstraint_GreaterOrEqual:
         header += "d.value >= ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       case OrthancPluginIdentifierConstraint_Wildcard:
         header += "d.value LIKE ${value}";
         statement.reset(new DatabaseManager::CachedStatement(
-                          STATEMENT_FROM_HERE, manager, header.c_str()));
+                          STATEMENT_FROM_HERE, manager, header));
         break;
         
       default:
@@ -1432,7 +1441,7 @@ namespace OrthancDatabases
 
     if (constraint == OrthancPluginIdentifierConstraint_Wildcard)
     {
-      args.SetUtf8Value("value", ConvertWildcardToLike(value));
+      args.SetUtf8Value("value", ConvertWildcardToLike(value, manager.GetDialect()));
     }
     else
     {
@@ -2226,6 +2235,114 @@ namespace OrthancDatabases
       }
     }
 
+    virtual std::string FormatLower(const std::string& value)
+    {
+      switch (dialect_)
+      {
+        case Dialect_SQLite:
+        {
+          return " lower_with_accents(" + value + ") ";
+        };
+        default:
+          return " lower(" + value + ") ";
+      }
+    }
+
+    virtual std::string FormatWildcardsForLike(const std::string& value)
+    {
+      bool escapeBrackets = IsEscapeBrackets();
+      std::string escaped;
+      escaped.reserve(value.size());
+
+      switch (dialect_)
+      {
+        case Dialect_SQLite:
+        {
+          escaped = value;  // SQLite uses GLOB instead of LIKE -> no need for escaping and we keep the 'Unix' like wildcards
+        }; break;
+        default:
+          for (size_t i = 0; i < value.size(); i++)
+          {
+            if (value[i] == '*')
+            {
+              escaped += "%";
+            }
+            else if (value[i] == '?')
+            {
+              escaped += "_";
+            }
+            else if (value[i] == '%')
+            {
+              escaped += "\\%";
+            }
+            else if (value[i] == '_')
+            {
+              escaped += "\\_";
+            }
+            else if (value[i] == '\\')
+            {
+              escaped += "\\\\";
+            }
+            else if (escapeBrackets && value[i] == '[')
+            {
+              escaped += "\\[";
+            }
+            else if (escapeBrackets && value[i] == ']')
+            {
+              escaped += "\\]";
+            }
+            else
+            {
+              escaped += value[i];
+            }
+          }
+      }
+      return escaped;
+    }
+
+
+    virtual std::string FormatLike(bool isCaseSensitive, const std::string& a, const std::string& b)
+    {
+      switch (dialect_)
+      {
+        case Dialect_MySQL: // LIKE is case insensitive by default !
+        {
+          if (isCaseSensitive)
+          {
+            return a + " LIKE BINARY " + b + " " + FormatWildcardEscape();
+          }
+          else
+          {
+            return a + " LIKE " + b + " " + FormatWildcardEscape();
+          }
+        }; break;
+        case Dialect_MSSQL:
+        case Dialect_PostgreSQL: // LIKE is case sensitive by default !
+        {
+          if (isCaseSensitive)
+          {
+            return a + " LIKE " + b + " " + FormatWildcardEscape();
+          }
+          else
+          {
+            return "lower(" + a + ") LIKE lower(" + b + ") " + FormatWildcardEscape();
+          }
+        }; break;
+        case Dialect_SQLite:
+        {
+          if (isCaseSensitive)
+          {
+            return a + " GLOB " + b + " "; // + FormatWildcardEscape();
+          }
+          else
+          {
+            return "lower_with_accents(" + a + ") GLOB lower_with_accents(" + b + ") "; // + FormatWildcardEscape();
+          }
+        }; break;
+        default:
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      }
+    }
 
     virtual std::string FormatLimits(uint64_t since, uint64_t count)
     {
@@ -2356,9 +2473,8 @@ namespace OrthancDatabases
     ISqlLookupFormatter::GetLookupLevels(lowerLevel, upperLevel,  queryLevel, lookup);
 
     std::string sql;
-    bool enableNewStudyCode = true;
 
-    if (enableNewStudyCode && lowerLevel == queryLevel && upperLevel == queryLevel)
+    if (lowerLevel == queryLevel && upperLevel == queryLevel)
     {
       ISqlLookupFormatter::ApplySingleLevel(sql, formatter, lookup, queryLevel, labels, labelsConstraint, limit);
 
@@ -3133,7 +3249,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       DatabaseManager::StandaloneStatement statement(manager, "SELECT 1");
 
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 11)
+      Orthanc::ElapsedTimer timer;
+#else
       Orthanc::Toolbox::ElapsedTimer timer;
+#endif
 
       statement.ExecuteWithoutResult();
 

@@ -49,7 +49,8 @@ namespace OrthancDatabases
       return true;
     }
 
-    void ApplyPrepareIndex(DatabaseManager::Transaction& t, DatabaseManager& manager);
+    void ApplyPrepareIndex(DatabaseManager::Transaction& t,
+                           const DatabaseManager& manager);
 
   public:
     PostgreSQLIndex(OrthancPluginContext* context,

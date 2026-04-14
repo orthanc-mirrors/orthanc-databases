@@ -50,7 +50,7 @@ namespace OrthancDatabases
     void SetFieldsCount(size_t count);
     
   public:
-    virtual ~ResultBase()
+    virtual ~ResultBase() ORTHANC_OVERRIDE
     {
       ClearFields();
     }

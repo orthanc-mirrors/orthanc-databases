@@ -50,7 +50,7 @@ namespace OrthancDatabases
     MySQLStatement(MySQLDatabase& db,
                    const Query& query);
 
-    virtual ~MySQLStatement();
+    virtual ~MySQLStatement() ORTHANC_OVERRIDE;
 
     MYSQL_STMT* GetObject();
 
@@ -61,10 +61,10 @@ namespace OrthancDatabases
 
     IValue* FetchResultField(size_t i);
 
-    IResult* Execute(ITransaction& transaction,
+    IResult* Execute(const ITransaction& transaction,
                      const Dictionary& parameters);
 
-    void ExecuteWithoutResult(ITransaction& transaction,
+    void ExecuteWithoutResult(const ITransaction& transaction,
                               const Dictionary& parameters);
   };
 }

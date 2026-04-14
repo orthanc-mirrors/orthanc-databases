@@ -645,7 +645,7 @@ namespace OrthancDatabases
     std::unique_ptr<Output>                          output_;
     
   public:
-    Transaction(IndexConnectionsPool& pool) :
+    explicit Transaction(IndexConnectionsPool& pool) :
       pool_(pool),
       accessor_(new IndexConnectionsPool::Accessor(pool)),
       output_(new Output)
@@ -677,7 +677,7 @@ namespace OrthancDatabases
                                                  uint32_t* target /* out */)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswersCount(*target);
   }
 
@@ -687,7 +687,7 @@ namespace OrthancDatabases
                                                      uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerAttachment(*target, index);
   }
 
@@ -697,7 +697,7 @@ namespace OrthancDatabases
                                                  uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerChange(*target, index);
   }
 
@@ -711,7 +711,7 @@ namespace OrthancDatabases
     assert(group != NULL);
     assert(element != NULL);
     assert(value != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerDicomTag(*group, *element, *value, index);
   }
 
@@ -721,7 +721,7 @@ namespace OrthancDatabases
                                                            uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerExportedResource(*target, index);
   }
 
@@ -731,7 +731,7 @@ namespace OrthancDatabases
                                                 uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerInt32(*target, index);
   }
 
@@ -741,7 +741,7 @@ namespace OrthancDatabases
                                                 uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerInt64(*target, index);
   }
 
@@ -751,7 +751,7 @@ namespace OrthancDatabases
                                                            uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerMatchingResource(*target, index);
   }
 
@@ -763,7 +763,7 @@ namespace OrthancDatabases
   {
     assert(metadata != NULL);
     assert(value != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerMetadata(*metadata, *value, index);
   }
 
@@ -773,7 +773,7 @@ namespace OrthancDatabases
                                                  uint32_t index)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadAnswerString(*target, index);
   }
 
@@ -782,7 +782,7 @@ namespace OrthancDatabases
                                                 uint32_t* target /* out */)
   {
     assert(target != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadEventsCount(*target);
   }
 
@@ -792,7 +792,7 @@ namespace OrthancDatabases
                                           uint32_t index)
   {
     assert(event != NULL);
-    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<const DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction& that = *reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
     return that.GetOutput().ReadEvent(*event, index);
   }
 
@@ -944,7 +944,7 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode Rollback(OrthancPluginDatabaseTransaction* transaction)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -959,7 +959,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode Commit(OrthancPluginDatabaseTransaction* transaction,
                                        int64_t fileSizeDelta /* TODO - not used? */)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -976,7 +976,7 @@ namespace OrthancDatabases
                                               const OrthancPluginAttachment* attachment,
                                               int64_t revision)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -990,7 +990,7 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode ClearChanges(OrthancPluginDatabaseTransaction* transaction)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1004,7 +1004,7 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode ClearExportedResources(OrthancPluginDatabaseTransaction* transaction)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1019,7 +1019,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode ClearMainDicomTags(OrthancPluginDatabaseTransaction* transaction,
                                                    int64_t resourceId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1038,7 +1038,7 @@ namespace OrthancDatabases
                                                const char* hashSeries,
                                                const char* hashInstance)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1063,7 +1063,7 @@ namespace OrthancDatabases
                                                  int64_t id,
                                                  int32_t contentType)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1079,7 +1079,7 @@ namespace OrthancDatabases
                                                int64_t id,
                                                int32_t metadataType)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1094,7 +1094,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode DeleteResource(OrthancPluginDatabaseTransaction* transaction,
                                                int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1109,7 +1109,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetAllMetadata(OrthancPluginDatabaseTransaction* transaction,
                                                int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1132,7 +1132,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetAllPublicIds(OrthancPluginDatabaseTransaction* transaction,
                                                 OrthancPluginResourceType resourceType)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1153,7 +1153,7 @@ namespace OrthancDatabases
                                                          uint64_t since,
                                                          uint64_t limit)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1174,7 +1174,7 @@ namespace OrthancDatabases
                                            int64_t since,
                                            uint32_t maxResults)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1193,7 +1193,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetChildrenInternalId(OrthancPluginDatabaseTransaction* transaction,
                                                       int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1213,7 +1213,7 @@ namespace OrthancDatabases
                                                     int64_t resourceId,
                                                     int32_t metadata)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1232,7 +1232,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetChildrenPublicId(OrthancPluginDatabaseTransaction* transaction,
                                                     int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1253,7 +1253,7 @@ namespace OrthancDatabases
                                                      int64_t since,
                                                      uint32_t maxResults)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1271,7 +1271,7 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode GetLastChange(OrthancPluginDatabaseTransaction* transaction)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1286,7 +1286,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetLastChangeIndex(OrthancPluginDatabaseTransaction* transaction,
                                                    int64_t* target)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1300,7 +1300,7 @@ namespace OrthancDatabases
   
   static OrthancPluginErrorCode GetLastExportedResource(OrthancPluginDatabaseTransaction* transaction)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1315,7 +1315,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetMainDicomTags(OrthancPluginDatabaseTransaction* transaction,
                                                  int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1330,7 +1330,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetPublicId(OrthancPluginDatabaseTransaction* transaction,
                                             int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1346,7 +1346,7 @@ namespace OrthancDatabases
                                                   uint64_t* target /* out */,
                                                   OrthancPluginResourceType resourceType)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1362,7 +1362,7 @@ namespace OrthancDatabases
                                                 OrthancPluginResourceType* target /* out */,
                                                 uint64_t resourceId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1377,7 +1377,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetTotalCompressedSize(OrthancPluginDatabaseTransaction* transaction,
                                                        uint64_t* target /* out */)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1392,7 +1392,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode GetTotalUncompressedSize(OrthancPluginDatabaseTransaction* transaction,
                                                          uint64_t* target /* out */)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1408,7 +1408,7 @@ namespace OrthancDatabases
                                                 uint8_t* target,
                                                 uint64_t threshold)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1425,7 +1425,7 @@ namespace OrthancDatabases
                                                    uint8_t* target,
                                                    int64_t resourceId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1442,7 +1442,7 @@ namespace OrthancDatabases
                                                    uint8_t* target,
                                                    int64_t resourceId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1458,7 +1458,7 @@ namespace OrthancDatabases
   static OrthancPluginErrorCode ListAvailableAttachments(OrthancPluginDatabaseTransaction* transaction,
                                                          int64_t resourceId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1479,7 +1479,7 @@ namespace OrthancDatabases
                                           OrthancPluginResourceType resourceType,
                                           const char* date)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1501,7 +1501,7 @@ namespace OrthancDatabases
                                                     const char* seriesInstanceUid,
                                                     const char* sopInstanceUid)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1519,7 +1519,7 @@ namespace OrthancDatabases
                                                  int64_t resourceId,
                                                  int32_t contentType)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1535,7 +1535,7 @@ namespace OrthancDatabases
                                                      const char* serverIdentifier,
                                                      int32_t property)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1558,7 +1558,7 @@ namespace OrthancDatabases
                                                int64_t id,
                                                int32_t metadata)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1581,7 +1581,7 @@ namespace OrthancDatabases
                                              int64_t* parentId /* out */,
                                              int64_t id)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1608,7 +1608,7 @@ namespace OrthancDatabases
                                                OrthancPluginResourceType* type /* out */,
                                                const char* publicId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1636,7 +1636,7 @@ namespace OrthancDatabases
                                                 uint32_t limit,
                                                 uint8_t requestSomeInstanceId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1664,7 +1664,7 @@ namespace OrthancDatabases
                                                         OrthancPluginResourceType* type /* out */,
                                                         const char* publicId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1695,7 +1695,7 @@ namespace OrthancDatabases
                                                        uint8_t* patientAvailable,
                                                        int64_t* patientId)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1721,7 +1721,7 @@ namespace OrthancDatabases
                                                         int64_t* patientId,
                                                         int64_t patientIdToAvoid)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1747,7 +1747,7 @@ namespace OrthancDatabases
                                                   int32_t property,
                                                   const char* value)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1765,7 +1765,7 @@ namespace OrthancDatabases
                                             const char* value,
                                             int64_t revision)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1781,7 +1781,7 @@ namespace OrthancDatabases
                                                     int64_t id,
                                                     uint8_t isProtected)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {
@@ -1801,7 +1801,7 @@ namespace OrthancDatabases
                                                     uint32_t countMetadata,
                                                     const OrthancPluginResourcesContentMetadata* metadata)
   {
-    DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
+    const DatabaseBackendAdapterV3::Transaction* t = reinterpret_cast<DatabaseBackendAdapterV3::Transaction*>(transaction);
 
     try
     {

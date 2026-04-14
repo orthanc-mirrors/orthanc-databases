@@ -28,10 +28,9 @@
 #include "../../Framework/MySQL/MySQLTransaction.h"
 #include "MySQLDefinitions.h"
 
-#include <Compatibility.h>  // For std::unique_ptr<>
+#include <Compatibility.h>      // For std::unique_ptr<>
+#include <CompatibilityMath.h>  // For Orthanc::Math::iround()
 #include <Logging.h>
-
-#include <boost/math/special_functions/round.hpp>
 
 
 namespace OrthancDatabases
@@ -47,8 +46,8 @@ namespace OrthancDatabases
       int64_t size;
       if (db.LookupGlobalIntegerVariable(size, "max_allowed_packet"))
       {
-        int mb = boost::math::iround(static_cast<double>(size) /
-                                     static_cast<double>(1024 * 1024));
+        int mb = Orthanc::Math::iround(static_cast<double>(size) /
+                                       static_cast<double>(1024 * 1024));
         LOG(WARNING) << "Your MySQL server cannot "
                      << "store DICOM files larger than " << mb << "MB";
         LOG(WARNING) << "  => Consider increasing \"max_allowed_packet\" "

@@ -62,7 +62,7 @@ namespace OrthancDatabases
                          size_t countConnections,
                          unsigned int houseKeepingDelaySeconds);
 
-    virtual ~IndexConnectionsPool();
+    virtual ~IndexConnectionsPool() ORTHANC_OVERRIDE;
 
     virtual void OpenConnections(bool hasIdentifierTags,
                                  const std::list<IdentifierTag>& identifierTags) ORTHANC_OVERRIDE;

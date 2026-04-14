@@ -135,7 +135,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = "lower(" + tag + ".value) " + op + " lower(" + parameter + ")";
+          comparison = formatter.FormatLower(tag + ".value") + op + formatter.FormatLower(parameter);
         }
 
         break;
@@ -158,7 +158,7 @@ namespace OrthancDatabases
           }
           else
           {
-            comparison += "lower(" + parameter + ")";
+            comparison += formatter.FormatLower(parameter);
           }
         }
 
@@ -168,7 +168,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = "lower(" +  tag + ".value) IN (" + comparison + ")";
+          comparison = formatter.FormatLower(tag + ".value") + " IN (" + comparison + ")";
         }
 
         break;
@@ -188,57 +188,11 @@ namespace OrthancDatabases
         }
         else
         {
-          std::string escaped;
-          escaped.reserve(value.size());
-
-          for (size_t i = 0; i < value.size(); i++)
-          {
-            if (value[i] == '*')
-            {
-              escaped += "%";
-            }
-            else if (value[i] == '?')
-            {
-              escaped += "_";
-            }
-            else if (value[i] == '%')
-            {
-              escaped += "\\%";
-            }
-            else if (value[i] == '_')
-            {
-              escaped += "\\_";
-            }
-            else if (value[i] == '\\')
-            {
-              escaped += "\\\\";
-            }
-            else if (escapeBrackets && value[i] == '[')
-            {
-              escaped += "\\[";
-            }
-            else if (escapeBrackets && value[i] == ']')
-            {
-              escaped += "\\]";
-            }
-            else
-            {
-              escaped += value[i];
-            }
-          }
-
+          std::string escaped = formatter.FormatWildcardsForLike(value);
           std::string parameter = formatter.GenerateParameter(escaped);
-
-          if (isCaseSensitive)
-          {
-            comparison = (tag + ".value LIKE " + parameter + " " +
-                          formatter.FormatWildcardEscape());
-          }
-          else
-          {
-            comparison = ("lower(" + tag + ".value) LIKE lower(" +
-                          parameter + ") " + formatter.FormatWildcardEscape());
-          }
+          comparison = formatter.FormatLike(isCaseSensitive,
+                                            tag + ".value",
+                                            parameter);
         }
 
         break;
@@ -553,7 +507,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = " AND lower(value) " + op + " lower(" + parameter + ")";
+          comparison = " AND " + formatter.FormatLower("value") + op + formatter.FormatLower(parameter);
         }
 
         break;
@@ -572,7 +526,7 @@ namespace OrthancDatabases
           }
           else
           {
-            comparisonValues.push_back("lower(" + parameter + ")");
+            comparisonValues.push_back(formatter.FormatLower(parameter));
           }
         }
 
@@ -584,7 +538,7 @@ namespace OrthancDatabases
         }
         else
         {
-          comparison = " AND lower(value) IN (" + values + ")";
+          comparison = " AND " + formatter.FormatLower("value") + " IN (" + values + ")";
         }
 
         break;
@@ -604,55 +558,11 @@ namespace OrthancDatabases
         }
         else
         {
-          std::string escaped;
-          escaped.reserve(value.size());
-
-          for (size_t i = 0; i < value.size(); i++)
-          {
-            if (value[i] == '*')
-            {
-              escaped += "%";
-            }
-            else if (value[i] == '?')
-            {
-              escaped += "_";
-            }
-            else if (value[i] == '%')
-            {
-              escaped += "\\%";
-            }
-            else if (value[i] == '_')
-            {
-              escaped += "\\_";
-            }
-            else if (value[i] == '\\')
-            {
-              escaped += "\\\\";
-            }
-            else if (escapeBrackets && value[i] == '[')
-            {
-              escaped += "\\[";
-            }
-            else if (escapeBrackets && value[i] == ']')
-            {
-              escaped += "\\]";
-            }
-            else
-            {
-              escaped += value[i];
-            }
-          }
-
+          std::string escaped = formatter.FormatWildcardsForLike(value);
           std::string parameter = formatter.GenerateParameter(escaped);
-
-          if (constraint.IsCaseSensitive())
-          {
-            comparison = " AND value LIKE " + parameter + " " + formatter.FormatWildcardEscape();
-          }
-          else
-          {
-            comparison = " AND lower(value) LIKE lower(" + parameter + ") " + formatter.FormatWildcardEscape();
-          }
+          comparison = " AND " + formatter.FormatLike(constraint.IsCaseSensitive(),
+                                                      "value",
+                                                      parameter);
         }
 
         break;
@@ -811,6 +721,10 @@ namespace OrthancDatabases
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + FormatLevel(queryLevel) +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
+    else if (labelsConstraint == LabelsConstraint_None) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    {
+      where.push_back("(SELECT COUNT(1) FROM Labels WHERE id = " + FormatLevel(queryLevel) + ".internalId) = 0");
+    }
 
     sql += joins + Join(where, " WHERE ", " AND ");
 
@@ -893,7 +807,7 @@ namespace OrthancDatabases
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
 
-    std::string ordering;
+    std::string orderingSql;
     std::string orderingJoins;
 
     if (request.ordering_size() > 0)
@@ -955,22 +869,22 @@ namespace OrthancDatabases
 
       if (formatter.SupportsNullsLast())
       {
-        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
+        orderingSql = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + " NULLS LAST) AS rowNumber";
       }
       else
       {
-        ordering = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + ") AS rowNumber";
+        orderingSql = "ROW_NUMBER() OVER (ORDER BY " + orderByFieldsString + ") AS rowNumber";
       }
     }
     else
     {
-      ordering = "ROW_NUMBER() OVER (ORDER BY " + strQueryLevel + ".publicId) AS rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
+      orderingSql = "ROW_NUMBER() OVER (ORDER BY " + strQueryLevel + ".publicId) AS rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
     }
 
     sql = ("SELECT " +
            strQueryLevel + ".publicId, " +
            strQueryLevel + ".internalId, " +
-           ordering +
+           orderingSql +
            " FROM Resources AS " + strQueryLevel);
 
 
@@ -1126,6 +1040,10 @@ namespace OrthancDatabases
       where.push_back("(SELECT COUNT(1) FROM Labels AS selectedLabels WHERE selectedLabels.id = " + strQueryLevel +
                       ".internalId AND selectedLabels.label IN (" + Join(formattedLabels, "", ", ") + ")) " + condition);
     }
+    else if (request.labels_constraint() == Orthanc::DatabasePluginMessages::LABELS_CONSTRAINT_NONE) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    {
+      where.push_back("(SELECT COUNT(1) FROM Labels WHERE id = " + FormatLevel(queryLevel) + ".internalId) = 0");
+    }
 
     sql += joins + orderingJoins + Join(where, " WHERE ", " AND ");
 
@@ -1245,6 +1163,11 @@ namespace OrthancDatabases
                                         ") AS temp "
                                  " WHERE labelsCount " + condition + ")");
     }
+    else if (labelsConstraint == LabelsConstraint_None) // from 1.12.11, 'None' with an empty labels list means "list all resources without any labels"
+    {
+      sql += (" AND (SELECT COUNT(1) FROM Labels WHERE id = internalId) = 0");
+    }
+
 
     if (limit != 0)
     {

@@ -72,7 +72,7 @@ namespace OrthancDatabases
     PostgreSQLStatement(PostgreSQLDatabase& database,
                         const Query& query);
 
-    ~PostgreSQLStatement();
+    virtual ~PostgreSQLStatement() ORTHANC_OVERRIDE;
     
     void DeclareInputInteger(unsigned int param);
     
@@ -103,10 +103,10 @@ namespace OrthancDatabases
       return database_;
     }
 
-    IResult* Execute(ITransaction& transaction,
+    IResult* Execute(const ITransaction& transaction,
                      const Dictionary& parameters);
 
-    void ExecuteWithoutResult(ITransaction& transaction,
+    void ExecuteWithoutResult(const ITransaction& transaction,
                               const Dictionary& parameters);
   };
 }

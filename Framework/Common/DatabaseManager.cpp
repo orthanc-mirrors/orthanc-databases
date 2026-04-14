@@ -102,16 +102,16 @@ namespace OrthancDatabases
     
     std::unique_ptr<IPrecompiledStatement> statement(GetDatabase().Compile(query));
       
-    IPrecompiledStatement* tmp = statement.get();
-    if (tmp == NULL)
+    if (statement.get() == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
     }
-
-    assert(cachedStatements_.find(statementId) == cachedStatements_.end());
-    cachedStatements_[statementId] = statement.release();
-
-    return *tmp;
+    else
+    {
+      assert(cachedStatements_.find(statementId) == cachedStatements_.end());
+      cachedStatements_[statementId] = statement.release();
+      return *cachedStatements_[statementId];
+    }
   }
 
     

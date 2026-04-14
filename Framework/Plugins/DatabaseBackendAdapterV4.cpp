@@ -48,7 +48,9 @@
 namespace OrthancDatabases
 {
   static bool isBackendInUse_ = false;  // Only for sanity checks
-  static BaseIndexConnectionsPool* connectionPool_ = NULL;  // Only for the AuditLogHandler
+
+  // The AuditLogHandler necessitates the plugin to manage the resources associated with the pool of connections
+  static std::unique_ptr<BaseIndexConnectionsPool> connectionPool_;
 
   static Orthanc::DatabasePluginMessages::ResourceType Convert(OrthancPluginResourceType resourceType)
   {
@@ -129,63 +131,63 @@ namespace OrthancDatabases
     }
     
   public:
-    Output(Orthanc::DatabasePluginMessages::DeleteAttachment::Response& deleteAttachment)
+    explicit Output(Orthanc::DatabasePluginMessages::DeleteAttachment::Response& deleteAttachment)
     {
       Clear();
       deleteAttachment_ = &deleteAttachment;
     }
     
-    Output(Orthanc::DatabasePluginMessages::DeleteResource::Response& deleteResource)
+    explicit Output(Orthanc::DatabasePluginMessages::DeleteResource::Response& deleteResource)
     {
       Clear();
       deleteResource_ = &deleteResource;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetChanges::Response& getChanges)
+    explicit Output(Orthanc::DatabasePluginMessages::GetChanges::Response& getChanges)
     {
       Clear();
       getChanges_ = &getChanges;
     }
 
 #if ORTHANC_PLUGINS_HAS_CHANGES_EXTENDED == 1
-    Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
+    explicit Output(Orthanc::DatabasePluginMessages::GetChangesExtended::Response& getChangesExtended)
     {
       Clear();
       getChangesExtended_ = &getChangesExtended;
     }
 #endif
 
-    Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
+    explicit Output(Orthanc::DatabasePluginMessages::GetExportedResources::Response& getExportedResources)
     {
       Clear();
       getExportedResources_ = &getExportedResources;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetLastChange::Response& getLastChange)
+    explicit Output(Orthanc::DatabasePluginMessages::GetLastChange::Response& getLastChange)
     {
       Clear();
       getLastChange_ = &getLastChange;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetLastExportedResource::Response& getLastExportedResource)
+    explicit Output(Orthanc::DatabasePluginMessages::GetLastExportedResource::Response& getLastExportedResource)
     {
       Clear();
       getLastExportedResource_ = &getLastExportedResource;
     }
     
-    Output(Orthanc::DatabasePluginMessages::GetMainDicomTags::Response& getMainDicomTags)
+    explicit Output(Orthanc::DatabasePluginMessages::GetMainDicomTags::Response& getMainDicomTags)
     {
       Clear();
       getMainDicomTags_ = &getMainDicomTags;
     }
     
-    Output(Orthanc::DatabasePluginMessages::LookupAttachment::Response& lookupAttachment)
+    explicit Output(Orthanc::DatabasePluginMessages::LookupAttachment::Response& lookupAttachment)
     {
       Clear();
       lookupAttachment_ = &lookupAttachment;
     }
     
-    Output(Orthanc::DatabasePluginMessages::LookupResources::Response& lookupResources)
+    explicit Output(Orthanc::DatabasePluginMessages::LookupResources::Response& lookupResources)
     {
       Clear();
       lookupResources_ = &lookupResources;
@@ -581,8 +583,25 @@ namespace OrthancDatabases
       countValues += constraint.values().size();
     }
 
+    std::vector<size_t> valuesIndex;
+    valuesIndex.resize(request.lookup().size());
+
     std::vector<const char*> values;
     values.reserve(countValues);
+
+    for (int i = 0; i < request.lookup().size(); i++)
+    {
+      valuesIndex[i] = values.size();
+
+      const Orthanc::DatabasePluginMessages::DatabaseConstraint& constraint = request.lookup(i);
+
+      for (int j = 0; j < constraint.values().size(); j++)
+      {
+        values.push_back(constraint.values(j).c_str());
+      }
+    }
+
+    assert(values.size() == countValues);
 
     DatabaseConstraints lookup;
 
@@ -638,13 +657,7 @@ namespace OrthancDatabases
       }
       else
       {
-        c.values = &values[values.size()];
-            
-        for (int j = 0; j < constraint.values().size(); j++)
-        {
-          assert(values.size() < countValues);
-          values.push_back(constraint.values(j).c_str());
-        }
+        c.values = &values[valuesIndex[i]];
       }
 
       lookup.AddConstraint(new DatabaseConstraint(c));
@@ -1454,20 +1467,26 @@ namespace OrthancDatabases
                                             const void* requestData,
                                             uint64_t requestSize)
   {
+    if (rawPool == NULL ||
+        connectionPool_.get() == NULL ||
+        rawPool != connectionPool_.get())
+    {
+      LOG(ERROR) << "Internal error: Incorrect state for the pool of connections";
+      return OrthancPluginErrorCode_InternalError;
+    }
+
+    if (!isBackendInUse_)
+    {
+      LOG(ERROR) << "More than one index backend was registered, internal error";
+      return OrthancPluginErrorCode_InternalError;
+    }
+
     Orthanc::DatabasePluginMessages::Request request;
     if (!request.ParseFromArray(requestData, requestSize))
     {
       LOG(ERROR) << "Cannot parse message from the Orthanc core using protobuf";
       return OrthancPluginErrorCode_InternalError;
     }
-
-    if (rawPool == NULL)
-    {
-      LOG(ERROR) << "Received a NULL pointer from the database";
-      return OrthancPluginErrorCode_InternalError;
-    }
-
-    BaseIndexConnectionsPool& pool = *reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
 
     try
     {
@@ -1476,12 +1495,12 @@ namespace OrthancDatabases
       switch (request.type())
       {
         case Orthanc::DatabasePluginMessages::REQUEST_DATABASE:
-          ProcessDatabaseOperation(*response.mutable_database_response(), request.database_request(), pool);
+          ProcessDatabaseOperation(*response.mutable_database_response(), request.database_request(), *connectionPool_);
           break;
           
         case Orthanc::DatabasePluginMessages::REQUEST_TRANSACTION:
         {
-          BaseIndexConnectionsPool::Accessor& transaction = *reinterpret_cast<BaseIndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
+          const BaseIndexConnectionsPool::Accessor& transaction = *reinterpret_cast<const BaseIndexConnectionsPool::Accessor*>(request.transaction_request().transaction());
           ProcessTransactionOperation(*response.mutable_transaction_response(), request.transaction_request(),
                                       transaction.GetBackend(), transaction.GetManager());
           break;
@@ -1498,7 +1517,7 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Cannot serialize to protobuf");
       }
 
-      if (OrthancPluginCreateMemoryBuffer64(pool.GetContext(), serializedResponse, s.size()) != OrthancPluginErrorCode_Success)
+      if (OrthancPluginCreateMemoryBuffer64(connectionPool_->GetContext(), serializedResponse, s.size()) != OrthancPluginErrorCode_Success)
       {
         throw Orthanc::OrthancException(Orthanc::ErrorCode_NotEnoughMemory, "Cannot allocate a memory buffer");
       }
@@ -1537,26 +1556,23 @@ namespace OrthancDatabases
 
   static void FinalizeBackend(void* rawPool)
   {
-    if (rawPool != NULL)
+    if (rawPool == NULL ||
+        connectionPool_.get() == NULL ||
+        connectionPool_.get() != rawPool)
     {
-      BaseIndexConnectionsPool* pool = reinterpret_cast<BaseIndexConnectionsPool*>(rawPool);
-      
-      if (isBackendInUse_)
-      {
-        isBackendInUse_ = false;
-        connectionPool_ = NULL;
-      }
-      else
-      {
-        LOG(ERROR) << "More than one index backend was registered, internal error";
-      }
+      LOG(ERROR) << "Internal error: Incorrect state for the pool of connections";
+    }
 
-      delete pool;
+    if (isBackendInUse_)
+    {
+      isBackendInUse_ = false;
     }
     else
     {
-      LOG(ERROR) << "Received a null pointer from the Orthanc core, internal error";
+      LOG(ERROR) << "More than one index backend was registered, internal error";
     }
+
+    connectionPool_.reset(NULL);
   }
 
 
@@ -1569,7 +1585,7 @@ namespace OrthancDatabases
                                          uint32_t                  logDataSize)
   {
     if (!isBackendInUse_ ||
-        connectionPool_ == NULL)
+        connectionPool_.get() == NULL)
     {
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
@@ -1785,29 +1801,28 @@ namespace OrthancDatabases
                                           unsigned int maxDatabaseRetries,
                                           unsigned int housekeepingDelaySeconds)
   {
-    std::unique_ptr<BaseIndexConnectionsPool> pool;
-
+    // The "connectionPool_" takes the ownership of the backend
     if (useDynamicConnectionPool)
     {
-      pool.reset(new DynamicIndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+      connectionPool_.reset(new DynamicIndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
     }
     else
     {
-      pool.reset(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
+      connectionPool_.reset(new IndexConnectionsPool(backend, countConnections, housekeepingDelaySeconds));
     }
     
     if (isBackendInUse_)
     {
+      connectionPool_.reset();  // This implies "delete backend"
       throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
     }
 
     OrthancPluginContext* context = backend->GetContext();
-    connectionPool_ = pool.get(); // we need to keep a pointer on the connectionPool for the static Audit log handler
  
-    if (OrthancPluginRegisterDatabaseBackendV4(context, pool.release(), maxDatabaseRetries,
+    if (OrthancPluginRegisterDatabaseBackendV4(context, connectionPool_.get(), maxDatabaseRetries,
                                                CallBackend, FinalizeBackend) != OrthancPluginErrorCode_Success)
     {
-      delete backend;
+      connectionPool_.reset();  // This implies "delete backend"
       throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError, "Unable to register the database backend");
     }
 

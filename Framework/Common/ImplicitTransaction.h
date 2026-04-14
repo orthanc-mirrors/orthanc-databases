@@ -53,7 +53,7 @@ namespace OrthancDatabases
   public:
     ImplicitTransaction();
 
-    virtual ~ImplicitTransaction();
+    virtual ~ImplicitTransaction() ORTHANC_OVERRIDE;
     
     virtual bool IsImplicit() const ORTHANC_OVERRIDE
     {

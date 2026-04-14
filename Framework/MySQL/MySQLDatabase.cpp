@@ -163,7 +163,7 @@ namespace OrthancDatabases
     {
       // Fallback to TCP connection if no UNIX socket is provided
       unsigned int protocol = MYSQL_PROTOCOL_TCP;
-      mysql_options(mysql_, MYSQL_OPT_PROTOCOL, (unsigned int *) &protocol);
+      mysql_options(mysql_, MYSQL_OPT_PROTOCOL, reinterpret_cast<const void*>(&protocol));
     }
 
     if (parameters_.IsSsl())
@@ -172,15 +172,15 @@ namespace OrthancDatabases
       {
 #if (MYSQL_VERSION_ID > 50110 && MYSQL_VERSION_ID < 80000)  // Removed in MySQL client 8.0
         my_bool verifyCert = 1;
-        mysql_options(mysql_, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (void *) &verifyCert);
+        mysql_options(mysql_, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, reinterpret_cast<const void*>(&verifyCert));
 #endif
         
-        mysql_options(mysql_, MYSQL_OPT_SSL_CA, (void *)(parameters_.GetSslCaCertificates()));
+        mysql_options(mysql_, MYSQL_OPT_SSL_CA, reinterpret_cast<const void*>(parameters_.GetSslCaCertificates()));
       }
 
 #if (MYSQL_VERSION_ID > 50110 && MYSQL_VERSION_ID < 80000)  // Removed in MySQL client 8.0
       my_bool enforceTls = 1;
-      mysql_options(mysql_, MYSQL_OPT_SSL_ENFORCE, (void *) &enforceTls);
+      mysql_options(mysql_, MYSQL_OPT_SSL_ENFORCE, reinterpret_cast<const void*>(&enforceTls));
 #endif
     }
 
@@ -402,7 +402,7 @@ namespace OrthancDatabases
   }
 
 
-  bool MySQLDatabase::DoesTableExist(MySQLTransaction& transaction,
+  bool MySQLDatabase::DoesTableExist(const MySQLTransaction& transaction,
                                      const std::string& name)
   {
     if (mysql_ == NULL)
@@ -434,7 +434,7 @@ namespace OrthancDatabases
   }
 
 
-  bool MySQLDatabase::DoesDatabaseExist(MySQLTransaction& transaction,
+  bool MySQLDatabase::DoesDatabaseExist(const MySQLTransaction& transaction,
                                         const std::string& name)
   {
     if (mysql_ == NULL)
@@ -464,7 +464,7 @@ namespace OrthancDatabases
   }
 
 
-  bool MySQLDatabase::DoesTriggerExist(MySQLTransaction& transaction,
+  bool MySQLDatabase::DoesTriggerExist(const MySQLTransaction& transaction,
                                        const std::string& name)
   {
     if (mysql_ == NULL)

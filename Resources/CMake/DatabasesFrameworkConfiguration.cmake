@@ -26,6 +26,7 @@
 
 if (ENABLE_SQLITE_BACKEND)
   set(ENABLE_SQLITE ON)
+  set(ENABLE_LOCALE ON)      # iconv is needed for lower_with_accents
 endif()
 
 if (ENABLE_POSTGRESQL_BACKEND)

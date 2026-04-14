@@ -57,7 +57,7 @@ namespace OrthancDatabases
     {
     }
 
-    ~PostgreSQLDatabase();
+    virtual ~PostgreSQLDatabase() ORTHANC_OVERRIDE;
 
     void Open();
 

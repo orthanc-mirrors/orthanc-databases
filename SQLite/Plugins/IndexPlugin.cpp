@@ -25,6 +25,7 @@
 #include "../../Framework/Plugins/PluginInitialization.h"
 
 #include <Logging.h>
+#include <Toolbox.h>
 
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
 #  include <google/protobuf/any.h>
@@ -41,6 +42,8 @@ extern "C"
 #if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 0)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 #endif
+
+    Orthanc::Toolbox::InitializeGlobalLocale(NULL);
 
     if (!OrthancDatabases::InitializePlugin(context, ORTHANC_PLUGIN_NAME, "SQLite", true))
     {

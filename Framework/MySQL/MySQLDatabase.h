@@ -54,7 +54,7 @@ namespace OrthancDatabases
   public:
     explicit MySQLDatabase(const MySQLParameters& parameters);
 
-    virtual ~MySQLDatabase();
+    virtual ~MySQLDatabase() ORTHANC_OVERRIDE;
 
     void LogError();
 
@@ -88,13 +88,13 @@ namespace OrthancDatabases
     void ExecuteMultiLines(const std::string& sql,
                            bool arobaseSeparator);
 
-    bool DoesTableExist(MySQLTransaction& transaction,
+    bool DoesTableExist(const MySQLTransaction& transaction,
                         const std::string& name);
 
-    bool DoesDatabaseExist(MySQLTransaction& transaction,
+    bool DoesDatabaseExist(const MySQLTransaction& transaction,
                            const std::string& name);
 
-    bool DoesTriggerExist(MySQLTransaction& transaction,
+    bool DoesTriggerExist(const MySQLTransaction& transaction,
                           const std::string& name);
 
     virtual Dialect GetDialect() const ORTHANC_OVERRIDE

@@ -330,7 +330,7 @@ namespace OrthancDatabases
       bool                         success_;
       
     public:
-      Visitor(OrthancPluginMemoryBuffer64* target) :
+      explicit Visitor(OrthancPluginMemoryBuffer64* target) :
         target_(target),
         success_(false)
       {
@@ -406,7 +406,7 @@ namespace OrthancDatabases
       bool                         success_;
       
     public:
-      Visitor(OrthancPluginMemoryBuffer64* target) :
+      explicit Visitor(OrthancPluginMemoryBuffer64* target) :
         target_(target),
         success_(false)
       {
@@ -520,7 +520,7 @@ namespace OrthancDatabases
       {
       }
 
-      ~Visitor()
+      virtual ~Visitor() ORTHANC_OVERRIDE
       {
         if (data_ != NULL /* this condition is invalidated by "Release()" */ &&
             *data_ != NULL)
@@ -792,7 +792,7 @@ namespace OrthancDatabases
         operation.Execute(*accessor);
         return;  // Success
       }
-      catch (Orthanc::OrthancException& e)
+      catch (const Orthanc::OrthancException& e)
       {
 #if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 9, 2)
         if (e.GetErrorCode() == Orthanc::ErrorCode_DatabaseCannotSerialize)

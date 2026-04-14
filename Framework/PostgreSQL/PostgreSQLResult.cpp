@@ -211,7 +211,7 @@ namespace OrthancDatabases
     Oid oid;
     assert(PQfsize(reinterpret_cast<PGresult*>(result_), column) == sizeof(oid));
 
-    oid = *(const Oid*) PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column);
+    oid = *reinterpret_cast<const Oid*>(PQgetvalue(reinterpret_cast<PGresult*>(result_), position_, column));
     oid = ntohl(oid);
 
     return boost::lexical_cast<std::string>(oid);

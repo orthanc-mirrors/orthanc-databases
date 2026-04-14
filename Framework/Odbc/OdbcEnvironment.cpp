@@ -44,7 +44,7 @@ namespace OrthancDatabases
     }
       
     /* We want ODBC 3 support */
-    if (!SQL_SUCCEEDED(SQLSetEnvAttr(handle_, SQL_ATTR_ODBC_VERSION, (void *) SQL_OV_ODBC3, 0)))
+    if (!SQL_SUCCEEDED(SQLSetEnvAttr(handle_, SQL_ATTR_ODBC_VERSION, reinterpret_cast<void*>(SQL_OV_ODBC3), 0)))
     {
       SQLFreeHandle(SQL_HANDLE_ENV, handle_);
       throw Orthanc::OrthancException(Orthanc::ErrorCode_Database,

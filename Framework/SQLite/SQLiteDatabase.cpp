@@ -28,6 +28,7 @@
 #include "../Common/ImplicitTransaction.h"
 
 #include <OrthancException.h>
+#include <Toolbox.h>
 
 namespace OrthancDatabases
 {
@@ -114,4 +115,44 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
     }
   }
+
+  class LowerWithAccents : public Orthanc::SQLite::IScalarFunction
+  {
+  public:
+    LowerWithAccents()
+    {
+    }
+
+    virtual const char* GetName() const ORTHANC_OVERRIDE
+    {
+      return "lower_with_accents";
+    }
+
+    virtual unsigned int GetCardinality() const ORTHANC_OVERRIDE
+    {
+      return 1;
+    }
+
+    virtual void Compute(Orthanc::SQLite::FunctionContext& context) ORTHANC_OVERRIDE
+    {
+      std::string source = context.GetStringValue(0);
+      std::string modified = Orthanc::Toolbox::ToLowerCaseWithAccents(source);
+
+      context.SetStringResult(modified);
+    }
+
+  };
+
+  void SQLiteDatabase::OpenInMemory()
+  {
+    connection_.OpenInMemory();
+    connection_.Register(new LowerWithAccents());
+  }
+
+  void SQLiteDatabase::Open(const std::string& path)
+  {
+    connection_.Open(path);
+    connection_.Register(new LowerWithAccents());
+  }
+
 }

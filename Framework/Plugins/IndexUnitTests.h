@@ -359,16 +359,16 @@ TEST(IndexBackend, Basic)
     CheckBlob(blob);
   }
 
-  std::string s;
-  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
-  ASSERT_EQ("6", s);
+  std::string a;
+  ASSERT_TRUE(db.LookupGlobalProperty(a, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseSchemaVersion));
+  ASSERT_EQ("6", a);
 
   db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9, "Hello");
-  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
-  ASSERT_EQ("Hello", s);
+  ASSERT_TRUE(db.LookupGlobalProperty(a, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
+  ASSERT_EQ("Hello", a);
   db.SetGlobalProperty(*manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9, "HelloWorld");
-  ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
-  ASSERT_EQ("HelloWorld", s);
+  ASSERT_TRUE(db.LookupGlobalProperty(a, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal9));
+  ASSERT_EQ("HelloWorld", a);
 
   ASSERT_EQ(0u, db.GetAllResourcesCount(*manager));
   ASSERT_EQ(0u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Patient));
@@ -408,9 +408,9 @@ TEST(IndexBackend, Basic)
   ASSERT_EQ(1u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Study));
   ASSERT_EQ(2u, db.GetResourcesCount(*manager, OrthancPluginResourceType_Series));
 
-  ASSERT_FALSE(db.GetParentPublicId(s, *manager, studyId));
-  ASSERT_TRUE(db.GetParentPublicId(s, *manager, seriesId));  ASSERT_EQ("study", s);
-  ASSERT_TRUE(db.GetParentPublicId(s, *manager, series2Id));  ASSERT_EQ("study", s);
+  ASSERT_FALSE(db.GetParentPublicId(a, *manager, studyId));
+  ASSERT_TRUE(db.GetParentPublicId(a, *manager, seriesId));  ASSERT_EQ("study", a);
+  ASSERT_TRUE(db.GetParentPublicId(a, *manager, series2Id));  ASSERT_EQ("study", a);
 
   std::list<std::string> children;
   db.GetChildren(children, *manager, studyId);
@@ -449,9 +449,9 @@ TEST(IndexBackend, Basic)
   db.SetMetadata(*manager, studyId, Orthanc::MetadataType_ModifiedFrom, "modified", 42);
   db.SetMetadata(*manager, studyId, Orthanc::MetadataType_LastUpdate, "update2", 43);
   int64_t revision = -1;
-  ASSERT_FALSE(db.LookupMetadata(s, revision, *manager, seriesId, Orthanc::MetadataType_LastUpdate));
-  ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
-  ASSERT_EQ("update2", s);
+  ASSERT_FALSE(db.LookupMetadata(a, revision, *manager, seriesId, Orthanc::MetadataType_LastUpdate));
+  ASSERT_TRUE(db.LookupMetadata(a, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
+  ASSERT_EQ("update2", a);
 
 #if HAS_REVISIONS == 1
   ASSERT_EQ(43, revision);
@@ -460,8 +460,8 @@ TEST(IndexBackend, Basic)
 #endif
 
   db.SetMetadata(*manager, studyId, Orthanc::MetadataType_LastUpdate, reinterpret_cast<const char*>(UTF8), 44);
-  ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
-  ASSERT_STREQ(reinterpret_cast<const char*>(UTF8), s.c_str());
+  ASSERT_TRUE(db.LookupMetadata(a, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
+  ASSERT_STREQ(reinterpret_cast<const char*>(UTF8), a.c_str());
 
 #if HAS_REVISIONS == 1
   ASSERT_EQ(44, revision);
@@ -496,11 +496,11 @@ TEST(IndexBackend, Basic)
   db.ListAvailableMetadata(md, *manager, seriesId);
   ASSERT_EQ(0u, md.size());
 
-  ASSERT_TRUE(db.LookupMetadata(s, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
+  ASSERT_TRUE(db.LookupMetadata(a, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
   db.DeleteMetadata(*manager, studyId, Orthanc::MetadataType_LastUpdate);
-  ASSERT_FALSE(db.LookupMetadata(s, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
+  ASSERT_FALSE(db.LookupMetadata(a, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
   db.DeleteMetadata(*manager, seriesId, Orthanc::MetadataType_LastUpdate);
-  ASSERT_FALSE(db.LookupMetadata(s, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
+  ASSERT_FALSE(db.LookupMetadata(a, revision, *manager, studyId, Orthanc::MetadataType_LastUpdate));
 
   db.ListAvailableMetadata(md, *manager, studyId);
   ASSERT_EQ(1u, md.size());
@@ -786,12 +786,12 @@ TEST(IndexBackend, Basic)
     // column in "ServerProperties" is "TEXT" instead of "LONGTEXT"
     db.SetGlobalProperty(*manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8, longProperty.c_str());
 
-    ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8));
-    ASSERT_EQ(longProperty, s);
+    ASSERT_TRUE(db.LookupGlobalProperty(a, *manager, MISSING_SERVER_IDENTIFIER, Orthanc::GlobalProperty_DatabaseInternal8));
+    ASSERT_EQ(longProperty, a);
 
-    s.clear();
-    ASSERT_TRUE(db.LookupGlobalProperty(s, *manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8));
-    ASSERT_EQ(longProperty, s);
+    a.clear();
+    ASSERT_TRUE(db.LookupGlobalProperty(a, *manager, "some-server", Orthanc::GlobalProperty_DatabaseInternal8));
+    ASSERT_EQ(longProperty, a);
   }
 
   for (size_t level = 0; level < 4; level++)
@@ -1069,7 +1069,7 @@ TEST(IndexBackend, Basic)
 #if ORTHANC_PLUGINS_HAS_RESERVE_QUEUE_VALUE == 1
   {
     std::string value;
-    uint64_t valueIdA, valueIdB, valueIdC, valueIdD, valueIdE, valueIdFail;
+    uint64_t valueIdA, valueIdB, valueIdC, valueIdD, valueIdE;
 
     {
       manager->StartTransaction(TransactionType_ReadWrite);
@@ -1111,6 +1111,8 @@ TEST(IndexBackend, Basic)
       ASSERT_EQ("d", value);
       ASSERT_TRUE(db.ReserveQueueValue(value, valueIdC, *manager, "test", false, 1));
       ASSERT_EQ("c", value);
+
+      uint64_t valueIdFail;
       ASSERT_FALSE(db.ReserveQueueValue(value, valueIdFail, *manager, "test", false, 1));
 
       manager->CommitTransaction();
