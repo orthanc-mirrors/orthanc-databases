@@ -43,7 +43,7 @@ if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "hg")
 else()
-  set(ORTHANC_FRAMEWORK_VERSION "e0979326ac53")  # while waiting for 1.12.11 for Orthanc::Toolbox::ToLowerCaseWithAccents
+  set(ORTHANC_FRAMEWORK_VERSION "1.12.11")  # 1.12.11 has a bug in ImageAccessor but it is not an issue here !
   set(ORTHANC_FRAMEWORK_DEFAULT_SOURCE "web")
 endif()
 
