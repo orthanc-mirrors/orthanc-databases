@@ -31,6 +31,7 @@
 #include <Logging.h>
 #include <OrthancException.h>
 
+#include <cassert>
 #include <sqlext.h>
 
 

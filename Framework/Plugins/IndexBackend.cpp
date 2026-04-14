@@ -34,6 +34,10 @@
 #include <OrthancException.h>
 #include <Toolbox.h>
 
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 11)
+#  include <ElapsedTimer.h>
+#endif
+
 #include <boost/algorithm/string/join.hpp>
 
 
@@ -3245,7 +3249,11 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       DatabaseManager::StandaloneStatement statement(manager, "SELECT 1");
 
+#if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 11)
+      Orthanc::ElapsedTimer timer;
+#else
       Orthanc::Toolbox::ElapsedTimer timer;
+#endif
 
       statement.ExecuteWithoutResult();
 
