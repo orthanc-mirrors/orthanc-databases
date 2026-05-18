@@ -1006,7 +1006,7 @@ namespace OrthancDatabases
     catch (Orthanc::OrthancException&)
     {
       // the statement may fail in case of temporary deadlock -> it will be retried at the next HK
-      LOG(INFO) << "Updat of invalid ChildCount entries has failed (will be retried)";
+      LOG(INFO) << "Update of invalid ChildCount entries has failed (will be retried)";
     }
   }
 }
