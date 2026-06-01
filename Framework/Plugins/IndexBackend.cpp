@@ -956,7 +956,7 @@ namespace OrthancDatabases
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
     }
 
     statement->SetReadOnly(true);
@@ -1025,7 +1025,7 @@ namespace OrthancDatabases
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
     }
 
     statement->SetReadOnly(true);
@@ -1063,7 +1063,7 @@ namespace OrthancDatabases
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
     }
 
     statement->SetReadOnly(true);
@@ -1354,7 +1354,7 @@ namespace OrthancDatabases
                                                 int32_t property,
                                                 int64_t increment)
   {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "IncrementGlobalProperty shall be overloaded");
   }
 
   bool IndexBackend::HasUpdateAndGetStatistics()
@@ -1370,7 +1370,7 @@ namespace OrthancDatabases
                                             int64_t& compressedSize,
                                             int64_t& uncompressedSize)
   {
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "UpdateAndGetStatistics shall be overloaded");
   }
 
   bool IndexBackend::HasMeasureLatency()
@@ -2063,7 +2063,7 @@ namespace OrthancDatabases
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
     }
 
     statement->SetReadOnly(true);
@@ -2087,7 +2087,7 @@ namespace OrthancDatabases
         break;
         
       case Dialect_PostgreSQL:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "GetUnprotectedPatientsCount is overloaded in PostgreSQL");
         break;
 
       case Dialect_MSSQL:
@@ -2098,7 +2098,7 @@ namespace OrthancDatabases
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
     }
 
     statement->SetReadOnly(true);
@@ -2215,7 +2215,7 @@ namespace OrthancDatabases
           return "ESCAPE '\\\\'";
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
     }
 
@@ -2231,7 +2231,7 @@ namespace OrthancDatabases
           return "NULL";
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
     }
 
@@ -2340,7 +2340,7 @@ namespace OrthancDatabases
           }
         }; break;
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
     }
 
@@ -2397,7 +2397,7 @@ namespace OrthancDatabases
           }
         }; break;
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
       
       return sql;
@@ -2427,7 +2427,7 @@ namespace OrthancDatabases
         case Dialect_MySQL:
           return "SIGNED";
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
     }
 
@@ -2443,7 +2443,7 @@ namespace OrthancDatabases
         case Dialect_MySQL:
           return "DECIMAL(10,10)";
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
     }
 
@@ -3082,7 +3082,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
     }
     
     statement->SetParameterType("id", ValueType_Integer64);
@@ -3264,7 +3264,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
 
     return measures[measures.size() / 2];
 #else
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "MeasureLatency is not supported");
 #endif
   }
 
@@ -3308,7 +3308,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         content = response->mutable_instance_content();
         break;
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Invalid level in GetResourceContent");
     }
     return content;
   }
@@ -3331,7 +3331,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         content = response->mutable_children_instances_content();
         break;
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Invalid level in GetChildrenContent");
     }
     return content;
   }
@@ -4484,7 +4484,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         }; break;
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Invalid queryId");
       }
       statement->Next();
     }    
@@ -4665,7 +4665,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           }
           break;
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
 
       statement->Execute(formatter.GetDictionary());
@@ -4728,7 +4728,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           break;
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
 
       DatabaseManager::CachedStatement statement(STATEMENT_FROM_HERE_DYNAMIC(sql), manager, sql);
@@ -4772,7 +4772,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           break;
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
 
       statement->Execute(formatter.GetDictionary());

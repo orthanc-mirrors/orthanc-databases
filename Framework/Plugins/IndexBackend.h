@@ -555,7 +555,7 @@ namespace OrthancDatabases
 
     virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "PerformDbHousekeeping should be overloaded");
     }
 
     /**

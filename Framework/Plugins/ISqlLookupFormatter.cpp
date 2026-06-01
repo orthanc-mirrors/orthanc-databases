@@ -246,7 +246,7 @@ namespace OrthancDatabases
       constraintType = OrthancDatabases::ConstraintType_Wildcard;
       break;
     default:
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported constraint type");
     }
 
     if (constraint.type() == Orthanc::DatabasePluginMessages::CONSTRAINT_LIST)
