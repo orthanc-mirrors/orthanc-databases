@@ -298,7 +298,7 @@ namespace OrthancDatabases
         return new Integer64Value(GetTimestamp(column));
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, std::string("Unknown value type: ") + boost::lexical_cast<std::string>(type));
     }
   }
 }

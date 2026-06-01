@@ -370,7 +370,7 @@ namespace OrthancDatabases
 
         case ValueType_Null:
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, std::string("Invalid parameter type ") + boost::lexical_cast<std::string>(formatter_.GetParameterType(i)) + " for parameter " + boost::lexical_cast<std::string>(i));
       }
     }
   }
