@@ -277,7 +277,7 @@ if USE_SYSTEM_EXCEPTION:
 elif FRAMEWORK_PATH != None:
     cpp.write('#include "%s/OrthancException.h"' % FRAMEWORK_PATH)
 else:
-    cpp.write('#include "OrthancFrameworkException.h"')
+    cpp.write('#include <OrthancException.h>')
 
 cpp.write("""
 #include <stdint.h>
