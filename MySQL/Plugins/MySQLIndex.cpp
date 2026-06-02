@@ -32,7 +32,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../../Framework/Common/OrthancFrameworkException.h"
 
 #include <ctype.h>
 

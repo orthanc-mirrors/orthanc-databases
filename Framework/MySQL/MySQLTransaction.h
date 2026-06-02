@@ -29,6 +29,7 @@
 
 #include "MySQLDatabase.h"
 #include "../Common/ITransaction.h"
+#include "../Common/OrthancFrameworkException.h"
 
 namespace OrthancDatabases
 {

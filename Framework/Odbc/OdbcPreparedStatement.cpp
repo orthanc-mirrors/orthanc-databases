@@ -29,7 +29,7 @@
 #include "OdbcResult.h"
 
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../Common/OrthancFrameworkException.h"
 
 #include <cassert>
 #include <sqlext.h>

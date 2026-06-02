@@ -26,7 +26,7 @@
 #include "MySQLDatabase.h"
 
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../Common/OrthancFrameworkException.h"
 
 namespace OrthancDatabases
 {

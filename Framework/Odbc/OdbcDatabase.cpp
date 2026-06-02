@@ -31,7 +31,7 @@
 #include "OdbcResult.h"
 
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../Common/OrthancFrameworkException.h"
 #include <Toolbox.h>
 
 #include <boost/algorithm/string/predicate.hpp>

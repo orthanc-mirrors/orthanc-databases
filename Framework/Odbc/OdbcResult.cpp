@@ -30,7 +30,7 @@
 
 #include <ChunkedBuffer.h>
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../Common/OrthancFrameworkException.h"
 #include <Toolbox.h>
 
 #include <boost/lexical_cast.hpp>
