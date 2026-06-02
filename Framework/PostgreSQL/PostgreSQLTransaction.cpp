@@ -27,7 +27,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 
 namespace OrthancDatabases
 {

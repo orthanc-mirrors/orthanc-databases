@@ -35,7 +35,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 #include <Toolbox.h>
 #include <Endianness.h>
 
@@ -580,7 +580,7 @@ namespace OrthancDatabases
           }
 
           default:
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
       }
     }

@@ -32,7 +32,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Framework/Common/OrthancFrameworkException.h"
 
 #include <boost/thread.hpp>
 #include <cassert>
@@ -349,7 +349,7 @@ namespace OrthancDatabases
       {
         if (success_)
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
         else
         {
@@ -425,13 +425,13 @@ namespace OrthancDatabases
       {
         if (success_)
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
         else
         {
           if (content.size() != target_->size)
           {
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
           }
           
           if (!content.empty())
@@ -543,7 +543,7 @@ namespace OrthancDatabases
       {
         if (success_)
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
         else if (data_ == NULL)
         {
@@ -730,7 +730,7 @@ namespace OrthancDatabases
     {
       if (success_)
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
       else
       {
@@ -751,7 +751,7 @@ namespace OrthancDatabases
 
     if (!visitor.IsSuccess())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
   }
     
@@ -768,7 +768,7 @@ namespace OrthancDatabases
 
     if (!visitor.IsSuccess())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -778,7 +778,7 @@ namespace OrthancDatabases
     std::unique_ptr<IAccessor> accessor(CreateAccessor());
     if (accessor.get() == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
     
 #if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 9, 2)

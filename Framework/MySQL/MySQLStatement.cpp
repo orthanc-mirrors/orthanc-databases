@@ -32,7 +32,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 #include <list>
 #include <memory>
@@ -46,7 +46,7 @@ namespace OrthancDatabases
     {
       if (length_ != buffer_.size())
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
             
       switch (mysqlType_)
@@ -104,7 +104,7 @@ namespace OrthancDatabases
           break;
               
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);              
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);              
       }
     }
         
@@ -177,7 +177,7 @@ namespace OrthancDatabases
 
             default:
               LOG(ERROR) << "Unsupported MySQL charset: " << field.charsetnr;
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);                
+              THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);                
           }
 
           if (field.max_length > 0)
@@ -189,7 +189,7 @@ namespace OrthancDatabases
           
         default:
           LOG(ERROR) << "MYSQL_TYPE not implemented: " << field.type;
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
     }
         
@@ -268,7 +268,7 @@ namespace OrthancDatabases
           }
           else
           {
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
           }
         }
 
@@ -283,7 +283,7 @@ namespace OrthancDatabases
       }
       else
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }          
     }
   };
@@ -375,7 +375,7 @@ namespace OrthancDatabases
     if (mysql_stmt_param_count(statement_) != formatter_.GetParametersCount())
     {
       Close();
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
 
     try
@@ -393,7 +393,7 @@ namespace OrthancDatabases
 
       if (result_.size() != result.GetFieldsCount())
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
     }
     catch (Orthanc::OrthancException&)
@@ -524,7 +524,7 @@ namespace OrthancDatabases
           }
 
           default:
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
       }
     }

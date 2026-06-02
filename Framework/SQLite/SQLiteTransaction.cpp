@@ -27,7 +27,7 @@
 #include "SQLiteStatement.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 namespace OrthancDatabases
 {
@@ -39,7 +39,7 @@ namespace OrthancDatabases
 
     if (!transaction_.IsOpen())
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
   }
 

@@ -27,7 +27,7 @@
 #include "NullValue.h"
 #include "Integer64Value.h"
 
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 #include <boost/lexical_cast.hpp>
 

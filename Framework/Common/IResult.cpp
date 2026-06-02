@@ -26,7 +26,7 @@
 #include "Utf8StringValue.h"
 
 #include <Compatibility.h>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 #include <cassert>
 #include <list>

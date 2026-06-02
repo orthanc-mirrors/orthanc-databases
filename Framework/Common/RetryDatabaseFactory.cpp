@@ -24,7 +24,7 @@
 #include "RetryDatabaseFactory.h"
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 #include <boost/thread.hpp>
 

@@ -21,36 +21,14 @@
  **/
 
 
-#include "DatabasesEnumerations.h"
+#pragma once
 
-#include "OrthancFrameworkException.h"
+#include <OrthancException.h>
 
-namespace OrthancDatabases
-{
-  const char* EnumerationToString(ValueType type)
-  {
-    switch (type)
-    {
-      case ValueType_BinaryString:
-        return "BinaryString";
-        
-      case ValueType_InputFile:
-        return "InputFile";
-        
-      case ValueType_Integer64:
-        return "Integer64";
-        
-      case ValueType_Null:
-        return "Null";
-        
-      case ValueType_ResultFile:
-        return "ResultFile";
-        
-      case ValueType_Utf8String:
-        return "Utf8String";
-
-      default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_ParameterOutOfRange);
-    }
-  }   
-}
+#if ORTHANC_ENABLE_LOGGING == 1
+	#define STRINGIFY_LINE_HELPER(line) #line
+	#define STRINGIFY_LINE(line) STRINGIFY_LINE_HELPER(line)
+	#define THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(errorCode) throw Orthanc::OrthancException(errorCode, #errorCode " triggered from " __ORTHANC_FILE__ ":" STRINGIFY_LINE(__LINE__))
+#else
+	#define THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN() throw Orthanc::OrthancException(errorCode)
+#endif

@@ -31,7 +31,7 @@
 #include "../Common/Utf8StringValue.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 #include <Logging.h>
 #include <Endianness.h>
 

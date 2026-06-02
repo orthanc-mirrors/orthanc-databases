@@ -27,7 +27,7 @@
 
 #include "IndexBackend.h"
 
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 
 #include <boost/thread/mutex.hpp>
 #include <list>

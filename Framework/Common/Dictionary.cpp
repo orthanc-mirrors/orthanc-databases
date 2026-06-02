@@ -31,7 +31,7 @@
 #include "Utf8StringValue.h"
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 #include <cassert>
 

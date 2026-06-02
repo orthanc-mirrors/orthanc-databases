@@ -31,7 +31,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 #include <Toolbox.h>
 
 #if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 12, 11)
@@ -109,7 +109,7 @@ namespace OrthancDatabases
     {
       if (statement.GetResultFieldsCount() != 1)
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
       
       statement.SetResultFieldType(0, ValueType_Integer64);
@@ -135,7 +135,7 @@ namespace OrthancDatabases
     {
       if (statement.GetResultFieldsCount() != 1)
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
       
       while (!statement.IsDone())
@@ -2001,7 +2001,7 @@ namespace OrthancDatabases
                                      OrthancPluginStorageArea* storageArea)
   {
     LOG(ERROR) << "Upgrading database is not implemented by this plugin";
-    throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+    THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
   }
 
     
@@ -2519,7 +2519,7 @@ namespace OrthancDatabases
             break;
 
           default:
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
       }
     }
@@ -2557,7 +2557,7 @@ namespace OrthancDatabases
             break;
 
           default:
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
       }
     }
@@ -2865,7 +2865,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
   {
     if (statement.GetResultFieldsCount() != 3)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
 
     statement.SetResultFieldType(0, ValueType_Integer64);
@@ -2888,7 +2888,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
         break;
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
       
     assert((statement.Next(), statement.IsDone()));
@@ -2920,7 +2920,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
     {
       if (statement.GetResultFieldsCount() != 2)
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
       
       statement.SetResultFieldType(0, ValueType_Integer64);
@@ -3499,7 +3499,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
                 "   INNER JOIN Lookup ON childLevel.parentId = Lookup.internalId";
         }; break;
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
       sql += ", _OneInstance AS (" + oneInstanceSqlCTE + ") ";
       sql += ", OneInstance AS (SELECT parentInternalId, instancePublicId, instanceInternalId FROM _OneInstance WHERE rowNum = 1) ";  // this is a generic way to implement DISTINCT ON
@@ -4595,7 +4595,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       {
         if (statement->GetResultFieldsCount() != 2)
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
         
         statement->SetResultFieldType(0, ValueType_Utf8String);
@@ -4934,7 +4934,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       {
         if (statement.GetResultFieldsCount() != 7)
         {
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
         }
         
         statement.SetResultFieldType(0, ValueType_Utf8String);

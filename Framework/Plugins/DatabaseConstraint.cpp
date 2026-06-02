@@ -30,7 +30,7 @@
 
 #include "DatabaseConstraint.h"
 
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 
 #include <boost/lexical_cast.hpp>
 #include <cassert>
@@ -278,7 +278,7 @@ namespace OrthancDatabases
         }
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
 
       s += "\n";

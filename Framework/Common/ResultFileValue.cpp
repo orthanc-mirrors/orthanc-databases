@@ -26,7 +26,7 @@
 #include "BinaryStringValue.h"
 #include "NullValue.h"
 
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 
 #include <boost/lexical_cast.hpp>
 

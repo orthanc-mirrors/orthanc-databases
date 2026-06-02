@@ -31,7 +31,7 @@
 #include "PostgreSQLTransaction.h"
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../Common/OrthancFrameworkException.h"
 #include <Toolbox.h>
 
 #include <boost/lexical_cast.hpp>

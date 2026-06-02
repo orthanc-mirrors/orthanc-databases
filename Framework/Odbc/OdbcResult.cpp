@@ -30,7 +30,7 @@
 
 #include <ChunkedBuffer.h>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 #include <Toolbox.h>
 
 #include <boost/lexical_cast.hpp>
@@ -386,7 +386,7 @@ namespace OrthancDatabases
     }
     else if (values_[field] == NULL)
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {

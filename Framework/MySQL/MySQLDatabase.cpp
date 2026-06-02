@@ -32,7 +32,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "OrthancFrameworkException.h"
 #include <Toolbox.h>
 
 #include <errmsg.h>
@@ -156,7 +156,7 @@ namespace OrthancDatabases
     if (mysql_ == NULL)
     {
       LOG(ERROR) << "Cannot initialize the MySQL connector";
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
     }
 
     if (parameters_.GetUnixSocket().empty())
@@ -572,7 +572,7 @@ namespace OrthancDatabases
 
       virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
       {
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
       }
 
       virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
