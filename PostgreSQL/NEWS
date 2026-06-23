@@ -1,3 +1,12 @@
+Release 10.2 (2026-06-23)
+=========================
+
+Changes:
+* Internal changes only:
+  - Enable linking with libpq18 (Ubuntu 26.04).
+  - Show more details when an internal error occurs.
+
+
 Release 10.1 (2026-04-14)
 =========================
 
