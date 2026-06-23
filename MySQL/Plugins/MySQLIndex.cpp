@@ -32,7 +32,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include "../../Framework/Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <ctype.h>
 
@@ -150,7 +150,7 @@ namespace OrthancDatabases
         if (!t.GetDatabaseTransaction().DoesTableExist("PatientRecyclingOrder"))
         {
           LOG(ERROR) << "Corrupted MySQL database";
-          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);        
+          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
         }
 
         // This is the last item to be created

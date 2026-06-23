@@ -30,7 +30,7 @@
 #include "../Common/Utf8StringValue.h"
 #include "SQLiteResult.h"
 
-#include "OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 namespace OrthancDatabases
 {
@@ -49,7 +49,7 @@ namespace OrthancDatabases
   {
     if (statement_.get() == NULL)
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {
@@ -99,7 +99,7 @@ namespace OrthancDatabases
           break;
 
         default:
-          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
     }    
   }

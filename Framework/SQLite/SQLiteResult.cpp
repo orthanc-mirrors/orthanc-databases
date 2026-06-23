@@ -28,7 +28,7 @@
 #include "../Common/NullValue.h"
 #include "../Common/Utf8StringValue.h"
 
-#include "OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 namespace OrthancDatabases
 {
@@ -37,7 +37,7 @@ namespace OrthancDatabases
   {
     if (statement_.GetObject().ColumnCount() < 0)
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {
@@ -67,7 +67,7 @@ namespace OrthancDatabases
         
       case Orthanc::SQLite::COLUMN_TYPE_FLOAT:
       default:
-        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
   

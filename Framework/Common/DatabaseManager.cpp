@@ -29,7 +29,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/thread.hpp>
 
@@ -104,7 +104,7 @@ namespace OrthancDatabases
       
     if (statement.get() == NULL)
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {
@@ -195,13 +195,13 @@ namespace OrthancDatabases
 
       if (database_.get() == NULL)
       {
-        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
 
       dialect_ = database_->GetDialect();
       if (dialect_ == Dialect_Unknown)
       {
-        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
     }
 
@@ -213,7 +213,7 @@ namespace OrthancDatabases
   {
     if (database_.get() == NULL)
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {

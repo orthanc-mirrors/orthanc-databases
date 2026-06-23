@@ -34,7 +34,7 @@
 #include <Toolbox.h>
 #include <SystemToolbox.h>
 #include <Logging.h>
-#include "../../Framework/Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/algorithm/string/join.hpp>
 
@@ -129,7 +129,7 @@ namespace OrthancDatabases
         if (!t.GetDatabaseTransaction().DoesSchemaExist(parameters_.GetSchema()))
         {
           LOG(ERROR) << "The schema '" << parameters_.GetSchema() << "' does not exist.  If you are not using the 'public' schema, you must create the schema manually before starting Orthanc.";
-          THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);        
+          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
         }
 
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
@@ -142,7 +142,7 @@ namespace OrthancDatabases
           if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
           {
             LOG(ERROR) << "Corrupted PostgreSQL database or failed to create the database schema";
-            THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);        
+            PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
           }
         }
         else

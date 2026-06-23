@@ -44,7 +44,7 @@
 #include "../Plugins/PostgreSQLStorageArea.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
-#include "../../Framework/Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/lexical_cast.hpp>
 

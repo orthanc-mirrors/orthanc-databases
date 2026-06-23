@@ -30,7 +30,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <cassert>
 #include <memory>
@@ -148,7 +148,7 @@ namespace OrthancDatabases
     }
     else if (fields_[index] == NULL)
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {

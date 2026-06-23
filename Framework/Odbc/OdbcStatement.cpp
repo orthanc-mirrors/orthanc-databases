@@ -27,7 +27,7 @@
 #include "OdbcEnvironment.h"
 
 #include <Logging.h>
-#include "../Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <sqlext.h>
 

@@ -27,7 +27,7 @@
 #include "PostgreSQLLargeObject.h"
 
 #include <Logging.h>
-#include "../Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/lexical_cast.hpp>
 #include <libpq/libpq-fs.h>
@@ -164,7 +164,7 @@ namespace OrthancDatabases
     {
       if (target.size() != size_)
       {
-        THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
       
       PGconn* pg = reinterpret_cast<PGconn*>(database_.pg_);

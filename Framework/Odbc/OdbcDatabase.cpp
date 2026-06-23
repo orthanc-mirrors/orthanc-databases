@@ -31,7 +31,7 @@
 #include "OdbcResult.h"
 
 #include <Logging.h>
-#include "../Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 #include <Toolbox.h>
 
 #include <boost/algorithm/string/predicate.hpp>
@@ -86,7 +86,7 @@ namespace OrthancDatabases
 
     virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
 
     virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
@@ -200,7 +200,7 @@ namespace OrthancDatabases
 
     virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
 
     virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
@@ -619,7 +619,7 @@ namespace OrthancDatabases
               break;
 
             default:
-              THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+              PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
         }
 

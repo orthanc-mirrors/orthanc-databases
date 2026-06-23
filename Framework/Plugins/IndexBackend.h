@@ -25,7 +25,7 @@
 
 #include "IDatabaseBackend.h"
 
-#include "../Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/thread/shared_mutex.hpp>
 
@@ -390,7 +390,7 @@ namespace OrthancDatabases
                                 const char* hashSeries,
                                 const char* hashInstance) ORTHANC_OVERRIDE
     {
-      THROW_WITH_FILE_AND_LINE_INFO_FROM_PLUGIN(Orthanc::ErrorCode_NotImplemented);
+      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
 #endif
 

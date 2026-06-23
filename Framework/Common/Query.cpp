@@ -24,7 +24,7 @@
 #include "Query.h"
 
 #include <Logging.h>
-#include "OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/regex.hpp>
 

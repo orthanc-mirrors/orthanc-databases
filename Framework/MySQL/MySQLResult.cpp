@@ -24,7 +24,7 @@
 #include "MySQLResult.h"
 
 #include <Logging.h>
-#include "../Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <errmsg.h>
 #include <mysqld_error.h>

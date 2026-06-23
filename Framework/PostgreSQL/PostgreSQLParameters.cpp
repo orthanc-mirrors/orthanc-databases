@@ -24,7 +24,7 @@
 #include "PostgreSQLParameters.h"
 
 #include <Logging.h>
-#include "../Common/OrthancFrameworkException.h"
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 #include <Toolbox.h>
 
 #include <boost/lexical_cast.hpp>
