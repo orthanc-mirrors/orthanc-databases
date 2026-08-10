@@ -59,7 +59,8 @@ namespace OrthancDatabases
     IndexBackend(context, readOnly, parameters.GetAllowInconsistentChildCounts()),
     parameters_(parameters),
     clearAll_(false),
-    hkHasComputedAllMissingChildCount_(false)
+    hkHasComputedAllMissingChildCount_(false),
+    orthancHasStarted_(false)
   {
   }
 
@@ -961,6 +962,12 @@ namespace OrthancDatabases
 
   void PostgreSQLIndex::PerformDbHousekeeping(DatabaseManager& manager)
   {
+    if (!orthancHasStarted_)
+    {
+      LOG(INFO) << "Waiting for Orthanc to finalize its initialization";
+      return;
+    }
+
     // Compute the missing child count (table introduced in rev3)
     if (!hkHasComputedAllMissingChildCount_)
     {

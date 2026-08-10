@@ -36,6 +36,7 @@ namespace OrthancDatabases
     PostgreSQLParameters   parameters_;
     bool                   clearAll_;
     bool                   hkHasComputedAllMissingChildCount_;
+    bool                   orthancHasStarted_;
 
   protected:
     virtual void ClearDeletedFiles(DatabaseManager& manager) ORTHANC_OVERRIDE;
@@ -193,6 +194,11 @@ namespace OrthancDatabases
     virtual bool HasPerformDbHousekeeping() ORTHANC_OVERRIDE;
 
     virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE;
+
+    virtual void SetOrthancStarted() ORTHANC_OVERRIDE
+    {
+      orthancHasStarted_ = true;
+    }
 
   };
 }

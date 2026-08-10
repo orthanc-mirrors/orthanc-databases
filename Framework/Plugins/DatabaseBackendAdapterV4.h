@@ -55,6 +55,8 @@ namespace OrthancDatabases
                          unsigned int housekeepingDelaySeconds);
 
     static void Finalize();
+
+    static void SetOrthancStarted();
   };
 }
 

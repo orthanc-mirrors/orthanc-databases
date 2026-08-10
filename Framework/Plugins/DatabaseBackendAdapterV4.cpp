@@ -1795,6 +1795,23 @@ namespace OrthancDatabases
     OrthancPlugins::AnswerJson(jsonLogs, output);
   }
 
+
+  OrthancPluginErrorCode OnChangeCallback(OrthancPluginChangeType changeType,
+                                          OrthancPluginResourceType resourceType,
+                                          const char* resourceId)
+  {
+    switch (changeType)
+    {
+      case OrthancPluginChangeType_OrthancStarted:
+        DatabaseBackendAdapterV4::SetOrthancStarted();
+        break;
+      default:
+        break;
+    }
+
+    return OrthancPluginErrorCode_Success;
+  }
+
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
                                           bool useDynamicConnectionPool,
@@ -1832,6 +1849,8 @@ namespace OrthancDatabases
     OrthancPluginRegisterAuditLogHandler(context, AuditLogHandler);
     OrthancPlugins::RegisterRestCallback<GetAuditLogs>("/plugins/postgresql/audit-logs", true);
 #endif
+
+    OrthancPluginRegisterOnChangeCallback(context, OnChangeCallback);
   }
 
 
@@ -1841,6 +1860,18 @@ namespace OrthancDatabases
     {
       LOG(ERROR) << "The Orthanc core has not destructed the index backend, internal error";
     }
+  }
+
+  void DatabaseBackendAdapterV4::SetOrthancStarted()
+  {
+    if (!isBackendInUse_)
+    {
+      LOG(ERROR) << "The Orthanc core has not created the index backend, internal error";
+      return;
+    }
+    
+    BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+    accessor.GetBackend().SetOrthancStarted();
   }
 }
 

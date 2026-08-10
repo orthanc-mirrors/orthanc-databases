@@ -558,6 +558,10 @@ namespace OrthancDatabases
       throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "PerformDbHousekeeping should be overloaded");
     }
 
+    virtual void SetOrthancStarted()
+    {
+    }
+
     /**
      * "maxDatabaseRetries" is to handle
      * "OrthancPluginErrorCode_DatabaseCannotSerialize" if there is a

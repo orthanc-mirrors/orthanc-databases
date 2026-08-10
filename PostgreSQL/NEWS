@@ -1,3 +1,10 @@
+Pending changes in the mainline
+===============================
+
+Changes:
+* Wait until Orthanc has finalized its startup before executing the DB HOUSEKEEPING task to avoid 
+  "Plugin trying to call the database during its initialization" errors.
+
 Release 10.2 (2026-06-23)
 =========================
 

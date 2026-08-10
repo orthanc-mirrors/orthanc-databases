@@ -30,7 +30,10 @@ namespace OrthancDatabases
 {
   void BaseIndexConnectionsPool::HousekeepingThread(BaseIndexConnectionsPool* that)
   {
-#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 2)
+#if ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 13, 0)
+    // Orthanc::Logging::ScopedCurrentThreadNameSetter setter("DB HOUSEKEEPING");
+    OrthancPluginSetCurrentThreadName(OrthancPlugins::GetGlobalContext(), "DB HOUSEKEEPING");    
+#elif ORTHANC_PLUGINS_VERSION_IS_ABOVE(1, 12, 2)
     OrthancPluginSetCurrentThreadName(OrthancPlugins::GetGlobalContext(), "DB HOUSEKEEPING");    
 #endif
 
@@ -44,7 +47,7 @@ namespace OrthancDatabases
         {
           {
             Accessor accessor(*that);
-            accessor.GetBackend().PerformDbHousekeeping(accessor.GetManager());
+            accessor.GetBackend().PerformDbHousekeeping(accessor.GetManager());  //
           }
 
           that->PerformPoolHousekeeping();
@@ -63,6 +66,8 @@ namespace OrthancDatabases
 
       boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
     }
+
+    LOG(INFO) << "database housekeeping has stopped";
   }
 
 
