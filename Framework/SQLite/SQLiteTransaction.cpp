@@ -27,7 +27,9 @@
 #include "SQLiteStatement.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
+
 #include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
+
 
 namespace OrthancDatabases
 {
@@ -53,5 +55,11 @@ namespace OrthancDatabases
                                                const Dictionary& parameters)
   {
     dynamic_cast<SQLiteStatement&>(statement).ExecuteWithoutResult(*this, parameters);
+  }
+
+
+  bool SQLiteTransaction::DoesSchemaExist(const std::string& name)
+  {
+    PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
   }
 }
