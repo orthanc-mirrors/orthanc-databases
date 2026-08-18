@@ -130,7 +130,7 @@ namespace OrthancDatabases
         if (!t.GetDatabaseTransaction().DoesSchemaExist(parameters_.GetSchema()))
         {
           LOG(ERROR) << "The schema '" << parameters_.GetSchema() << "' does not exist.  If you are not using the 'public' schema, you must create the schema manually before starting Orthanc.";
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
 
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
@@ -143,7 +143,7 @@ namespace OrthancDatabases
           if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
           {
             LOG(ERROR) << "Corrupted PostgreSQL database or failed to create the database schema";
-            PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
         }
         else

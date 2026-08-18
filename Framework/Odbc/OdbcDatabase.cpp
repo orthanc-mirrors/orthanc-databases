@@ -86,7 +86,7 @@ namespace OrthancDatabases
 
     virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
 
     virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
@@ -200,7 +200,7 @@ namespace OrthancDatabases
 
     virtual bool DoesSchemaExist(const std::string& name) ORTHANC_OVERRIDE
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
 
     virtual bool DoesIndexExist(const std::string& name) ORTHANC_OVERRIDE
@@ -619,7 +619,7 @@ namespace OrthancDatabases
               break;
 
             default:
-              PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+              ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
         }
 

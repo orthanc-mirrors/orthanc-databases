@@ -131,7 +131,7 @@ namespace OrthancDatabases
       if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
       {
         LOG(ERROR) << "Corrupted SQLite database";
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
 
       int version = 0;
@@ -270,7 +270,7 @@ namespace OrthancDatabases
           
         default:
           //LOG(ERROR) << value.Format();
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
     }
   }
@@ -289,14 +289,14 @@ namespace OrthancDatabases
                                 DatabaseManager& manager,
                                 const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
-    PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+    ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
   }
 
   void SQLiteIndex::ExecuteCount(Orthanc::DatabasePluginMessages::TransactionResponse& response,
                                  DatabaseManager& manager,
                                  const Orthanc::DatabasePluginMessages::Find_Request& request)
   {
-    PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+    ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
   }
 #endif
 

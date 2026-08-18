@@ -41,7 +41,7 @@ namespace OrthancDatabases
 
     if (!transaction_.IsOpen())
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -60,6 +60,6 @@ namespace OrthancDatabases
 
   bool SQLiteTransaction::DoesSchemaExist(const std::string& name)
   {
-    PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+    ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
   }
 }

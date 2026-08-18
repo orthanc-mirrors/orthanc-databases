@@ -249,7 +249,7 @@ static void ListKeys(std::set<std::string>& keys,
       if (!db.GetKeyValue(value, manager, storeId, item.key()) ||
           value != item.value())
       {
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
     }
   }
@@ -282,7 +282,7 @@ static void ListKeys(std::set<std::string>& keys,
 
     if (keys.size() != keys2.size())
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {
@@ -290,7 +290,7 @@ static void ListKeys(std::set<std::string>& keys,
       {
         if (keys2.find(*it) == keys2.end())
         {
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
       }
     }
@@ -933,7 +933,7 @@ TEST(IndexBackend, Basic)
           break;
 
         default:
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
     
       {

@@ -349,7 +349,7 @@ namespace OrthancDatabases
       {
         if (success_)
         {
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
         else
         {
@@ -425,13 +425,13 @@ namespace OrthancDatabases
       {
         if (success_)
         {
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
         else
         {
           if (content.size() != target_->size)
           {
-            PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
           
           if (!content.empty())
@@ -543,7 +543,7 @@ namespace OrthancDatabases
       {
         if (success_)
         {
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
         else if (data_ == NULL)
         {
@@ -730,7 +730,7 @@ namespace OrthancDatabases
     {
       if (success_)
       {
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
       else
       {
@@ -751,7 +751,7 @@ namespace OrthancDatabases
 
     if (!visitor.IsSuccess())
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
     
@@ -768,7 +768,7 @@ namespace OrthancDatabases
 
     if (!visitor.IsSuccess())
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -778,7 +778,7 @@ namespace OrthancDatabases
     std::unique_ptr<IAccessor> accessor(CreateAccessor());
     if (accessor.get() == NULL)
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     
 #if ORTHANC_FRAMEWORK_VERSION_IS_ABOVE(1, 9, 2)

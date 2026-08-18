@@ -60,7 +60,7 @@ namespace OrthancDatabases
         return "instances";
 
       default:
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -83,7 +83,7 @@ namespace OrthancDatabases
         return std::string(prefix) + "instances";
 
       default:
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }      
 #endif
@@ -124,7 +124,7 @@ namespace OrthancDatabases
             break;
 
           default:
-            PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
 
         std::string parameter = formatter.GenerateParameter(values[0]);
@@ -496,7 +496,7 @@ namespace OrthancDatabases
             break;
 
           default:
-            PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
 
         std::string parameter = formatter.GenerateParameter(constraint.GetSingleValue());
@@ -764,7 +764,7 @@ namespace OrthancDatabases
     }
     else
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -781,7 +781,7 @@ namespace OrthancDatabases
       case Orthanc::ResourceType_Instance:
         return request.orthanc_id_instance();
       default:
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
   
@@ -828,7 +828,7 @@ namespace OrthancDatabases
             FormatJoinForOrdering(orderingJoin, ordering.metadata(), i, queryLevel);
             break;
           default:
-            PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
 
         orderingJoins += orderingJoin;

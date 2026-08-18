@@ -83,7 +83,7 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
 
       default:
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);          
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -117,7 +117,7 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
 
       default:
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);          
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 

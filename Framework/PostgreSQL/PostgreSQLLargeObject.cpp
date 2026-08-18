@@ -164,7 +164,7 @@ namespace OrthancDatabases
     {
       if (target.size() != size_)
       {
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
       
       PGconn* pg = reinterpret_cast<PGconn*>(database_.pg_);

@@ -150,7 +150,7 @@ namespace OrthancDatabases
         if (!t.GetDatabaseTransaction().DoesTableExist("PatientRecyclingOrder"))
         {
           LOG(ERROR) << "Corrupted MySQL database";
-          PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);        
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
 
         // This is the last item to be created

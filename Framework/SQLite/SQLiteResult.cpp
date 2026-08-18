@@ -37,7 +37,7 @@ namespace OrthancDatabases
   {
     if (statement_.GetObject().ColumnCount() < 0)
     {
-      PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
     else
     {
@@ -67,7 +67,7 @@ namespace OrthancDatabases
         
       case Orthanc::SQLite::COLUMN_TYPE_FLOAT:
       default:
-        PLUGIN_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
   
