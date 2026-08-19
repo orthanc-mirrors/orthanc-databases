@@ -25,19 +25,19 @@ project(OrthancPostgreSQL)
 set(ORTHANC_PLUGIN_VERSION "mainline")
 
 # This is the preferred version of the Orthanc SDK for this plugin
-set(ORTHANC_SDK_DEFAULT_VERSION "1.12.10")
+set(ORTHANC_SDK_DEFAULT_VERSION "1.13.0")
 
 # This is the list of the versions of the Orthanc SDK against which
 # this plugin will compile
-set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4" "1.12.5" "1.12.8" "1.12.9" "1.12.10")
+set(ORTHANC_SDK_COMPATIBLE_VERSIONS "1.12.3" "1.12.4" "1.12.5" "1.12.8" "1.12.9" "1.12.10" "1.13.0")
 
 # This is the minimal version of the Orthanc runtime that will provide
 # best performance. If the version of the Orthanc runtime is below
 # this minimal version, a warning message will be printed (but the
 # plugin will still start).
 set(ORTHANC_OPTIMAL_VERSION_MAJOR    1)
-set(ORTHANC_OPTIMAL_VERSION_MINOR    12)
-set(ORTHANC_OPTIMAL_VERSION_REVISION 10)
+set(ORTHANC_OPTIMAL_VERSION_MINOR    13)
+set(ORTHANC_OPTIMAL_VERSION_REVISION 0)
 
 if (ORTHANC_PLUGIN_VERSION STREQUAL "mainline")
   set(ORTHANC_FRAMEWORK_VERSION "mainline")

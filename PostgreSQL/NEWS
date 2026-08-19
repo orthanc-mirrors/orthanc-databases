@@ -1,9 +1,18 @@
 Pending changes in the mainline
 ===============================
 
+Minimum plugin SDK (for build): 1.12.5
+Optimal plugin SDK (for build): 1.13.0
+Minimum Orthanc runtime: 1.12.5
+Optimal Orthanc runtime: 1.13.0
+
+Minimal Postgresql Server version: 9
+Optimal Postgresql Server version: 11+
+
 Changes:
 * Wait until Orthanc has finalized its startup before executing the DB HOUSEKEEPING task to avoid 
   "Plugin trying to call the database during its initialization" errors.
+
 
 Release 10.2 (2026-06-23)
 =========================
