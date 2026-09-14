@@ -884,11 +884,13 @@ namespace OrthancDatabases
     sql = ("SELECT " +
            strQueryLevel + ".publicId, " +
            strQueryLevel + ".internalId, " +
+           strQueryLevel + ".resourceType, " +
            orderingSql +
            " FROM Resources AS " + strQueryLevel);
 
 
-    std::string joins, comparisons;
+    std::string joins; //, comparisons;
+    std::vector<std::string> comparisons;
 
     const bool isOrthancIdentifiersDefined = (!request.orthanc_id_patient().empty() ||
                                               !request.orthanc_id_study().empty() ||
@@ -902,11 +904,11 @@ namespace OrthancDatabases
 
       if (topParentLevel == queryLevel)
       {
-        comparisons += " AND " + FormatLevel(topParentLevel) + ".publicId = " + formatter.GenerateParameter(GetOrthancIdentifier(request, topParentLevel));
+        comparisons.push_back(FormatLevel(topParentLevel) + ".publicId = " + formatter.GenerateParameter(GetOrthancIdentifier(request, topParentLevel)));
       }
       else
       {
-        comparisons += " AND " + FormatLevel("parent", topParentLevel) + ".publicId = " + formatter.GenerateParameter(GetOrthancIdentifier(request, topParentLevel));
+        comparisons.push_back(FormatLevel("parent", topParentLevel) + ".publicId = " + formatter.GenerateParameter(GetOrthancIdentifier(request, topParentLevel)));
 
         for (int level = queryLevel; level > topParentLevel; level--)
         {
@@ -954,7 +956,7 @@ namespace OrthancDatabases
 
         if (!comparison.empty())
         {
-          comparisons += " AND " + comparison;
+          comparisons.push_back(comparison);
         }
 
         count ++;
@@ -973,7 +975,7 @@ namespace OrthancDatabases
 
         if (!comparison.empty())
         {
-          comparisons += " AND " + comparison;
+          comparisons.push_back(comparison);
         }
         
         count ++;
@@ -999,9 +1001,28 @@ namespace OrthancDatabases
     // }
 
     std::list<std::string> where;
-    where.push_back(strQueryLevel + ".resourceType = " +
-                    formatter.FormatResourceType(queryLevel) + comparisons);
+    std::string comparisonsStr;
+    if (comparisons.size() > 0)
+    {
+      Orthanc::Toolbox::JoinStrings(comparisonsStr, comparisons, " AND ");
+    }
 
+    if (isOrthancIdentifiersDefined)
+    {
+      // if there is a filter on the publicId, there is no need to filter on the resourceType.  Filtering for resourceType=X AND publicId=Y 
+      // would return the same result as publicId=Y since publicIds are unique.
+      assert(comparisons.size() > 0); // at least "publicId=Y"
+      where.push_back(comparisonsStr);
+    }
+    else
+    {
+      if (comparisonsStr.size() > 0)
+      {
+        comparisonsStr = " AND " + comparisonsStr;
+      }
+      where.push_back(strQueryLevel + ".resourceType = " +
+                      formatter.FormatResourceType(queryLevel) + comparisonsStr);
+    }
 
     if (!request.labels().empty())
     {
