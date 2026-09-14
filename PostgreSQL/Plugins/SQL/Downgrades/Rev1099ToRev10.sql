@@ -106,6 +106,8 @@ BEGIN
     END IF;
 END;
 
+DROP INDEX IF EXISTS AttachedFilesUuid;
+
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 -- modify only the ones that have changed
 DELETE FROM GlobalProperties WHERE property IN (4);

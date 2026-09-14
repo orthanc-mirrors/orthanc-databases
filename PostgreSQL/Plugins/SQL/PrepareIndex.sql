@@ -854,7 +854,11 @@ CREATE INDEX IF NOT EXISTS AuditLogsSourcePlugin ON AuditLogs (sourcePlugin);
 
 CREATE INDEX IF NOT EXISTS InvalidChildCountsId ON InvalidChildCounts (id); -- see https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6
 
+-- new in rev 1099
 
+CREATE INDEX IF NOT EXISTS AttachedFilesUuid ON AttachedFiles (uuid);
+
+----------------------------------
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
