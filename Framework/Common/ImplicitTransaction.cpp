@@ -25,7 +25,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <memory>
 
@@ -83,7 +83,7 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);          
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 
@@ -117,7 +117,7 @@ namespace OrthancDatabases
         throw Orthanc::OrthancException(Orthanc::ErrorCode_BadSequenceOfCalls);
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);          
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
   }
 

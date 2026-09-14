@@ -25,7 +25,7 @@
 
 #include "Utf8StringValue.h"
 
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 namespace OrthancDatabases
 {

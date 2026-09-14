@@ -153,9 +153,12 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_MYSQL_CLIENT)
   endif()
 
 else()
+  # The MariaDB and the MySQL client libraries provide the same C interface
   find_path(MYSQLCLIENT_INCLUDE_DIR mysql.h
-    /usr/local/include/mysql
+    /usr/include/mariadb
     /usr/include/mysql
+    /usr/local/include/mariadb
+    /usr/local/include/mysql
     )
 
   if (MYSQLCLIENT_INCLUDE_DIR)
@@ -165,23 +168,46 @@ else()
 
   check_include_file(mysql.h HAVE_MYSQL_CLIENT_H)
   if (NOT HAVE_MYSQL_CLIENT_H)
-    message(FATAL_ERROR "Please install the libmysqlclient-dev package")
+    message(FATAL_ERROR "Please install the libmariadb-dev or libmysqlclient-dev package")
   endif()
 
-  find_library(MYSQL_CLIENT_LIB NAMES mysqlclient PATHS
-    /usr/lib/mysql
-    /usr/local/lib/mysql
+
+  # Select MariaDB client library by default, if available
+  find_library(MARIADB_CLIENT_LIB NAMES mariadbclient PATHS
+    /usr/lib/
+    /usr/local/lib/
     )
-  
-  if (MYSQL_CLIENT_LIB)
-    check_library_exists(${MYSQL_CLIENT_LIB} mysql_init "" HAVE_MYSQL_CLIENT_LIB)
-    if (NOT HAVE_MYSQL_CLIENT_LIB)
-      message(FATAL_ERROR "Unable to use mysql_init from mysqlclient library")
-    endif()    
-    get_filename_component(MYSQL_CLIENT_LIB_PATH ${MYSQL_CLIENT_LIB} DIRECTORY)
-    link_directories(${MYSQL_CLIENT_LIB_PATH})
-    link_libraries(mysqlclient)
+
+  if (MARIADB_CLIENT_LIB)
+    check_library_exists(${MARIADB_CLIENT_LIB} mysql_init "" HAVE_MARIADB_CLIENT_LIB)
+    if (NOT HAVE_MARIADB_CLIENT_LIB)
+      message(FATAL_ERROR "Unable to use mysql_init from mariadbclient library")
+    endif()
+    get_filename_component(MARIADB_CLIENT_LIB_PATH ${MARIADB_CLIENT_LIB} DIRECTORY)
+    link_directories(${MARIADB_CLIENT_LIB_PATH})
+    link_libraries(mariadbclient)
+
   else()
-     message(FATAL_ERROR "Unable to find the mysqlclient library")
-   endif()
+
+    # No MariaDB client library, fallback to the MySQL client library
+    find_library(MYSQL_CLIENT_LIB NAMES mysqlclient PATHS
+      /usr/lib/mysql
+      /usr/local/lib/mysql
+      )
+
+    if (MYSQL_CLIENT_LIB)
+      check_library_exists(${MYSQL_CLIENT_LIB} mysql_init "" HAVE_MYSQL_CLIENT_LIB)
+      if (NOT HAVE_MYSQL_CLIENT_LIB)
+        message(FATAL_ERROR "Unable to use mysql_init from mysqlclient library")
+      endif()
+      get_filename_component(MYSQL_CLIENT_LIB_PATH ${MYSQL_CLIENT_LIB} DIRECTORY)
+      link_directories(${MYSQL_CLIENT_LIB_PATH})
+      link_libraries(mysqlclient)
+    else()
+
+      # Neither the MariaDB, not the MySQL client library is available
+      message(FATAL_ERROR "Unable to find the mariadbclient or mysqlclient library")
+
+    endif()
+  endif()
 endif()

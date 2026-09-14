@@ -25,7 +25,7 @@
 
 #include "NullValue.h"
 
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/lexical_cast.hpp>
 

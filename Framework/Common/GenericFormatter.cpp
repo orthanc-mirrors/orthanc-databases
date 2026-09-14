@@ -23,7 +23,7 @@
 
 #include "GenericFormatter.h"
 
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/lexical_cast.hpp>
 
@@ -76,7 +76,7 @@ namespace OrthancDatabases
           break;
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
     }
     else
@@ -94,7 +94,7 @@ namespace OrthancDatabases
           break;
 
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
       }
 
       parametersName_.push_back(source);

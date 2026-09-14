@@ -80,7 +80,7 @@ namespace OrthancDatabases
               break;
               
             default:
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "Unsupported dialect");
           }
 
           {

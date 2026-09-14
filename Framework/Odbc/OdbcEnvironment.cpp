@@ -24,7 +24,7 @@
 #include "OdbcEnvironment.h"
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/lexical_cast.hpp>
 #include <sqlext.h>

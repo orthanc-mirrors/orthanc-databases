@@ -29,7 +29,7 @@
 #include "OdbcResult.h"
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <cassert>
 #include <sqlext.h>
@@ -74,7 +74,7 @@ namespace OrthancDatabases
           break;
             
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
     }
 
@@ -151,7 +151,7 @@ namespace OrthancDatabases
               break;
 
             default:
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+              ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
 
           SQLLEN null = SQL_NULL_DATA;
@@ -229,7 +229,7 @@ namespace OrthancDatabases
             }
 
             default:
-              throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+              ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
         }
       }

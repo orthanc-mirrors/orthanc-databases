@@ -25,7 +25,7 @@
 
 #include "IDatabaseBackend.h"
 
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/thread/shared_mutex.hpp>
 
@@ -390,7 +390,7 @@ namespace OrthancDatabases
                                 const char* hashSeries,
                                 const char* hashInstance) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+      ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
     }
 #endif
 
@@ -555,7 +555,11 @@ namespace OrthancDatabases
 
     virtual void PerformDbHousekeeping(DatabaseManager& manager) ORTHANC_OVERRIDE
     {
-      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+      throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, "PerformDbHousekeeping should be overloaded");
+    }
+
+    virtual void SetOrthancStarted()
+    {
     }
 
     /**

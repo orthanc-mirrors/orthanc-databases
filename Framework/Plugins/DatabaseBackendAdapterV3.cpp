@@ -29,7 +29,7 @@
 #include "IndexConnectionsPool.h"
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <stdexcept>
 #include <list>
@@ -178,7 +178,7 @@ namespace OrthancDatabases
           break;
         
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
       }
       
       answerType_ = _OrthancPluginDatabaseAnswerType_None;

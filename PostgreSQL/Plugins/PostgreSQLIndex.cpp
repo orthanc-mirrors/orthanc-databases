@@ -34,7 +34,7 @@
 #include <Toolbox.h>
 #include <SystemToolbox.h>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <boost/algorithm/string/join.hpp>
 
@@ -59,7 +59,8 @@ namespace OrthancDatabases
     IndexBackend(context, readOnly, parameters.GetAllowInconsistentChildCounts()),
     parameters_(parameters),
     clearAll_(false),
-    hkHasComputedAllMissingChildCount_(false)
+    hkHasComputedAllMissingChildCount_(false),
+    orthancHasStarted_(false)
   {
   }
 
@@ -129,7 +130,7 @@ namespace OrthancDatabases
         if (!t.GetDatabaseTransaction().DoesSchemaExist(parameters_.GetSchema()))
         {
           LOG(ERROR) << "The schema '" << parameters_.GetSchema() << "' does not exist.  If you are not using the 'public' schema, you must create the schema manually before starting Orthanc.";
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
+          ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
 
         if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
@@ -142,7 +143,7 @@ namespace OrthancDatabases
           if (!t.GetDatabaseTransaction().DoesTableExist("Resources"))
           {
             LOG(ERROR) << "Corrupted PostgreSQL database or failed to create the database schema";
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);        
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
           }
         }
         else
@@ -961,6 +962,12 @@ namespace OrthancDatabases
 
   void PostgreSQLIndex::PerformDbHousekeeping(DatabaseManager& manager)
   {
+    if (!orthancHasStarted_)
+    {
+      LOG(INFO) << "Waiting for Orthanc to finalize its initialization";
+      return;
+    }
+
     // Compute the missing child count (table introduced in rev3)
     if (!hkHasComputedAllMissingChildCount_)
     {
@@ -1006,7 +1013,7 @@ namespace OrthancDatabases
     catch (Orthanc::OrthancException&)
     {
       // the statement may fail in case of temporary deadlock -> it will be retried at the next HK
-      LOG(INFO) << "Updat of invalid ChildCount entries has failed (will be retried)";
+      LOG(INFO) << "Update of invalid ChildCount entries has failed (will be retried)";
     }
   }
 }

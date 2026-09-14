@@ -35,7 +35,7 @@
 
 #include <Compatibility.h>  // For std::unique_ptr<>
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 #include <Toolbox.h>
 #include <Endianness.h>
 
@@ -370,7 +370,7 @@ namespace OrthancDatabases
 
         case ValueType_Null:
         default:
-          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+          throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, std::string("Invalid parameter type ") + boost::lexical_cast<std::string>(formatter_.GetParameterType(i)) + " for parameter " + boost::lexical_cast<std::string>(i));
       }
     }
   }
@@ -580,7 +580,7 @@ namespace OrthancDatabases
           }
 
           default:
-            throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+            ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
         }
       }
     }

@@ -34,7 +34,7 @@
 #include <OrthancDatabasePlugin.pb.h>  // Include protobuf messages
 
 #include <Logging.h>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 
 #include <stdexcept>
 #include <list>
@@ -506,7 +506,7 @@ namespace OrthancDatabases
 
       case Orthanc::DatabasePluginMessages::OPERATION_FLUSH_TO_DISK:
         // Raise an exception since "set_supports_flush_to_disk(false)"
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+        ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
 
       case Orthanc::DatabasePluginMessages::OPERATION_START_TRANSACTION:
       {
@@ -1273,7 +1273,7 @@ namespace OrthancDatabases
             case OrthancPluginResourceType_Instance:
               if (parent.empty())
               {
-                throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+                ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
               }
               else
               {
@@ -1284,7 +1284,7 @@ namespace OrthancDatabases
             case OrthancPluginResourceType_Patient:
               if (!parent.empty())
               {
-                throw Orthanc::OrthancException(Orthanc::ErrorCode_InternalError);
+                ORTHANC_PLUGINS_THROW_WITH_FILE_AND_LINE_INFO(Orthanc::ErrorCode_NotImplemented);
               }
               break;
 
@@ -1795,6 +1795,23 @@ namespace OrthancDatabases
     OrthancPlugins::AnswerJson(jsonLogs, output);
   }
 
+
+  OrthancPluginErrorCode OnChangeCallback(OrthancPluginChangeType changeType,
+                                          OrthancPluginResourceType resourceType,
+                                          const char* resourceId)
+  {
+    switch (changeType)
+    {
+      case OrthancPluginChangeType_OrthancStarted:
+        DatabaseBackendAdapterV4::SetOrthancStarted();
+        break;
+      default:
+        break;
+    }
+
+    return OrthancPluginErrorCode_Success;
+  }
+
   void DatabaseBackendAdapterV4::Register(IndexBackend* backend,
                                           size_t countConnections,
                                           bool useDynamicConnectionPool,
@@ -1832,6 +1849,8 @@ namespace OrthancDatabases
     OrthancPluginRegisterAuditLogHandler(context, AuditLogHandler);
     OrthancPlugins::RegisterRestCallback<GetAuditLogs>("/plugins/postgresql/audit-logs", true);
 #endif
+
+    OrthancPluginRegisterOnChangeCallback(context, OnChangeCallback);
   }
 
 
@@ -1841,6 +1860,18 @@ namespace OrthancDatabases
     {
       LOG(ERROR) << "The Orthanc core has not destructed the index backend, internal error";
     }
+  }
+
+  void DatabaseBackendAdapterV4::SetOrthancStarted()
+  {
+    if (!isBackendInUse_)
+    {
+      LOG(ERROR) << "The Orthanc core has not created the index backend, internal error";
+      return;
+    }
+    
+    BaseIndexConnectionsPool::Accessor accessor(*connectionPool_);
+    accessor.GetBackend().SetOrthancStarted();
   }
 }
 

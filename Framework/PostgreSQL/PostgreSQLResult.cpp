@@ -31,7 +31,7 @@
 #include "../Common/Utf8StringValue.h"
 
 #include <Compatibility.h>  // For std::unique_ptr<>
-#include <OrthancException.h>
+#include "../../Resources/Orthanc/Plugins/OrthancPluginException.h"
 #include <Logging.h>
 #include <Endianness.h>
 
@@ -298,7 +298,7 @@ namespace OrthancDatabases
         return new Integer64Value(GetTimestamp(column));
 
       default:
-        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented);
+        throw Orthanc::OrthancException(Orthanc::ErrorCode_NotImplemented, std::string("Unknown value type: ") + boost::lexical_cast<std::string>(type));
     }
   }
 }
