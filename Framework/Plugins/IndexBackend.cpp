@@ -3565,7 +3565,7 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
           "  " + formatter.FormatNull("TEXT") + " AS c4_string2, "
           "  " + formatter.FormatNull("TEXT") + " AS c5_string3, "
           "  " + formatter.FormatNull("BYTEA") + " AS c6_string4, "
-          "  Lookup.resourceType AS c7_int1, "
+          "  " + formatter.FormatNull("INT") + " AS c7_int1, "
           "  " + formatter.FormatNull("INT") + " AS c8_int2, "
           "  " + formatter.FormatNull("INT") + " AS c9_int3, "
           "  " + formatter.FormatNull("BIGINT") + " AS c10_big_int1, "
@@ -4236,28 +4236,17 @@ bool IndexBackend::LookupResourceAndParent(int64_t& id,
       int32_t queryId = statement->ReadInteger32(C0_QUERY_ID);
       int64_t internalId = statement->ReadInteger64(C1_INTERNAL_ID);
       
-      // assert(queryId == QUERY_LOOKUP); // the QUERY_LOOKUP must be read first and must create the response before any other query tries to populate the fields
-
-      if (queryId != QUERY_LOOKUP && responses.find(internalId) == responses.end()) // this happens when e.g, accessing an instance level with a series id
-      {
-        statement->Next();
-        continue;
-      }
+      assert(queryId == QUERY_LOOKUP || responses.find(internalId) != responses.end()); // the QUERY_LOOKUP must be read first and must create the response before any other query tries to populate the fields
 
       // LOG(INFO) << queryId << "  " << statement->ReadString(C3_STRING_1);
 
       switch (queryId)
       {
         case QUERY_LOOKUP:
-        {
-          int64_t resourceType = statement->ReadInteger32(C7_INT_1);
-          if (resourceType == request.level()) // this happens when e.g, accessing an instance level with a series id
-          {
-            responses[internalId] = response.add_find();
-            responses[internalId]->set_public_id(statement->ReadString(C3_STRING_1));
-            responses[internalId]->set_internal_id(internalId);
-          }
-          }; break;
+          responses[internalId] = response.add_find();
+          responses[internalId]->set_public_id(statement->ReadString(C3_STRING_1));
+          responses[internalId]->set_internal_id(internalId);
+          break;
 
         case QUERY_LABELS:
           responses[internalId]->add_labels(statement->ReadString(C3_STRING_1));
