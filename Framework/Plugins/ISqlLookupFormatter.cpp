@@ -807,6 +807,11 @@ namespace OrthancDatabases
     assert(upperLevel <= queryLevel &&
            queryLevel <= lowerLevel);
 
+    const bool isOrthancIdentifiersDefined = (!request.orthanc_id_patient().empty() ||
+                                              !request.orthanc_id_study().empty() ||
+                                              !request.orthanc_id_series().empty() ||
+                                              !request.orthanc_id_instance().empty());
+
     std::string orderingSql;
     std::string orderingJoins;
 
@@ -878,7 +883,14 @@ namespace OrthancDatabases
     }
     else
     {
-      orderingSql = "ROW_NUMBER() OVER (ORDER BY " + strQueryLevel + ".publicId) AS rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
+      if (isOrthancIdentifiersDefined && DetectLevel(request) == queryLevel)
+      { // this is a single resource, no need for ordering (ordering may prevents a lot of optimizations from the query planner)
+        orderingSql = "0 AS rowNumber";
+      }
+      else
+      {
+        orderingSql = "ROW_NUMBER() OVER (ORDER BY " + strQueryLevel + ".publicId) AS rowNumber";  // we need a default ordering in order to make default queries repeatable when using since&limit
+      }
     }
 
     sql = ("SELECT " +
@@ -889,11 +901,6 @@ namespace OrthancDatabases
 
 
     std::string joins, comparisons;
-
-    const bool isOrthancIdentifiersDefined = (!request.orthanc_id_patient().empty() ||
-                                              !request.orthanc_id_study().empty() ||
-                                              !request.orthanc_id_series().empty() ||
-                                              !request.orthanc_id_instance().empty());
 
     // handle parent constraints
     if (isOrthancIdentifiersDefined && Orthanc::IsResourceLevelAboveOrEqual(DetectLevel(request), queryLevel))
