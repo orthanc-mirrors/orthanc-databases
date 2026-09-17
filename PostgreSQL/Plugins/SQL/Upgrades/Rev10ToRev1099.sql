@@ -2,3 +2,4 @@
 
 -- the DeleteResource function is updated in PrepareIndex.sql
 -- the AttachedFilesUuid index is created in PrepareIndex.sql
+SELECT 1;

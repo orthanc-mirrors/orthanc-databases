@@ -189,7 +189,7 @@ namespace OrthancDatabases
       PQclear(result);
 
       LOG(ERROR) << "PostgreSQL error: " << message;
-      ThrowException(false);
+      ThrowException(true);
     }
   }
 
