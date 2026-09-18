@@ -260,9 +260,11 @@ BEGIN
     -- delete the resource itself
     DELETE FROM Resources WHERE internalId=id RETURNING * INTO deleted_resource_row;
 
-    -- keep track of the deleted resources for C++ code
-    INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId);
-  
+    IF FOUND THEN
+        -- keep track of the deleted resources for C++ code
+        INSERT INTO DeletedResources VALUES (deleted_resource_row.resourceType, deleted_resource_row.publicId);
+    END IF;
+
     -- If this resource still has siblings, keep track of the remaining parent
     -- (a parent that must not be deleted but whose LastUpdate must be updated)
     SELECT resourceType, publicId INTO remaining_ancestor_resource_type, remaining_anncestor_public_id
@@ -852,12 +854,16 @@ CREATE INDEX IF NOT EXISTS AuditLogsSourcePlugin ON AuditLogs (sourcePlugin);
 
 CREATE INDEX IF NOT EXISTS InvalidChildCountsId ON InvalidChildCounts (id); -- see https://discourse.orthanc-server.org/t/increase-in-cpu-usage-of-database-after-update-to-orthanc-1-12-7/6057/6
 
+-- new in rev 11
 
+CREATE INDEX IF NOT EXISTS AttachedFilesUuid ON AttachedFiles (uuid);
+
+----------------------------------
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
 DELETE FROM GlobalProperties WHERE property IN (1, 4, 6, 10, 11, 12, 13, 14);
 INSERT INTO GlobalProperties VALUES (1, 6); -- GlobalProperty_DatabaseSchemaVersion
-INSERT INTO GlobalProperties VALUES (4, 10); -- GlobalProperty_DatabasePatchLevel
+INSERT INTO GlobalProperties VALUES (4, 11); -- GlobalProperty_DatabasePatchLevel
 INSERT INTO GlobalProperties VALUES (6, 1); -- GlobalProperty_GetTotalSizeIsFast
 INSERT INTO GlobalProperties VALUES (10, 1); -- GlobalProperty_HasTrigramIndex
 INSERT INTO GlobalProperties VALUES (11, 3); -- GlobalProperty_HasCreateInstance  -- this is actually the 3rd version of HasCreateInstance
