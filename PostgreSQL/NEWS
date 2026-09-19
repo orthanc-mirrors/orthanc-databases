@@ -1,5 +1,7 @@
-Pending changes in the mainline
-===============================
+Release 11.0 (2026-09-19)
+=========================
+
+DB schema revision: 11
 
 Changes:
 * Added an index on AttachedFiles uuids to speed-up the SDK calls 
