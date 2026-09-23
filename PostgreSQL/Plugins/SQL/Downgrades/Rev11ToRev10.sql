@@ -106,6 +106,8 @@ BEGIN
     END IF;
 END;
 
+$body$ LANGUAGE plpgsql;
+
 DROP INDEX IF EXISTS AttachedFilesUuid;
 
 -- set the global properties that actually documents the DB version, revision and some of the capabilities
