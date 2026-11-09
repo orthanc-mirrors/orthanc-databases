@@ -50,7 +50,7 @@ endif()
 include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginParameters.cmake)
 
 set(ENABLE_MYSQL_BACKEND ON)
-set(OPENSSL_STATIC_VERSION "3.0" CACHE STRING "Force the use of OpenSSL 3.0.x" FORCE)
+set(OPENSSL_STATIC_VERSION "default" CACHE STRING "Version of OpenSSL to be used in static builds (can be \"1.1.1\", \"3.1.4\", or \"default\")")
   
 include(${CMAKE_SOURCE_DIR}/../Resources/CMake/DatabasesPluginConfiguration.cmake)
 

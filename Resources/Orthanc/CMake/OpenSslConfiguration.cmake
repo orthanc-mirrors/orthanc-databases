@@ -24,8 +24,10 @@ if (STATIC_BUILD OR NOT USE_SYSTEM_OPENSSL)
   if (OPENSSL_STATIC_VERSION STREQUAL "1.1.1")
     # Still used by orthanc-gcp (Google Cloud Platform) as of its release 1.0
     include(${CMAKE_CURRENT_LIST_DIR}/OpenSslConfigurationStatic-1.1.1.cmake)
-  elseif (OPENSSL_STATIC_VERSION STREQUAL "3.0")
-    include(${CMAKE_CURRENT_LIST_DIR}/OpenSslConfigurationStatic-3.0.cmake)
+  elseif (OPENSSL_STATIC_VERSION STREQUAL "3.1.4")
+    include(${CMAKE_CURRENT_LIST_DIR}/OpenSslConfigurationStatic-3.1.4.cmake)
+  elseif (OPENSSL_STATIC_VERSION STREQUAL "default")
+    include(${CMAKE_CURRENT_LIST_DIR}/OpenSslConfigurationStatic.cmake)
   else()
     message(FATAL_ERROR "Unsupported version of OpenSSL: ${OPENSSL_STATIC_VERSION}")
   endif()
@@ -43,7 +45,7 @@ elseif (CMAKE_CROSSCOMPILING AND
   CHECK_LIBRARY_EXISTS(crypto "OPENSSL_init" "" HAVE_OPENSSL_CRYPTO_LIB)
   if (NOT HAVE_OPENSSL_CRYPTO_LIB)
     message(FATAL_ERROR "Please install the libopenssl package")
-  endif()  
+  endif()
 
   # The "SSL_library_init" is for OpenSSL <= 1.0.2, whereas
   # "OPENSSL_init_ssl" is for OpenSSL >= 1.1.0
@@ -52,9 +54,9 @@ elseif (CMAKE_CROSSCOMPILING AND
     CHECK_LIBRARY_EXISTS(ssl "OPENSSL_init_ssl" "" HAVE_OPENSSL_SSL_LIB_2)
     if (NOT HAVE_OPENSSL_SSL_LIB_2)
       message(FATAL_ERROR "Please install the libopenssl package")
-    endif()  
-  endif()  
-  
+    endif()
+  endif()
+
   link_libraries(crypto ssl)
 
 else()
